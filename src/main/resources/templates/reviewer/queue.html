@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Review Queue — Return Home Tracker</title>
+    <th:block th:replace="~{fragments/layout :: styles}"></th:block>
+</head>
+<body>
+<div th:replace="~{fragments/layout :: nav}"></div>
+<main>
+    <h1>Reports Awaiting Review</h1>
+
+    <table>
+        <thead>
+        <tr>
+            <th>Child</th>
+            <th>Home</th>
+            <th>Visitor</th>
+            <th>Raised</th>
+            <th></th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="r : ${requests}">
+            <td th:text="${r.child.fullName}">Child Name</td>
+            <td th:text="${r.home.name}">Home</td>
+            <td th:text="${r.allocatedVisitor} ? ${r.allocatedVisitor.fullName} : '—'">Visitor</td>
+            <td th:text="${#temporals.format(r.createdAt, 'dd MMM yyyy HH:mm')}">Created</td>
+            <td>
+                <a th:href="@{/interview-requests/{id}(id=${r.id})}">View details</a> ·
+                <a th:href="@{/reviewer/reports/{id}/review(id=${r.id})}">Review</a>
+            </td>
+        </tr>
+        <tr th:if="${#lists.isEmpty(requests)}">
+            <td colspan="5" class="muted">Nothing awaiting review.</td>
+        </tr>
+        </tbody>
+    </table>
+</main>
+</body>
+</html>

@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Raise a Request — Return Home Tracker</title>
+    <th:block th:replace="~{fragments/layout :: styles}"></th:block>
+</head>
+<body>
+<div th:replace="~{fragments/layout :: nav}"></div>
+<main>
+    <h1>Raise a Return Home Interview Request</h1>
+    <div class="card">
+        <form method="post" th:action="@{/requests}" th:object="${form}">
+
+            <h3>Young Person</h3>
+            <label for="childId">Child</label>
+            <select id="childId" th:field="*{childId}">
+                <option value="">Select a child…</option>
+                <option th:each="c : ${children}" th:value="${c.id}" th:text="${c.fullName}">Child</option>
+            </select>
+            <p class="muted"><a href="/children/new">+ Add a child</a> not in this list</p>
+
+            <label for="legalStatus">Legal status</label>
+            <input type="text" id="legalStatus" th:field="*{legalStatus}"/>
+
+            <label for="missingSince">Date of missing episode</label>
+            <input type="datetime-local" id="missingSince" th:field="*{missingSince}"/>
+
+            <label for="returnedAt">Date/time child returned</label>
+            <input type="datetime-local" id="returnedAt" th:field="*{returnedAt}"/>
+
+            <label for="knownRisks">Any known risks</label>
+            <textarea id="knownRisks" th:field="*{knownRisks}" placeholder="Any known risks to the young person, or that the interviewer needs to be aware of prior to their visit"></textarea>
+
+            <label for="childsComments">Comments made by the young person</label>
+            <textarea id="childsComments" th:field="*{childsComments}" placeholder="Conversation held with the young person since their return that is relevant to the missing episode"></textarea>
+
+            <label for="missingEpisodeDetails">Details relating to the missing episode</label>
+            <textarea id="missingEpisodeDetails" th:field="*{missingEpisodeDetails}" placeholder="Potential triggers, known locations, general overview"></textarea>
+
+            <label for="missingInLast6Months">Missing in the last 6 months?</label>
+            <select id="missingInLast6Months" th:field="*{missingInLast6Months}">
+                <option value="">Unknown</option>
+                <option value="true">Yes</option>
+                <option value="false">No</option>
+            </select>
+
+            <label for="missingFiveTimesIn30Days">Missing 5+ times in the last 30 days?</label>
+            <select id="missingFiveTimesIn30Days" th:field="*{missingFiveTimesIn30Days}">
+                <option value="">Unknown</option>
+                <option value="true">Yes</option>
+                <option value="false">No</option>
+            </select>
+
+            <label for="strategyMeetingRequested">Strategy meeting requested? (only relevant if the above is Yes)</label>
+            <select id="strategyMeetingRequested" th:field="*{strategyMeetingRequested}">
+                <option value="">Unknown / not applicable</option>
+                <option value="true">Yes</option>
+                <option value="false">No</option>
+            </select>
+
+            <label for="importantPeople">Important people to the young person</label>
+            <textarea id="importantPeople" th:field="*{importantPeople}"></textarea>
+
+            <label for="aboutYoungPerson">About the young person</label>
+            <textarea id="aboutYoungPerson" th:field="*{aboutYoungPerson}" placeholder="Likes/dislikes and any potential barriers to completing the RHI"></textarea>
+
+            <h3>Details of Professionals</h3>
+
+            <label for="socialWorkerDetails">Social worker details</label>
+            <textarea id="socialWorkerDetails" th:field="*{socialWorkerDetails}"></textarea>
+
+            <label for="consentProvided">Has consent for IRHI's been provided?</label>
+            <select id="consentProvided" th:field="*{consentProvided}">
+                <option value="">Unknown</option>
+                <option value="true">Yes</option>
+                <option value="false">No</option>
+            </select>
+
+            <label for="placingLocalAuthority">Local authority</label>
+            <input type="text" id="placingLocalAuthority" th:field="*{placingLocalAuthority}"/>
+
+            <label for="policeMfhCoordinatorDetails">Police MFH coordinator details</label>
+            <textarea id="policeMfhCoordinatorDetails" th:field="*{policeMfhCoordinatorDetails}"></textarea>
+
+            <label for="parentsDetails">Parents' details</label>
+            <textarea id="parentsDetails" th:field="*{parentsDetails}"></textarea>
+
+            <label for="otherProfessionals">Any other professionals</label>
+            <textarea id="otherProfessionals" th:field="*{otherProfessionals}"></textarea>
+
+            <h3>Your Details</h3>
+
+            <label for="submitterOrganisation">Organisation</label>
+            <input type="text" id="submitterOrganisation" th:field="*{submitterOrganisation}"/>
+
+            <label for="submitterNameAndRole">Name and role</label>
+            <input type="text" id="submitterNameAndRole" th:field="*{submitterNameAndRole}"/>
+
+            <label for="relationshipToYoungPerson">Relationship to young person</label>
+            <input type="text" id="relationshipToYoungPerson" th:field="*{relationshipToYoungPerson}"/>
+
+            <label for="submitterAddress">Address (include what3words if known)</label>
+            <input type="text" id="submitterAddress" th:field="*{submitterAddress}"/>
+
+            <label for="submitterContactDetails">Contact details</label>
+            <input type="text" id="submitterContactDetails" th:field="*{submitterContactDetails}"/>
+
+            <label for="bestTimesToVisit">Best times to visit the young person</label>
+            <input type="text" id="bestTimesToVisit" th:field="*{bestTimesToVisit}"/>
+
+            <label for="notes">Additional notes</label>
+            <textarea id="notes" th:field="*{notes}" placeholder="Anything else relevant that doesn't fit above"></textarea>
+
+            <button type="submit" class="btn">Submit request</button>
+            <a class="btn secondary" href="/requests">Cancel</a>
+        </form>
+    </div>
+</main>
+</body>
+</html>

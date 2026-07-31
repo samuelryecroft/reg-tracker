@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Confirm Visit Time — Return Home Tracker</title>
+    <th:block th:replace="~{fragments/layout :: styles}"></th:block>
+</head>
+<body>
+<div th:replace="~{fragments/layout :: nav}"></div>
+<main>
+    <h1 th:text="${'Confirm visit time: ' + request.child.fullName}">Confirm visit time</h1>
+    <p class="muted" th:text="${'Home: ' + request.home.name}">Home</p>
+
+    <div class="card">
+        <form method="post" th:action="@{/visitor/interviews/{id}/schedule(id=${request.id})}" th:object="${form}">
+            <label for="scheduledAt">Scheduled visit date/time</label>
+            <input type="datetime-local" id="scheduledAt" th:field="*{scheduledAt}"/>
+
+            <button type="submit" class="btn">Confirm</button>
+            <a class="btn secondary" href="/visitor/interviews">Cancel</a>
+        </form>
+    </div>
+</main>
+</body>
+</html>

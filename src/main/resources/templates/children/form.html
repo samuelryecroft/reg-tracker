@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Add Child — Return Home Tracker</title>
+    <th:block th:replace="~{fragments/layout :: styles}"></th:block>
+</head>
+<body>
+<div th:replace="~{fragments/layout :: nav}"></div>
+<main>
+    <h1>Add Child</h1>
+    <div class="card">
+        <form method="post" th:action="@{/children}" th:object="${form}">
+            <label for="firstName">First name</label>
+            <input type="text" id="firstName" th:field="*{firstName}"/>
+
+            <label for="lastName">Last name</label>
+            <input type="text" id="lastName" th:field="*{lastName}"/>
+
+            <label for="dateOfBirth">Date of birth</label>
+            <input type="date" id="dateOfBirth" th:field="*{dateOfBirth}"/>
+
+            <label for="localCaseReference">Case reference (optional)</label>
+            <input type="text" id="localCaseReference" th:field="*{localCaseReference}"/>
+
+            <div th:if="${isAdmin}">
+                <label for="homeId">Home</label>
+                <select id="homeId" th:field="*{homeId}">
+                    <option value="">Select a home…</option>
+                    <option th:each="h : ${homes}" th:value="${h.id}" th:text="${h.name}">Home</option>
+                </select>
+            </div>
+
+            <button type="submit" class="btn">Add child</button>
+            <a class="btn secondary" href="/children">Cancel</a>
+        </form>
+    </div>
+</main>
+</body>
+</html>

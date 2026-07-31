@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Users — Return Home Tracker</title>
+    <th:block th:replace="~{fragments/layout :: styles}"></th:block>
+</head>
+<body>
+<div th:replace="~{fragments/layout :: nav}"></div>
+<main>
+    <h1>Users</h1>
+    <a class="btn" href="/admin/users/new">Add user</a>
+
+    <table>
+        <thead>
+        <tr>
+            <th>Username</th>
+            <th>Full name</th>
+            <th>Roles</th>
+            <th>Home</th>
+            <th>Organisation</th>
+            <th>Enabled</th>
+            <th></th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="u : ${users}">
+            <td th:text="${u.username}">username</td>
+            <td th:text="${u.fullName}">Full Name</td>
+            <td th:text="${#strings.setJoin(u.roles, ', ')}">ROLES</td>
+            <td th:text="${u.home} ? ${u.home.name} : '—'">Home</td>
+            <td th:text="${u.organisation} ? ${u.organisation.name} : '—'">Organisation</td>
+            <td th:text="${u.enabled} ? 'Yes' : 'No'">Enabled</td>
+            <td><a th:href="@{/admin/users/{id}/edit(id=${u.id})}">Edit</a></td>
+        </tr>
+        </tbody>
+    </table>
+</main>
+</body>
+</html>

@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Submit Report — Return Home Tracker</title>
+    <th:block th:replace="~{fragments/layout :: styles}"></th:block>
+</head>
+<body>
+<div th:replace="~{fragments/layout :: nav}"></div>
+<main>
+    <h1 th:text="${'Report: ' + request.child.fullName}">Report</h1>
+    <p class="muted" th:text="${'Home: ' + request.home.name}">Home</p>
+    <p><a th:href="@{/interview-requests/{id}(id=${request.id})}">View full request details</a> (known risks, professionals, missing episode context)</p>
+
+    <div class="banner-warning" th:if="${request.status.name() == 'REPORT_REJECTED'}">
+        <strong>This report was sent back for revision.</strong>
+        <p th:text="${form.reviewComments}">Reviewer comments</p>
+    </div>
+
+    <div class="card">
+        <form method="post" th:action="@{/visitor/interviews/{id}/report(id=${request.id})}" th:object="${form}">
+
+            <div th:replace="~{fragments/report-fields :: fields}"></div>
+
+            <button type="submit" name="action" value="submit" class="btn">Submit for review</button>
+            <button type="submit" name="action" value="draft" class="btn secondary">Save draft</button>
+            <a class="btn secondary" href="/visitor/interviews">Cancel</a>
+        </form>
+    </div>
+</main>
+</body>
+</html>

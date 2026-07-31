@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Branding — Return Home Tracker</title>
+    <th:block th:replace="~{fragments/layout :: styles}"></th:block>
+</head>
+<body>
+<div th:replace="~{fragments/layout :: nav}"></div>
+<main>
+    <h1>Branding</h1>
+    <p class="muted" th:if="${platformWide}">These colours are the platform default, used for the platform admin view and as a fallback for any supplier org without its own branding.</p>
+    <p class="muted" th:unless="${platformWide}">These colours apply across the app for your organisation and for every Care Provider org you serve, and appear on the return home interview reports you generate.</p>
+    <div class="card">
+        <form method="post" th:action="@{/admin/theme}" th:object="${form}">
+            <label for="primaryColor">Primary colour</label>
+            <input type="color" id="primaryColor" th:field="*{primaryColor}" style="height: 3rem; padding: 0.25rem;"/>
+
+            <label for="secondaryColor">Secondary colour</label>
+            <input type="color" id="secondaryColor" th:field="*{secondaryColor}" style="height: 3rem; padding: 0.25rem;"/>
+
+            <button type="submit" class="btn">Save colours</button>
+        </form>
+    </div>
+</main>
+</body>
+</html>

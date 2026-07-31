@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <title>All Requests — Return Home Tracker</title>
+    <th:block th:replace="~{fragments/layout :: styles}"></th:block>
+</head>
+<body>
+<div th:replace="~{fragments/layout :: nav}"></div>
+<main>
+    <h1>All Return Home Interview Requests</h1>
+
+    <table>
+        <thead>
+        <tr>
+            <th>Child</th>
+            <th>Home</th>
+            <th>Status</th>
+            <th>Scheduled</th>
+            <th>Visitor</th>
+            <th>Raised</th>
+            <th></th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="r : ${requests}">
+            <td th:text="${r.child.fullName}">Child Name</td>
+            <td th:text="${r.home.name}">Home</td>
+            <td><span class="status" th:classappend="${r.status}" th:text="${r.status.displayName}">STATUS</span></td>
+            <td th:text="${r.scheduledAt} ?: '—'">Scheduled</td>
+            <td th:text="${r.allocatedVisitor} ? ${r.allocatedVisitor.fullName} : '—'">Visitor</td>
+            <td th:text="${#temporals.format(r.createdAt, 'dd MMM yyyy HH:mm')}">Created</td>
+            <td>
+                <a th:href="@{/interview-requests/{id}(id=${r.id})}">View details</a>
+                <span th:if="${r.status.name() == 'REQUESTED' or r.status.name() == 'ALLOCATED' or r.status.name() == 'SCHEDULED'}"> · </span>
+                <a th:if="${r.status.name() == 'REQUESTED' or r.status.name() == 'ALLOCATED' or r.status.name() == 'SCHEDULED'}"
+                   th:href="@{/coordinator/requests/{id}/allocate(id=${r.id})}">Allocate / reschedule</a>
+            </td>
+        </tr>
+        <tr th:if="${#lists.isEmpty(requests)}">
+            <td colspan="7" class="muted">No requests yet.</td>
+        </tr>
+        </tbody>
+    </table>
+</main>
+</body>
+</html>

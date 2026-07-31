@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Allocate — Return Home Tracker</title>
+    <th:block th:replace="~{fragments/layout :: styles}"></th:block>
+</head>
+<body>
+<div th:replace="~{fragments/layout :: nav}"></div>
+<main>
+    <h1 th:text="${'Allocate: ' + request.child.fullName}">Allocate</h1>
+    <p class="muted" th:text="${'Home: ' + request.home.name}">Home</p>
+
+    <div class="card">
+        <form method="post" th:action="@{/coordinator/requests/{id}/allocate(id=${request.id})}" th:object="${form}">
+            <label for="visitorId">Visitor</label>
+            <select id="visitorId" th:field="*{visitorId}">
+                <option value="">Select a visitor…</option>
+                <option th:each="v : ${visitors}" th:value="${v.id}" th:text="${v.fullName}">Visitor</option>
+            </select>
+
+            <label for="scheduledAt">Scheduled visit date/time (optional — leave blank for the visitor to arrange with the home)</label>
+            <input type="datetime-local" id="scheduledAt" th:field="*{scheduledAt}"/>
+
+            <button type="submit" class="btn">Allocate &amp; schedule</button>
+            <a class="btn secondary" href="/coordinator/requests">Cancel</a>
+        </form>
+    </div>
+</main>
+</body>
+</html>

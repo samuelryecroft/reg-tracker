@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Add Organisation — Return Home Tracker</title>
+    <th:block th:replace="~{fragments/layout :: styles}"></th:block>
+</head>
+<body>
+<div th:replace="~{fragments/layout :: nav}"></div>
+<main>
+    <h1>Add Organisation</h1>
+    <div class="card">
+        <form method="post" th:action="@{/admin/organisations}" th:object="${form}">
+            <label for="name">Name</label>
+            <input type="text" id="name" th:field="*{name}"/>
+
+            <label for="type">Type</label>
+            <select id="type" th:field="*{type}">
+                <option th:each="t : ${types}" th:value="${t}" th:text="${t}">TYPE</option>
+            </select>
+
+            <div id="supplierField">
+                <label for="supplierOrganisationId">Supplier</label>
+                <select id="supplierOrganisationId" th:field="*{supplierOrganisationId}">
+                    <option value="">Select a supplier…</option>
+                    <option th:each="s : ${suppliers}" th:value="${s.id}" th:text="${s.name}">Supplier</option>
+                </select>
+            </div>
+
+            <button type="submit" class="btn">Create organisation</button>
+            <a class="btn secondary" href="/admin/organisations">Cancel</a>
+        </form>
+    </div>
+</main>
+<script th:inline="none">
+    (function () {
+        var typeSelect = document.getElementById('type');
+        var supplierField = document.getElementById('supplierField');
+        function toggleSupplierField() {
+            supplierField.style.display = typeSelect.value === 'CARE_PROVIDER' ? '' : 'none';
+        }
+        typeSelect.addEventListener('change', toggleSupplierField);
+        toggleSupplierField();
+    })();
+</script>
+</body>
+</html>

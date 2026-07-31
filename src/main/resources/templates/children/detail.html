@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <title th:text="${child.fullName + ' — Return Home Tracker'}">Child</title>
+    <th:block th:replace="~{fragments/layout :: styles}"></th:block>
+</head>
+<body>
+<div th:replace="~{fragments/layout :: nav}"></div>
+<main>
+    <h1 th:text="${child.fullName}">Child Name</h1>
+    <p class="muted" th:text="${'Home: ' + child.home.name}">Home</p>
+
+    <h3>Return Home Interview History</h3>
+    <table>
+        <thead>
+        <tr>
+            <th>Status</th>
+            <th>Raised</th>
+            <th>Scheduled</th>
+            <th></th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="r : ${requests}">
+            <td><span class="status" th:classappend="${r.status}" th:text="${r.status.displayName}">STATUS</span></td>
+            <td th:text="${#temporals.format(r.createdAt, 'dd MMM yyyy HH:mm')}">Raised</td>
+            <td th:text="${r.scheduledAt} ?: '—'">Scheduled</td>
+            <td>
+                <a th:href="@{/interview-requests/{id}(id=${r.id})}">View details</a>
+                <th:block th:if="${r.status.name() == 'REPORT_APPROVED'}">
+                    · <a th:href="@{/reports/{id}/view(id=${r.id})}">View report</a>
+                    · <a th:href="@{/reports/{id}/download(id=${r.id})}">Download</a>
+                </th:block>
+            </td>
+        </tr>
+        <tr th:if="${#lists.isEmpty(requests)}">
+            <td colspan="4" class="muted">No return home interviews recorded yet.</td>
+        </tr>
+        </tbody>
+    </table>
+</main>
+</body>
+</html>

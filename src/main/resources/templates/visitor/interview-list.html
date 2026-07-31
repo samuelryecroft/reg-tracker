@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <title>My Interviews — Return Home Tracker</title>
+    <th:block th:replace="~{fragments/layout :: styles}"></th:block>
+</head>
+<body>
+<div th:replace="~{fragments/layout :: nav}"></div>
+<main>
+    <h1>My Allocated Interviews</h1>
+
+    <table>
+        <thead>
+        <tr>
+            <th>Child</th>
+            <th>Home</th>
+            <th>Status</th>
+            <th>Scheduled</th>
+            <th></th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="r : ${requests}">
+            <td th:text="${r.child.fullName}">Child Name</td>
+            <td th:text="${r.home.name}">Home</td>
+            <td><span class="status" th:classappend="${r.status}" th:text="${r.status.displayName}">STATUS</span></td>
+            <td th:text="${r.scheduledAt} ?: '—'">Scheduled</td>
+            <td>
+                <a th:href="@{/interview-requests/{id}(id=${r.id})}">View details</a> ·
+                <a th:if="${r.status.name() == 'ALLOCATED'}" th:href="@{/visitor/interviews/{id}/schedule(id=${r.id})}">Confirm visit time</a>
+                <a th:if="${r.status.name() == 'SCHEDULED'}" th:href="@{/visitor/interviews/{id}/report(id=${r.id})}">Submit report</a>
+                <a th:if="${r.status.name() == 'REPORT_REJECTED'}" th:href="@{/visitor/interviews/{id}/report(id=${r.id})}">Resubmit report</a>
+                <span th:if="${r.status.name() == 'REPORT_SUBMITTED'}" class="muted">Awaiting review</span>
+                <a th:if="${r.status.name() == 'REPORT_APPROVED'}" th:href="@{/reports/{id}/view(id=${r.id})}">View report</a>
+                <a th:if="${r.status.name() == 'REPORT_APPROVED'}" th:href="@{/reports/{id}/download(id=${r.id})}">Download</a>
+            </td>
+        </tr>
+        <tr th:if="${#lists.isEmpty(requests)}">
+            <td colspan="5" class="muted">No interviews allocated to you yet.</td>
+        </tr>
+        </tbody>
+    </table>
+</main>
+</body>
+</html>

@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <title th:text="${'Report: ' + request.child.fullName}">Report</title>
+    <th:block th:replace="~{fragments/layout :: styles}"></th:block>
+</head>
+<body>
+<div th:replace="~{fragments/layout :: nav}"></div>
+<main>
+    <h1 th:text="${request.child.fullName}">Child Name</h1>
+    <p class="muted" th:text="${'Home: ' + request.home.name}">Home</p>
+    <a class="btn secondary" th:href="@{/reports/{id}/download(id=${request.id})}">Download .docx</a>
+
+    <div class="card">
+        <h3>Details</h3>
+        <dl class="detail">
+            <dt>Visitor</dt>
+            <dd th:text="${report.visitor.fullName}">Visitor</dd>
+
+            <dt>Date of interview</dt>
+            <dd th:text="${report.interviewDate} ?: '—'">Date</dd>
+
+            <dt>Location of this interview</dt>
+            <dd th:text="${report.interviewLocation} ?: '—'">Location</dd>
+
+            <dt>Was this interview offered and completed within 72 hours of return?</dt>
+            <dd th:text="${report.within72Hours} == null ? 'Unknown' : (${report.within72Hours} ? 'Yes' : 'No')">—</dd>
+
+            <dt>If not, why?</dt>
+            <dd th:text="${report.ifNotWhyLate} ?: '—'">—</dd>
+
+            <dt>Consultation with home's staff to establish any new information</dt>
+            <dd th:text="${report.consultationWithHomeStaff} ?: '—'">—</dd>
+
+            <dt>Has this young person previously been missing?</dt>
+            <dd th:text="${report.previouslyMissing} == null ? 'Unknown' : (${report.previouslyMissing} ? 'Yes' : 'No')">—</dd>
+
+            <dt>How many occasions of missing has there been in the last 30 days?</dt>
+            <dd th:text="${report.missingOccasionsLast30Days} ?: '—'">—</dd>
+
+            <dt>Confidentiality explained to the young person regarding safeguarding duty of care?</dt>
+            <dd th:text="${report.confidentialityExplained} == null ? 'Unknown' : (${report.confidentialityExplained} ? 'Yes' : 'No')">—</dd>
+        </dl>
+    </div>
+
+    <div class="card">
+        <h3>Return Home Interview</h3>
+        <dl class="detail">
+            <dt>Interview accepted?</dt>
+            <dd th:text="${report.interviewAccepted} == null ? 'Unknown' : (${report.interviewAccepted} ? 'Yes' : 'No')">—</dd>
+
+            <dt>If not, why?</dt>
+            <dd th:text="${report.interviewDeclinedReason} ?: '—'">—</dd>
+
+            <dt>Where were you while missing?</dt>
+            <dd th:text="${report.whereWereYouWhileMissing} ?: '—'">—</dd>
+
+            <dt>Who were you with while missing?</dt>
+            <dd th:text="${report.whoWereYouWithWhileMissing} ?: '—'">—</dd>
+
+            <dt>What made you go missing?</dt>
+            <dd th:text="${report.whatMadeYouGoMissing} ?: '—'">—</dd>
+
+            <dt>What can be done to address these reasons?</dt>
+            <dd th:text="${report.whatCanBeDoneToAddressReasons} ?: '—'">—</dd>
+
+            <dt>Did you consider yourself to be missing?</dt>
+            <dd th:text="${report.consideredSelfMissing} == null ? 'Unknown' : (${report.consideredSelfMissing} ? 'Yes' : 'No')">—</dd>
+
+            <dt>What did you do while you were missing?</dt>
+            <dd th:text="${report.whatDidYouDoWhileMissing} ?: '—'">—</dd>
+
+            <dt>What happened when you returned home?</dt>
+            <dd th:text="${report.whatHappenedWhenReturned} ?: '—'">—</dd>
+
+            <dt>Is there anything that can be done to stop you going missing again?</dt>
+            <dd th:text="${report.preventFutureMissingSuggestions} ?: '—'">—</dd>
+
+            <dt>Any additional comments from the young person?</dt>
+            <dd th:text="${report.additionalCommentsFromYoungPerson} ?: '—'">—</dd>
+
+            <dt>Any additional information provided by the parent/carer?</dt>
+            <dd th:text="${report.additionalInfoFromParentCarer} ?: '—'">—</dd>
+        </dl>
+    </div>
+
+    <div class="card">
+        <h3>Future Incidents</h3>
+        <dl class="detail">
+            <dt>Any identified risks during this missing episode?</dt>
+            <dd th:text="${report.risksIdentifiedDuringEpisode} ?: '—'">—</dd>
+
+            <dt>Is there anything that would increase risks during future missing episodes?</dt>
+            <dd th:text="${report.risksIncreaseFutureEpisodes} ?: '—'">—</dd>
+
+            <dt>Any safeguarding concerns that need to be further explored?</dt>
+            <dd th:text="${report.safeguardingConcernsToExplore} ?: '—'">—</dd>
+
+            <dt>Any information that might help locating the young person during future missing episodes?</dt>
+            <dd th:text="${report.infoToHelpLocateFuture} ?: '—'">—</dd>
+        </dl>
+    </div>
+
+    <div class="card">
+        <h3>Interviewer's Comments</h3>
+        <p th:text="${report.interviewerComments} ?: '—'">Comments</p>
+    </div>
+
+    <div class="card">
+        <h3>Recommendations</h3>
+        <p th:text="${report.recommendations} ?: '—'">Recommendations</p>
+    </div>
+
+    <div class="card">
+        <h3>Declaration</h3>
+        <dl class="detail">
+            <dt>Statement</dt>
+            <dd th:text="${report.conductedByStatement} ?: '—'">—</dd>
+
+            <dt>Signed</dt>
+            <dd th:text="${report.visitor.fullName + ' on ' + #temporals.format(report.submittedAt, 'dd MMM yyyy HH:mm')}">—</dd>
+
+            <dt>Date report shared with relevant professionals</dt>
+            <dd th:text="${report.dateReportShared} ?: 'Not yet shared'">—</dd>
+        </dl>
+    </div>
+</main>
+</body>
+</html>

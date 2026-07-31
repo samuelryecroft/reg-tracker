@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Add Home — Return Home Tracker</title>
+    <th:block th:replace="~{fragments/layout :: styles}"></th:block>
+</head>
+<body>
+<div th:replace="~{fragments/layout :: nav}"></div>
+<main>
+    <h1>Add Home</h1>
+    <div class="card">
+        <form method="post" th:action="@{/admin/homes}" th:object="${form}">
+            <label for="name">Name</label>
+            <input type="text" id="name" th:field="*{name}"/>
+
+            <div th:if="${organisations != null}">
+                <label for="organisationId">Care provider organisation</label>
+                <select id="organisationId" th:field="*{organisationId}">
+                    <option value="">Select a care provider…</option>
+                    <option th:each="o : ${organisations}" th:value="${o.id}" th:text="${o.name}">Organisation</option>
+                </select>
+            </div>
+
+            <label for="addressLine1">Address line 1</label>
+            <input type="text" id="addressLine1" th:field="*{addressLine1}"/>
+
+            <label for="addressLine2">Address line 2</label>
+            <input type="text" id="addressLine2" th:field="*{addressLine2}"/>
+
+            <label for="addressLine3">Address line 3</label>
+            <input type="text" id="addressLine3" th:field="*{addressLine3}"/>
+
+            <label for="postcode">Postcode</label>
+            <input type="text" id="postcode" th:field="*{postcode}"/>
+
+            <label for="what3words">what3words</label>
+            <input type="text" id="what3words" th:field="*{what3words}" placeholder="e.g. ///filled.count.soap"/>
+
+            <label for="localAuthority">Local authority</label>
+            <input type="text" id="localAuthority" th:field="*{localAuthority}"/>
+
+            <button type="submit" class="btn">Create home</button>
+            <a class="btn secondary" href="/admin/homes">Cancel</a>
+        </form>
+    </div>
+</main>
+</body>
+</html>

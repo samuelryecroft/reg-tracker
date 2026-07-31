@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Children — Return Home Tracker</title>
+    <th:block th:replace="~{fragments/layout :: styles}"></th:block>
+</head>
+<body>
+<div th:replace="~{fragments/layout :: nav}"></div>
+<main>
+    <h1 th:text="${isAdmin} ? 'Children' : 'My Children'">Children</h1>
+    <a class="btn" href="/children/new" th:unless="${#authorization.expression('hasRole(''VIEWER'')')}">Add child</a>
+
+    <table>
+        <thead>
+        <tr>
+            <th>Name</th>
+            <th>Date of birth</th>
+            <th th:if="${isAdmin}">Home</th>
+            <th>Case reference</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="c : ${children}">
+            <td th:text="${c.fullName}">Child Name</td>
+            <td th:text="${c.dateOfBirth}">DOB</td>
+            <td th:if="${isAdmin}" th:text="${c.home.name}">Home</td>
+            <td th:text="${c.localCaseReference} ?: '—'">Case reference</td>
+        </tr>
+        <tr th:if="${#lists.isEmpty(children)}">
+            <td colspan="4" class="muted">No children yet.</td>
+        </tr>
+        </tbody>
+    </table>
+</main>
+</body>
+</html>

@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <title th:text="${'Request: ' + request.child.fullName}">Request detail</title>
+    <th:block th:replace="~{fragments/layout :: styles}"></th:block>
+</head>
+<body>
+<div th:replace="~{fragments/layout :: nav}"></div>
+<main>
+    <h1 th:text="${request.child.fullName}">Child Name</h1>
+    <span class="status" th:classappend="${request.status}" th:text="${request.status.displayName}">STATUS</span>
+    <span class="status warning"
+          th:if="${request.consentProvided == null or request.consentProvided == false}">
+        Consent not yet confirmed
+    </span>
+
+    <div class="card">
+        <h3>Request</h3>
+        <dl class="detail">
+            <dt>Home</dt>
+            <dd th:text="${request.home.name}">Home</dd>
+
+            <dt>Requested by</dt>
+            <dd th:text="${request.requestedBy.fullName}">User</dd>
+
+            <dt>Date of missing episode</dt>
+            <dd th:text="${request.missingSince} ?: '—'">Missing since</dd>
+
+            <dt>Date of return</dt>
+            <dd th:text="${request.returnedAt} ?: '—'">Returned at</dd>
+
+            <dt>Allocated visitor</dt>
+            <dd th:text="${request.allocatedVisitor} ? ${request.allocatedVisitor.fullName} : 'Not yet allocated'">Visitor</dd>
+
+            <dt>Scheduled visit</dt>
+            <dd th:text="${request.scheduledAt} ?: 'Not yet scheduled'">Scheduled</dd>
+        </dl>
+    </div>
+
+    <div class="card">
+        <h3>Details of the Young Person</h3>
+        <dl class="detail">
+            <dt>Legal status</dt>
+            <dd th:text="${request.legalStatus} ?: '—'">Legal status</dd>
+
+            <dt>Any known risks</dt>
+            <dd th:text="${request.knownRisks} ?: '—'">Known risks</dd>
+
+            <dt>Comments made by the young person</dt>
+            <dd th:text="${request.childsComments} ?: '—'">Comments</dd>
+
+            <dt>Details relating to the missing episode</dt>
+            <dd th:text="${request.missingEpisodeDetails} ?: '—'">Missing episode details</dd>
+
+            <dt>Missing in the last 6 months?</dt>
+            <dd th:text="${request.missingInLast6Months} == null ? 'Unknown' : (${request.missingInLast6Months} ? 'Yes' : 'No')">—</dd>
+
+            <dt>Missing 5+ times in the last 30 days?</dt>
+            <dd th:text="${request.missingFiveTimesIn30Days} == null ? 'Unknown' : (${request.missingFiveTimesIn30Days} ? 'Yes' : 'No')">—</dd>
+
+            <dt>Strategy meeting requested?</dt>
+            <dd th:text="${request.strategyMeetingRequested} == null ? 'Unknown' : (${request.strategyMeetingRequested} ? 'Yes' : 'No')">—</dd>
+
+            <dt>Important people to the young person</dt>
+            <dd th:text="${request.importantPeople} ?: '—'">Important people</dd>
+
+            <dt>About the young person</dt>
+            <dd th:text="${request.aboutYoungPerson} ?: '—'">About the young person</dd>
+        </dl>
+    </div>
+
+    <div class="card">
+        <h3>Details of Professionals</h3>
+        <dl class="detail">
+            <dt>Social worker details</dt>
+            <dd th:text="${request.socialWorkerDetails} ?: '—'">Social worker</dd>
+
+            <dt>Consent for IRHI provided?</dt>
+            <dd th:text="${request.consentProvided} == null ? 'Unknown' : (${request.consentProvided} ? 'Yes' : 'No')">—</dd>
+
+            <dt>Placing local authority</dt>
+            <dd th:text="${request.placingLocalAuthority} ?: '—'">Local authority</dd>
+
+            <dt>Police MFH coordinator details</dt>
+            <dd th:text="${request.policeMfhCoordinatorDetails} ?: '—'">Police coordinator</dd>
+
+            <dt>Parents' details</dt>
+            <dd th:text="${request.parentsDetails} ?: '—'">Parents</dd>
+
+            <dt>Any other professionals</dt>
+            <dd th:text="${request.otherProfessionals} ?: '—'">Other professionals</dd>
+        </dl>
+    </div>
+
+    <div class="card">
+        <h3>Submitted By</h3>
+        <dl class="detail">
+            <dt>Organisation</dt>
+            <dd th:text="${request.submitterOrganisation} ?: '—'">Organisation</dd>
+
+            <dt>Name and role</dt>
+            <dd th:text="${request.submitterNameAndRole} ?: '—'">Name and role</dd>
+
+            <dt>Relationship to young person</dt>
+            <dd th:text="${request.relationshipToYoungPerson} ?: '—'">Relationship</dd>
+
+            <dt>Address</dt>
+            <dd th:text="${request.submitterAddress} ?: '—'">Address</dd>
+
+            <dt>Contact details</dt>
+            <dd th:text="${request.submitterContactDetails} ?: '—'">Contact details</dd>
+
+            <dt>Best times to visit</dt>
+            <dd th:text="${request.bestTimesToVisit} ?: '—'">Best times to visit</dd>
+        </dl>
+    </div>
+
+    <div class="card" th:if="${request.notes}">
+        <h3>Additional Notes</h3>
+        <p th:text="${request.notes}">Notes</p>
+    </div>
+
+    <a th:if="${canAllocate}" class="btn"
+       th:href="@{/coordinator/requests/{id}/allocate(id=${request.id})}">Allocate / reschedule</a>
+    <a th:if="${canConfirmSchedule}" class="btn"
+       th:href="@{/visitor/interviews/{id}/schedule(id=${request.id})}">Confirm visit time</a>
+    <a th:if="${canSubmitReport}" class="btn"
+       th:href="@{/visitor/interviews/{id}/report(id=${request.id})}">Submit report</a>
+    <a th:if="${canReview}" class="btn"
+       th:href="@{/reviewer/reports/{id}/review(id=${request.id})}">Review report</a>
+    <a th:if="${canView}" class="btn"
+       th:href="@{/reports/{id}/view(id=${request.id})}">View report</a>
+    <a th:if="${canDownload}" class="btn"
+       th:href="@{/reports/{id}/download(id=${request.id})}">Download report</a>
+</main>
+</body>
+</html>

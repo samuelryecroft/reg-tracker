@@ -1,0 +1,232 @@
+package ninja.samryecroft.returnhome.tracker;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.securityContext;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrlPattern;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Set;
+import ninja.samryecroft.returnhome.tracker.child.Child;
+import ninja.samryecroft.returnhome.tracker.child.ChildRepository;
+import ninja.samryecroft.returnhome.tracker.home.Home;
+import ninja.samryecroft.returnhome.tracker.home.HomeRepository;
+import ninja.samryecroft.returnhome.tracker.interview.InterviewRequestRepository;
+import ninja.samryecroft.returnhome.tracker.interview.InterviewStatus;
+import ninja.samryecroft.returnhome.tracker.organisation.Organisation;
+import ninja.samryecroft.returnhome.tracker.organisation.OrganisationRepository;
+import ninja.samryecroft.returnhome.tracker.organisation.OrgType;
+import ninja.samryecroft.returnhome.tracker.report.InterviewReportRepository;
+import ninja.samryecroft.returnhome.tracker.user.Role;
+import ninja.samryecroft.returnhome.tracker.user.User;
+import ninja.samryecroft.returnhome.tracker.user.UserRepository;
+import ninja.samryecroft.returnhome.tracker.user.AppUserDetailsService;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextImpl;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
+
+@SpringBootTest
+@AutoConfigureMockMvc
+class GoldenPathIntegrationTest extends AbstractIntegrationTest {
+
+    @TempDir
+    static Path docxOutputDir;
+
+    @DynamicPropertySource
+    static void docxOutputDir(DynamicPropertyRegistry registry) {
+        registry.add("app.docx.output-dir", () -> docxOutputDir.toString());
+    }
+
+    @Autowired
+    private MockMvc mockMvc;
+    @Autowired
+    private HomeRepository homeRepository;
+    @Autowired
+    private ChildRepository childRepository;
+    @Autowired
+    private UserRepository userRepository;
+    @Autowired
+    private InterviewRequestRepository interviewRequestRepository;
+    @Autowired
+    private InterviewReportRepository interviewReportRepository;
+    @Autowired
+    private OrganisationRepository organisationRepository;
+    @Autowired
+    private AppUserDetailsService appUserDetailsService;
+
+    private Long childId;
+
+    /**
+     * spring-security-test 7.1 dropped the classic {@code userDetails(username)} request
+     * post-processor; this rebuilds the equivalent by loading the user through the app's own
+     * {@link AppUserDetailsService} so requests are authenticated as a real {@code AppUserPrincipal}.
+     */
+    private RequestPostProcessor asUser(String username) {
+        UserDetails userDetails = appUserDetailsService.loadUserByUsername(username);
+        SecurityContext context = new SecurityContextImpl(
+                new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities()));
+        return securityContext(context);
+    }
+
+    @BeforeEach
+    void seedData() {
+        // V5__add_organisations.sql seeds exactly one Supplier and one Care Provider org, linked.
+        Organisation supplierOrg = organisationRepository.findByTypeOrderByName(OrgType.SUPPLIER).get(0);
+        Organisation careProviderOrg = organisationRepository.findByTypeOrderByName(OrgType.CARE_PROVIDER).get(0);
+
+        Home home = new Home();
+        home.setName("Golden Path House");
+        home.setOrganisation(careProviderOrg);
+        home = homeRepository.save(home);
+
+        Child child = new Child();
+        child.setFirstName("Riley");
+        child.setLastName("Doe");
+        child.setDateOfBirth(java.time.LocalDate.of(2011, 3, 4));
+        child.setHome(home);
+        child = childRepository.save(child);
+        childId = child.getId();
+
+        userRepository.save(newUser("gp-home", Role.HOME_STAFF, home, null));
+        userRepository.save(newUser("gp-coordinator", Role.COORDINATOR, null, supplierOrg));
+        userRepository.save(newUser("gp-visitor", Role.VISITOR, null, supplierOrg));
+        userRepository.save(newUser("gp-reviewer", Role.REVIEWER, null, supplierOrg));
+    }
+
+    private User newUser(String username, Role role, Home home, Organisation organisation) {
+        User user = new User();
+        user.setUsername(username);
+        user.setPassword("irrelevant-not-checked-by-with-userDetails");
+        user.setFullName(username);
+        user.setRoles(Set.of(role));
+        user.setHome(home);
+        user.setOrganisation(organisation);
+        user.setEnabled(true);
+        return user;
+    }
+
+    @Test
+    void homeStaffRaisesRequest_coordinatorAllocates_visitorSubmitsReport_reviewerApproves() throws Exception {
+        // 1. Home staff raises a request
+        mockMvc.perform(post("/requests").with(asUser("gp-home")).with(csrf())
+                        .param("childId", childId.toString())
+                        .param("returnedAt", "2026-07-16T20:30")
+                        .param("notes", "Golden path test"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrlPattern("/interview-requests/*"));
+
+        Long requestId = interviewRequestRepository.findAllDetailed().stream()
+                .filter(r -> r.getChild().getId().equals(childId))
+                .findFirst().orElseThrow().getId();
+
+        assertThat(interviewRequestRepository.findDetailedById(requestId).orElseThrow().getStatus())
+                .isEqualTo(InterviewStatus.REQUESTED);
+
+        // 2. Coordinator allocates and schedules
+        Long visitorId = userRepository.findByUsername("gp-visitor").orElseThrow().getId();
+        mockMvc.perform(post("/coordinator/requests/{id}/allocate", requestId)
+                        .with(asUser("gp-coordinator")).with(csrf())
+                        .param("visitorId", visitorId.toString())
+                        .param("scheduledAt", "2026-07-20T14:00"))
+                .andExpect(status().is3xxRedirection());
+
+        assertThat(interviewRequestRepository.findDetailedById(requestId).orElseThrow().getStatus())
+                .isEqualTo(InterviewStatus.SCHEDULED);
+
+        // 3. Visitor submits report for review
+        mockMvc.perform(post("/visitor/interviews/{id}/report", requestId)
+                        .with(asUser("gp-visitor")).with(csrf())
+                        .param("action", "submit")
+                        .param("interviewDate", "2026-07-20")
+                        .param("interviewLocation", "Golden Path House")
+                        .param("within72Hours", "true")
+                        .param("consultationWithHomeStaff", "Spoke with key worker")
+                        .param("previouslyMissing", "false")
+                        .param("confidentialityExplained", "true")
+                        .param("interviewAccepted", "true")
+                        .param("whereWereYouWhileMissing", "At a friend's house")
+                        .param("whatMadeYouGoMissing", "None")
+                        .param("consideredSelfMissing", "false")
+                        .param("whatDidYouDoWhileMissing", "All is well.")
+                        .param("whatHappenedWhenReturned", "Settled back in")
+                        .param("risksIdentifiedDuringEpisode", "None")
+                        .param("interviewerComments", "Cooperative throughout")
+                        .param("recommendations", "No further action")
+                        .param("conductedByStatement", "Conducted by the allocated visitor"))
+                .andExpect(status().is3xxRedirection());
+
+        assertThat(interviewRequestRepository.findDetailedById(requestId).orElseThrow().getStatus())
+                .isEqualTo(InterviewStatus.REPORT_SUBMITTED);
+
+        var submittedReport = interviewReportRepository.findByInterviewRequestId(requestId).orElseThrow();
+        assertThat(submittedReport.getGeneratedDocumentPath()).isNull();
+
+        // 4. Nobody can download it yet - it's still pending review, not approved
+        mockMvc.perform(get("/reports/{id}/download", requestId).with(asUser("gp-home")))
+                .andExpect(status().isNotFound());
+
+        // 5. A different Reviewer approves it - this is the point the docx is actually generated
+        mockMvc.perform(post("/reviewer/reports/{id}/review", requestId)
+                        .with(asUser("gp-reviewer")).with(csrf())
+                        .param("action", "approve")
+                        .param("interviewDate", "2026-07-20")
+                        .param("interviewLocation", "Golden Path House")
+                        .param("within72Hours", "true")
+                        .param("consultationWithHomeStaff", "Spoke with key worker")
+                        .param("previouslyMissing", "false")
+                        .param("confidentialityExplained", "true")
+                        .param("interviewAccepted", "true")
+                        .param("whereWereYouWhileMissing", "At a friend's house")
+                        .param("whatMadeYouGoMissing", "None")
+                        .param("consideredSelfMissing", "false")
+                        .param("whatDidYouDoWhileMissing", "All is well.")
+                        .param("whatHappenedWhenReturned", "Settled back in")
+                        .param("risksIdentifiedDuringEpisode", "None")
+                        .param("interviewerComments", "Cooperative throughout")
+                        .param("recommendations", "No further action")
+                        .param("conductedByStatement", "Conducted by the allocated visitor"))
+                .andExpect(status().is3xxRedirection());
+
+        assertThat(interviewRequestRepository.findDetailedById(requestId).orElseThrow().getStatus())
+                .isEqualTo(InterviewStatus.REPORT_APPROVED);
+
+        var report = interviewReportRepository.findByInterviewRequestId(requestId).orElseThrow();
+        assertThat(report.getGeneratedDocumentPath()).isNotBlank();
+        assertThat(docxOutputDir.resolve(report.getGeneratedDocumentPath())).exists();
+
+        // 6. Home staff can now download the generated report
+        mockMvc.perform(get("/reports/{id}/download", requestId).with(asUser("gp-home")))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Type",
+                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"));
+
+        assertThat(Files.exists(docxOutputDir.resolve(report.getGeneratedDocumentPath()))).isTrue();
+
+        // 7. The shared detail view is reachable by every role involved in this request,
+        // and the old role-specific detail route no longer exists.
+        mockMvc.perform(get("/interview-requests/{id}", requestId).with(asUser("gp-home")))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/interview-requests/{id}", requestId).with(asUser("gp-coordinator")))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/interview-requests/{id}", requestId).with(asUser("gp-visitor")))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/requests/{id}", requestId).with(asUser("gp-home")))
+                .andExpect(status().isNotFound());
+    }
+}

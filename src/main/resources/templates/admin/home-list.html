@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Homes — Return Home Tracker</title>
+    <th:block th:replace="~{fragments/layout :: styles}"></th:block>
+</head>
+<body>
+<div th:replace="~{fragments/layout :: nav}"></div>
+<main>
+    <h1>Homes</h1>
+    <a th:if="${canCreate}" class="btn" href="/admin/homes/new">Add home</a>
+
+    <table>
+        <thead>
+        <tr>
+            <th>Name</th>
+            <th>Organisation</th>
+            <th>Address</th>
+            <th>Local authority</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="h : ${homes}">
+            <td th:text="${h.name}">Home name</td>
+            <td th:text="${h.organisation.name}">Organisation</td>
+            <td th:text="${h.fullAddress} ?: '—'">Address</td>
+            <td th:text="${h.localAuthority} ?: '—'">Local authority</td>
+        </tr>
+        <tr th:if="${#lists.isEmpty(homes)}">
+            <td colspan="4" class="muted">No homes yet.</td>
+        </tr>
+        </tbody>
+    </table>
+</main>
+</body>
+</html>
