@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
 <head>
     <meta charset="UTF-8"/>
     <title>Submit Report — Return Home Tracker</title>
@@ -7,7 +7,7 @@
 </head>
 <body>
 <div th:replace="~{fragments/layout :: nav}"></div>
-<main>
+<main id="main">
     <h1 th:text="${'Report: ' + request.child.fullName}">Report</h1>
     <p class="muted" th:text="${'Home: ' + request.home.name}">Home</p>
     <p><a th:href="@{/interview-requests/{id}(id=${request.id})}">View full request details</a> (known risks, professionals, missing episode context)</p>

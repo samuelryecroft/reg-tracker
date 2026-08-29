@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
 <head>
     <meta charset="UTF-8"/>
     <title>Children — Return Home Tracker</title>
@@ -7,7 +7,7 @@
 </head>
 <body>
 <div th:replace="~{fragments/layout :: nav}"></div>
-<main>
+<main id="main">
     <h1 th:text="${isAdmin} ? 'Children' : 'My Children'">Children</h1>
     <a class="btn" href="/children/new" th:unless="${#authorization.expression('hasRole(''VIEWER'')')}">Add child</a>
 

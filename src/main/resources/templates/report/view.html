@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
 <head>
     <meta charset="UTF-8"/>
     <title th:text="${'Report: ' + request.child.fullName}">Report</title>
@@ -7,7 +7,7 @@
 </head>
 <body>
 <div th:replace="~{fragments/layout :: nav}"></div>
-<main>
+<main id="main">
     <h1 th:text="${request.child.fullName}">Child Name</h1>
     <p class="muted" th:text="${'Home: ' + request.home.name}">Home</p>
     <a class="btn secondary" th:href="@{/reports/{id}/download(id=${request.id})}">Download .docx</a>

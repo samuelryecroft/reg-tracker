@@ -1,12 +1,12 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
 <head>
     <meta charset="UTF-8"/>
     <title>Log in — Return Home Tracker</title>
     <th:block th:replace="~{fragments/layout :: styles}"></th:block>
 </head>
 <body>
-<main style="max-width: 380px;">
+<main id="main" style="max-width: 380px;">
     <h1>Return Home Tracker</h1>
     <div class="card">
         <p th:if="${param.error}" class="error">Invalid username or password.</p>
