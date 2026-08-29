@@ -4,6 +4,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import ninja.samryecroft.returnhome.tracker.audit.AuditEventPublisher;
 import ninja.samryecroft.returnhome.tracker.theme.ThemeService;
 import ninja.samryecroft.returnhome.tracker.web.LoginController;
 import ninja.samryecroft.returnhome.tracker.web.RootController;
@@ -24,6 +25,10 @@ class SecurityConfigTest {
 
     @MockitoBean
     private ThemeService themeService;
+
+    // GlobalControllerAdvice is picked up by the @WebMvcTest slice and now depends on this.
+    @MockitoBean
+    private AuditEventPublisher auditEventPublisher;
 
     @Test
     void anonymousRequestToRootRedirectsToLogin() throws Exception {
