@@ -12,9 +12,22 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 public abstract class AbstractUiTest extends AbstractIntegrationTest {
+
+    /** There is no default seed password any more, so tests that sign in as the platform admin
+     * have to supply one - the same way a real deployment injects it from the environment. */
+    protected static final String ADMIN_USERNAME = "admin";
+    protected static final String ADMIN_PASSWORD = "ui-test-seed-password";
+
+    @DynamicPropertySource
+    static void adminSeedCredentials(DynamicPropertyRegistry registry) {
+        registry.add("app.admin.username", () -> ADMIN_USERNAME);
+        registry.add("app.admin.password", () -> ADMIN_PASSWORD);
+    }
 
     private static Playwright playwright;
     private static Browser browser;

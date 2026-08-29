@@ -21,7 +21,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 
 class HomeStaffRequestUiTest extends AbstractUiTest {
 
-    private static final String PASSWORD = "ChangeMe123!";
+    private static final String PASSWORD = "home-staff-test-password";
 
     @Autowired
     private HomeRepository homeRepository;

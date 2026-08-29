@@ -11,9 +11,15 @@ import org.springframework.security.core.userdetails.UserDetails;
 public class AppUserPrincipal implements UserDetails {
 
     private final User user;
+    private final boolean locked;
 
     public AppUserPrincipal(User user) {
+        this(user, false);
+    }
+
+    public AppUserPrincipal(User user, boolean locked) {
         this.user = user;
+        this.locked = locked;
     }
 
     public User getUser() {
@@ -66,9 +72,10 @@ public class AppUserPrincipal implements UserDetails {
         return true;
     }
 
+    /** False while failed-login throttling has this account locked out (see LoginAttemptService). */
     @Override
     public boolean isAccountNonLocked() {
-        return true;
+        return !locked;
     }
 
     @Override
