@@ -12,10 +12,17 @@
     <p class="muted" th:text="${'Home: ' + request.home.name}">Home</p>
     <p><a th:href="@{/interview-requests/{id}(id=${request.id})}">View full request details</a> (known risks, professionals, missing episode context)</p>
 
+    <div class="banner-warning">
+        <strong>This report is read-only.</strong>
+        <p>The report is the visitor's own record of the interview and is signed in their name, so it
+            cannot be edited here. To get something changed, reject it with comments and the visitor
+            will amend and resubmit.</p>
+    </div>
+
     <div class="card">
         <form method="post" th:action="@{/reviewer/reports/{id}/review(id=${request.id})}" th:object="${form}">
 
-            <div th:replace="~{fragments/report-fields :: fields}"></div>
+            <div th:replace="~{fragments/report-fields :: fields(true)}"></div>
 
             <h3>Review Comments</h3>
 

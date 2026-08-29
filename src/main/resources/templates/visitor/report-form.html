@@ -20,7 +20,7 @@
     <div class="card">
         <form method="post" th:action="@{/visitor/interviews/{id}/report(id=${request.id})}" th:object="${form}">
 
-            <div th:replace="~{fragments/report-fields :: fields}"></div>
+            <div th:replace="~{fragments/report-fields :: fields(false)}"></div>
 
             <button type="submit" name="action" value="submit" class="btn">Submit for review</button>
             <button type="submit" name="action" value="draft" class="btn secondary">Save draft</button>
