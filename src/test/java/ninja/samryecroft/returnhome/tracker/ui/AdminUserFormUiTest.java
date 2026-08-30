@@ -8,7 +8,7 @@ class AdminUserFormUiTest extends AbstractUiTest {
 
     @Test
     void homeAndOrganisationFieldsTrackSelectedRoles() {
-        login("admin", "ChangeMe123!");
+        login(ADMIN_USERNAME, ADMIN_PASSWORD);
         page.navigate(url("/admin/users/new"));
 
         // No checkbox is checked yet, so both conditional fields start hidden.
