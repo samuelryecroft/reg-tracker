@@ -150,7 +150,7 @@ public class ThemeService {
     private ThemeView toView(ThemeSettings settings) {
         String primary = settings.getPrimaryColor();
         String tint = settings.getSecondaryColor();
-        return new ThemeView(primary, darken(primary, tint), tint, textOnAccent(primary));
+        return new ThemeView(primary, darken(primary, tint), tint, readableForegroundOn(primary));
     }
 
     /**
@@ -178,11 +178,25 @@ public class ThemeService {
     }
 
     /**
-     * FE-01. The button background <em>is</em> the brand colour, so darkening a text token can't help -
-     * the foreground has to be chosen per theme. The rule: pick ink or white, whichever reads better
-     * against the supplier's accent colour. No supplier colour can produce a failing primary button.
+     * FE-01, and the same fix the generated .docx header bar needs (Creed's docx-format-review.md
+     * finding 1 - a shipped report measured 1.98:1, white text hardcoded over a supplier accent fill).
+     * A background that <em>is</em> the brand colour can't be fixed by darkening a text token - the
+     * foreground has to be chosen per theme. The rule: pick ink or white, whichever reads better
+     * against the accent. No supplier colour can produce an unreadable result either surface.
+     *
+     * <p>Public and static on purpose: this is the single shared decision point for "what text colour
+     * goes on this accent fill", called from {@link #toView} for the UI button and (separately, by
+     * whoever wires up the docx header-bar token) from {@code DocxReportGenerator}. Don't reimplement
+     * this logic a second time there - call this method.
+     *
+     * @param accentHex a 6-digit hex colour, with or without a leading {@code #} (e.g. {@code "#F36E2A"}
+     *                   or {@code "F36E2A"})
+     * @return {@code "#1F2328"} (ink) or {@code "#FFFFFF"} (white), whichever clears more contrast
+     *         against {@code accentHex} - always with a leading {@code #}; strip it yourself if the
+     *         caller's convention (like the docx token replacement) doesn't use one
      */
-    static String textOnAccent(String accentColor) {
+    public static String readableForegroundOn(String accentHex) {
+        String accentColor = accentHex.startsWith("#") ? accentHex : "#" + accentHex;
         double accentLuminance = relativeLuminance(hexToRgb(accentColor));
         double inkContrast = contrastRatio(accentLuminance, relativeLuminance(hexToRgb(INK)));
         double whiteContrast = contrastRatio(accentLuminance, relativeLuminance(hexToRgb(WHITE)));

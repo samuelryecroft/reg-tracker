@@ -39,13 +39,27 @@ class ThemeServiceContrastTest {
             "#111111, #FFFFFF", // near-black brand -> white wins
     })
     void buttonForegroundIsWhicheverOfInkOrWhiteWinsAgainstAccent(String accent, String expectedForeground) {
-        assertThat(ThemeService.textOnAccent(accent)).isEqualToIgnoringCase(expectedForeground);
+        assertThat(ThemeService.readableForegroundOn(accent)).isEqualToIgnoringCase(expectedForeground);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "#F4AA2A, #1F2328", // Creed's docx-review check: 8.00:1 -> ink
+            "#F36E2A, #1F2328", // Creed's docx-review check: 5.32:1 -> ink
+            "#1D4ED8, #FFFFFF", // Creed's docx-review check: 6.70:1 -> white
+    })
+    void matchesCreedsDocxReviewCheckValues(String accent, String expectedForeground) {
+        // readableForegroundOn is the shared helper DocxReportGenerator's header-bar-text fix will
+        // also call (Creed's docx-format-review.md finding 1) - confirming it here, with and without
+        // the leading '#', since the docx side's own token convention drops it.
+        assertThat(ThemeService.readableForegroundOn(accent)).isEqualToIgnoringCase(expectedForeground);
+        assertThat(ThemeService.readableForegroundOn(accent.substring(1))).isEqualToIgnoringCase(expectedForeground);
     }
 
     @Test
     void buttonForegroundAlwaysClearsAaAgainstTheAccentItSitsOn() {
         for (String accent : new String[] { "#F36E2A", "#FFD400", "#7ED321", "#00B8D9", "#1D4ED8", "#111111" }) {
-            String foreground = ThemeService.textOnAccent(accent);
+            String foreground = ThemeService.readableForegroundOn(accent);
             assertThat(contrast(foreground, accent))
                     .as("button foreground contrast for accent %s", accent)
                     .isGreaterThanOrEqualTo(4.5);
