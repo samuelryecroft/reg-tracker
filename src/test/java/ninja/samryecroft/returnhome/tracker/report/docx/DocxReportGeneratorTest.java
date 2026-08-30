@@ -16,6 +16,108 @@ class DocxReportGeneratorTest {
 
     private final DocxReportGenerator generator = new DocxReportGenerator();
 
+    /** Reads a named part straight out of the generated package. */
+    private String partOf(Path docx, String entryName) throws Exception {
+        try (java.util.zip.ZipFile zip = new java.util.zip.ZipFile(docx.toFile())) {
+            java.util.zip.ZipEntry entry = zip.getEntry(entryName);
+            assertThat(entry).as("package contains %s", entryName).isNotNull();
+            try (InputStream in = zip.getInputStream(entry)) {
+                return new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+            }
+        }
+    }
+
+    private Path generateWithBrand(Path tempDir, String name, String accent, String tint) throws Exception {
+        Path outputPath = tempDir.resolve(name);
+        try (InputStream templateStream =
+                new ClassPathResource("docx-templates/rhi-report-template.docx").getInputStream()) {
+            generator.generate(templateStream,
+                    Map.of("childName", "Alex Smith", "caseReference", "CR-42",
+                            "interviewDate", "20 Jul 2026", "supplierName", "STEPS with Children",
+                            "interviewerComments", "Not provided"),
+                    accent, null, tint, outputPath);
+        }
+        return outputPath;
+    }
+
+    @Test
+    void headerBarTextColourIsChosenByContrastAgainstTheSupplierAccent(@TempDir Path tempDir) throws Exception {
+        // D-01. The shipped palette that measured 1.98:1 with the old baked-in white.
+        String paleAccent = partOf(generateWithBrand(tempDir, "pale.docx", "f4aa2a", "FFF0DD"),
+                "word/document.xml");
+        // Ink wins on a pale accent...
+        assertThat(paleAccent).contains("<w:color w:val=\"1F2328\"/>");
+        assertThat(paleAccent).doesNotContain("ACCENTTEXTTOKEN");
+        // ...and no white header text survives anywhere.
+        assertThat(paleAccent).doesNotContain("<w:color w:val=\"FFFFFF\"/>");
+
+        // A dark accent must flip the other way.
+        String darkAccent = partOf(generateWithBrand(tempDir, "dark.docx", "1D4ED8", "1D4ED8"),
+                "word/document.xml");
+        assertThat(darkAccent).contains("<w:color w:val=\"FFFFFF\"/>");
+
+        // The 34 white value-cell FILLS are a different thing entirely and must survive both.
+        assertThat(paleAccent.split("w:fill=\"FFFFFF\"", -1).length - 1).isEqualTo(34);
+        assertThat(darkAccent.split("w:fill=\"FFFFFF\"", -1).length - 1).isEqualTo(34);
+    }
+
+    @Test
+    void everyBrandTokenIsResolvedLeavingNoPlaceholderBehind(@TempDir Path tempDir) throws Exception {
+        String xml = partOf(generateWithBrand(tempDir, "tokens.docx", "F36E2A", "FFF0DD"), "word/document.xml");
+
+        // D-08: the old misleading name is gone, and nothing token-shaped is left in the output.
+        for (String token : new String[] {"ACCENTFILLTOKEN", "ACCENTDARKFILLTOKEN", "ACCENTTEXTDARKTOKEN",
+                "TINTFILLTOKEN", "ACCENTTEXTTOKEN", "TINTTEXTTOKEN"}) {
+            assertThat(xml).as("token %s resolved", token).doesNotContain(token);
+        }
+    }
+
+    @Test
+    void documentHasHeadingStructurePageSetupAndAFooter(@TempDir Path tempDir) throws Exception {
+        Path docx = generateWithBrand(tempDir, "structure.docx", "F36E2A", "FFF0DD");
+        String document = partOf(docx, "word/document.xml");
+
+        // D-03: real heading styles, not bold-and-big direct formatting.
+        String styles = partOf(docx, "word/styles.xml");
+        assertThat(styles).contains("w:styleId=\"Heading1\"").contains("w:styleId=\"Title\"");
+        assertThat(document).contains("<w:pStyle w:val=\"Title\"/>");
+        assertThat(document.split("<w:pStyle w:val=\"Heading1\"/>", -1).length - 1).isEqualTo(6);
+
+        // D-04: explicit UK A4 so pagination can't depend on the reader's Word locale.
+        assertThat(document).contains("<w:sectPr>").contains("w:w=\"11906\"").contains("w:h=\"16838\"");
+        assertThat(document).contains("w:top=\"1134\"");
+
+        // D-05: page numbers plus the child identifier on continuation pages.
+        String footer = partOf(docx, "word/footer1.xml");
+        assertThat(footer).contains("PAGE").contains("NUMPAGES");
+        assertThat(footer).contains("Alex Smith").contains("CR-42");
+        assertThat(footer).doesNotContain("${");
+
+        // D-06: an explicit font rather than whatever Word defaults to.
+        assertThat(styles).contains("w:ascii=\"Calibri\"");
+    }
+
+    @Test
+    void documentPropertiesAreSet(@TempDir Path tempDir) throws Exception {
+        Path docx = generateWithBrand(tempDir, "props.docx", "F36E2A", "FFF0DD");
+        try (XWPFDocument document = new XWPFDocument(java.nio.file.Files.newInputStream(docx))) {
+            var core = document.getProperties().getCoreProperties();
+            // D-07: title, real creator, language - creator was literally "Apache POI".
+            assertThat(core.getTitle()).contains("Return Home Interview Report").contains("Alex Smith");
+            assertThat(core.getCreator()).isEqualTo("STEPS with Children");
+            assertThat(core.getCreator()).isNotEqualTo("Apache POI");
+            assertThat(core.getUnderlyingProperties().getLanguageProperty()).contains("en-GB");
+        }
+    }
+
+    @Test
+    void unansweredValuesRenderMutedSoAnEmptyReportLooksEmpty(@TempDir Path tempDir) throws Exception {
+        // D-10: 16 of these appeared in a shipped sample, styled identically to real answers.
+        String xml = partOf(generateWithBrand(tempDir, "empty.docx", "F36E2A", "FFF0DD"), "word/document.xml");
+        assertThat(xml).contains("686F7D");
+        assertThat(xml).contains("Not provided");
+    }
+
     @Test
     void resolvesAllPlaceholdersAndConvertsNewlinesToRealLineBreaks(@TempDir Path tempDir) throws Exception {
         Map<String, String> values = Map.ofEntries(
