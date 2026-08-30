@@ -58,6 +58,12 @@
     </div>
 
     <div class="empty" th:if="${#lists.isEmpty(requests)}">No return home interviews recorded yet.</div>
+
+    <div class="card">
+        <h2 style="margin-top:0">Case history</h2>
+        <div th:replace="~{fragments/audit-history :: provenance}"></div>
+        <div th:replace="~{fragments/audit-history :: timeline(${caseHistory})}"></div>
+    </div>
 </main>
 </body>
 </html>

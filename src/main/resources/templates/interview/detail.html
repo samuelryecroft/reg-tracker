@@ -133,6 +133,12 @@
        th:href="@{/reports/{id}/view(id=${request.id})}">View report</a>
     <a th:if="${canDownload}" class="btn"
        th:href="@{/reports/{id}/download(id=${request.id})}">Download report</a>
+
+    <div class="card">
+        <h2 style="margin-top:0">History</h2>
+        <div th:replace="~{fragments/audit-history :: provenance}"></div>
+        <div th:replace="~{fragments/audit-history :: timeline(${auditHistory})}"></div>
+    </div>
 </main>
 </body>
 </html>

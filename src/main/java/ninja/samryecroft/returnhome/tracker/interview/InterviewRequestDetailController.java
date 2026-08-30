@@ -1,5 +1,6 @@
 package ninja.samryecroft.returnhome.tracker.interview;
 
+import ninja.samryecroft.returnhome.tracker.audit.AuditHistoryService;
 import ninja.samryecroft.returnhome.tracker.user.AppUserPrincipal;
 import ninja.samryecroft.returnhome.tracker.user.Role;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -14,9 +15,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 public class InterviewRequestDetailController {
 
     private final InterviewRequestService interviewRequestService;
+    private final AuditHistoryService auditHistoryService;
 
-    public InterviewRequestDetailController(InterviewRequestService interviewRequestService) {
+    public InterviewRequestDetailController(InterviewRequestService interviewRequestService,
+            AuditHistoryService auditHistoryService) {
         this.interviewRequestService = interviewRequestService;
+        this.auditHistoryService = auditHistoryService;
     }
 
     @GetMapping("/{id}")
@@ -49,6 +53,7 @@ public class InterviewRequestDetailController {
         model.addAttribute("canReview", canReview);
         model.addAttribute("canDownload", canDownload);
         model.addAttribute("canView", canDownload);
+        model.addAttribute("auditHistory", auditHistoryService.historyFor(request));
         return "interview/detail";
     }
 }

@@ -2,9 +2,11 @@ package ninja.samryecroft.returnhome.tracker.child;
 
 import jakarta.validation.Valid;
 import java.util.List;
+import ninja.samryecroft.returnhome.tracker.audit.AuditHistoryService;
 import ninja.samryecroft.returnhome.tracker.child.dto.CreateChildForm;
 import ninja.samryecroft.returnhome.tracker.home.Home;
 import ninja.samryecroft.returnhome.tracker.home.HomeRepository;
+import ninja.samryecroft.returnhome.tracker.interview.InterviewRequest;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewRequestRepository;
 import ninja.samryecroft.returnhome.tracker.organisation.OrgType;
 import ninja.samryecroft.returnhome.tracker.organisation.OrganisationAccessService;
@@ -30,13 +32,16 @@ public class ChildController {
     private final HomeRepository homeRepository;
     private final InterviewRequestRepository interviewRequestRepository;
     private final OrganisationAccessService organisationAccessService;
+    private final AuditHistoryService auditHistoryService;
 
     public ChildController(ChildRepository childRepository, HomeRepository homeRepository,
-            InterviewRequestRepository interviewRequestRepository, OrganisationAccessService organisationAccessService) {
+            InterviewRequestRepository interviewRequestRepository, OrganisationAccessService organisationAccessService,
+            AuditHistoryService auditHistoryService) {
         this.childRepository = childRepository;
         this.homeRepository = homeRepository;
         this.interviewRequestRepository = interviewRequestRepository;
         this.organisationAccessService = organisationAccessService;
+        this.auditHistoryService = auditHistoryService;
     }
 
     @GetMapping
@@ -69,8 +74,10 @@ public class ChildController {
             throw new AccessDeniedException("Not authorized to view this child");
         }
 
+        List<InterviewRequest> requests = interviewRequestRepository.findByChildIdOrderByCreatedAtDesc(id);
         model.addAttribute("child", child);
-        model.addAttribute("requests", interviewRequestRepository.findByChildIdOrderByCreatedAtDesc(id));
+        model.addAttribute("requests", requests);
+        model.addAttribute("caseHistory", auditHistoryService.caseHistoryFor(requests));
         return "children/detail";
     }
 

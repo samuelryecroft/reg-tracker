@@ -1,5 +1,6 @@
 package ninja.samryecroft.returnhome.tracker.audit;
 
+import java.util.Collection;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -16,6 +17,13 @@ public interface AuditEventRepository extends JpaRepository<AuditEvent, Long> {
     List<AuditEvent> findByEventTypeOrderByOccurredAtDesc(AuditEventType eventType);
 
     List<AuditEvent> findByTargetTypeAndTargetIdOrderByOccurredAtDesc(String targetType, Long targetId);
+
+    /**
+     * Batched form of the finder above - a child's case history spans several interview requests
+     * (and each one's report), so building it one id at a time would be N+1. Same target type across
+     * every id in the collection; callers combine two calls (one per target type) when they need both.
+     */
+    List<AuditEvent> findByTargetTypeAndTargetIdInOrderByOccurredAtDesc(String targetType, Collection<Long> targetIds);
 
     @Query("select a from AuditEvent a where a.organisationId = :organisationId order by a.occurredAt desc")
     List<AuditEvent> findByOrganisationId(@Param("organisationId") Long organisationId);
