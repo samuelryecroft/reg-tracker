@@ -2,6 +2,7 @@ package ninja.samryecroft.returnhome.tracker.interview;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import ninja.samryecroft.returnhome.tracker.audit.AuditEventPublisher;
 import ninja.samryecroft.returnhome.tracker.child.Child;
 import ninja.samryecroft.returnhome.tracker.child.ChildRepository;
 import ninja.samryecroft.returnhome.tracker.home.HomeRepository;
@@ -25,15 +26,17 @@ public class InterviewRequestService {
     private final UserRepository userRepository;
     private final HomeRepository homeRepository;
     private final OrganisationAccessService organisationAccessService;
+    private final AuditEventPublisher auditEventPublisher;
 
     public InterviewRequestService(InterviewRequestRepository interviewRequestRepository,
             ChildRepository childRepository, UserRepository userRepository, HomeRepository homeRepository,
-            OrganisationAccessService organisationAccessService) {
+            OrganisationAccessService organisationAccessService, AuditEventPublisher auditEventPublisher) {
         this.interviewRequestRepository = interviewRequestRepository;
         this.childRepository = childRepository;
         this.userRepository = userRepository;
         this.homeRepository = homeRepository;
         this.organisationAccessService = organisationAccessService;
+        this.auditEventPublisher = auditEventPublisher;
     }
 
     /** Pre-fills the submitter fields of a blank request form from the logged-in user's account. */
@@ -137,7 +140,9 @@ public class InterviewRequestService {
         request.setSubmitterContactDetails(form.getSubmitterContactDetails());
         request.setBestTimesToVisit(form.getBestTimesToVisit());
 
-        return interviewRequestRepository.save(request);
+        InterviewRequest saved = interviewRequestRepository.save(request);
+        auditEventPublisher.interviewRequestCreated(saved, principal);
+        return saved;
     }
 
     /** No scheduled time means the request moves to ALLOCATED, not SCHEDULED - the visitor arranges the time themselves via confirmSchedule(). */
@@ -157,11 +162,14 @@ public class InterviewRequestService {
             throw new AccessDeniedException("Visitor does not belong to your organisation");
         }
 
+        InterviewStatus statusBefore = request.getStatus();
         request.setAllocatedVisitor(visitor);
         request.setScheduledAt(form.getScheduledAt());
         request.setStatus(form.getScheduledAt() != null ? InterviewStatus.SCHEDULED : InterviewStatus.ALLOCATED);
         request.setUpdatedAt(LocalDateTime.now());
-        return interviewRequestRepository.save(request);
+        InterviewRequest saved = interviewRequestRepository.save(request);
+        auditEventPublisher.interviewRequestAllocated(saved, visitor.getId(), statusBefore, principal);
+        return saved;
     }
 
     /** The visitor (or an admin, on their behalf) sets/confirms the actual visit time after being allocated. */
@@ -171,10 +179,13 @@ public class InterviewRequestService {
         if (request.getStatus() != InterviewStatus.ALLOCATED) {
             throw new IllegalStateException("This interview is not awaiting a scheduled time");
         }
+        InterviewStatus statusBefore = request.getStatus();
         request.setScheduledAt(scheduledAt);
         request.setStatus(InterviewStatus.SCHEDULED);
         request.setUpdatedAt(LocalDateTime.now());
-        return interviewRequestRepository.save(request);
+        InterviewRequest saved = interviewRequestRepository.save(request);
+        auditEventPublisher.interviewRequestScheduled(saved, statusBefore, principal);
+        return saved;
     }
 
     @Transactional

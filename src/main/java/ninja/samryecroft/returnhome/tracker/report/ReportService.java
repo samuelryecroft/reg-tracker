@@ -9,6 +9,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.Map;
+import ninja.samryecroft.returnhome.tracker.audit.AuditEventPublisher;
 import ninja.samryecroft.returnhome.tracker.config.AppProperties;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewRequest;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewRequestService;
@@ -38,17 +39,20 @@ public class ReportService {
     private final DocxReportGenerator docxReportGenerator;
     private final AppProperties appProperties;
     private final ThemeService themeService;
+    private final AuditEventPublisher auditEventPublisher;
     private final DefaultResourceLoader resourceLoader = new DefaultResourceLoader();
 
     public ReportService(InterviewReportRepository interviewReportRepository,
             InterviewRequestService interviewRequestService, UserRepository userRepository,
-            DocxReportGenerator docxReportGenerator, AppProperties appProperties, ThemeService themeService) {
+            DocxReportGenerator docxReportGenerator, AppProperties appProperties, ThemeService themeService,
+            AuditEventPublisher auditEventPublisher) {
         this.interviewReportRepository = interviewReportRepository;
         this.interviewRequestService = interviewRequestService;
         this.userRepository = userRepository;
         this.docxReportGenerator = docxReportGenerator;
         this.appProperties = appProperties;
         this.themeService = themeService;
+        this.auditEventPublisher = auditEventPublisher;
     }
 
     /** The Visitor's or Reviewer's form, prefilled from an existing draft/rejected/submitted report
@@ -66,7 +70,9 @@ public class ReportService {
         applyFormValues(report, form);
         report.setStatus(ReportStatus.DRAFT);
         report.setUpdatedAt(LocalDateTime.now());
-        return interviewReportRepository.save(report);
+        InterviewReport saved = interviewReportRepository.save(report);
+        auditEventPublisher.reportDraftSaved(saved, principal);
+        return saved;
     }
 
     @Transactional
@@ -84,6 +90,7 @@ public class ReportService {
         report.setReviewedAt(null);
         report = interviewReportRepository.save(report);
         interviewRequestService.markStatus(report.getInterviewRequest(), InterviewStatus.REPORT_SUBMITTED);
+        auditEventPublisher.reportSubmitted(report, principal);
         return report;
     }
 
@@ -98,9 +105,11 @@ public class ReportService {
         report.setReviewedAt(LocalDateTime.now());
         report.setReviewComments(form.getReviewComments());
         report.setUpdatedAt(LocalDateTime.now());
-        generateDocx(report);
+        String generatedFilename = generateDocx(report);
         report = interviewReportRepository.save(report);
         interviewRequestService.markStatus(report.getInterviewRequest(), InterviewStatus.REPORT_APPROVED);
+        auditEventPublisher.docxGenerated(report, generatedFilename, principal);
+        auditEventPublisher.reportApproved(report, principal);
         return report;
     }
 
@@ -118,6 +127,8 @@ public class ReportService {
         report.setUpdatedAt(LocalDateTime.now());
         report = interviewReportRepository.save(report);
         interviewRequestService.markStatus(report.getInterviewRequest(), InterviewStatus.REPORT_REJECTED);
+        auditEventPublisher.reportRejected(report, form.getReviewComments() != null
+                && !form.getReviewComments().isBlank(), principal);
         return report;
     }
 
@@ -165,7 +176,8 @@ public class ReportService {
         return report;
     }
 
-    private void generateDocx(InterviewReport report) {
+    /** @return the generated filename, so the caller can record it on the audit event. */
+    private String generateDocx(InterviewReport report) {
         InterviewRequest request = report.getInterviewRequest();
         String filename = "rhi-report-" + request.getId() + "-" + System.currentTimeMillis() + ".docx";
         Path outputPath = Path.of(appProperties.getDocx().getOutputDir(), filename);
@@ -180,6 +192,7 @@ public class ReportService {
             throw new UncheckedIOException("Failed to generate report document", e);
         }
         report.setGeneratedDocumentPath(filename);
+        return filename;
     }
 
     private SubmitReportForm blankFormFor(AppUserPrincipal principal) {

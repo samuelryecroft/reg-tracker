@@ -3,6 +3,7 @@ package ninja.samryecroft.returnhome.tracker.report;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import ninja.samryecroft.returnhome.tracker.audit.AuditEventPublisher;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewRequest;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewRequestService;
 import ninja.samryecroft.returnhome.tracker.user.AppUserPrincipal;
@@ -26,10 +27,13 @@ public class ReportController {
 
     private final InterviewRequestService interviewRequestService;
     private final ReportService reportService;
+    private final AuditEventPublisher auditEventPublisher;
 
-    public ReportController(InterviewRequestService interviewRequestService, ReportService reportService) {
+    public ReportController(InterviewRequestService interviewRequestService, ReportService reportService,
+            AuditEventPublisher auditEventPublisher) {
         this.interviewRequestService = interviewRequestService;
         this.reportService = reportService;
+        this.auditEventPublisher = auditEventPublisher;
     }
 
     @GetMapping("/reports/{requestId}/download")
@@ -41,6 +45,13 @@ public class ReportController {
         Path path = reportService.resolveDocumentPath(report);
 
         String filename = "RHI-Report-" + request.getChild().getFullName().replace(" ", "-") + ".docx";
+
+        // Published here rather than from a service method because a download is a read with no
+        // transactional service call of its own to hang off - the audit listener's
+        // fallbackExecution handles the no-transaction case. Recording who *reads* a safeguarding
+        // document matters as much as who wrote it (AUDIT-PLAN.md §A.3).
+        auditEventPublisher.docxDownloaded(request, report.getId(),
+                report.getGeneratedDocumentPath(), principal);
 
         return ResponseEntity.ok()
                 .contentType(DOCX_MEDIA_TYPE)

@@ -4,6 +4,7 @@ import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import ninja.samryecroft.returnhome.tracker.audit.AuditEventPublisher;
 import ninja.samryecroft.returnhome.tracker.home.Home;
 import ninja.samryecroft.returnhome.tracker.home.HomeRepository;
 import ninja.samryecroft.returnhome.tracker.organisation.Organisation;
@@ -28,15 +29,17 @@ public class UserService {
     private final OrganisationRepository organisationRepository;
     private final OrganisationAccessService organisationAccessService;
     private final PasswordEncoder passwordEncoder;
+    private final AuditEventPublisher auditEventPublisher;
 
     public UserService(UserRepository userRepository, HomeRepository homeRepository,
             OrganisationRepository organisationRepository, OrganisationAccessService organisationAccessService,
-            PasswordEncoder passwordEncoder) {
+            PasswordEncoder passwordEncoder, AuditEventPublisher auditEventPublisher) {
         this.userRepository = userRepository;
         this.homeRepository = homeRepository;
         this.organisationRepository = organisationRepository;
         this.organisationAccessService = organisationAccessService;
         this.passwordEncoder = passwordEncoder;
+        this.auditEventPublisher = auditEventPublisher;
     }
 
     /** Platform ADMIN sees everyone; an org-admin sees only users belonging to their own organisation. */
@@ -93,9 +96,11 @@ public class UserService {
         user.setRoles(form.getRoles());
         user.setHome(form.getRoles().contains(Role.HOME_STAFF) ? resolveHome(form.getHomeId(), principal) : null);
         user.setOrganisation(needsOrganisation(form.getRoles()) ? resolveOrganisation(form.getOrganisationId(), principal) : null);
-        user.setViewerHomes(form.getRoles().contains(Role.VIEWER) ? resolveViewerHomes(form.getViewerHomeIds(), principal) : Set.of());
+        user.setViewerHomes(form.getRoles().contains(Role.VIEWER) ? resolveViewerHomes(form.getViewerHomeIds(), principal) : new HashSet<>());
         user.setEnabled(true);
-        return userRepository.save(user);
+        User saved = userRepository.save(user);
+        auditEventPublisher.userCreated(saved, principal);
+        return saved;
     }
 
     @Transactional
@@ -103,16 +108,24 @@ public class UserService {
         User user = getAuthorized(id, principal);
         validateRoles(form.getRoles(), principal);
 
+        // Snapshotted before the setters below mutate the managed entity, so the audit row can
+        // record the actual role/enabled transition rather than just the end state.
+        Set<Role> rolesBefore = Set.copyOf(user.getRoles());
+        boolean enabledBefore = user.isEnabled();
+
         user.setFullName(form.getFullName());
         user.setRoles(form.getRoles());
         user.setHome(form.getRoles().contains(Role.HOME_STAFF) ? resolveHome(form.getHomeId(), principal) : null);
         user.setOrganisation(needsOrganisation(form.getRoles()) ? resolveOrganisation(form.getOrganisationId(), principal) : null);
-        user.setViewerHomes(form.getRoles().contains(Role.VIEWER) ? resolveViewerHomes(form.getViewerHomeIds(), principal) : Set.of());
+        user.setViewerHomes(form.getRoles().contains(Role.VIEWER) ? resolveViewerHomes(form.getViewerHomeIds(), principal) : new HashSet<>());
         user.setEnabled(form.isEnabled());
-        if (form.getNewPassword() != null && !form.getNewPassword().isBlank()) {
+        boolean passwordChanged = form.getNewPassword() != null && !form.getNewPassword().isBlank();
+        if (passwordChanged) {
             user.setPassword(passwordEncoder.encode(form.getNewPassword()));
         }
-        return userRepository.save(user);
+        User saved = userRepository.save(user);
+        auditEventPublisher.userUpdated(saved, rolesBefore, enabledBefore, passwordChanged, principal);
+        return saved;
     }
 
     private void validateRoles(Set<Role> roles, AppUserPrincipal principal) {
