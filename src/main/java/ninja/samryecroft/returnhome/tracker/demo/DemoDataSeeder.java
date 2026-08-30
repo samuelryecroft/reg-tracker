@@ -32,7 +32,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Profile;
-import org.springframework.core.annotation.Order;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
@@ -57,6 +56,14 @@ import org.springframework.stereotype.Component;
  * UPDATE and DELETE) and its rows reference the seeded users. To start over, throw the database
  * away and recreate it - see DEMO.md, which is one command.
  *
+ * <p><strong>Never reassign from {@code save()} here.</strong> For an entity that already has an
+ * id, {@code save()} is a {@code merge()}: it returns a <em>different</em>, managed copy whose lazy
+ * associations are proxies, and this class runs outside any transaction, so those proxies are
+ * detached the moment the call returns. The audit publisher resolves organisation and home scope by
+ * walking those associations, so handing it a merged copy fails with a
+ * {@code LazyInitializationException}. The locally-built instance is already fully populated - keep
+ * using it and discard the return value.
+ *
  * <p><strong>How the lifecycle states are produced.</strong> Base records are written straight
  * through the repositories, but every state transition is announced through the real
  * {@link AuditEventPublisher}, and the two review outcomes are driven through the real
@@ -66,7 +73,6 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @Profile("demo")
-@Order(100) // after AdminUserSeeder, so the platform admin is the first user in the audit trail
 public class DemoDataSeeder implements ApplicationRunner {
 
     private static final Logger log = LoggerFactory.getLogger(DemoDataSeeder.class);
@@ -134,7 +140,7 @@ public class DemoDataSeeder implements ApplicationRunner {
      * Deliberately answered with an existing production query rather than a new {@code findByName}
      * on the shared repository: the demo feature should not widen the application's persistence API.
      */
-    private boolean alreadySeeded() {
+    boolean alreadySeeded() {
         return organisationRepository.findByTypeOrderByName(OrgType.SUPPLIER).stream()
                 .anyMatch(org -> MARKER_ORGANISATION.equals(org.getName()));
     }
@@ -241,7 +247,7 @@ public class DemoDataSeeder implements ApplicationRunner {
         // A Viewer has no org of its own: it is granted read access to a named set of homes.
         seed.viewer = user("viewer", "Local Authority Liaison", Set.of(Role.VIEWER), null, null);
         seed.viewer.setViewerHomes(new LinkedHashSet<>(List.of(seed.oakwood, seed.marisco)));
-        seed.viewer = userRepository.save(seed.viewer);
+        userRepository.save(seed.viewer);
 
         // Northgate's own coordinator, to show cross-Supplier separation in the demo.
         seed.northgateCoordinator =
@@ -282,15 +288,13 @@ public class DemoDataSeeder implements ApplicationRunner {
         // 1. REQUESTED - raised by home staff this morning, not yet picked up.
         InterviewRequest requested = request(seed, seed.alex, seed.oakwood, seed.homeStaff,
                 now.minusHours(6), "Returned overnight; keen to be seen quickly.");
-        audit.interviewRequestCreated(requested, new AppUserPrincipal(seed.homeStaff));
 
         // 2. ALLOCATED - a visitor is named but no date is agreed yet.
         InterviewRequest allocated = request(seed, seed.priya, seed.oakwood, seed.homeStaff,
                 now.minusDays(1), "Second episode this month; escalation discussed.");
-        audit.interviewRequestCreated(allocated, new AppUserPrincipal(seed.homeStaff));
         allocated.setAllocatedVisitor(seed.visitor);
         allocated.setStatus(InterviewStatus.ALLOCATED);
-        allocated = interviewRequestRepository.save(allocated);
+        interviewRequestRepository.save(allocated);
         audit.interviewRequestAllocated(allocated, seed.visitor.getId(), InterviewStatus.REQUESTED,
                 new AppUserPrincipal(seed.coordinator));
 
@@ -398,7 +402,9 @@ public class DemoDataSeeder implements ApplicationRunner {
         request.setSubmitterContactDetails("01234 000002");
         request.setBestTimesToVisit("Weekday afternoons after 15:30 (school hours excluded)");
         request.setUpdatedAt(raisedAt);
-        return interviewRequestRepository.save(request);
+        interviewRequestRepository.save(request);
+        audit.interviewRequestCreated(request, new AppUserPrincipal(raisedBy));
+        return request;
     }
 
     private InterviewRequest schedule(Seed seed, InterviewRequest request, User visitor,
@@ -407,11 +413,11 @@ public class DemoDataSeeder implements ApplicationRunner {
         request.setAllocatedVisitor(visitor);
         request.setScheduledAt(at);
         request.setStatus(InterviewStatus.SCHEDULED);
-        InterviewRequest saved = interviewRequestRepository.save(request);
-        audit.interviewRequestAllocated(saved, visitor.getId(), before,
+        interviewRequestRepository.save(request);
+        audit.interviewRequestAllocated(request, visitor.getId(), before,
                 new AppUserPrincipal(seed.coordinator));
-        audit.interviewRequestScheduled(saved, before, new AppUserPrincipal(seed.coordinator));
-        return saved;
+        audit.interviewRequestScheduled(request, before, new AppUserPrincipal(seed.coordinator));
+        return request;
     }
 
     /** A fully-answered report body, so the generated .docx has content in every section. */

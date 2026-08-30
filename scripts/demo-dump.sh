@@ -11,5 +11,5 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 OUT="${1:-demo-seed.dump}"
 
-docker compose exec -T postgres pg_dump -U tracker -d return_home_tracker -Fc > "$OUT"
+docker compose exec -T postgres pg_dump -U tracker -d "${DEMO_DB:-rht_demo}" -Fc > "$OUT"
 echo "Wrote $OUT ($(du -h "$OUT" | cut -f1))"

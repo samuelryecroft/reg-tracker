@@ -29,6 +29,21 @@ startup. An admin account is seeded automatically on first boot:
 Log in as `admin` and go to **Users** to create Coordinator, Contractor and
 Home Staff accounts.
 
+## Demo instance
+
+To show the app to someone, use the seeded demo instead of building data by
+hand:
+
+```bash
+./scripts/demo-up.sh
+```
+
+That brings up a separate `rht_demo` database populated with a complete
+fictional tenancy — two supplier organisations, their care providers, users in
+every role, and an interview in every lifecycle state. See [DEMO.md](DEMO.md)
+for the logins and what is in there. It is gated behind the `demo` Spring
+profile and never runs otherwise.
+
 ## Known v1 limitation: Homes and Children
 
 There is currently no admin UI for creating **Homes** or **Children** —
