@@ -25,16 +25,16 @@
             <dd th:text="${request.requestedBy.fullName}">User</dd>
 
             <dt>Date of missing episode</dt>
-            <dd th:text="${request.missingSince} ?: '—'">Missing since</dd>
+            <dd th:text="${request.missingSince} != null ? ${#temporals.format(request.missingSince, 'dd MMM yyyy HH:mm')} : '—'">Missing since</dd>
 
             <dt>Date of return</dt>
-            <dd th:text="${request.returnedAt} ?: '—'">Returned at</dd>
+            <dd th:text="${request.returnedAt} != null ? ${#temporals.format(request.returnedAt, 'dd MMM yyyy HH:mm')} : '—'">Returned at</dd>
 
             <dt>Allocated visitor</dt>
             <dd th:text="${request.allocatedVisitor} ? ${request.allocatedVisitor.fullName} : 'Not yet allocated'">Visitor</dd>
 
             <dt>Scheduled visit</dt>
-            <dd th:text="${request.scheduledAt} ?: 'Not yet scheduled'">Scheduled</dd>
+            <dd th:text="${request.scheduledAt} != null ? ${#temporals.format(request.scheduledAt, 'dd MMM yyyy HH:mm')} : 'Not yet scheduled'">Scheduled</dd>
         </dl>
     </div>
 

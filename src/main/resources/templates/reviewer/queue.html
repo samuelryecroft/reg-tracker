@@ -10,14 +10,16 @@
 <main id="main">
     <h1>Reports Awaiting Review</h1>
 
+    <div class="table-wrap responsive">
     <table>
+        <caption>Reports submitted by visitors, awaiting your review.</caption>
         <thead>
         <tr>
-            <th>Child</th>
-            <th>Home</th>
-            <th>Visitor</th>
-            <th>Raised</th>
-            <th></th>
+            <th scope="col">Child</th>
+            <th scope="col">Home</th>
+            <th scope="col">Visitor</th>
+            <th scope="col">Raised</th>
+            <th scope="col" class="visually-hidden">Action</th>
         </tr>
         </thead>
         <tbody>
@@ -27,15 +29,30 @@
             <td th:text="${r.allocatedVisitor} ? ${r.allocatedVisitor.fullName} : '—'">Visitor</td>
             <td th:text="${#temporals.format(r.createdAt, 'dd MMM yyyy HH:mm')}">Created</td>
             <td>
-                <a th:href="@{/interview-requests/{id}(id=${r.id})}">View details</a> ·
-                <a th:href="@{/reviewer/reports/{id}/review(id=${r.id})}">Review</a>
+                <a class="rowlink" th:href="@{/interview-requests/{id}(id=${r.id})}">View details</a>
+                <a class="rowlink" th:href="@{/reviewer/reports/{id}/review(id=${r.id})}">Review</a>
             </td>
-        </tr>
-        <tr th:if="${#lists.isEmpty(requests)}">
-            <td colspan="5" class="muted">Nothing awaiting review.</td>
         </tr>
         </tbody>
     </table>
+    </div>
+
+    <div class="stack">
+        <div class="srow" th:each="r : ${requests}">
+            <div class="top"><span class="name" th:text="${r.child.fullName}">Child Name</span></div>
+            <dl>
+                <dt>Home</dt><dd th:text="${r.home.name}">Home</dd>
+                <dt>Visitor</dt><dd th:text="${r.allocatedVisitor} ? ${r.allocatedVisitor.fullName} : '—'">Visitor</dd>
+                <dt>Raised</dt><dd th:text="${#temporals.format(r.createdAt, 'dd MMM yyyy HH:mm')}">Raised</dd>
+            </dl>
+            <div class="act">
+                <a class="btn" th:href="@{/reviewer/reports/{id}/review(id=${r.id})}">Review</a>
+                <a class="btn ghost" th:href="@{/interview-requests/{id}(id=${r.id})}">View details</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="empty" th:if="${#lists.isEmpty(requests)}">Nothing awaiting review.</div>
 </main>
 </body>
 </html>

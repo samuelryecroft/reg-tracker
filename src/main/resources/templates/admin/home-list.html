@@ -11,13 +11,15 @@
     <h1>Homes</h1>
     <a th:if="${canCreate}" class="btn" href="/admin/homes/new">Add home</a>
 
+    <div class="table-wrap responsive">
     <table>
+        <caption>All children's homes.</caption>
         <thead>
         <tr>
-            <th>Name</th>
-            <th>Organisation</th>
-            <th>Address</th>
-            <th>Local authority</th>
+            <th scope="col">Name</th>
+            <th scope="col">Organisation</th>
+            <th scope="col">Address</th>
+            <th scope="col">Local authority</th>
         </tr>
         </thead>
         <tbody>
@@ -27,11 +29,22 @@
             <td th:text="${h.fullAddress} ?: '—'">Address</td>
             <td th:text="${h.localAuthority} ?: '—'">Local authority</td>
         </tr>
-        <tr th:if="${#lists.isEmpty(homes)}">
-            <td colspan="4" class="muted">No homes yet.</td>
-        </tr>
         </tbody>
     </table>
+    </div>
+
+    <div class="stack">
+        <div class="srow" th:each="h : ${homes}">
+            <div class="top"><span class="name" th:text="${h.name}">Home name</span></div>
+            <dl>
+                <dt>Organisation</dt><dd th:text="${h.organisation.name}">Organisation</dd>
+                <dt>Address</dt><dd th:text="${h.fullAddress} ?: '—'">Address</dd>
+                <dt>Local authority</dt><dd th:text="${h.localAuthority} ?: '—'">Local authority</dd>
+            </dl>
+        </div>
+    </div>
+
+    <div class="empty" th:if="${#lists.isEmpty(homes)}">No homes yet.</div>
 </main>
 </body>
 </html>

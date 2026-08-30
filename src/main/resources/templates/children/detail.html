@@ -11,34 +11,53 @@
     <h1 th:text="${child.fullName}">Child Name</h1>
     <p class="muted" th:text="${'Home: ' + child.home.name}">Home</p>
 
-    <h3>Return Home Interview History</h3>
+    <h2>Return Home Interview History</h2>
+    <div class="table-wrap responsive">
     <table>
+        <caption>Every interview request raised for this child.</caption>
         <thead>
         <tr>
-            <th>Status</th>
-            <th>Raised</th>
-            <th>Scheduled</th>
-            <th></th>
+            <th scope="col">Status</th>
+            <th scope="col">Raised</th>
+            <th scope="col">Scheduled</th>
+            <th scope="col" class="visually-hidden">Action</th>
         </tr>
         </thead>
         <tbody>
         <tr th:each="r : ${requests}">
             <td><span class="status" th:classappend="${r.status}" th:text="${r.status.displayName}">STATUS</span></td>
             <td th:text="${#temporals.format(r.createdAt, 'dd MMM yyyy HH:mm')}">Raised</td>
-            <td th:text="${r.scheduledAt} ?: '—'">Scheduled</td>
+            <td th:text="${r.scheduledAt} != null ? ${#temporals.format(r.scheduledAt, 'dd MMM yyyy HH:mm')} : '—'">Scheduled</td>
             <td>
-                <a th:href="@{/interview-requests/{id}(id=${r.id})}">View details</a>
+                <a class="rowlink" th:href="@{/interview-requests/{id}(id=${r.id})}">View details</a>
                 <th:block th:if="${r.status.name() == 'REPORT_APPROVED'}">
-                    · <a th:href="@{/reports/{id}/view(id=${r.id})}">View report</a>
-                    · <a th:href="@{/reports/{id}/download(id=${r.id})}">Download</a>
+                    <a class="rowlink" th:href="@{/reports/{id}/view(id=${r.id})}">View report</a>
+                    <a class="rowlink" th:href="@{/reports/{id}/download(id=${r.id})}">Download</a>
                 </th:block>
             </td>
         </tr>
-        <tr th:if="${#lists.isEmpty(requests)}">
-            <td colspan="4" class="muted">No return home interviews recorded yet.</td>
-        </tr>
         </tbody>
     </table>
+    </div>
+
+    <div class="stack">
+        <div class="srow" th:each="r : ${requests}">
+            <div class="top"><span class="status" th:classappend="${r.status}" th:text="${r.status.displayName}">STATUS</span></div>
+            <dl>
+                <dt>Raised</dt><dd th:text="${#temporals.format(r.createdAt, 'dd MMM yyyy HH:mm')}">Raised</dd>
+                <dt>Scheduled</dt><dd th:text="${r.scheduledAt} != null ? ${#temporals.format(r.scheduledAt, 'dd MMM yyyy HH:mm')} : 'Not yet scheduled'">Scheduled</dd>
+            </dl>
+            <div class="act">
+                <a class="btn ghost" th:href="@{/interview-requests/{id}(id=${r.id})}">View details</a>
+                <th:block th:if="${r.status.name() == 'REPORT_APPROVED'}">
+                    <a class="btn secondary" th:href="@{/reports/{id}/view(id=${r.id})}">View report</a>
+                    <a class="btn ghost" th:href="@{/reports/{id}/download(id=${r.id})}">Download</a>
+                </th:block>
+            </div>
+        </div>
+    </div>
+
+    <div class="empty" th:if="${#lists.isEmpty(requests)}">No return home interviews recorded yet.</div>
 </main>
 </body>
 </html>

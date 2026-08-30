@@ -13,17 +13,30 @@
 
     <div class="card">
         <form method="post" th:action="@{/coordinator/requests/{id}/allocate(id=${request.id})}" th:object="${form}">
-            <label for="visitorId">Visitor</label>
-            <select id="visitorId" th:field="*{visitorId}">
+            <div class="banner err" role="alert" th:if="${#fields.hasErrors('*')}">
+                <span class="ic" aria-hidden="true">▲</span>
+                <div>
+                    <strong>Before this can be allocated</strong>
+                    <ul><li th:if="${#fields.hasErrors('visitorId')}"><a href="#visitorId" th:text="${#fields.errors('visitorId')[0]}">Error</a></li></ul>
+                </div>
+            </div>
+
+            <label for="visitorId">Visitor <span class="req" aria-hidden="true">*</span></label>
+            <select id="visitorId" th:field="*{visitorId}" required
+                    th:errorclass="is-invalid" th:aria-invalid="${#fields.hasErrors('visitorId')}" aria-describedby="visitorId-error">
                 <option value="">Select a visitor…</option>
                 <option th:each="v : ${visitors}" th:value="${v.id}" th:text="${v.fullName}">Visitor</option>
             </select>
+            <div th:replace="~{fragments/layout :: fieldError('visitorId')}"></div>
 
-            <label for="scheduledAt">Scheduled visit date/time (optional — leave blank for the visitor to arrange with the home)</label>
+            <label for="scheduledAt">Scheduled visit date/time</label>
+            <p class="hint">Optional — leave blank for the visitor to arrange with the home.</p>
             <input type="datetime-local" id="scheduledAt" th:field="*{scheduledAt}"/>
 
-            <button type="submit" class="btn">Allocate &amp; schedule</button>
-            <a class="btn secondary" href="/coordinator/requests">Cancel</a>
+            <div class="btn-row">
+                <button type="submit" class="btn">Allocate &amp; schedule</button>
+                <a class="btn ghost" href="/coordinator/requests">Cancel</a>
+            </div>
         </form>
     </div>
 </main>

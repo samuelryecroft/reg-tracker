@@ -6,7 +6,7 @@
     <th:block th:replace="~{fragments/layout :: styles}"></th:block>
 </head>
 <body>
-<main id="main" style="max-width: 480px;">
+<main id="main" class="narrow">
     <h1 th:text="${status} ?: 'Error'">Error</h1>
     <p class="error" th:text="${message} ?: 'Something went wrong.'">Message</p>
     <a class="btn secondary" href="/">Back home</a>

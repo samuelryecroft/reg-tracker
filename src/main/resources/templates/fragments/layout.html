@@ -5,7 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" th:href="@{/css/app.css}">
 <style th:if="${theme != null}"
-       th:text="${':root { --accent: ' + theme.primaryColor + '; --accent-dark: ' + theme.primaryColorDark + '; --tint: ' + theme.secondaryColor + '; }'}"></style>
+       th:text="${':root { --accent: ' + theme.primaryColor + '; --accent-dark: ' + theme.primaryColorDark + '; --accent-ink: ' + theme.primaryColorInk + '; --tint: ' + theme.secondaryColor + '; }'}"></style>
+</th:block>
+
+<!-- FE-02: shared field-error rendering. Pairs with th:errorclass="is-invalid" and aria-describedby
+     on the input; the ▲ glyph and colour come from .field-error in app.css, not from this markup,
+     so validation is never signalled by colour alone. -->
+<th:block th:fragment="fieldError(field)">
+    <p class="field-error" th:if="${#fields.hasErrors(field)}" th:id="${field} + '-error'" th:errors="${field}"></p>
 </th:block>
 </head>
 <body>
@@ -26,7 +33,7 @@
         <a th:if="${#authorization.expression('hasRole(''ADMIN'')')}" href="/admin/organisations">Organisations</a>
     </nav>
     <form method="post" th:action="@{/logout}">
-        <span sec:authentication="name" style="margin-right:0.75rem;"></span>
+        <span sec:authentication="name" class="header-user"></span>
         <button type="submit">Log out</button>
     </form>
 </header>

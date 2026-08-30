@@ -11,29 +11,46 @@
     <h1>Return Home Interview Requests</h1>
     <a class="btn" href="/requests/new">Raise new request</a>
 
+    <div class="table-wrap responsive">
     <table>
+        <caption>Requests raised by your home.</caption>
         <thead>
         <tr>
-            <th>Child</th>
-            <th>Status</th>
-            <th>Scheduled</th>
-            <th>Visitor</th>
-            <th>Raised</th>
+            <th scope="col">Child</th>
+            <th scope="col">Status</th>
+            <th scope="col">Scheduled</th>
+            <th scope="col">Visitor</th>
+            <th scope="col">Raised</th>
         </tr>
         </thead>
         <tbody>
         <tr th:each="r : ${requests}">
-            <td><a th:href="@{/interview-requests/{id}(id=${r.id})}" th:text="${r.child.fullName}">Child Name</a></td>
+            <td><a class="rowlink" th:href="@{/interview-requests/{id}(id=${r.id})}" th:text="${r.child.fullName}">Child Name</a></td>
             <td><span class="status" th:classappend="${r.status}" th:text="${r.status.displayName}">STATUS</span></td>
-            <td th:text="${r.scheduledAt} ?: '—'">Scheduled</td>
+            <td th:text="${r.scheduledAt} != null ? ${#temporals.format(r.scheduledAt, 'dd MMM yyyy HH:mm')} : '—'">Scheduled</td>
             <td th:text="${r.allocatedVisitor} ? ${r.allocatedVisitor.fullName} : '—'">Visitor</td>
             <td th:text="${#temporals.format(r.createdAt, 'dd MMM yyyy HH:mm')}">Created</td>
         </tr>
-        <tr th:if="${#lists.isEmpty(requests)}">
-            <td colspan="5" class="muted">No requests yet.</td>
-        </tr>
         </tbody>
     </table>
+    </div>
+
+    <div class="stack">
+        <div class="srow" th:each="r : ${requests}">
+            <div class="top">
+                <span class="name" th:text="${r.child.fullName}">Child Name</span>
+                <span class="status" th:classappend="${r.status}" th:text="${r.status.displayName}">STATUS</span>
+            </div>
+            <dl>
+                <dt>Visitor</dt><dd th:text="${r.allocatedVisitor} ? ${r.allocatedVisitor.fullName} : 'Not yet allocated'">Visitor</dd>
+                <dt>Scheduled</dt><dd th:text="${r.scheduledAt} != null ? ${#temporals.format(r.scheduledAt, 'dd MMM yyyy HH:mm')} : 'Not yet scheduled'">Scheduled</dd>
+                <dt>Raised</dt><dd th:text="${#temporals.format(r.createdAt, 'dd MMM yyyy HH:mm')}">Raised</dd>
+            </dl>
+            <div class="act"><a class="btn ghost" th:href="@{/interview-requests/{id}(id=${r.id})}">View details</a></div>
+        </div>
+    </div>
+
+    <div class="empty" th:if="${#lists.isEmpty(requests)}">No requests yet.</div>
 </main>
 </body>
 </html>

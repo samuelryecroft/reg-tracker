@@ -14,7 +14,9 @@ class LoginUiTest extends AbstractUiTest {
         page.click("button[type=submit]");
         page.waitForLoadState();
 
-        assertThat(page.getByText("Invalid username or password.").isVisible()).isTrue();
+        // T25 redesign: "We couldn't sign you in" replaces "Invalid username or password" - same
+        // information, without implying the user necessarily did something wrong (mockups.html §01).
+        assertThat(page.getByText("We couldn't sign you in").isVisible()).isTrue();
         assertThat(page.url()).contains("/login");
     }
 }

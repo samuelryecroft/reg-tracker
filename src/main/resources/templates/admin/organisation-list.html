@@ -11,12 +11,14 @@
     <h1>Organisations</h1>
     <a class="btn" href="/admin/organisations/new">Add organisation</a>
 
+    <div class="table-wrap responsive">
     <table>
+        <caption>All organisations on the platform.</caption>
         <thead>
         <tr>
-            <th>Name</th>
-            <th>Type</th>
-            <th>Supplier</th>
+            <th scope="col">Name</th>
+            <th scope="col">Type</th>
+            <th scope="col">Supplier</th>
         </tr>
         </thead>
         <tbody>
@@ -25,11 +27,21 @@
             <td th:text="${o.type}">Type</td>
             <td th:text="${o.supplierOrganisation} ? ${o.supplierOrganisation.name} : '—'">Supplier</td>
         </tr>
-        <tr th:if="${#lists.isEmpty(organisations)}">
-            <td colspan="3" class="muted">No organisations yet.</td>
-        </tr>
         </tbody>
     </table>
+    </div>
+
+    <div class="stack">
+        <div class="srow" th:each="o : ${organisations}">
+            <div class="top"><span class="name" th:text="${o.name}">Name</span></div>
+            <dl>
+                <dt>Type</dt><dd th:text="${o.type}">Type</dd>
+                <dt>Supplier</dt><dd th:text="${o.supplierOrganisation} ? ${o.supplierOrganisation.name} : '—'">Supplier</dd>
+            </dl>
+        </div>
+    </div>
+
+    <div class="empty" th:if="${#lists.isEmpty(organisations)}">No organisations yet.</div>
 </main>
 </body>
 </html>
