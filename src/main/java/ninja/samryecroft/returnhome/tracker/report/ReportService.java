@@ -94,12 +94,16 @@ public class ReportService {
         return report;
     }
 
-    /** Approving may also apply the reviewer's own edits, and is the point the docx is generated -
-     * not submission, since the content can still change (reviewer edit, or reject/resubmit) after. */
+    /**
+     * Approving transitions the report and generates the docx; it deliberately does <em>not</em> apply
+     * the submitted form values. The report is the visitor's own record of the interview and is signed
+     * in their name, so a reviewer must not be able to alter its content - corrections go back via
+     * {@link #reject} for the visitor to amend and resubmit. Generation still happens here rather than
+     * at submission because the content can change across a reject/resubmit round.
+     */
     @Transactional
     public InterviewReport approve(Long requestId, SubmitReportForm form, AppUserPrincipal principal) {
         InterviewReport report = getReviewable(requestId, principal);
-        applyFormValues(report, form);
         report.setStatus(ReportStatus.APPROVED);
         report.setReviewedBy(userRepository.findById(principal.getUserId()).orElseThrow());
         report.setReviewedAt(LocalDateTime.now());
@@ -119,7 +123,6 @@ public class ReportService {
             throw new IllegalArgumentException("Comments are required when rejecting a report");
         }
         InterviewReport report = getReviewable(requestId, principal);
-        applyFormValues(report, form);
         report.setStatus(ReportStatus.REJECTED);
         report.setReviewedBy(userRepository.findById(principal.getUserId()).orElseThrow());
         report.setReviewedAt(LocalDateTime.now());

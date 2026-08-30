@@ -1,40 +1,40 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
-<th:block th:fragment="fields">
+<th:block th:fragment="fields(readonly)">
     <h3>Details</h3>
 
     <label for="interviewDate">Date of interview</label>
-    <input type="date" id="interviewDate" th:field="*{interviewDate}"/>
+    <input type="date" id="interviewDate" th:field="*{interviewDate}" th:readonly="${readonly}"/>
 
     <label for="interviewLocation">Location of this interview</label>
-    <input type="text" id="interviewLocation" th:field="*{interviewLocation}"/>
+    <input type="text" id="interviewLocation" th:field="*{interviewLocation}" th:readonly="${readonly}"/>
 
     <label for="within72Hours">Was this interview offered and completed within 72 hours of return?</label>
-    <select id="within72Hours" th:field="*{within72Hours}">
+    <select id="within72Hours" th:field="*{within72Hours}" th:disabled="${readonly}">
         <option value="">Unknown</option>
         <option value="true">Yes</option>
         <option value="false">No</option>
     </select>
 
     <label for="ifNotWhyLate">If not, why?</label>
-    <textarea id="ifNotWhyLate" th:field="*{ifNotWhyLate}"></textarea>
+    <textarea id="ifNotWhyLate" th:field="*{ifNotWhyLate}" th:readonly="${readonly}"></textarea>
 
     <label for="consultationWithHomeStaff">Consultation with home's staff to establish any new information</label>
-    <textarea id="consultationWithHomeStaff" th:field="*{consultationWithHomeStaff}"></textarea>
+    <textarea id="consultationWithHomeStaff" th:field="*{consultationWithHomeStaff}" th:readonly="${readonly}"></textarea>
 
     <label for="previouslyMissing">Has this young person previously been missing?</label>
-    <select id="previouslyMissing" th:field="*{previouslyMissing}">
+    <select id="previouslyMissing" th:field="*{previouslyMissing}" th:disabled="${readonly}">
         <option value="">Unknown</option>
         <option value="true">Yes</option>
         <option value="false">No</option>
     </select>
 
     <label for="missingOccasionsLast30Days">How many occasions of missing has there been in the last 30 days?</label>
-    <input type="number" min="0" id="missingOccasionsLast30Days" th:field="*{missingOccasionsLast30Days}"/>
+    <input type="number" min="0" id="missingOccasionsLast30Days" th:field="*{missingOccasionsLast30Days}" th:readonly="${readonly}"/>
 
     <label for="confidentialityExplained">Confidentiality explained to the young person regarding safeguarding duty of care?</label>
-    <select id="confidentialityExplained" th:field="*{confidentialityExplained}">
+    <select id="confidentialityExplained" th:field="*{confidentialityExplained}" th:disabled="${readonly}">
         <option value="">Unknown</option>
         <option value="true">Yes</option>
         <option value="false">No</option>
@@ -43,80 +43,80 @@
     <h3>Return Home Interview</h3>
 
     <label for="interviewAccepted">Interview accepted?</label>
-    <select id="interviewAccepted" th:field="*{interviewAccepted}">
+    <select id="interviewAccepted" th:field="*{interviewAccepted}" th:disabled="${readonly}">
         <option value="">Unknown</option>
         <option value="true">Yes</option>
         <option value="false">No</option>
     </select>
 
     <label for="interviewDeclinedReason">If not, why?</label>
-    <textarea id="interviewDeclinedReason" th:field="*{interviewDeclinedReason}"></textarea>
+    <textarea id="interviewDeclinedReason" th:field="*{interviewDeclinedReason}" th:readonly="${readonly}"></textarea>
 
     <label for="whereWereYouWhileMissing">Where were you while missing?</label>
-    <textarea id="whereWereYouWhileMissing" th:field="*{whereWereYouWhileMissing}"></textarea>
+    <textarea id="whereWereYouWhileMissing" th:field="*{whereWereYouWhileMissing}" th:readonly="${readonly}"></textarea>
 
     <label for="whoWereYouWithWhileMissing">Who were you with while missing?</label>
-    <textarea id="whoWereYouWithWhileMissing" th:field="*{whoWereYouWithWhileMissing}"></textarea>
+    <textarea id="whoWereYouWithWhileMissing" th:field="*{whoWereYouWithWhileMissing}" th:readonly="${readonly}"></textarea>
 
     <label for="whatMadeYouGoMissing">What made you go missing?</label>
-    <textarea id="whatMadeYouGoMissing" th:field="*{whatMadeYouGoMissing}"></textarea>
+    <textarea id="whatMadeYouGoMissing" th:field="*{whatMadeYouGoMissing}" th:readonly="${readonly}"></textarea>
 
     <label for="whatCanBeDoneToAddressReasons">What can be done to address these reasons?</label>
-    <textarea id="whatCanBeDoneToAddressReasons" th:field="*{whatCanBeDoneToAddressReasons}"></textarea>
+    <textarea id="whatCanBeDoneToAddressReasons" th:field="*{whatCanBeDoneToAddressReasons}" th:readonly="${readonly}"></textarea>
 
     <label for="consideredSelfMissing">Did you consider yourself to be missing?</label>
-    <select id="consideredSelfMissing" th:field="*{consideredSelfMissing}">
+    <select id="consideredSelfMissing" th:field="*{consideredSelfMissing}" th:disabled="${readonly}">
         <option value="">Unknown</option>
         <option value="true">Yes</option>
         <option value="false">No</option>
     </select>
 
     <label for="whatDidYouDoWhileMissing">What did you do while you were missing?</label>
-    <textarea id="whatDidYouDoWhileMissing" th:field="*{whatDidYouDoWhileMissing}"></textarea>
+    <textarea id="whatDidYouDoWhileMissing" th:field="*{whatDidYouDoWhileMissing}" th:readonly="${readonly}"></textarea>
 
     <label for="whatHappenedWhenReturned">What happened when you returned home?</label>
-    <textarea id="whatHappenedWhenReturned" th:field="*{whatHappenedWhenReturned}"></textarea>
+    <textarea id="whatHappenedWhenReturned" th:field="*{whatHappenedWhenReturned}" th:readonly="${readonly}"></textarea>
 
     <label for="preventFutureMissingSuggestions">Is there anything that can be done to stop you going missing again?</label>
-    <textarea id="preventFutureMissingSuggestions" th:field="*{preventFutureMissingSuggestions}"></textarea>
+    <textarea id="preventFutureMissingSuggestions" th:field="*{preventFutureMissingSuggestions}" th:readonly="${readonly}"></textarea>
 
     <label for="additionalCommentsFromYoungPerson">Any additional comments from the young person?</label>
-    <textarea id="additionalCommentsFromYoungPerson" th:field="*{additionalCommentsFromYoungPerson}"></textarea>
+    <textarea id="additionalCommentsFromYoungPerson" th:field="*{additionalCommentsFromYoungPerson}" th:readonly="${readonly}"></textarea>
 
     <label for="additionalInfoFromParentCarer">Any additional information provided by the parent/carer?</label>
-    <textarea id="additionalInfoFromParentCarer" th:field="*{additionalInfoFromParentCarer}"></textarea>
+    <textarea id="additionalInfoFromParentCarer" th:field="*{additionalInfoFromParentCarer}" th:readonly="${readonly}"></textarea>
 
     <h3>Future Incidents</h3>
 
     <label for="risksIdentifiedDuringEpisode">Any identified risks during this missing episode?</label>
-    <textarea id="risksIdentifiedDuringEpisode" th:field="*{risksIdentifiedDuringEpisode}"></textarea>
+    <textarea id="risksIdentifiedDuringEpisode" th:field="*{risksIdentifiedDuringEpisode}" th:readonly="${readonly}"></textarea>
 
     <label for="risksIncreaseFutureEpisodes">Is there anything that would increase risks during future missing episodes?</label>
-    <textarea id="risksIncreaseFutureEpisodes" th:field="*{risksIncreaseFutureEpisodes}"></textarea>
+    <textarea id="risksIncreaseFutureEpisodes" th:field="*{risksIncreaseFutureEpisodes}" th:readonly="${readonly}"></textarea>
 
     <label for="safeguardingConcernsToExplore">Any safeguarding concerns that need to be further explored?</label>
-    <textarea id="safeguardingConcernsToExplore" th:field="*{safeguardingConcernsToExplore}"></textarea>
+    <textarea id="safeguardingConcernsToExplore" th:field="*{safeguardingConcernsToExplore}" th:readonly="${readonly}"></textarea>
 
     <label for="infoToHelpLocateFuture">Any information that might help locating the young person during future missing episodes?</label>
-    <textarea id="infoToHelpLocateFuture" th:field="*{infoToHelpLocateFuture}"></textarea>
+    <textarea id="infoToHelpLocateFuture" th:field="*{infoToHelpLocateFuture}" th:readonly="${readonly}"></textarea>
 
     <h3>Interviewer's Comments</h3>
 
     <label for="interviewerComments">Comments</label>
-    <textarea id="interviewerComments" th:field="*{interviewerComments}"></textarea>
+    <textarea id="interviewerComments" th:field="*{interviewerComments}" th:readonly="${readonly}"></textarea>
 
     <h3>Recommendations</h3>
 
     <label for="recommendations">Recommendations</label>
-    <textarea id="recommendations" th:field="*{recommendations}" placeholder="Following analysis of the information held within this report, and observations/discussions during the visit"></textarea>
+    <textarea id="recommendations" th:field="*{recommendations}" placeholder="Following analysis of the information held within this report, and observations/discussions during the visit" th:readonly="${readonly}"></textarea>
 
     <h3>Declaration</h3>
 
     <label for="conductedByStatement">Statement</label>
-    <textarea id="conductedByStatement" th:field="*{conductedByStatement}"></textarea>
+    <textarea id="conductedByStatement" th:field="*{conductedByStatement}" th:readonly="${readonly}"></textarea>
 
     <label for="dateReportShared">Date report shared with relevant professionals (leave blank if not yet shared)</label>
-    <input type="date" id="dateReportShared" th:field="*{dateReportShared}"/>
+    <input type="date" id="dateReportShared" th:field="*{dateReportShared}" th:readonly="${readonly}"/>
 </th:block>
 </body>
 </html>
