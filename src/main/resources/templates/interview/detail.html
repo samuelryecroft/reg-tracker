@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
 <head>
     <meta charset="UTF-8"/>
     <title th:text="${'Request: ' + request.child.fullName}">Request detail</title>
@@ -7,7 +7,7 @@
 </head>
 <body>
 <div th:replace="~{fragments/layout :: nav}"></div>
-<main>
+<main id="main">
     <h1 th:text="${request.child.fullName}">Child Name</h1>
     <span class="status" th:classappend="${request.status}" th:text="${request.status.displayName}">STATUS</span>
     <span class="status warning"

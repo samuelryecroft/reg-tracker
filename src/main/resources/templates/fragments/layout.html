@@ -1,222 +1,18 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
 <head>
 <th:block th:fragment="styles">
-<style>
-    :root {
-        color-scheme: light dark;
-        --border: #E5E7EB;
-        --muted: #6B7280;
-        --ink: #1F2328;
-        --accent: #F36E2A;
-        --accent-dark: #D85A1D;
-        --tint: #FFF0DD;
-        --bg: #FAFAFA;
-        --surface: #FFFFFF;
-    }
-    body {
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-        margin: 0;
-        color: var(--ink);
-        background: var(--bg);
-    }
-    header {
-        background: var(--surface);
-        color: var(--ink);
-        border-bottom: 1px solid var(--border);
-        padding: 0.85rem 1.5rem;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        flex-wrap: wrap;
-    }
-    header .brand-mark {
-        display: inline-block;
-        width: 0.7rem;
-        height: 0.7rem;
-        border-radius: 3px;
-        background: var(--accent);
-        margin-right: 0.5rem;
-    }
-    header a {
-        color: var(--muted);
-        text-decoration: none;
-        margin-right: 1.5rem;
-        font-size: 0.92rem;
-        font-weight: 500;
-        padding-bottom: 0.25rem;
-        border-bottom: 2px solid transparent;
-    }
-    header a:hover {
-        color: var(--accent-dark);
-        border-bottom-color: var(--accent);
-    }
-    header a.brand {
-        color: var(--ink);
-        font-weight: 700;
-        font-size: 1.1rem;
-        margin-right: 2rem;
-        border-bottom: none;
-        display: inline-flex;
-        align-items: center;
-    }
-    header a.brand:hover { color: var(--ink); }
-    header form { display: inline; }
-    header button {
-        background: var(--surface);
-        border: 1px solid var(--border);
-        color: var(--ink);
-        border-radius: 6px;
-        padding: 0.35rem 0.85rem;
-        font-size: 0.88rem;
-        cursor: pointer;
-    }
-    header button:hover { border-color: var(--accent); color: var(--accent-dark); }
-    main {
-        max-width: 960px;
-        margin: 2rem auto;
-        padding: 0 1.5rem;
-    }
-    table {
-        width: 100%;
-        border-collapse: collapse;
-        background: var(--surface);
-        border: 1px solid var(--border);
-        border-radius: 10px;
-        overflow: hidden;
-        margin-top: 1.5rem;
-    }
-    thead tr { background: var(--tint); }
-    th, td {
-        text-align: left;
-        padding: 0.65rem 0.85rem;
-        border-bottom: 1px solid var(--border);
-        font-size: 0.92rem;
-    }
-    th { color: var(--accent-dark); font-weight: 600; }
-    .card {
-        background: var(--surface);
-        border: 1px solid var(--border);
-        border-radius: 12px;
-        padding: 1.75rem;
-        margin-bottom: 1.5rem;
-        box-shadow: 0 1px 3px rgba(20, 20, 20, 0.04);
-    }
-    .card h3 {
-        margin: 1.75rem 0 0.5rem;
-        padding-bottom: 0.4rem;
-        border-bottom: 2px solid var(--tint);
-        color: var(--accent-dark);
-        font-size: 0.95rem;
-        text-transform: uppercase;
-        letter-spacing: 0.04em;
-    }
-    .card h3:first-child { margin-top: 0; }
-    label { display: block; margin-top: 1rem; margin-bottom: 0.3rem; font-weight: 600; font-size: 0.9rem; }
-    input, select, textarea {
-        width: 100%;
-        padding: 0.55rem 0.65rem;
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        font-size: 0.95rem;
-        box-sizing: border-box;
-        font-family: inherit;
-        background: var(--surface);
-        color: var(--ink);
-    }
-    input:focus, select:focus, textarea:focus {
-        outline: none;
-        border-color: var(--accent);
-        box-shadow: 0 0 0 3px rgba(243, 110, 42, 0.15);
-    }
-    textarea { min-height: 5rem; resize: vertical; }
-    .checkbox-group {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.5rem;
-        margin-top: 0.4rem;
-    }
-    .checkbox-option {
-        display: flex;
-        align-items: center;
-        gap: 0.4rem;
-        margin: 0;
-        padding: 0.45rem 0.85rem;
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        background: var(--surface);
-        font-weight: 500;
-        font-size: 0.9rem;
-        cursor: pointer;
-    }
-    .checkbox-option:has(input:checked) {
-        border-color: var(--accent);
-        background: var(--tint);
-        color: var(--accent-dark);
-    }
-    .checkbox-option input {
-        width: auto;
-        margin: 0;
-    }
-    .checkbox-option.disabled {
-        opacity: 0.45;
-        cursor: not-allowed;
-    }
-    .btn {
-        display: inline-block;
-        background: var(--accent);
-        color: white;
-        border: none;
-        border-radius: 8px;
-        padding: 0.6rem 1.2rem;
-        font-size: 0.95rem;
-        font-weight: 600;
-        cursor: pointer;
-        text-decoration: none;
-        margin-top: 1.25rem;
-        margin-right: 0.5rem;
-        box-shadow: 0 1px 2px rgba(20, 20, 20, 0.06);
-    }
-    .btn:hover { background: var(--accent-dark); }
-    .btn.secondary { background: var(--surface); color: var(--accent-dark); border: 1px solid var(--accent); box-shadow: none; }
-    .btn.secondary:hover { background: var(--tint); }
-    .status {
-        display: inline-block;
-        padding: 0.15rem 0.6rem;
-        border-radius: 12px;
-        font-size: 0.8rem;
-        font-weight: 600;
-        background: #eef2f6;
-        color: #333;
-    }
-    .status.REQUESTED { background: #fef3c7; color: #92400e; }
-    .status.ALLOCATED, .status.SCHEDULED, .status.REPORT_SUBMITTED { background: #dbeafe; color: #1e40af; }
-    .status.REPORT_REJECTED { background: #FDE7D8; color: #9A3412; }
-    .status.REPORT_APPROVED { background: #dcfce7; color: #166534; }
-    .status.CANCELLED { background: #fee2e2; color: #991b1b; }
-    .status.warning { background: #FDE7D8; color: #9A3412; margin-left: 0.4rem; }
-    .error { color: #b91c1c; background: #fee2e2; padding: 0.75rem 1rem; border-radius: 8px; margin-bottom: 1rem; }
-    .banner-warning {
-        background: #FDE7D8;
-        color: #9A3412;
-        border: 1px solid #f3c6a5;
-        border-radius: 12px;
-        padding: 1rem 1.25rem;
-        margin-bottom: 1.5rem;
-    }
-    .banner-warning p { margin: 0.35rem 0 0; white-space: pre-wrap; }
-    .muted { color: var(--muted); }
-    h1 { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.01em; }
-    dl.detail dt { font-weight: 600; margin-top: 0.75rem; font-size: 0.85rem; color: var(--muted); }
-    dl.detail dd { margin: 0.15rem 0 0; white-space: pre-wrap; }
-</style>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" th:href="@{/css/app.css}">
 <style th:if="${theme != null}"
        th:text="${':root { --accent: ' + theme.primaryColor + '; --accent-dark: ' + theme.primaryColorDark + '; --tint: ' + theme.secondaryColor + '; }'}"></style>
 </th:block>
 </head>
 <body>
-<header th:fragment="nav">
-    <div>
+<th:block th:fragment="nav">
+<a class="skip-link" href="#main">Skip to main content</a>
+<header>
+    <nav aria-label="Main">
         <a class="brand" href="/"><span class="brand-mark"></span>Return Home Tracker</a>
         <a th:if="${#authorization.expression('hasRole(''HOME_STAFF'')')}" href="/requests">My Requests</a>
         <a th:if="${#authorization.expression('hasRole(''HOME_STAFF'')')}" href="/children">My Children</a>
@@ -228,11 +24,12 @@
         <a th:if="${#authorization.expression('hasAnyRole(''ADMIN'',''ORG_ADMIN'',''VIEWER'')')}" href="/children">Children</a>
         <a th:if="${canEditTheme}" href="/admin/theme">Branding</a>
         <a th:if="${#authorization.expression('hasRole(''ADMIN'')')}" href="/admin/organisations">Organisations</a>
-    </div>
+    </nav>
     <form method="post" th:action="@{/logout}">
         <span sec:authentication="name" style="margin-right:0.75rem;"></span>
         <button type="submit">Log out</button>
     </form>
 </header>
+</th:block>
 </body>
 </html>

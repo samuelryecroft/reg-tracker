@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
 <head>
     <meta charset="UTF-8"/>
     <title>Add Child — Return Home Tracker</title>
@@ -7,7 +7,7 @@
 </head>
 <body>
 <div th:replace="~{fragments/layout :: nav}"></div>
-<main>
+<main id="main">
     <h1>Add Child</h1>
     <div class="card">
         <form method="post" th:action="@{/children}" th:object="${form}">

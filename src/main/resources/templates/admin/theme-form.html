@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
 <head>
     <meta charset="UTF-8"/>
     <title>Branding — Return Home Tracker</title>
@@ -7,7 +7,7 @@
 </head>
 <body>
 <div th:replace="~{fragments/layout :: nav}"></div>
-<main>
+<main id="main">
     <h1>Branding</h1>
     <p class="muted" th:if="${platformWide}">These colours are the platform default, used for the platform admin view and as a fallback for any supplier org without its own branding.</p>
     <p class="muted" th:unless="${platformWide}">These colours apply across the app for your organisation and for every Care Provider org you serve, and appear on the return home interview reports you generate.</p>
