@@ -286,6 +286,9 @@ public class ReportService {
         Map<String, String> values = new HashMap<>();
 
         values.put("childName", request.getChild().getFullName());
+        // Footer identifier for continuation pages (D-05) and docProps creator (D-07).
+        values.put("caseReference", orNotProvided(request.getChild().getLocalCaseReference()));
+        values.put("supplierName", request.getHome().getOrganisation().getName());
         values.put("homeName", request.getHome().getName());
         values.put("visitorName", report.getVisitor().getFullName());
         values.put("requestReceivedAt", request.getCreatedAt().format(DATETIME_FMT));
