@@ -19,7 +19,7 @@
             <dd th:text="${report.visitor.fullName}">Visitor</dd>
 
             <dt>Date of interview</dt>
-            <dd th:text="${report.interviewDate} ?: '—'">Date</dd>
+            <dd th:text="${report.interviewDate} != null ? ${#temporals.format(report.interviewDate, 'dd MMM yyyy')} : '—'">Date</dd>
 
             <dt>Location of this interview</dt>
             <dd th:text="${report.interviewLocation} ?: '—'">Location</dd>
@@ -122,7 +122,7 @@
             <dd th:text="${report.visitor.fullName + ' on ' + #temporals.format(report.submittedAt, 'dd MMM yyyy HH:mm')}">—</dd>
 
             <dt>Date report shared with relevant professionals</dt>
-            <dd th:text="${report.dateReportShared} ?: 'Not yet shared'">—</dd>
+            <dd th:text="${report.dateReportShared} != null ? ${#temporals.format(report.dateReportShared, 'dd MMM yyyy')} : 'Not yet shared'">—</dd>
         </dl>
     </div>
 </main>

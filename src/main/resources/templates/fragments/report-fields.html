@@ -1,122 +1,217 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" lang="en">
 <body>
+<!--
+  Shared by visitor/report-form (readonly=false, editable, stepped) and reviewer/review-form
+  (readonly=true, rendered as a record - see FE-05). Depends on an enclosing th:object bound to a
+  SubmitReportForm-shaped bean exposed as the model attribute "form" - the readonly branch below
+  reads via ${form.property} rather than nesting *{property} inside ${...} (that combination isn't
+  valid Thymeleaf/SpEL); th:field keeps using *{property} on its own, which is the one place that
+  syntax is meant to stand alone.
+
+  The six <fieldset class="step"> groups below are also the visitor stepper's step model (T7 / roadmap
+  2.4): report-stepper.js shows one at a time on the pages that opt in via data-js="stepper" on the
+  <form>; everywhere else (this fragment used without that JS, or th:if="${readonly}") all six render
+  as one flowing document, which is also the correct no-JS fallback.
+-->
 <th:block th:fragment="fields(readonly)">
-    <h3>Details</h3>
+    <fieldset class="step" data-step="1">
+    <legend class="section-title">Details</legend>
 
-    <label for="interviewDate">Date of interview</label>
-    <input type="date" id="interviewDate" th:field="*{interviewDate}" th:readonly="${readonly}"/>
+    <label th:id="${readonly} ? 'interviewDate-label' : null" th:for="${readonly} ? null : 'interviewDate'">
+        Date of interview
+        <span class="req" aria-hidden="true" th:unless="${readonly}">*</span>
+    </label>
+    <p class="hint" th:unless="${readonly}">Needed before this report can be submitted for review — you can save a draft without it.</p>
+    <div class="readonly-val" th:classappend="${form.interviewDate == null} ? ' empty' : ''" role="group" aria-labelledby="interviewDate-label"
+         th:if="${readonly}" th:text="${form.interviewDate != null} ? ${#temporals.format(form.interviewDate, 'dd MMMM yyyy')} : 'Not answered'">Date</div>
+    <input type="date" id="interviewDate" th:field="*{interviewDate}" th:unless="${readonly}"
+           th:errorclass="is-invalid" th:aria-invalid="${#fields.hasErrors('interviewDate')}"
+           aria-describedby="interviewDate-error"/>
+    <div th:unless="${readonly}" th:replace="~{fragments/layout :: fieldError('interviewDate')}"></div>
 
-    <label for="interviewLocation">Location of this interview</label>
-    <input type="text" id="interviewLocation" th:field="*{interviewLocation}" th:readonly="${readonly}"/>
+    <label th:id="${readonly} ? 'interviewLocation-label' : null" th:for="${readonly} ? null : 'interviewLocation'">
+        Location of this interview
+        <span class="req" aria-hidden="true" th:unless="${readonly}">*</span>
+    </label>
+    <div class="readonly-val" th:classappend="${#strings.isEmpty(form.interviewLocation)} ? ' empty' : ''" role="group" aria-labelledby="interviewLocation-label"
+         th:if="${readonly}" th:text="${#strings.isEmpty(form.interviewLocation)} ? 'Not answered' : ${form.interviewLocation}">Location</div>
+    <input type="text" id="interviewLocation" th:field="*{interviewLocation}" th:unless="${readonly}"
+           th:errorclass="is-invalid" th:aria-invalid="${#fields.hasErrors('interviewLocation')}"
+           aria-describedby="interviewLocation-error"/>
+    <div th:unless="${readonly}" th:replace="~{fragments/layout :: fieldError('interviewLocation')}"></div>
 
-    <label for="within72Hours">Was this interview offered and completed within 72 hours of return?</label>
-    <select id="within72Hours" th:field="*{within72Hours}" th:disabled="${readonly}">
+    <label th:id="${readonly} ? 'within72Hours-label' : null" th:for="${readonly} ? null : 'within72Hours'">Was this interview offered and completed within 72 hours of return?</label>
+    <div class="readonly-val" role="group" aria-labelledby="within72Hours-label" th:if="${readonly}"
+         th:text="${form.within72Hours == null} ? 'Unknown' : (${form.within72Hours} ? 'Yes' : 'No')">Answer</div>
+    <select id="within72Hours" th:field="*{within72Hours}" th:unless="${readonly}">
         <option value="">Unknown</option>
         <option value="true">Yes</option>
         <option value="false">No</option>
     </select>
 
-    <label for="ifNotWhyLate">If not, why?</label>
-    <textarea id="ifNotWhyLate" th:field="*{ifNotWhyLate}" th:readonly="${readonly}"></textarea>
+    <label th:id="${readonly} ? 'ifNotWhyLate-label' : null" th:for="${readonly} ? null : 'ifNotWhyLate'">If not, why?</label>
+    <div class="readonly-val" th:classappend="${#strings.isEmpty(form.ifNotWhyLate)} ? ' empty' : ''" role="group" aria-labelledby="ifNotWhyLate-label"
+         th:if="${readonly}" th:text="${#strings.isEmpty(form.ifNotWhyLate)} ? 'Not answered' : ${form.ifNotWhyLate}">Answer</div>
+    <textarea id="ifNotWhyLate" th:field="*{ifNotWhyLate}" th:unless="${readonly}"></textarea>
 
-    <label for="consultationWithHomeStaff">Consultation with home's staff to establish any new information</label>
-    <textarea id="consultationWithHomeStaff" th:field="*{consultationWithHomeStaff}" th:readonly="${readonly}"></textarea>
+    <label th:id="${readonly} ? 'consultationWithHomeStaff-label' : null" th:for="${readonly} ? null : 'consultationWithHomeStaff'">Consultation with home's staff to establish any new information</label>
+    <div class="readonly-val" th:classappend="${#strings.isEmpty(form.consultationWithHomeStaff)} ? ' empty' : ''" role="group" aria-labelledby="consultationWithHomeStaff-label"
+         th:if="${readonly}" th:text="${#strings.isEmpty(form.consultationWithHomeStaff)} ? 'Not answered' : ${form.consultationWithHomeStaff}">Answer</div>
+    <textarea id="consultationWithHomeStaff" th:field="*{consultationWithHomeStaff}" th:unless="${readonly}"></textarea>
 
-    <label for="previouslyMissing">Has this young person previously been missing?</label>
-    <select id="previouslyMissing" th:field="*{previouslyMissing}" th:disabled="${readonly}">
+    <label th:id="${readonly} ? 'previouslyMissing-label' : null" th:for="${readonly} ? null : 'previouslyMissing'">Has this young person previously been missing?</label>
+    <div class="readonly-val" role="group" aria-labelledby="previouslyMissing-label" th:if="${readonly}"
+         th:text="${form.previouslyMissing == null} ? 'Unknown' : (${form.previouslyMissing} ? 'Yes' : 'No')">Answer</div>
+    <select id="previouslyMissing" th:field="*{previouslyMissing}" th:unless="${readonly}">
         <option value="">Unknown</option>
         <option value="true">Yes</option>
         <option value="false">No</option>
     </select>
 
-    <label for="missingOccasionsLast30Days">How many occasions of missing has there been in the last 30 days?</label>
-    <input type="number" min="0" id="missingOccasionsLast30Days" th:field="*{missingOccasionsLast30Days}" th:readonly="${readonly}"/>
+    <label th:id="${readonly} ? 'missingOccasionsLast30Days-label' : null" th:for="${readonly} ? null : 'missingOccasionsLast30Days'">How many occasions of missing has there been in the last 30 days?</label>
+    <div class="readonly-val" th:classappend="${form.missingOccasionsLast30Days == null} ? ' empty' : ''" role="group" aria-labelledby="missingOccasionsLast30Days-label"
+         th:if="${readonly}" th:text="${form.missingOccasionsLast30Days} ?: 'Not answered'">Answer</div>
+    <input type="number" min="0" id="missingOccasionsLast30Days" th:field="*{missingOccasionsLast30Days}" th:unless="${readonly}"/>
 
-    <label for="confidentialityExplained">Confidentiality explained to the young person regarding safeguarding duty of care?</label>
-    <select id="confidentialityExplained" th:field="*{confidentialityExplained}" th:disabled="${readonly}">
+    <label th:id="${readonly} ? 'confidentialityExplained-label' : null" th:for="${readonly} ? null : 'confidentialityExplained'">Confidentiality explained to the young person regarding safeguarding duty of care?</label>
+    <div class="readonly-val" role="group" aria-labelledby="confidentialityExplained-label" th:if="${readonly}"
+         th:text="${form.confidentialityExplained == null} ? 'Unknown' : (${form.confidentialityExplained} ? 'Yes' : 'No')">Answer</div>
+    <select id="confidentialityExplained" th:field="*{confidentialityExplained}" th:unless="${readonly}">
+        <option value="">Unknown</option>
+        <option value="true">Yes</option>
+        <option value="false">No</option>
+    </select>
+    </fieldset>
+
+    <fieldset class="step" data-step="2">
+    <legend class="section-title">Return Home Interview</legend>
+
+    <label th:id="${readonly} ? 'interviewAccepted-label' : null" th:for="${readonly} ? null : 'interviewAccepted'">Interview accepted?</label>
+    <div class="readonly-val" role="group" aria-labelledby="interviewAccepted-label" th:if="${readonly}"
+         th:text="${form.interviewAccepted == null} ? 'Unknown' : (${form.interviewAccepted} ? 'Yes' : 'No')">Answer</div>
+    <select id="interviewAccepted" th:field="*{interviewAccepted}" th:unless="${readonly}">
         <option value="">Unknown</option>
         <option value="true">Yes</option>
         <option value="false">No</option>
     </select>
 
-    <h3>Return Home Interview</h3>
+    <label th:id="${readonly} ? 'interviewDeclinedReason-label' : null" th:for="${readonly} ? null : 'interviewDeclinedReason'">If not, why?</label>
+    <div class="readonly-val" th:classappend="${#strings.isEmpty(form.interviewDeclinedReason)} ? ' empty' : ''" role="group" aria-labelledby="interviewDeclinedReason-label"
+         th:if="${readonly}" th:text="${#strings.isEmpty(form.interviewDeclinedReason)} ? 'Not answered' : ${form.interviewDeclinedReason}">Answer</div>
+    <textarea id="interviewDeclinedReason" th:field="*{interviewDeclinedReason}" th:unless="${readonly}"></textarea>
 
-    <label for="interviewAccepted">Interview accepted?</label>
-    <select id="interviewAccepted" th:field="*{interviewAccepted}" th:disabled="${readonly}">
+    <label th:id="${readonly} ? 'whereWereYouWhileMissing-label' : null" th:for="${readonly} ? null : 'whereWereYouWhileMissing'">Where were you while missing?</label>
+    <div class="readonly-val" th:classappend="${#strings.isEmpty(form.whereWereYouWhileMissing)} ? ' empty' : ''" role="group" aria-labelledby="whereWereYouWhileMissing-label"
+         th:if="${readonly}" th:text="${#strings.isEmpty(form.whereWereYouWhileMissing)} ? 'Not answered' : ${form.whereWereYouWhileMissing}">Answer</div>
+    <textarea id="whereWereYouWhileMissing" th:field="*{whereWereYouWhileMissing}" th:unless="${readonly}"></textarea>
+
+    <label th:id="${readonly} ? 'whoWereYouWithWhileMissing-label' : null" th:for="${readonly} ? null : 'whoWereYouWithWhileMissing'">Who were you with while missing?</label>
+    <div class="readonly-val" th:classappend="${#strings.isEmpty(form.whoWereYouWithWhileMissing)} ? ' empty' : ''" role="group" aria-labelledby="whoWereYouWithWhileMissing-label"
+         th:if="${readonly}" th:text="${#strings.isEmpty(form.whoWereYouWithWhileMissing)} ? 'Not answered' : ${form.whoWereYouWithWhileMissing}">Answer</div>
+    <textarea id="whoWereYouWithWhileMissing" th:field="*{whoWereYouWithWhileMissing}" th:unless="${readonly}"></textarea>
+
+    <label th:id="${readonly} ? 'whatMadeYouGoMissing-label' : null" th:for="${readonly} ? null : 'whatMadeYouGoMissing'">What made you go missing?</label>
+    <div class="readonly-val" th:classappend="${#strings.isEmpty(form.whatMadeYouGoMissing)} ? ' empty' : ''" role="group" aria-labelledby="whatMadeYouGoMissing-label"
+         th:if="${readonly}" th:text="${#strings.isEmpty(form.whatMadeYouGoMissing)} ? 'Not answered' : ${form.whatMadeYouGoMissing}">Answer</div>
+    <textarea id="whatMadeYouGoMissing" th:field="*{whatMadeYouGoMissing}" th:unless="${readonly}"></textarea>
+
+    <label th:id="${readonly} ? 'whatCanBeDoneToAddressReasons-label' : null" th:for="${readonly} ? null : 'whatCanBeDoneToAddressReasons'">What can be done to address these reasons?</label>
+    <div class="readonly-val" th:classappend="${#strings.isEmpty(form.whatCanBeDoneToAddressReasons)} ? ' empty' : ''" role="group" aria-labelledby="whatCanBeDoneToAddressReasons-label"
+         th:if="${readonly}" th:text="${#strings.isEmpty(form.whatCanBeDoneToAddressReasons)} ? 'Not answered' : ${form.whatCanBeDoneToAddressReasons}">Answer</div>
+    <textarea id="whatCanBeDoneToAddressReasons" th:field="*{whatCanBeDoneToAddressReasons}" th:unless="${readonly}"></textarea>
+
+    <label th:id="${readonly} ? 'consideredSelfMissing-label' : null" th:for="${readonly} ? null : 'consideredSelfMissing'">Did you consider yourself to be missing?</label>
+    <div class="readonly-val" role="group" aria-labelledby="consideredSelfMissing-label" th:if="${readonly}"
+         th:text="${form.consideredSelfMissing == null} ? 'Unknown' : (${form.consideredSelfMissing} ? 'Yes' : 'No')">Answer</div>
+    <select id="consideredSelfMissing" th:field="*{consideredSelfMissing}" th:unless="${readonly}">
         <option value="">Unknown</option>
         <option value="true">Yes</option>
         <option value="false">No</option>
     </select>
 
-    <label for="interviewDeclinedReason">If not, why?</label>
-    <textarea id="interviewDeclinedReason" th:field="*{interviewDeclinedReason}" th:readonly="${readonly}"></textarea>
+    <label th:id="${readonly} ? 'whatDidYouDoWhileMissing-label' : null" th:for="${readonly} ? null : 'whatDidYouDoWhileMissing'">What did you do while you were missing?</label>
+    <div class="readonly-val" th:classappend="${#strings.isEmpty(form.whatDidYouDoWhileMissing)} ? ' empty' : ''" role="group" aria-labelledby="whatDidYouDoWhileMissing-label"
+         th:if="${readonly}" th:text="${#strings.isEmpty(form.whatDidYouDoWhileMissing)} ? 'Not answered' : ${form.whatDidYouDoWhileMissing}">Answer</div>
+    <textarea id="whatDidYouDoWhileMissing" th:field="*{whatDidYouDoWhileMissing}" th:unless="${readonly}"></textarea>
 
-    <label for="whereWereYouWhileMissing">Where were you while missing?</label>
-    <textarea id="whereWereYouWhileMissing" th:field="*{whereWereYouWhileMissing}" th:readonly="${readonly}"></textarea>
+    <label th:id="${readonly} ? 'whatHappenedWhenReturned-label' : null" th:for="${readonly} ? null : 'whatHappenedWhenReturned'">What happened when you returned home?</label>
+    <div class="readonly-val" th:classappend="${#strings.isEmpty(form.whatHappenedWhenReturned)} ? ' empty' : ''" role="group" aria-labelledby="whatHappenedWhenReturned-label"
+         th:if="${readonly}" th:text="${#strings.isEmpty(form.whatHappenedWhenReturned)} ? 'Not answered' : ${form.whatHappenedWhenReturned}">Answer</div>
+    <textarea id="whatHappenedWhenReturned" th:field="*{whatHappenedWhenReturned}" th:unless="${readonly}"></textarea>
 
-    <label for="whoWereYouWithWhileMissing">Who were you with while missing?</label>
-    <textarea id="whoWereYouWithWhileMissing" th:field="*{whoWereYouWithWhileMissing}" th:readonly="${readonly}"></textarea>
+    <label th:id="${readonly} ? 'preventFutureMissingSuggestions-label' : null" th:for="${readonly} ? null : 'preventFutureMissingSuggestions'">Is there anything that can be done to stop you going missing again?</label>
+    <div class="readonly-val" th:classappend="${#strings.isEmpty(form.preventFutureMissingSuggestions)} ? ' empty' : ''" role="group" aria-labelledby="preventFutureMissingSuggestions-label"
+         th:if="${readonly}" th:text="${#strings.isEmpty(form.preventFutureMissingSuggestions)} ? 'Not answered' : ${form.preventFutureMissingSuggestions}">Answer</div>
+    <textarea id="preventFutureMissingSuggestions" th:field="*{preventFutureMissingSuggestions}" th:unless="${readonly}"></textarea>
 
-    <label for="whatMadeYouGoMissing">What made you go missing?</label>
-    <textarea id="whatMadeYouGoMissing" th:field="*{whatMadeYouGoMissing}" th:readonly="${readonly}"></textarea>
+    <label th:id="${readonly} ? 'additionalCommentsFromYoungPerson-label' : null" th:for="${readonly} ? null : 'additionalCommentsFromYoungPerson'">Any additional comments from the young person?</label>
+    <div class="readonly-val" th:classappend="${#strings.isEmpty(form.additionalCommentsFromYoungPerson)} ? ' empty' : ''" role="group" aria-labelledby="additionalCommentsFromYoungPerson-label"
+         th:if="${readonly}" th:text="${#strings.isEmpty(form.additionalCommentsFromYoungPerson)} ? 'Not answered' : ${form.additionalCommentsFromYoungPerson}">Answer</div>
+    <textarea id="additionalCommentsFromYoungPerson" th:field="*{additionalCommentsFromYoungPerson}" th:unless="${readonly}"></textarea>
 
-    <label for="whatCanBeDoneToAddressReasons">What can be done to address these reasons?</label>
-    <textarea id="whatCanBeDoneToAddressReasons" th:field="*{whatCanBeDoneToAddressReasons}" th:readonly="${readonly}"></textarea>
+    <label th:id="${readonly} ? 'additionalInfoFromParentCarer-label' : null" th:for="${readonly} ? null : 'additionalInfoFromParentCarer'">Any additional information provided by the parent/carer?</label>
+    <div class="readonly-val" th:classappend="${#strings.isEmpty(form.additionalInfoFromParentCarer)} ? ' empty' : ''" role="group" aria-labelledby="additionalInfoFromParentCarer-label"
+         th:if="${readonly}" th:text="${#strings.isEmpty(form.additionalInfoFromParentCarer)} ? 'Not answered' : ${form.additionalInfoFromParentCarer}">Answer</div>
+    <textarea id="additionalInfoFromParentCarer" th:field="*{additionalInfoFromParentCarer}" th:unless="${readonly}"></textarea>
+    </fieldset>
 
-    <label for="consideredSelfMissing">Did you consider yourself to be missing?</label>
-    <select id="consideredSelfMissing" th:field="*{consideredSelfMissing}" th:disabled="${readonly}">
-        <option value="">Unknown</option>
-        <option value="true">Yes</option>
-        <option value="false">No</option>
-    </select>
+    <fieldset class="step" data-step="3">
+    <legend class="section-title">Future Incidents</legend>
 
-    <label for="whatDidYouDoWhileMissing">What did you do while you were missing?</label>
-    <textarea id="whatDidYouDoWhileMissing" th:field="*{whatDidYouDoWhileMissing}" th:readonly="${readonly}"></textarea>
+    <label th:id="${readonly} ? 'risksIdentifiedDuringEpisode-label' : null" th:for="${readonly} ? null : 'risksIdentifiedDuringEpisode'">Any identified risks during this missing episode?</label>
+    <div class="readonly-val" th:classappend="${#strings.isEmpty(form.risksIdentifiedDuringEpisode)} ? ' empty' : ''" role="group" aria-labelledby="risksIdentifiedDuringEpisode-label"
+         th:if="${readonly}" th:text="${#strings.isEmpty(form.risksIdentifiedDuringEpisode)} ? 'Not answered' : ${form.risksIdentifiedDuringEpisode}">Answer</div>
+    <textarea id="risksIdentifiedDuringEpisode" th:field="*{risksIdentifiedDuringEpisode}" th:unless="${readonly}"></textarea>
 
-    <label for="whatHappenedWhenReturned">What happened when you returned home?</label>
-    <textarea id="whatHappenedWhenReturned" th:field="*{whatHappenedWhenReturned}" th:readonly="${readonly}"></textarea>
+    <label th:id="${readonly} ? 'risksIncreaseFutureEpisodes-label' : null" th:for="${readonly} ? null : 'risksIncreaseFutureEpisodes'">Is there anything that would increase risks during future missing episodes?</label>
+    <div class="readonly-val" th:classappend="${#strings.isEmpty(form.risksIncreaseFutureEpisodes)} ? ' empty' : ''" role="group" aria-labelledby="risksIncreaseFutureEpisodes-label"
+         th:if="${readonly}" th:text="${#strings.isEmpty(form.risksIncreaseFutureEpisodes)} ? 'Not answered' : ${form.risksIncreaseFutureEpisodes}">Answer</div>
+    <textarea id="risksIncreaseFutureEpisodes" th:field="*{risksIncreaseFutureEpisodes}" th:unless="${readonly}"></textarea>
 
-    <label for="preventFutureMissingSuggestions">Is there anything that can be done to stop you going missing again?</label>
-    <textarea id="preventFutureMissingSuggestions" th:field="*{preventFutureMissingSuggestions}" th:readonly="${readonly}"></textarea>
+    <label th:id="${readonly} ? 'safeguardingConcernsToExplore-label' : null" th:for="${readonly} ? null : 'safeguardingConcernsToExplore'">Any safeguarding concerns that need to be further explored?</label>
+    <div class="readonly-val" th:classappend="${#strings.isEmpty(form.safeguardingConcernsToExplore)} ? ' empty' : ''" role="group" aria-labelledby="safeguardingConcernsToExplore-label"
+         th:if="${readonly}" th:text="${#strings.isEmpty(form.safeguardingConcernsToExplore)} ? 'Not answered' : ${form.safeguardingConcernsToExplore}">Answer</div>
+    <textarea id="safeguardingConcernsToExplore" th:field="*{safeguardingConcernsToExplore}" th:unless="${readonly}"></textarea>
 
-    <label for="additionalCommentsFromYoungPerson">Any additional comments from the young person?</label>
-    <textarea id="additionalCommentsFromYoungPerson" th:field="*{additionalCommentsFromYoungPerson}" th:readonly="${readonly}"></textarea>
+    <label th:id="${readonly} ? 'infoToHelpLocateFuture-label' : null" th:for="${readonly} ? null : 'infoToHelpLocateFuture'">Any information that might help locating the young person during future missing episodes?</label>
+    <div class="readonly-val" th:classappend="${#strings.isEmpty(form.infoToHelpLocateFuture)} ? ' empty' : ''" role="group" aria-labelledby="infoToHelpLocateFuture-label"
+         th:if="${readonly}" th:text="${#strings.isEmpty(form.infoToHelpLocateFuture)} ? 'Not answered' : ${form.infoToHelpLocateFuture}">Answer</div>
+    <textarea id="infoToHelpLocateFuture" th:field="*{infoToHelpLocateFuture}" th:unless="${readonly}"></textarea>
+    </fieldset>
 
-    <label for="additionalInfoFromParentCarer">Any additional information provided by the parent/carer?</label>
-    <textarea id="additionalInfoFromParentCarer" th:field="*{additionalInfoFromParentCarer}" th:readonly="${readonly}"></textarea>
+    <fieldset class="step" data-step="4">
+    <legend class="section-title">Interviewer's Comments</legend>
 
-    <h3>Future Incidents</h3>
+    <label th:id="${readonly} ? 'interviewerComments-label' : null" th:for="${readonly} ? null : 'interviewerComments'">Comments</label>
+    <div class="readonly-val" th:classappend="${#strings.isEmpty(form.interviewerComments)} ? ' empty' : ''" role="group" aria-labelledby="interviewerComments-label"
+         th:if="${readonly}" th:text="${#strings.isEmpty(form.interviewerComments)} ? 'Not answered' : ${form.interviewerComments}">Answer</div>
+    <textarea id="interviewerComments" th:field="*{interviewerComments}" th:unless="${readonly}"></textarea>
+    </fieldset>
 
-    <label for="risksIdentifiedDuringEpisode">Any identified risks during this missing episode?</label>
-    <textarea id="risksIdentifiedDuringEpisode" th:field="*{risksIdentifiedDuringEpisode}" th:readonly="${readonly}"></textarea>
+    <fieldset class="step" data-step="5">
+    <legend class="section-title">Recommendations</legend>
 
-    <label for="risksIncreaseFutureEpisodes">Is there anything that would increase risks during future missing episodes?</label>
-    <textarea id="risksIncreaseFutureEpisodes" th:field="*{risksIncreaseFutureEpisodes}" th:readonly="${readonly}"></textarea>
+    <label th:id="${readonly} ? 'recommendations-label' : null" th:for="${readonly} ? null : 'recommendations'">Recommendations</label>
+    <p class="hint" th:unless="${readonly}">Following analysis of the information held within this report, and observations/discussions during the visit.</p>
+    <div class="readonly-val" th:classappend="${#strings.isEmpty(form.recommendations)} ? ' empty' : ''" role="group" aria-labelledby="recommendations-label"
+         th:if="${readonly}" th:text="${#strings.isEmpty(form.recommendations)} ? 'Not answered' : ${form.recommendations}">Answer</div>
+    <textarea id="recommendations" th:field="*{recommendations}" th:unless="${readonly}"></textarea>
+    </fieldset>
 
-    <label for="safeguardingConcernsToExplore">Any safeguarding concerns that need to be further explored?</label>
-    <textarea id="safeguardingConcernsToExplore" th:field="*{safeguardingConcernsToExplore}" th:readonly="${readonly}"></textarea>
+    <fieldset class="step" data-step="6">
+    <legend class="section-title">Declaration</legend>
 
-    <label for="infoToHelpLocateFuture">Any information that might help locating the young person during future missing episodes?</label>
-    <textarea id="infoToHelpLocateFuture" th:field="*{infoToHelpLocateFuture}" th:readonly="${readonly}"></textarea>
+    <label th:id="${readonly} ? 'conductedByStatement-label' : null" th:for="${readonly} ? null : 'conductedByStatement'">Statement</label>
+    <div class="readonly-val" th:classappend="${#strings.isEmpty(form.conductedByStatement)} ? ' empty' : ''" role="group" aria-labelledby="conductedByStatement-label"
+         th:if="${readonly}" th:text="${#strings.isEmpty(form.conductedByStatement)} ? 'Not answered' : ${form.conductedByStatement}">Answer</div>
+    <textarea id="conductedByStatement" th:field="*{conductedByStatement}" th:unless="${readonly}"></textarea>
 
-    <h3>Interviewer's Comments</h3>
-
-    <label for="interviewerComments">Comments</label>
-    <textarea id="interviewerComments" th:field="*{interviewerComments}" th:readonly="${readonly}"></textarea>
-
-    <h3>Recommendations</h3>
-
-    <label for="recommendations">Recommendations</label>
-    <textarea id="recommendations" th:field="*{recommendations}" placeholder="Following analysis of the information held within this report, and observations/discussions during the visit" th:readonly="${readonly}"></textarea>
-
-    <h3>Declaration</h3>
-
-    <label for="conductedByStatement">Statement</label>
-    <textarea id="conductedByStatement" th:field="*{conductedByStatement}" th:readonly="${readonly}"></textarea>
-
-    <label for="dateReportShared">Date report shared with relevant professionals (leave blank if not yet shared)</label>
-    <input type="date" id="dateReportShared" th:field="*{dateReportShared}" th:readonly="${readonly}"/>
+    <label th:id="${readonly} ? 'dateReportShared-label' : null" th:for="${readonly} ? null : 'dateReportShared'">Date report shared with relevant professionals (leave blank if not yet shared)</label>
+    <div class="readonly-val" th:classappend="${form.dateReportShared == null} ? ' empty' : ''" role="group" aria-labelledby="dateReportShared-label"
+         th:if="${readonly}" th:text="${form.dateReportShared != null} ? ${#temporals.format(form.dateReportShared, 'dd MMMM yyyy')} : 'Not shared yet'">Date</div>
+    <input type="date" id="dateReportShared" th:field="*{dateReportShared}" th:unless="${readonly}"/>
+    </fieldset>
 </th:block>
 </body>
 </html>

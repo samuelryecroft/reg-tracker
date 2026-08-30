@@ -11,27 +11,40 @@
     <h1 th:text="${isAdmin} ? 'Children' : 'My Children'">Children</h1>
     <a class="btn" href="/children/new" th:unless="${#authorization.expression('hasRole(''VIEWER'')')}">Add child</a>
 
+    <div class="table-wrap responsive">
     <table>
+        <caption>All children, most recently added first.</caption>
         <thead>
         <tr>
-            <th>Name</th>
-            <th>Date of birth</th>
-            <th th:if="${isAdmin}">Home</th>
-            <th>Case reference</th>
+            <th scope="col">Name</th>
+            <th scope="col">Date of birth</th>
+            <th scope="col" th:if="${isAdmin}">Home</th>
+            <th scope="col">Case reference</th>
         </tr>
         </thead>
         <tbody>
         <tr th:each="c : ${children}">
             <td th:text="${c.fullName}">Child Name</td>
-            <td th:text="${c.dateOfBirth}">DOB</td>
+            <td th:text="${#temporals.format(c.dateOfBirth, 'dd MMM yyyy')}">DOB</td>
             <td th:if="${isAdmin}" th:text="${c.home.name}">Home</td>
             <td th:text="${c.localCaseReference} ?: '—'">Case reference</td>
         </tr>
-        <tr th:if="${#lists.isEmpty(children)}">
-            <td colspan="4" class="muted">No children yet.</td>
-        </tr>
         </tbody>
     </table>
+    </div>
+
+    <div class="stack">
+        <div class="srow" th:each="c : ${children}">
+            <div class="top"><span class="name" th:text="${c.fullName}">Child Name</span></div>
+            <dl>
+                <dt>Date of birth</dt><dd th:text="${#temporals.format(c.dateOfBirth, 'dd MMM yyyy')}">DOB</dd>
+                <dt th:if="${isAdmin}">Home</dt><dd th:if="${isAdmin}" th:text="${c.home.name}">Home</dd>
+                <dt>Case reference</dt><dd th:text="${c.localCaseReference} ?: '—'">Case reference</dd>
+            </dl>
+        </div>
+    </div>
+
+    <div class="empty" th:if="${#lists.isEmpty(children)}">No children yet.</div>
 </main>
 </body>
 </html>

@@ -6,19 +6,27 @@
     <th:block th:replace="~{fragments/layout :: styles}"></th:block>
 </head>
 <body>
-<main id="main" style="max-width: 380px;">
+<main id="main" class="narrow">
     <h1>Return Home Tracker</h1>
+    <p class="sub">Sign in to raise, allocate or complete a return home interview.</p>
+    <div class="banner err" role="alert" th:if="${param.error}">
+        <span class="ic" aria-hidden="true">▲</span>
+        <div><strong>We couldn't sign you in</strong><p>Check your username and password and try again.</p></div>
+    </div>
+    <div class="banner ok" role="status" th:if="${param.logout}">
+        <span class="ic" aria-hidden="true">✓</span>
+        <div><strong>You've been signed out</strong></div>
+    </div>
     <div class="card">
-        <p th:if="${param.error}" class="error">Invalid username or password.</p>
-        <p th:if="${param.logout}" class="muted">You have been logged out.</p>
         <form method="post" th:action="@{/login}">
             <label for="username">Username</label>
-            <input type="text" id="username" name="username" autofocus="autofocus"/>
+            <input type="text" id="username" name="username" autocomplete="username" autofocus="autofocus"/>
             <label for="password">Password</label>
-            <input type="password" id="password" name="password"/>
-            <button type="submit" class="btn">Log in</button>
+            <input type="password" id="password" name="password" autocomplete="current-password"/>
+            <div class="btn-row"><button type="submit" class="btn block">Log in</button></div>
         </form>
     </div>
+    <p class="sub" style="margin-top:16px">Trouble signing in? Contact your organisation's administrator.</p>
 </main>
 </body>
 </html>

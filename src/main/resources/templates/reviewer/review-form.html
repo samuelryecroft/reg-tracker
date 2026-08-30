@@ -12,26 +12,43 @@
     <p class="muted" th:text="${'Home: ' + request.home.name}">Home</p>
     <p><a th:href="@{/interview-requests/{id}(id=${request.id})}">View full request details</a> (known risks, professionals, missing episode context)</p>
 
-    <div class="banner-warning">
-        <strong>This report is read-only.</strong>
-        <p>The report is the visitor's own record of the interview and is signed in their name, so it
-            cannot be edited here. To get something changed, reject it with comments and the visitor
-            will amend and resubmit.</p>
+    <div class="banner info">
+        <span class="ic" aria-hidden="true">🔒</span>
+        <div>
+            <strong>This report is the visitor's own record and can't be edited here</strong>
+            <p>It is signed in their name. To get something changed, send it back with comments and
+                they will amend and resubmit.</p>
+        </div>
+    </div>
+
+    <div class="card" th:object="${form}">
+        <div th:replace="~{fragments/report-fields :: fields(true)}"></div>
     </div>
 
     <div class="card">
         <form method="post" th:action="@{/reviewer/reports/{id}/review(id=${request.id})}" th:object="${form}">
+            <div class="banner err" role="alert" th:if="${#fields.hasErrors('reviewComments')}">
+                <span class="ic" aria-hidden="true">▲</span>
+                <div>
+                    <strong>The report hasn't been sent back yet</strong>
+                    <ul><li><a href="#reviewComments" th:text="${#fields.errors('reviewComments')[0]}">Error</a></li></ul>
+                </div>
+            </div>
 
-            <div th:replace="~{fragments/report-fields :: fields(true)}"></div>
+            <h3>Your decision</h3>
 
-            <h3>Review Comments</h3>
+            <label for="reviewComments">Comments <span class="hint" style="display:inline;font-weight:400">— required if sending back, optional if approving</span></label>
+            <textarea id="reviewComments" th:field="*{reviewComments}" th:errorclass="is-invalid"
+                      th:aria-invalid="${#fields.hasErrors('reviewComments')}" aria-describedby="reviewComments-error"
+                      placeholder="What needs to change, and where?"></textarea>
+            <div th:replace="~{fragments/layout :: fieldError('reviewComments')}"></div>
 
-            <label for="reviewComments">Comments (required if rejecting)</label>
-            <textarea id="reviewComments" th:field="*{reviewComments}"></textarea>
-
-            <button type="submit" name="action" value="approve" class="btn">Approve</button>
-            <button type="submit" name="action" value="reject" class="btn secondary">Reject with comments</button>
-            <a class="btn secondary" href="/reviewer/reports">Cancel</a>
+            <div class="btn-row">
+                <button type="submit" name="action" value="approve" class="btn">Approve and publish</button>
+                <button type="submit" name="action" value="reject" class="btn danger">Send back with comments</button>
+                <a class="btn ghost" href="/reviewer/reports">Cancel</a>
+            </div>
+            <p class="hint" style="margin-top:12px">Approving generates the final Word document and releases it to the child's home. This can't be undone.</p>
         </form>
     </div>
 </main>

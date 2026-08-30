@@ -22,7 +22,10 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class ThemeService {
 
-    private static final double DARKEN_FACTOR = 0.8;
+    /** WCAG 1.4.3 AA for normal-weight text. Every derived/chosen colour below targets this. */
+    private static final double MIN_CONTRAST = 4.5;
+    private static final String WHITE = "#FFFFFF";
+    private static final String INK = "#1F2328";
     private static final String DEFAULT_PRIMARY = "#F36E2A";
     private static final String DEFAULT_SECONDARY = "#FFF0DD";
 
@@ -145,22 +148,131 @@ public class ThemeService {
     }
 
     private ThemeView toView(ThemeSettings settings) {
-        return new ThemeView(settings.getPrimaryColor(), darken(settings.getPrimaryColor()), settings.getSecondaryColor());
+        String primary = settings.getPrimaryColor();
+        String tint = settings.getSecondaryColor();
+        return new ThemeView(primary, darken(primary, tint), tint, textOnAccent(primary));
     }
 
-    private String darken(String hexColor) {
-        int r = Integer.parseInt(hexColor.substring(1, 3), 16);
-        int g = Integer.parseInt(hexColor.substring(3, 5), 16);
-        int b = Integer.parseInt(hexColor.substring(5, 7), 16);
-        return String.format("#%02x%02x%02x",
-                scale(r), scale(g), scale(b));
+    /**
+     * FE-01. Was a fixed {@code x0.8} multiply with no contrast guarantee - a supplier picking a pale
+     * colour got an unreadable table header. Instead: hold the hue and saturation of the supplier's
+     * brand colour and walk the lightness down, one step at a time, until the result reads at 4.5:1
+     * or better against <em>both</em> {@code --surface} (white) and {@code --tint}, and stop at the
+     * first value that clears both - the lightest, and so most recognisably-branded, compliant shade.
+     * Used for table headers, card headings and secondary-button text (both here and in the generated
+     * .docx via {@link ThemeView#primaryColorDark()}), so fixing this one method fixes both surfaces.
+     */
+    static String darken(String hexColor, String tintColor) {
+        double[] hsl = toHsl(hexColor);
+        double tintLuminance = relativeLuminance(hexToRgb(tintColor));
+        double whiteLuminance = relativeLuminance(hexToRgb(WHITE));
+        for (int lightness = (int) Math.round(hsl[2]); lightness >= 0; lightness--) {
+            String candidate = fromHsl(hsl[0], hsl[1], lightness);
+            double candidateLuminance = relativeLuminance(hexToRgb(candidate));
+            if (contrastRatio(candidateLuminance, whiteLuminance) >= MIN_CONTRAST
+                    && contrastRatio(candidateLuminance, tintLuminance) >= MIN_CONTRAST) {
+                return candidate;
+            }
+        }
+        return "#000000";
     }
 
-    private int scale(int channel) {
-        int scaled = (int) Math.round(channel * DARKEN_FACTOR);
-        return Math.max(0, Math.min(255, scaled));
+    /**
+     * FE-01. The button background <em>is</em> the brand colour, so darkening a text token can't help -
+     * the foreground has to be chosen per theme. The rule: pick ink or white, whichever reads better
+     * against the supplier's accent colour. No supplier colour can produce a failing primary button.
+     */
+    static String textOnAccent(String accentColor) {
+        double accentLuminance = relativeLuminance(hexToRgb(accentColor));
+        double inkContrast = contrastRatio(accentLuminance, relativeLuminance(hexToRgb(INK)));
+        double whiteContrast = contrastRatio(accentLuminance, relativeLuminance(hexToRgb(WHITE)));
+        return inkContrast >= whiteContrast ? INK : WHITE;
     }
 
-    public record ThemeView(String primaryColor, String primaryColorDark, String secondaryColor) {
+    static int[] hexToRgb(String hexColor) {
+        return new int[] {
+                Integer.parseInt(hexColor.substring(1, 3), 16),
+                Integer.parseInt(hexColor.substring(3, 5), 16),
+                Integer.parseInt(hexColor.substring(5, 7), 16)
+        };
+    }
+
+    /** WCAG relative luminance (sRGB), the basis of the 1.4.3 contrast-ratio formula. */
+    static double relativeLuminance(int[] rgb) {
+        double r = channelLuminance(rgb[0]);
+        double g = channelLuminance(rgb[1]);
+        double b = channelLuminance(rgb[2]);
+        return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    }
+
+    private static double channelLuminance(int channel) {
+        double normalised = channel / 255.0;
+        return normalised <= 0.03928 ? normalised / 12.92 : Math.pow((normalised + 0.055) / 1.055, 2.4);
+    }
+
+    static double contrastRatio(double luminanceA, double luminanceB) {
+        double lighter = Math.max(luminanceA, luminanceB);
+        double darker = Math.min(luminanceA, luminanceB);
+        return (lighter + 0.05) / (darker + 0.05);
+    }
+
+    private static double[] toHsl(String hexColor) {
+        int[] rgb = hexToRgb(hexColor);
+        double r = rgb[0] / 255.0, g = rgb[1] / 255.0, b = rgb[2] / 255.0;
+        double max = Math.max(r, Math.max(g, b));
+        double min = Math.min(r, Math.min(g, b));
+        double lightness = (max + min) / 2.0;
+        double hue;
+        double saturation;
+        if (max == min) {
+            hue = 0;
+            saturation = 0;
+        } else {
+            double delta = max - min;
+            saturation = lightness > 0.5 ? delta / (2.0 - max - min) : delta / (max + min);
+            if (max == r) {
+                hue = ((g - b) / delta) + (g < b ? 6 : 0);
+            } else if (max == g) {
+                hue = ((b - r) / delta) + 2;
+            } else {
+                hue = ((r - g) / delta) + 4;
+            }
+            hue *= 60;
+        }
+        return new double[] { hue, saturation * 100, lightness * 100 };
+    }
+
+    private static String fromHsl(double hue, double saturationPct, double lightnessPct) {
+        double s = saturationPct / 100.0;
+        double l = lightnessPct / 100.0;
+        if (s == 0) {
+            int gray = (int) Math.round(l * 255);
+            return String.format("#%02x%02x%02x", gray, gray, gray);
+        }
+        double q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+        double p = 2 * l - q;
+        double h = hue / 360.0;
+        int r = (int) Math.round(hueToRgb(p, q, h + 1.0 / 3.0) * 255);
+        int g = (int) Math.round(hueToRgb(p, q, h) * 255);
+        int b = (int) Math.round(hueToRgb(p, q, h - 1.0 / 3.0) * 255);
+        return String.format("#%02x%02x%02x", clamp(r), clamp(g), clamp(b));
+    }
+
+    private static double hueToRgb(double p, double q, double t) {
+        double tt = t;
+        if (tt < 0) tt += 1;
+        if (tt > 1) tt -= 1;
+        if (tt < 1.0 / 6.0) return p + (q - p) * 6 * tt;
+        if (tt < 1.0 / 2.0) return q;
+        if (tt < 2.0 / 3.0) return p + (q - p) * (2.0 / 3.0 - tt) * 6;
+        return p;
+    }
+
+    private static int clamp(int channel) {
+        return Math.max(0, Math.min(255, channel));
+    }
+
+    public record ThemeView(String primaryColor, String primaryColorDark, String secondaryColor,
+            String primaryColorInk) {
     }
 }

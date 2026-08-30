@@ -9,26 +9,47 @@
 <div th:replace="~{fragments/layout :: nav}"></div>
 <main id="main">
     <h1>Add Organisation</h1>
+
     <div class="card">
         <form method="post" th:action="@{/admin/organisations}" th:object="${form}">
-            <label for="name">Name</label>
-            <input type="text" id="name" th:field="*{name}"/>
+            <div class="banner err" role="alert" th:if="${#fields.hasErrors('*')}">
+                <span class="ic" aria-hidden="true">▲</span>
+                <div>
+                    <strong>Before this organisation can be added</strong>
+                    <ul>
+                        <li th:if="${#fields.hasErrors('name')}"><a href="#name" th:text="${#fields.errors('name')[0]}">Error</a></li>
+                        <li th:if="${#fields.hasErrors('type')}"><a href="#type" th:text="${#fields.errors('type')[0]}">Error</a></li>
+                        <li th:if="${#fields.hasErrors('supplierOrganisationId')}"><a href="#supplierOrganisationId" th:text="${#fields.errors('supplierOrganisationId')[0]}">Error</a></li>
+                    </ul>
+                </div>
+            </div>
 
-            <label for="type">Type</label>
-            <select id="type" th:field="*{type}">
+            <label for="name">Name <span class="req" aria-hidden="true">*</span></label>
+            <input type="text" id="name" th:field="*{name}" required
+                   th:errorclass="is-invalid" th:aria-invalid="${#fields.hasErrors('name')}" aria-describedby="name-error"/>
+            <div th:replace="~{fragments/layout :: fieldError('name')}"></div>
+
+            <label for="type">Type <span class="req" aria-hidden="true">*</span></label>
+            <select id="type" th:field="*{type}" required
+                    th:errorclass="is-invalid" th:aria-invalid="${#fields.hasErrors('type')}" aria-describedby="type-error">
                 <option th:each="t : ${types}" th:value="${t}" th:text="${t}">TYPE</option>
             </select>
+            <div th:replace="~{fragments/layout :: fieldError('type')}"></div>
 
             <div id="supplierField">
-                <label for="supplierOrganisationId">Supplier</label>
-                <select id="supplierOrganisationId" th:field="*{supplierOrganisationId}">
+                <label for="supplierOrganisationId">Supplier <span class="req" aria-hidden="true">*</span></label>
+                <select id="supplierOrganisationId" th:field="*{supplierOrganisationId}"
+                        th:errorclass="is-invalid" th:aria-invalid="${#fields.hasErrors('supplierOrganisationId')}" aria-describedby="supplierOrganisationId-error">
                     <option value="">Select a supplier…</option>
                     <option th:each="s : ${suppliers}" th:value="${s.id}" th:text="${s.name}">Supplier</option>
                 </select>
+                <div th:replace="~{fragments/layout :: fieldError('supplierOrganisationId')}"></div>
             </div>
 
-            <button type="submit" class="btn">Create organisation</button>
-            <a class="btn secondary" href="/admin/organisations">Cancel</a>
+            <div class="btn-row">
+                <button type="submit" class="btn">Create organisation</button>
+                <a class="btn ghost" href="/admin/organisations">Cancel</a>
+            </div>
         </form>
     </div>
 </main>

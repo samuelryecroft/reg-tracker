@@ -2,6 +2,7 @@ package ninja.samryecroft.returnhome.tracker.user.dto;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.Size;
 import java.util.HashSet;
 import java.util.Set;
 import ninja.samryecroft.returnhome.tracker.user.Role;
@@ -22,6 +23,7 @@ public class EditUserForm {
 
     private boolean enabled;
 
+    @Size(min = 8, message = "Password must be at least 8 characters")
     private String newPassword;
 
     public String getFullName() {

@@ -11,16 +11,18 @@
     <h1>Users</h1>
     <a class="btn" href="/admin/users/new">Add user</a>
 
+    <div class="table-wrap responsive">
     <table>
+        <caption>All user accounts.</caption>
         <thead>
         <tr>
-            <th>Username</th>
-            <th>Full name</th>
-            <th>Roles</th>
-            <th>Home</th>
-            <th>Organisation</th>
-            <th>Enabled</th>
-            <th></th>
+            <th scope="col">Username</th>
+            <th scope="col">Full name</th>
+            <th scope="col">Roles</th>
+            <th scope="col">Home</th>
+            <th scope="col">Organisation</th>
+            <th scope="col">Enabled</th>
+            <th scope="col" class="visually-hidden">Action</th>
         </tr>
         </thead>
         <tbody>
@@ -31,10 +33,27 @@
             <td th:text="${u.home} ? ${u.home.name} : '—'">Home</td>
             <td th:text="${u.organisation} ? ${u.organisation.name} : '—'">Organisation</td>
             <td th:text="${u.enabled} ? 'Yes' : 'No'">Enabled</td>
-            <td><a th:href="@{/admin/users/{id}/edit(id=${u.id})}">Edit</a></td>
+            <td><a class="rowlink" th:href="@{/admin/users/{id}/edit(id=${u.id})}">Edit</a></td>
         </tr>
         </tbody>
     </table>
+    </div>
+
+    <div class="stack">
+        <div class="srow" th:each="u : ${users}">
+            <div class="top"><span class="name" th:text="${u.username}">username</span></div>
+            <dl>
+                <dt>Full name</dt><dd th:text="${u.fullName}">Full Name</dd>
+                <dt>Roles</dt><dd th:text="${#strings.setJoin(u.roles, ', ')}">ROLES</dd>
+                <dt th:if="${u.home}">Home</dt><dd th:if="${u.home}" th:text="${u.home.name}">Home</dd>
+                <dt th:if="${u.organisation}">Organisation</dt><dd th:if="${u.organisation}" th:text="${u.organisation.name}">Organisation</dd>
+                <dt>Enabled</dt><dd th:text="${u.enabled} ? 'Yes' : 'No'">Enabled</dd>
+            </dl>
+            <div class="act"><a class="btn ghost" th:href="@{/admin/users/{id}/edit(id=${u.id})}">Edit</a></div>
+        </div>
+    </div>
+
+    <div class="empty" th:if="${#lists.isEmpty(users)}">No users yet.</div>
 </main>
 </body>
 </html>

@@ -9,30 +9,54 @@
 <div th:replace="~{fragments/layout :: nav}"></div>
 <main id="main">
     <h1>Add Child</h1>
+
     <div class="card">
         <form method="post" th:action="@{/children}" th:object="${form}">
-            <label for="firstName">First name</label>
-            <input type="text" id="firstName" th:field="*{firstName}"/>
+            <div class="banner err" role="alert" th:if="${#fields.hasErrors('*')}">
+                <span class="ic" aria-hidden="true">▲</span>
+                <div>
+                    <strong>Before this child can be added</strong>
+                    <ul>
+                        <li th:if="${#fields.hasErrors('firstName')}"><a href="#firstName" th:text="${#fields.errors('firstName')[0]}">Error</a></li>
+                        <li th:if="${#fields.hasErrors('lastName')}"><a href="#lastName" th:text="${#fields.errors('lastName')[0]}">Error</a></li>
+                        <li th:if="${#fields.hasErrors('dateOfBirth')}"><a href="#dateOfBirth" th:text="${#fields.errors('dateOfBirth')[0]}">Error</a></li>
+                        <li th:if="${#fields.hasErrors('homeId')}"><a href="#homeId" th:text="${#fields.errors('homeId')[0]}">Error</a></li>
+                    </ul>
+                </div>
+            </div>
 
-            <label for="lastName">Last name</label>
-            <input type="text" id="lastName" th:field="*{lastName}"/>
+            <label for="firstName">First name <span class="req" aria-hidden="true">*</span></label>
+            <input type="text" id="firstName" th:field="*{firstName}" required
+                   th:errorclass="is-invalid" th:aria-invalid="${#fields.hasErrors('firstName')}" aria-describedby="firstName-error"/>
+            <div th:replace="~{fragments/layout :: fieldError('firstName')}"></div>
 
-            <label for="dateOfBirth">Date of birth</label>
-            <input type="date" id="dateOfBirth" th:field="*{dateOfBirth}"/>
+            <label for="lastName">Last name <span class="req" aria-hidden="true">*</span></label>
+            <input type="text" id="lastName" th:field="*{lastName}" required
+                   th:errorclass="is-invalid" th:aria-invalid="${#fields.hasErrors('lastName')}" aria-describedby="lastName-error"/>
+            <div th:replace="~{fragments/layout :: fieldError('lastName')}"></div>
+
+            <label for="dateOfBirth">Date of birth <span class="req" aria-hidden="true">*</span></label>
+            <input type="date" id="dateOfBirth" th:field="*{dateOfBirth}" required
+                   th:errorclass="is-invalid" th:aria-invalid="${#fields.hasErrors('dateOfBirth')}" aria-describedby="dateOfBirth-error"/>
+            <div th:replace="~{fragments/layout :: fieldError('dateOfBirth')}"></div>
 
             <label for="localCaseReference">Case reference (optional)</label>
             <input type="text" id="localCaseReference" th:field="*{localCaseReference}"/>
 
             <div th:if="${isAdmin}">
-                <label for="homeId">Home</label>
-                <select id="homeId" th:field="*{homeId}">
+                <label for="homeId">Home <span class="req" aria-hidden="true">*</span></label>
+                <select id="homeId" th:field="*{homeId}" required
+                        th:errorclass="is-invalid" th:aria-invalid="${#fields.hasErrors('homeId')}" aria-describedby="homeId-error">
                     <option value="">Select a home…</option>
                     <option th:each="h : ${homes}" th:value="${h.id}" th:text="${h.name}">Home</option>
                 </select>
+                <div th:replace="~{fragments/layout :: fieldError('homeId')}"></div>
             </div>
 
-            <button type="submit" class="btn">Add child</button>
-            <a class="btn secondary" href="/children">Cancel</a>
+            <div class="btn-row">
+                <button type="submit" class="btn">Add child</button>
+                <a class="btn ghost" href="/children">Cancel</a>
+            </div>
         </form>
     </div>
 </main>

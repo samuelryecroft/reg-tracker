@@ -13,11 +13,23 @@
 
     <div class="card">
         <form method="post" th:action="@{/visitor/interviews/{id}/schedule(id=${request.id})}" th:object="${form}">
-            <label for="scheduledAt">Scheduled visit date/time</label>
-            <input type="datetime-local" id="scheduledAt" th:field="*{scheduledAt}"/>
+            <div class="banner err" role="alert" th:if="${#fields.hasErrors('*')}">
+                <span class="ic" aria-hidden="true">▲</span>
+                <div>
+                    <strong>Before this can be confirmed</strong>
+                    <ul><li th:if="${#fields.hasErrors('scheduledAt')}"><a href="#scheduledAt" th:text="${#fields.errors('scheduledAt')[0]}">Error</a></li></ul>
+                </div>
+            </div>
 
-            <button type="submit" class="btn">Confirm</button>
-            <a class="btn secondary" href="/visitor/interviews">Cancel</a>
+            <label for="scheduledAt">Scheduled visit date/time <span class="req" aria-hidden="true">*</span></label>
+            <input type="datetime-local" id="scheduledAt" th:field="*{scheduledAt}" required
+                   th:errorclass="is-invalid" th:aria-invalid="${#fields.hasErrors('scheduledAt')}" aria-describedby="scheduledAt-error"/>
+            <div th:replace="~{fragments/layout :: fieldError('scheduledAt')}"></div>
+
+            <div class="btn-row">
+                <button type="submit" class="btn">Confirm</button>
+                <a class="btn ghost" href="/visitor/interviews">Cancel</a>
+            </div>
         </form>
     </div>
 </main>

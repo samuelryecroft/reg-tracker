@@ -200,11 +200,18 @@ class ReviewerReadOnlyIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
 
-        // Inputs/textareas carry readonly; a select cannot, so it carries disabled instead.
-        assertThat(tagWithId(reviewerHtml, "interviewLocation")).contains("readonly");
-        assertThat(tagWithId(reviewerHtml, "interviewerComments")).contains("readonly");
-        assertThat(tagWithId(reviewerHtml, "within72Hours")).contains("disabled");
-        assertThat(reviewerHtml).contains("This report is read-only.");
+        // T25 redesign: the reviewer's copy renders each answer as a record (.readonly-val), not a
+        // disabled/readonly input - a disabled <select> silently drops its value from a POST, and a
+        // "readonly" field still looks like something that ought to be typeable. So there is no
+        // editable interviewLocation/interviewerComments/within72Hours element on this page at all;
+        // instead each one has a plain label (id="<field>-label") describing the read-only value.
+        assertThat(reviewerHtml).doesNotContain("id=\"interviewLocation\"");
+        assertThat(reviewerHtml).contains("id=\"interviewLocation-label\"");
+        assertThat(reviewerHtml).doesNotContain("id=\"interviewerComments\"");
+        assertThat(reviewerHtml).contains("id=\"interviewerComments-label\"");
+        assertThat(reviewerHtml).doesNotContain("id=\"within72Hours\"");
+        assertThat(reviewerHtml).contains("id=\"within72Hours-label\"");
+        assertThat(reviewerHtml).contains("can't be edited here");
         // The one thing a reviewer must still be able to type.
         assertThat(tagWithId(reviewerHtml, "reviewComments")).doesNotContain("readonly");
 

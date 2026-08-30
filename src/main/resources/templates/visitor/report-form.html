@@ -12,21 +12,37 @@
     <p class="muted" th:text="${'Home: ' + request.home.name}">Home</p>
     <p><a th:href="@{/interview-requests/{id}(id=${request.id})}">View full request details</a> (known risks, professionals, missing episode context)</p>
 
-    <div class="banner-warning" th:if="${request.status.name() == 'REPORT_REJECTED'}">
-        <strong>This report was sent back for revision.</strong>
-        <p th:text="${form.reviewComments}">Reviewer comments</p>
+    <div class="banner warn" th:if="${request.status.name() == 'REPORT_REJECTED'}" role="alert">
+        <span class="ic" aria-hidden="true">↩</span>
+        <div>
+            <strong>Sent back for revision</strong>
+            <p th:text="${form.reviewComments}">Reviewer comments</p>
+        </div>
     </div>
 
     <div class="card">
-        <form method="post" th:action="@{/visitor/interviews/{id}/report(id=${request.id})}" th:object="${form}">
+        <form method="post" th:action="@{/visitor/interviews/{id}/report(id=${request.id})}" th:object="${form}" data-js="stepper">
+            <div class="banner err" role="alert" th:if="${#fields.hasErrors('*')}">
+                <span class="ic" aria-hidden="true">▲</span>
+                <div>
+                    <strong>Before you can submit for review</strong>
+                    <ul>
+                        <li th:if="${#fields.hasErrors('interviewDate')}"><a href="#interviewDate" th:text="${#fields.errors('interviewDate')[0]}">Error</a></li>
+                        <li th:if="${#fields.hasErrors('interviewLocation')}"><a href="#interviewLocation" th:text="${#fields.errors('interviewLocation')[0]}">Error</a></li>
+                    </ul>
+                </div>
+            </div>
 
             <div th:replace="~{fragments/report-fields :: fields(false)}"></div>
 
-            <button type="submit" name="action" value="submit" class="btn">Submit for review</button>
-            <button type="submit" name="action" value="draft" class="btn secondary">Save draft</button>
-            <a class="btn secondary" href="/visitor/interviews">Cancel</a>
+            <div class="btn-row">
+                <button type="submit" name="action" value="submit" class="btn">Submit for review</button>
+                <button type="submit" name="action" value="draft" class="btn secondary">Save draft</button>
+                <a class="btn ghost" href="/visitor/interviews">Cancel</a>
+            </div>
         </form>
     </div>
 </main>
+<script th:src="@{/js/report-stepper.js}"></script>
 </body>
 </html>

@@ -9,17 +9,33 @@
 <div th:replace="~{fragments/layout :: nav}"></div>
 <main id="main">
     <h1>Add Home</h1>
+
     <div class="card">
         <form method="post" th:action="@{/admin/homes}" th:object="${form}">
-            <label for="name">Name</label>
-            <input type="text" id="name" th:field="*{name}"/>
+            <div class="banner err" role="alert" th:if="${#fields.hasErrors('*')}">
+                <span class="ic" aria-hidden="true">▲</span>
+                <div>
+                    <strong>Before this home can be added</strong>
+                    <ul>
+                        <li th:if="${#fields.hasErrors('name')}"><a href="#name" th:text="${#fields.errors('name')[0]}">Error</a></li>
+                        <li th:if="${#fields.hasErrors('organisationId')}"><a href="#organisationId" th:text="${#fields.errors('organisationId')[0]}">Error</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <label for="name">Name <span class="req" aria-hidden="true">*</span></label>
+            <input type="text" id="name" th:field="*{name}" required
+                   th:errorclass="is-invalid" th:aria-invalid="${#fields.hasErrors('name')}" aria-describedby="name-error"/>
+            <div th:replace="~{fragments/layout :: fieldError('name')}"></div>
 
             <div th:if="${organisations != null}">
-                <label for="organisationId">Care provider organisation</label>
-                <select id="organisationId" th:field="*{organisationId}">
+                <label for="organisationId">Care provider organisation <span class="req" aria-hidden="true">*</span></label>
+                <select id="organisationId" th:field="*{organisationId}" required
+                        th:errorclass="is-invalid" th:aria-invalid="${#fields.hasErrors('organisationId')}" aria-describedby="organisationId-error">
                     <option value="">Select a care provider…</option>
                     <option th:each="o : ${organisations}" th:value="${o.id}" th:text="${o.name}">Organisation</option>
                 </select>
+                <div th:replace="~{fragments/layout :: fieldError('organisationId')}"></div>
             </div>
 
             <label for="addressLine1">Address line 1</label>
@@ -35,13 +51,16 @@
             <input type="text" id="postcode" th:field="*{postcode}"/>
 
             <label for="what3words">what3words</label>
-            <input type="text" id="what3words" th:field="*{what3words}" placeholder="e.g. ///filled.count.soap"/>
+            <p class="hint">e.g. ///filled.count.soap</p>
+            <input type="text" id="what3words" th:field="*{what3words}"/>
 
             <label for="localAuthority">Local authority</label>
             <input type="text" id="localAuthority" th:field="*{localAuthority}"/>
 
-            <button type="submit" class="btn">Create home</button>
-            <a class="btn secondary" href="/admin/homes">Cancel</a>
+            <div class="btn-row">
+                <button type="submit" class="btn">Create home</button>
+                <a class="btn ghost" href="/admin/homes">Cancel</a>
+            </div>
         </form>
     </div>
 </main>

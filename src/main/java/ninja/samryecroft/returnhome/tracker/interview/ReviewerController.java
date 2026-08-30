@@ -44,7 +44,7 @@ public class ReviewerController {
             @ModelAttribute("form") SubmitReportForm form, BindingResult bindingResult,
             @RequestParam("action") String action, Model model) {
         if ("reject".equals(action) && (form.getReviewComments() == null || form.getReviewComments().isBlank())) {
-            bindingResult.rejectValue("reviewComments", "required", "Comments are required when rejecting a report");
+            bindingResult.rejectValue("reviewComments", "required", "Comments are required when sending a report back");
         }
         if (bindingResult.hasErrors()) {
             model.addAttribute("request", interviewRequestService.getAuthorized(id, principal));

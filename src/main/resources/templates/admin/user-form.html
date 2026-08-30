@@ -9,24 +9,47 @@
 <div th:replace="~{fragments/layout :: nav}"></div>
 <main id="main">
     <h1>Add User</h1>
+
     <div class="card">
         <form method="post" th:action="@{/admin/users}" th:object="${form}">
-            <label for="username">Username</label>
-            <input type="text" id="username" th:field="*{username}"/>
-
-            <label for="password">Password</label>
-            <input type="password" id="password" th:field="*{password}"/>
-
-            <label for="fullName">Full name</label>
-            <input type="text" id="fullName" th:field="*{fullName}"/>
-
-            <label>Roles</label>
-            <div class="checkbox-group">
-                <label class="checkbox-option" th:each="r : ${roles}">
-                    <input type="checkbox" th:field="*{roles}" th:value="${r}"/>
-                    <span th:text="${r}">ROLE</span>
-                </label>
+            <div class="banner err" role="alert" th:if="${#fields.hasErrors('*')}">
+                <span class="ic" aria-hidden="true">▲</span>
+                <div>
+                    <strong>Before this user can be created</strong>
+                    <ul>
+                        <li th:if="${#fields.hasErrors('username')}"><a href="#username" th:text="${#fields.errors('username')[0]}">Error</a></li>
+                        <li th:if="${#fields.hasErrors('password')}"><a href="#password" th:text="${#fields.errors('password')[0]}">Error</a></li>
+                        <li th:if="${#fields.hasErrors('fullName')}"><a href="#fullName" th:text="${#fields.errors('fullName')[0]}">Error</a></li>
+                    </ul>
+                </div>
             </div>
+
+            <label for="username">Username <span class="req" aria-hidden="true">*</span></label>
+            <input type="text" id="username" th:field="*{username}" required
+                   th:errorclass="is-invalid" th:aria-invalid="${#fields.hasErrors('username')}" aria-describedby="username-error"/>
+            <div th:replace="~{fragments/layout :: fieldError('username')}"></div>
+
+            <label for="password">Password <span class="req" aria-hidden="true">*</span></label>
+            <p class="hint">At least 8 characters.</p>
+            <input type="password" id="password" th:field="*{password}" required minlength="8" autocomplete="new-password"
+                   th:errorclass="is-invalid" th:aria-invalid="${#fields.hasErrors('password')}" aria-describedby="password-error"/>
+            <div th:replace="~{fragments/layout :: fieldError('password')}"></div>
+
+            <label for="fullName">Full name <span class="req" aria-hidden="true">*</span></label>
+            <input type="text" id="fullName" th:field="*{fullName}" required
+                   th:errorclass="is-invalid" th:aria-invalid="${#fields.hasErrors('fullName')}" aria-describedby="fullName-error"/>
+            <div th:replace="~{fragments/layout :: fieldError('fullName')}"></div>
+
+            <fieldset class="checkbox-fieldset">
+                <legend>Roles</legend>
+                <div class="checkbox-group">
+                    <label class="checkbox-option" th:each="r : ${roles}">
+                        <input type="checkbox" th:field="*{roles}" th:value="${r}"/>
+                        <span th:text="${r}">ROLE</span>
+                    </label>
+                </div>
+                <p class="constraint-note" id="roleConstraintNote" aria-live="polite"></p>
+            </fieldset>
 
             <div id="homeField" th:if="${homes != null}">
                 <label for="homeId">Home</label>
@@ -44,18 +67,20 @@
                 </select>
             </div>
 
-            <div id="viewerHomesField" th:if="${homes != null}">
-                <label>Homes this Viewer can see</label>
+            <fieldset class="checkbox-fieldset" id="viewerHomesField" th:if="${homes != null}">
+                <legend>Homes this Viewer can see</legend>
                 <div class="checkbox-group">
                     <label class="checkbox-option" th:each="h : ${homes}">
                         <input type="checkbox" th:field="*{viewerHomeIds}" th:value="${h.id}"/>
                         <span th:text="${h.name}">Home</span>
                     </label>
                 </div>
-            </div>
+            </fieldset>
 
-            <button type="submit" class="btn">Create user</button>
-            <a class="btn secondary" href="/admin/users">Cancel</a>
+            <div class="btn-row">
+                <button type="submit" class="btn">Create user</button>
+                <a class="btn ghost" href="/admin/users">Cancel</a>
+            </div>
         </form>
     </div>
 </main>

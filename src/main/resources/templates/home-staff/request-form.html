@@ -9,15 +9,25 @@
 <div th:replace="~{fragments/layout :: nav}"></div>
 <main id="main">
     <h1>Raise a Return Home Interview Request</h1>
+
     <div class="card">
         <form method="post" th:action="@{/requests}" th:object="${form}">
+            <div class="banner err" role="alert" th:if="${#fields.hasErrors('*')}">
+                <span class="ic" aria-hidden="true">▲</span>
+                <div>
+                    <strong>Before this request can be raised</strong>
+                    <ul><li th:if="${#fields.hasErrors('childId')}"><a href="#childId" th:text="${#fields.errors('childId')[0]}">Error</a></li></ul>
+                </div>
+            </div>
 
             <h3>Young Person</h3>
-            <label for="childId">Child</label>
-            <select id="childId" th:field="*{childId}">
+            <label for="childId">Child <span class="req" aria-hidden="true">*</span></label>
+            <select id="childId" th:field="*{childId}" required
+                    th:errorclass="is-invalid" th:aria-invalid="${#fields.hasErrors('childId')}" aria-describedby="childId-error">
                 <option value="">Select a child…</option>
                 <option th:each="c : ${children}" th:value="${c.id}" th:text="${c.fullName}">Child</option>
             </select>
+            <div th:replace="~{fragments/layout :: fieldError('childId')}"></div>
             <p class="muted"><a href="/children/new">+ Add a child</a> not in this list</p>
 
             <label for="legalStatus">Legal status</label>
@@ -30,13 +40,16 @@
             <input type="datetime-local" id="returnedAt" th:field="*{returnedAt}"/>
 
             <label for="knownRisks">Any known risks</label>
-            <textarea id="knownRisks" th:field="*{knownRisks}" placeholder="Any known risks to the young person, or that the interviewer needs to be aware of prior to their visit"></textarea>
+            <p class="hint">Any known risks to the young person, or that the interviewer needs to be aware of prior to their visit.</p>
+            <textarea id="knownRisks" th:field="*{knownRisks}"></textarea>
 
             <label for="childsComments">Comments made by the young person</label>
-            <textarea id="childsComments" th:field="*{childsComments}" placeholder="Conversation held with the young person since their return that is relevant to the missing episode"></textarea>
+            <p class="hint">Conversation held with the young person since their return that is relevant to the missing episode.</p>
+            <textarea id="childsComments" th:field="*{childsComments}"></textarea>
 
             <label for="missingEpisodeDetails">Details relating to the missing episode</label>
-            <textarea id="missingEpisodeDetails" th:field="*{missingEpisodeDetails}" placeholder="Potential triggers, known locations, general overview"></textarea>
+            <p class="hint">Potential triggers, known locations, general overview.</p>
+            <textarea id="missingEpisodeDetails" th:field="*{missingEpisodeDetails}"></textarea>
 
             <label for="missingInLast6Months">Missing in the last 6 months?</label>
             <select id="missingInLast6Months" th:field="*{missingInLast6Months}">
@@ -52,7 +65,8 @@
                 <option value="false">No</option>
             </select>
 
-            <label for="strategyMeetingRequested">Strategy meeting requested? (only relevant if the above is Yes)</label>
+            <label for="strategyMeetingRequested">Strategy meeting requested?</label>
+            <p class="hint">Only relevant if the above is Yes.</p>
             <select id="strategyMeetingRequested" th:field="*{strategyMeetingRequested}">
                 <option value="">Unknown / not applicable</option>
                 <option value="true">Yes</option>
@@ -63,7 +77,8 @@
             <textarea id="importantPeople" th:field="*{importantPeople}"></textarea>
 
             <label for="aboutYoungPerson">About the young person</label>
-            <textarea id="aboutYoungPerson" th:field="*{aboutYoungPerson}" placeholder="Likes/dislikes and any potential barriers to completing the RHI"></textarea>
+            <p class="hint">Likes/dislikes and any potential barriers to completing the RHI.</p>
+            <textarea id="aboutYoungPerson" th:field="*{aboutYoungPerson}"></textarea>
 
             <h3>Details of Professionals</h3>
 
@@ -110,10 +125,13 @@
             <input type="text" id="bestTimesToVisit" th:field="*{bestTimesToVisit}"/>
 
             <label for="notes">Additional notes</label>
-            <textarea id="notes" th:field="*{notes}" placeholder="Anything else relevant that doesn't fit above"></textarea>
+            <p class="hint">Anything else relevant that doesn't fit above.</p>
+            <textarea id="notes" th:field="*{notes}"></textarea>
 
-            <button type="submit" class="btn">Submit request</button>
-            <a class="btn secondary" href="/requests">Cancel</a>
+            <div class="btn-row">
+                <button type="submit" class="btn">Submit request</button>
+                <a class="btn ghost" href="/requests">Cancel</a>
+            </div>
         </form>
     </div>
 </main>
