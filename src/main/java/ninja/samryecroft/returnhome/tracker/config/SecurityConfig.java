@@ -1,5 +1,7 @@
 package ninja.samryecroft.returnhome.tracker.config;
 
+import org.springframework.boot.health.actuate.endpoint.HealthEndpoint;
+import org.springframework.boot.security.autoconfigure.actuate.web.servlet.EndpointRequest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -22,6 +24,12 @@ public class SecurityConfig {
         http
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/login", "/css/**", "/js/**", "/webjars/**", "/error").permitAll()
+                        // WS-C: the health endpoint (and its liveness/readiness groups) is public so
+                        // App Service probes can reach it unauthenticated. show-details=when-authorized
+                        // means anonymous callers still only see {"status":"UP"}. Every OTHER actuator
+                        // endpoint (metrics, info, ...) is ADMIN-only - never anonymous.
+                        .requestMatchers(EndpointRequest.to(HealthEndpoint.class)).permitAll()
+                        .requestMatchers(EndpointRequest.toAnyEndpoint()).hasRole("ADMIN")
                         // Platform-admin-only: creating organisations stays out of org-admins' hands.
                         // Must come before the broader /admin/** rule below. /admin/theme is NOT
                         // restricted here - a Supplier ORG_ADMIN can edit their own org's brand
