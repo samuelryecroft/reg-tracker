@@ -1,4 +1,5 @@
 # Registered here rather than as a @Bean so the guard runs before the application context (and any
 # demo seeder in it) is created, and applies to every SpringApplication launch.
 org.springframework.context.ApplicationListener=\
-ninja.samryecroft.returnhome.tracker.config.DemoProfileGuard
+ninja.samryecroft.returnhome.tracker.config.DemoProfileGuard,\
+ninja.samryecroft.returnhome.tracker.config.DatabasePasswordGuard

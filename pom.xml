@@ -140,6 +140,20 @@
     <build>
         <plugins>
             <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <systemPropertyVariables>
+                        <!-- Not a credential: integration tests get their real connection details
+                             from a Testcontainers @ServiceConnection. This only satisfies the
+                             ${DB_PASSWORD} placeholder, which application.properties deliberately
+                             leaves without a default, so DatabasePasswordGuard needs no test-only
+                             exemption. -->
+                        <DB_PASSWORD>unused-testcontainers-supplies-the-real-one</DB_PASSWORD>
+                    </systemPropertyVariables>
+                </configuration>
+            </plugin>
+            <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
             </plugin>
