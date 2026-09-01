@@ -73,8 +73,21 @@ See the message sent to your inbox; summarised here so it lives with the code:
 | Read/write encrypted `.docx` blobs | **Storage Blob Data Contributor** | `azure-storage-blob` |
 
 Key Vault uses the **RBAC authorization model** (not access policies), soft-delete + **purge
-protection ON**. KEKs are **keys** named `org-{id}-kek`; the app never exports private key
-material — wrap/unwrap happens server-side in Key Vault.
+protection ON** (90-day retention; irreversible once set — the mitigation for "lost KEK = unreadable
+reports"). KEKs are **keys** named `org-{id}-kek`; the app never exports private key material —
+wrap/unwrap happens server-side in Key Vault.
+
+**Key type — RSA-2048, not symmetric (confirmed with WS-B, T47).** Standard/premium Key Vault
+supports only **RSA and EC** key types; symmetric `oct` keys exist solely in Managed HSM, which is
+ruled out on cost. So per-org KEKs are **RSA-2048**, data keys wrapped with **RSA-OAEP-256**. This
+is approach (b) in `DOCUMENT-ENCRYPTION-DESIGN.md` and preserves the property that matters (private
+key never leaves the vault); the envelope records the algorithm, so it stays self-describing.
+
+**Keys are pre-provisioned, not lazily created** — so the runtime app identity holds **Key Vault
+Crypto User** only (get/wrap/unwrap). Key *creation* (Crypto Officer) is a **privileged org-onboarding
+step** by a separate operator/automation identity, never the request-serving app: when a
+CARE_PROVIDER org is created, its `org-{id}-kek` must exist before its first report (missing key →
+report fails closed). Prod sets `app.documents.keys.auto-create=false`.
 
 **Health-indicator rule (the graceful-degradation contract):** if you add a Blob or Key Vault
 `HealthIndicator`, it must (a) **not** be registered into the `readiness` group, and (b) return
