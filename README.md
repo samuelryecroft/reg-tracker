@@ -14,17 +14,23 @@ Spring Data JPA + PostgreSQL + Flyway, Apache POI for `.docx` generation.
 ## Running locally
 
 ```bash
-docker compose up -d          # starts Postgres on localhost:5432
-./mvnw spring-boot:run
+docker compose up -d                                    # starts Postgres on localhost:5432
+export ADMIN_SEED_PASSWORD='LocalDev123!'               # required on first boot, see below
+SPRING_PROFILES_ACTIVE=dev ./mvnw spring-boot:run
 ```
 
-The app boots on `http://localhost:8080` and applies Flyway migrations on
-startup. An admin account is seeded automatically on first boot:
+The `dev` profile supplies the throwaway local database credentials that match
+`docker-compose.yml`. They are deliberately not defaults in
+`application.properties`: `spring.datasource.password` has no fallback, so a
+deployment that forgets to inject `DB_PASSWORD` fails to start instead of
+coming up on a well-known credential. Without the `dev` profile, export
+`DB_URL` / `DB_USERNAME` / `DB_PASSWORD` yourself.
 
-- username: `admin`
-- password: `ChangeMe123!` (configurable via `app.admin.username` /
-  `app.admin.password`, e.g. `APP_ADMIN_PASSWORD` env var in any
-  non-local environment)
+The app boots on `http://localhost:8080` and applies Flyway migrations on
+startup. The bootstrap admin (`admin`, or `ADMIN_SEED_USERNAME`) is seeded on
+first boot **only if `ADMIN_SEED_PASSWORD` is set** — there is deliberately no
+default password. If it is unset the seeder logs a warning, skips, and nobody
+can sign in until you set it and restart.
 
 Log in as `admin` and go to **Users** to create Coordinator, Contractor and
 Home Staff accounts.
