@@ -2,8 +2,13 @@ package ninja.samryecroft.returnhome.tracker.web;
 
 import jakarta.servlet.http.HttpServletRequest;
 import ninja.samryecroft.returnhome.tracker.audit.AuditEventPublisher;
+import ninja.samryecroft.returnhome.tracker.document.DocumentNotFoundException;
+import ninja.samryecroft.returnhome.tracker.document.DocumentSecurityException;
+import ninja.samryecroft.returnhome.tracker.document.KeyUnavailableException;
 import ninja.samryecroft.returnhome.tracker.theme.ThemeService;
 import ninja.samryecroft.returnhome.tracker.user.AppUserPrincipal;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
@@ -18,6 +23,8 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 
 @ControllerAdvice
 public class GlobalControllerAdvice {
+
+    private static final Logger log = LoggerFactory.getLogger(GlobalControllerAdvice.class);
 
     private final ThemeService themeService;
     private final AuditEventPublisher auditEventPublisher;
@@ -80,6 +87,42 @@ public class GlobalControllerAdvice {
     public String handleConflict(IllegalStateException ex, Model model) {
         model.addAttribute("status", 409);
         model.addAttribute("message", ex.getMessage());
+        return "error";
+    }
+
+    /**
+     * The fail-closed boundary for encrypted report documents.
+     *
+     * <p>It catches {@link DocumentSecurityException} - the base type - rather than the specific
+     * failures, so a crypto path that grows a new failure mode still cannot fall through to a
+     * handler that might serve something. Nothing about the cause reaches the user: the detail is
+     * already on the audit row and in the log, and telling a caller <em>why</em> a decryption failed
+     * is telling them how to probe it.
+     *
+     * <p>A key-store outage is a 503 because it is genuinely transient and retrying is the right
+     * advice. An integrity failure is a 500: the bytes are wrong, and no amount of retrying fixes
+     * that. Either way the document is not served.
+     */
+    @ExceptionHandler(DocumentSecurityException.class)
+    public String handleDocumentSecurity(DocumentSecurityException ex, Model model,
+            jakarta.servlet.http.HttpServletResponse response) {
+        HttpStatus status;
+        String message;
+        if (ex instanceof DocumentNotFoundException) {
+            status = HttpStatus.NOT_FOUND;
+            message = "That report document is no longer available.";
+        } else if (ex instanceof KeyUnavailableException) {
+            status = HttpStatus.SERVICE_UNAVAILABLE;
+            message = "The secure key service is temporarily unavailable, so this report cannot be "
+                    + "opened right now. Please try again shortly.";
+        } else {
+            status = HttpStatus.INTERNAL_SERVER_ERROR;
+            message = "This report document could not be verified and has not been released.";
+        }
+        log.error("Refusing to serve a report document: {}", ex.getClass().getSimpleName(), ex);
+        response.setStatus(status.value());
+        model.addAttribute("status", status.value());
+        model.addAttribute("message", message);
         return "error";
     }
 

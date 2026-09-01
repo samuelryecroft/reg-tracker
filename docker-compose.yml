@@ -10,5 +10,18 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
 
+  # Azurite is the Azure Storage emulator. It exists so the encrypted-document path can be
+  # developed and exercised against real Blob semantics - metadata handling included - before any
+  # Azure resource is provisioned (WS-B/WS-D). It is not needed for the default local profile,
+  # which stores the same ciphertext on disk.
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite:latest
+    command: azurite-blob --blobHost 0.0.0.0 --location /data
+    ports:
+      - "10000:10000"
+    volumes:
+      - azuritedata:/data
+
 volumes:
   pgdata:
+  azuritedata:
