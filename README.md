@@ -68,8 +68,25 @@ POI. Swap in your organisation's real template later — keep the same
 placeholder as the sole content of its own table cell/paragraph (needed so
 substitution isn't corrupted by Word splitting text across multiple runs).
 
-Generated documents are written to `app.docx.output-dir` (defaults to
-`./generated-reports`, outside version control).
+Generated documents are **encrypted before they are stored** — a per-file
+AES-256-GCM data key, wrapped by the owning organisation's key. Locally
+the ciphertext lands in `app.docx.output-dir` (defaults to
+`./generated-reports`, outside version control) and the keys are derived
+in-process; deployment stores it in Azure Blob with the keys in Key Vault.
+The same code path runs in both cases — there is no unencrypted mode.
+
+You do not need to configure anything to run locally. To exercise the real
+Blob path without an Azure subscription, start the storage emulator:
+
+```bash
+docker compose up -d azurite
+./mvnw spring-boot:run -Dspring-boot.run.profiles=azurite
+```
+
+See **[DOCUMENT-KEYS.md](DOCUMENT-KEYS.md)** for what this protects against,
+the per-organisation key model, and the operational steps that go with it —
+in particular, **creating a new organisation in production requires creating
+its key first**, or its first report approval will fail closed.
 
 ## Tests
 
