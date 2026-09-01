@@ -42,6 +42,23 @@ App Service app settings (set by WS-D Terraform):
 | `APPLICATIONINSIGHTS_CONFIGURATION_FILE` | path to `applicationinsights.json` (this folder) |
 | **Health check path** | `/actuator/health/readiness` |
 
+### Required at boot — WS-B fail-fast (WS-D must provision these before first deploy)
+
+WS-B's `DocumentStorageConfig` **refuses to start** in a prod environment (`app.env=prod` or a
+`prod` profile) if it resolves to a local storage/key backend — i.e. if these are missing. A prod
+boot without them is the **guard working, not a broken image**. WS-D provisions them as App Service
+app settings (Key Vault references / resource endpoints), and the first-deploy runbook sets them
+**before** the jar is swapped live:
+
+| Setting | Source |
+|---|---|
+| `BLOB_ENDPOINT` (`app.documents.blob.endpoint`) | Storage account blob endpoint (WS-D output) |
+| `KEY_VAULT_URI` (`app.documents.key-vault.uri`) | Key Vault URI (WS-D output) |
+| `SPRING_PROFILES_ACTIVE` | `azure` (+ `prod`) — selects the Blob/Key Vault backends |
+
+No storage credential is ever set: staging/prod authenticate via the App Service system-assigned
+managed identity (`DefaultAzureCredential`); the Azurite connection string is a dev-only override.
+
 If `APPLICATIONINSIGHTS_CONNECTION_STRING` is unset, the agent stays inert — no crash, no export.
 `applicationinsights.json` in this folder sets the role name (`return-home-tracker`), 100% sampling
 (fine at ~20 users), Micrometer + JDBC instrumentation, and live metrics.
@@ -94,3 +111,14 @@ report fails closed). Prod sets `app.documents.keys.auto-create=false`.
 `UP`/`UNKNOWN` — never `DOWN` — when the resource is **not configured yet**, so a pre-provisioning
 boot keeps probes green. Gate on `APPLICATIONINSIGHTS_CONNECTION_STRING`-style presence checks, not
 on a live connection at construction time.
+
+**Storage/Key Vault HealthIndicator — deferred to a POST-MERGE follow-up (Pam owns).** It needs
+*both* actuator (this branch) *and* WS-B's `DocumentStorageProperties`/`StorageProvider` beans
+(`feat/blob-encryption`) — neither branch has both today, so it can't compile on either alone. Once
+both land on `main`, add it under `observability/` following the rule above, gating on
+`DocumentStorageProperties` (inject the bound bean, per Jim): Blob configured =
+`app.documents.blob.endpoint` **or** `.connection-string` set; Key Vault configured =
+`app.documents.key-vault.uri` set; if `app.documents.storage`/`app.documents.keys` resolve to
+`local`, report `UP`/`UNKNOWN` and probe nothing. `StorageProvider.describe()` gives a backend label
+(e.g. `azure-blob:report-documents`) for the health detail. Surfaces in the full `/actuator/health`
+for diagnostics/alerting only — **never** in the readiness probe.
