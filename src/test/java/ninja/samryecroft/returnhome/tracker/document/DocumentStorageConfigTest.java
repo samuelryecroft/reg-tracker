@@ -2,12 +2,9 @@ package ninja.samryecroft.returnhome.tracker.document;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import ninja.samryecroft.returnhome.tracker.config.AppProperties;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
-import org.springframework.context.annotation.Configuration;
 
 /**
  * The production guard. The local storage and key backends are legitimate for development - they
@@ -21,9 +18,9 @@ class DocumentStorageConfigTest {
     private ApplicationContextRunner runner() {
         return new ApplicationContextRunner()
                 .withConfiguration(AutoConfigurations.of())
-                .withUserConfiguration(AppPropertiesConfiguration.class, DocumentStorageConfig.class)
+                .withUserConfiguration(DocumentStorageConfig.class)
                 .withPropertyValues(
-                        "app.docx.output-dir=target/test-documents",
+                        "app.documents.local.directory=target/test-documents",
                         "app.documents.local-keys.master-secret=a-master-secret-for-tests");
     }
 
@@ -90,8 +87,4 @@ class DocumentStorageConfigTest {
                         .hasMessageContaining("app.documents.key-vault.uri must be set"));
     }
 
-    @Configuration
-    @EnableConfigurationProperties(AppProperties.class)
-    static class AppPropertiesConfiguration {
-    }
 }

@@ -55,6 +55,7 @@ Three independent things have to agree before a document decrypts:
 | Property | Dev default | Deployment |
 |---|---|---|
 | `app.documents.storage` | `local` | `azure-blob` |
+| `app.documents.local.directory` | `./generated-reports` | unused |
 | `app.documents.keys` | `local` | `key-vault` |
 | `app.documents.blob.endpoint` | - | account endpoint; managed identity authenticates |
 | `app.documents.blob.container` | `report-documents` | same |
@@ -70,9 +71,10 @@ must fail loudly rather than run in a state that looks encrypted and is not.
 
 ### Running locally
 
-The default needs nothing: ciphertext goes to `generated-reports/`, and per-organisation KEKs are
-derived from `app.documents.local-keys.master-secret`. Set `DOCUMENT_KEY_SECRET` if you want local
-documents to stay readable across a machine rebuild.
+The default needs nothing: ciphertext goes to `app.documents.local.directory`
+(`./generated-reports`), and per-organisation KEKs are derived from
+`app.documents.local-keys.master-secret`. Set `DOCUMENT_KEY_SECRET` if you want local documents to
+stay readable across a machine rebuild.
 
 To exercise the real Blob code path without an Azure subscription:
 

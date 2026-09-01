@@ -11,7 +11,6 @@ import com.azure.storage.blob.BlobServiceClientBuilder;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
-import ninja.samryecroft.returnhome.tracker.config.AppProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -37,8 +36,7 @@ public class DocumentStorageConfig {
     private static final List<String> PRODUCTION_MARKERS = List.of("prod", "production");
 
     @Bean
-    StorageProvider storageProvider(DocumentStorageProperties properties, AppProperties appProperties,
-            Environment environment) {
+    StorageProvider storageProvider(DocumentStorageProperties properties, Environment environment) {
         boolean production = isProduction(environment);
         if (properties.getStorage() == DocumentStorageProperties.StorageBackend.AZURE_BLOB) {
             return new AzureBlobStorageProvider(blobContainerClient(properties));
@@ -48,9 +46,8 @@ public class DocumentStorageConfig {
                     + "App Service disk is ephemeral, so approved reports would be lost on restart. "
                     + "Set app.documents.storage=azure-blob.");
         }
-        Path directory = Path.of(properties.getLocal().getDirectory() != null
-                ? properties.getLocal().getDirectory()
-                : appProperties.getDocx().getOutputDir());
+        Path directory = Path.of(require(properties.getLocal().getDirectory(),
+                "app.documents.local.directory"));
         log.info("Report documents are encrypted and stored on the local filesystem at {} (development only)",
                 directory);
         return new LocalFileStorageProvider(directory);

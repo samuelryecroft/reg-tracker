@@ -70,7 +70,7 @@ substitution isn't corrupted by Word splitting text across multiple runs).
 
 Generated documents are **encrypted before they are stored** — a per-file
 AES-256-GCM data key, wrapped by the owning organisation's key. Locally
-the ciphertext lands in `app.docx.output-dir` (defaults to
+the ciphertext lands in `app.documents.local.directory` (defaults to
 `./generated-reports`, outside version control) and the keys are derived
 in-process; deployment stores it in Azure Blob with the keys in Key Vault.
 The same code path runs in both cases — there is no unencrypted mode.

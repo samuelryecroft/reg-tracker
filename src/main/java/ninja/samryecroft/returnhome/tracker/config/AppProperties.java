@@ -24,7 +24,6 @@ public class AppProperties {
 
     public static class Docx {
         private String templatePath;
-        private String outputDir;
 
         public String getTemplatePath() {
             return templatePath;
@@ -34,13 +33,6 @@ public class AppProperties {
             this.templatePath = templatePath;
         }
 
-        public String getOutputDir() {
-            return outputDir;
-        }
-
-        public void setOutputDir(String outputDir) {
-            this.outputDir = outputDir;
-        }
     }
 
     public static class Security {
