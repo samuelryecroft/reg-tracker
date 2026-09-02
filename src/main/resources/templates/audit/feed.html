@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Audit — Return Home Tracker</title>
+    <th:block th:replace="~{fragments/layout :: styles}"></th:block>
+</head>
+<body>
+<div th:replace="~{fragments/layout :: nav}"></div>
+<main id="main">
+    <h1>Case activity</h1>
+    <p class="sub">Every interview request/report event you're authorized to see — never sign-in or account activity.</p>
+
+    <form method="get" class="filters">
+        <div class="f">
+            <label for="homeId">Home</label>
+            <select id="homeId" name="homeId" style="min-width:170px">
+                <option value="">All homes</option>
+                <option th:each="h : ${homes}" th:value="${h.id}" th:text="${h.name}" th:selected="${homeId != null and homeId == h.id}">Home</option>
+            </select>
+        </div>
+        <div class="f"><label for="from">From</label><input id="from" type="date" name="from" th:value="${from}" style="min-width:150px"/></div>
+        <div class="f"><label for="to">To</label><input id="to" type="date" name="to" th:value="${to}" style="min-width:150px"/></div>
+        <button type="submit" class="btn secondary" style="margin-left:auto">Apply filters</button>
+    </form>
+
+    <p class="hint" th:text="${#lists.size(rows) + ' event' + (#lists.size(rows) == 1 ? '' : 's') + ' match. Exporting produces a CSV of these ' + #lists.size(rows) + ' rows — the same columns you can see, for the same records you can already open.'}">Count</p>
+
+    <p class="btn-row">
+        <a class="btn secondary" th:href="@{/audit/export.csv(homeId=${homeId}, from=${from}, to=${to})}">Export this view</a>
+    </p>
+
+    <div class="table-wrap responsive">
+    <table>
+        <caption>Most recent first</caption>
+        <thead>
+        <tr>
+            <th scope="col">Date</th>
+            <th scope="col">Home</th>
+            <th scope="col">Child</th>
+            <th scope="col">Event</th>
+            <th scope="col">Role</th>
+            <th scope="col">Detail</th>
+            <th scope="col" class="visually-hidden">Action</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="row : ${rows}">
+            <td th:text="${row.entry().when()}">Date</td>
+            <td th:text="${row.homeName()}">Home</td>
+            <td th:text="${row.childLabel()}">Child</td>
+            <td th:text="${row.entry().headline()}">Event</td>
+            <td th:text="${row.entry().actorRole()} ?: '—'">Role</td>
+            <td th:text="${row.entry().detail()} ?: '—'">Detail</td>
+            <td><a class="rowlink" th:href="@{/interview-requests/{id}(id=${row.requestId()})}">View</a></td>
+        </tr>
+        </tbody>
+    </table>
+    </div>
+
+    <div class="empty" th:if="${#lists.isEmpty(rows)}">No case activity matches these filters.</div>
+</main>
+</body>
+</html>

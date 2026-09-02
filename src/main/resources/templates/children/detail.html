@@ -11,6 +11,19 @@
     <h1 th:text="${child.fullName}">Child Name</h1>
     <p class="muted" th:text="${'Home: ' + child.home.name}">Home</p>
 
+    <div class="card" th:if="${canExport}" style="display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap">
+        <div style="flex:1 1 320px">
+            <h3 style="margin-top:0">Case file</h3>
+            <p style="margin:0">Every return home interview raised for this child, with its full timeline and its
+                approved report — assembled into one dated evidence pack.</p>
+            <p class="hint" style="margin-top:8px" th:text="${#lists.size(requests) + ' interview' + (#lists.size(requests) == 1 ? '' : 's') + ' · ' + approvedReportCount + ' approved report' + (approvedReportCount == 1 ? '' : 's')}">Summary</p>
+        </div>
+        <div style="flex:0 0 auto">
+            <a class="btn" th:href="@{/children/{id}/export(id=${child.id})}">Export case file</a>
+            <p class="hint" style="margin-top:8px;text-align:right">Exports are recorded</p>
+        </div>
+    </div>
+
     <h2>Return Home Interview History</h2>
     <div class="table-wrap responsive">
     <table>

@@ -4,6 +4,7 @@ import jakarta.validation.Valid;
 import java.util.List;
 import ninja.samryecroft.returnhome.tracker.audit.AuditHistoryService;
 import ninja.samryecroft.returnhome.tracker.child.dto.CreateChildForm;
+import ninja.samryecroft.returnhome.tracker.export.ExportAuthorization;
 import ninja.samryecroft.returnhome.tracker.home.Home;
 import ninja.samryecroft.returnhome.tracker.home.HomeRepository;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewRequest;
@@ -75,9 +76,14 @@ public class ChildController {
         }
 
         List<InterviewRequest> requests = interviewRequestRepository.findByChildIdOrderByCreatedAtDesc(id);
+        long approvedReportCount = requests.stream()
+                .filter(r -> r.getStatus().name().equals("REPORT_APPROVED"))
+                .count();
         model.addAttribute("child", child);
         model.addAttribute("requests", requests);
         model.addAttribute("caseHistory", auditHistoryService.caseHistoryFor(requests));
+        model.addAttribute("canExport", ExportAuthorization.canExport(principal));
+        model.addAttribute("approvedReportCount", approvedReportCount);
         return "children/detail";
     }
 

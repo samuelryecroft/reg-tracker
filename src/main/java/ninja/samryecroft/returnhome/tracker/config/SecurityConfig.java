@@ -44,6 +44,12 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/coordinator/requests").hasAnyRole("COORDINATOR", "ADMIN", "ORG_ADMIN", "VIEWER")
                         .requestMatchers("/coordinator/**").hasAnyRole("COORDINATOR", "ADMIN")
                         .requestMatchers("/dashboard/**").hasAnyRole("ORG_ADMIN", "VIEWER", "COORDINATOR")
+                        // Roadmap 2.5: the org-wide case-activity feed + its CSV export. Exporting is
+                        // a capability separate from viewing (D-6) - ExportAuthorization narrows this
+                        // further per-request; this matcher is just "authenticated enough to try".
+                        // HOME_STAFF/VISITOR/REVIEWER excluded - none of them has an org-wide view of
+                        // anyone else's case activity anywhere else in the app either.
+                        .requestMatchers("/audit/**").hasAnyRole("ORG_ADMIN", "VIEWER", "COORDINATOR", "ADMIN")
                         .requestMatchers("/visitor/**").hasAnyRole("VISITOR", "ADMIN")
                         .requestMatchers("/reviewer/**").hasAnyRole("REVIEWER", "ADMIN")
                         .requestMatchers("/requests/**").hasAnyRole("HOME_STAFF", "ADMIN")

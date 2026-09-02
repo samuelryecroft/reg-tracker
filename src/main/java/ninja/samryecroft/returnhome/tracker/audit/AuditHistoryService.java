@@ -13,6 +13,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewRequest;
 import ninja.samryecroft.returnhome.tracker.report.InterviewReport;
 import ninja.samryecroft.returnhome.tracker.report.InterviewReportRepository;
@@ -43,6 +44,19 @@ public class AuditHistoryService {
     /** Sign-in monitoring is explicitly out of scope for V1 (gated on an unresolved GDPR policy call). */
     private static final Set<AuditEventType> EXCLUDED_FROM_USER_HISTORY =
             Set.of(AuditEventType.LOGIN_SUCCESS, AuditEventType.LOGIN_FAILURE);
+
+    /**
+     * Roadmap 2.5's audit feed is deliberately "case activity" only (Oscar's T35 split) - interview
+     * request/report lifecycle, never sign-in, account-admin or access-denied events. This is what
+     * keeps the ADMIN sign-in-events export out of MVP for free: those types simply never appear
+     * here, rather than needing a separate check.
+     */
+    private static final Set<AuditEventType> CASE_ACTIVITY_TYPES = Set.of(
+            AuditEventType.INTERVIEW_REQUEST_CREATED, AuditEventType.INTERVIEW_REQUEST_ALLOCATED,
+            AuditEventType.INTERVIEW_REQUEST_SCHEDULED, AuditEventType.INTERVIEW_REQUEST_RETURN_TIME_RECORDED,
+            AuditEventType.REPORT_DRAFT_SAVED, AuditEventType.REPORT_SUBMITTED,
+            AuditEventType.REPORT_APPROVED, AuditEventType.REPORT_REJECTED,
+            AuditEventType.DOCX_GENERATED, AuditEventType.DOCX_DOWNLOADED);
 
     /**
      * How the WHEN column reads. TIME is used inside a day-grouped section (the day is already the
@@ -107,6 +121,54 @@ public class AuditHistoryService {
             sections.add(new AuditHistorySection(label, toEntries(forThisRequest, WhenStyle.SHORT_DATE)));
         }
         return sections;
+    }
+
+    /**
+     * Roadmap 2.5's org-wide case-activity feed: every request in {@code requestsInScope} (already
+     * org-scoped by the caller, the same "fetch scope, then compute" pattern the dashboard uses),
+     * filtered by home and date range, resolved back to its home/child so a multi-child feed can
+     * show and link them. Sign-in/account/access-denied events never appear (see
+     * {@link #CASE_ACTIVITY_TYPES}), which is what keeps the platform-ADMIN sign-in-export question
+     * out of scope here rather than needing a separate exclusion.
+     */
+    public List<AuditFeedRow> caseActivityFeed(List<InterviewRequest> requestsInScope, Long homeIdFilter,
+            LocalDate from, LocalDate to) {
+        if (requestsInScope.isEmpty()) {
+            return List.of();
+        }
+        Set<Long> organisationIds = requestsInScope.stream()
+                .map(r -> r.getHome().getOrganisation().getId())
+                .collect(Collectors.toSet());
+        Map<Long, InterviewRequest> requestById = requestsInScope.stream()
+                .collect(Collectors.toMap(InterviewRequest::getId, r -> r, (a, b) -> a));
+        List<Long> requestIds = requestsInScope.stream().map(InterviewRequest::getId).toList();
+        Map<Long, Long> requestIdByReportId = interviewReportRepository.findByInterviewRequestIdIn(requestIds).stream()
+                .collect(Collectors.toMap(InterviewReport::getId, r -> r.getInterviewRequest().getId()));
+
+        List<AuditFeedRow> rows = new ArrayList<>();
+        for (AuditEvent event : auditEventRepository.findByOrganisationIdIn(organisationIds)) {
+            if (!CASE_ACTIVITY_TYPES.contains(event.getEventType())) {
+                continue;
+            }
+            Long requestId = "InterviewRequest".equals(event.getTargetType()) ? event.getTargetId()
+                    : "InterviewReport".equals(event.getTargetType()) ? requestIdByReportId.get(event.getTargetId())
+                    : null;
+            InterviewRequest request = requestId == null ? null : requestById.get(requestId);
+            if (request == null) {
+                continue;
+            }
+            if (homeIdFilter != null && !homeIdFilter.equals(request.getHome().getId())) {
+                continue;
+            }
+            LocalDate day = event.getOccurredAt().toLocalDate();
+            if ((from != null && day.isBefore(from)) || (to != null && day.isAfter(to))) {
+                continue;
+            }
+            rows.add(new AuditFeedRow(toEntry(event, WhenStyle.SHORT_DATE), request.getHome().getName(),
+                    request.getChild().getFullName(), request.getId()));
+        }
+        rows.sort(Comparator.comparing((AuditFeedRow row) -> row.entry().occurredAt()).reversed());
+        return rows;
     }
 
     /** A user account's own audit trail - role/enabled/password changes, never sign-in activity. */

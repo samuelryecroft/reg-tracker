@@ -35,5 +35,12 @@ public enum AuditEventType {
     DOCUMENT_KEY_UNWRAPPED,
     DOCUMENT_CRYPTO_FAILED,
 
+    // Roadmap 2.5 - export takes children's data OUT of the encrypted boundary, so the act itself
+    // is audited (export-build-brief.md, CONFIRMED non-negotiable). Both record whether the
+    // attempt succeeded; a failed export is recorded precisely so a quoted attempt number means
+    // something.
+    CASE_FILE_EXPORTED,
+    AUDIT_QUERY_EXPORTED,
+
     ACCESS_DENIED
 }

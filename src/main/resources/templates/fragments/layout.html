@@ -30,6 +30,7 @@
         <a th:if="${#authorization.expression('hasAnyRole(''ADMIN'',''ORG_ADMIN'')')}" href="/admin/users">Users</a>
         <a th:if="${#authorization.expression('hasAnyRole(''ADMIN'',''ORG_ADMIN'')')}" href="/admin/homes">Homes</a>
         <a th:if="${#authorization.expression('hasAnyRole(''ADMIN'',''ORG_ADMIN'',''VIEWER'')')}" href="/children">Children</a>
+        <a th:if="${#authorization.expression('hasAnyRole(''ORG_ADMIN'',''VIEWER'',''COORDINATOR'',''ADMIN'')')}" href="/audit">Audit</a>
         <a th:if="${canEditTheme}" href="/admin/theme">Branding</a>
         <a th:if="${#authorization.expression('hasRole(''ADMIN'')')}" href="/admin/organisations">Organisations</a>
     </nav>

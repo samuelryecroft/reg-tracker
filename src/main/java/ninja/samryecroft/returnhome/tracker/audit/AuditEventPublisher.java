@@ -3,6 +3,7 @@ package ninja.samryecroft.returnhome.tracker.audit;
 import java.util.Comparator;
 import java.util.Set;
 import java.util.stream.Collectors;
+import ninja.samryecroft.returnhome.tracker.child.Child;
 import ninja.samryecroft.returnhome.tracker.home.Home;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewRequest;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewStatus;
@@ -207,6 +208,60 @@ public class AuditEventPublisher {
                 .meta("requestId", request.getId())
                 .meta("operation", operation)
                 .meta("reason", reason)
+                .build());
+    }
+
+    // --- Roadmap 2.5: export (A.5) ---
+
+    /**
+     * A case file left the encrypted boundary. Records the stated purpose/reference, what the pack
+     * contained and its checksum - never the pack's own contents. {@code namedActors} is always
+     * false in this MVP (role-only, no tick - export-build-brief.md D-1).
+     */
+    public void caseFileExported(Child child, String purpose, String reference, int interviewCount,
+            int reportCount, String checksum, AppUserPrincipal principal) {
+        publish(actor(AuditEventRecord.of(AuditEventType.CASE_FILE_EXPORTED), principal)
+                .target("Child", child.getId())
+                .scope(child.getHome().getOrganisation().getId(), child.getHome().getId())
+                .meta("purpose", purpose)
+                .meta("reference", reference)
+                .meta("interviewCount", interviewCount)
+                .meta("reportCount", reportCount)
+                .meta("namedActors", false)
+                .meta("checksum", checksum)
+                .meta("success", true)
+                .build());
+    }
+
+    /**
+     * Fail-closed trip for an export: one document could not be retrieved, so nothing was produced.
+     * Recording the attempt is the point - a fail-closed error screen that quotes an attempt number
+     * means nothing if the attempt was never written down.
+     */
+    public void caseFileExportFailed(Child child, String purpose, String reference, Long affectedRequestId,
+            String reason, AppUserPrincipal principal) {
+        publish(actor(AuditEventRecord.of(AuditEventType.CASE_FILE_EXPORTED), principal)
+                .target("Child", child.getId())
+                .scope(child.getHome().getOrganisation().getId(), child.getHome().getId())
+                .meta("purpose", purpose)
+                .meta("reference", reference)
+                .meta("affectedRequestId", affectedRequestId)
+                .meta("reason", reason)
+                .meta("success", false)
+                .build());
+    }
+
+    /**
+     * The audit feed's own export - a CSV of exactly the filtered rows on screen. {@code scope}
+     * reads back as the same filter sentence the user saw (home / event type / date range / count),
+     * per Creed's export-design-intent.md.
+     */
+    public void auditQueryExported(Long organisationId, String scope, int rowCount, AppUserPrincipal principal) {
+        publish(actor(AuditEventRecord.of(AuditEventType.AUDIT_QUERY_EXPORTED), principal)
+                .target("Organisation", organisationId)
+                .scope(organisationId, null)
+                .meta("scope", scope)
+                .meta("rowCount", rowCount)
                 .build());
     }
 

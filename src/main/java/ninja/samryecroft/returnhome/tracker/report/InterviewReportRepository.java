@@ -31,4 +31,7 @@ public interface InterviewReportRepository extends JpaRepository<InterviewReport
     @EntityGraph(attributePaths = {"visitor", "reviewedBy", "interviewRequest", "interviewRequest.child", "interviewRequest.home"})
     @Query("select r from InterviewReport r where r.interviewRequest.home.id in :homeIds")
     List<InterviewReport> findByHomeIdIn(@Param("homeIds") Collection<Long> homeIds);
+
+    /** Batched form of {@link #findByInterviewRequestId} - the roadmap 2.5 audit feed resolves many requests at once. */
+    List<InterviewReport> findByInterviewRequestIdIn(Collection<Long> interviewRequestIds);
 }

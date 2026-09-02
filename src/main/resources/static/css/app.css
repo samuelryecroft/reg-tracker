@@ -491,3 +491,24 @@ fieldset.step[hidden] { display: none; }
     .no-print, .zone-hd form, .zone-hd select, .btn { display: none !important; }
     .zone, .tile, table { break-inside: avoid; }
 }
+
+/* ============================== audit feed (roadmap 2.5) ============================== */
+.filters { display: flex; gap: var(--s3); flex-wrap: wrap; align-items: flex-end; margin: var(--s4) 0; }
+.filters .f { display: flex; flex-direction: column; gap: var(--s1); }
+.filters label { font-size: var(--t-xs); font-weight: 650; color: var(--muted); margin: 0; }
+@media (max-width: 720px) { .filters .f { flex: 1 1 100%; } }
+
+/* ============================== export consequence panel + manifest (roadmap 2.5) ============================== */
+.consequence {
+    border: 1px solid var(--border); border-left: 4px solid var(--accent); border-radius: 0 var(--radius) var(--radius) 0;
+    background: var(--surface); padding: var(--s5); margin-bottom: var(--s4);
+}
+.manifest { list-style: none; margin: var(--s3) 0 0; padding: 0; font-size: var(--t-sm); }
+.manifest li { display: flex; gap: var(--s3); align-items: flex-start; padding: 9px 0; border-bottom: 1px solid var(--border); }
+.manifest li:last-child { border-bottom: 0; }
+.manifest .mk-in { color: var(--ok); font-weight: 700; flex: 0 0 18px; }
+.manifest .mk-out { color: var(--muted); font-weight: 700; flex: 0 0 18px; }
+.manifest .lbl-wrap { flex: 1; }
+.manifest .n { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.manifest li.out .lbl { color: var(--muted); }
+.manifest .why { display: block; font-size: var(--t-xs); color: var(--muted); margin-top: 2px; }
