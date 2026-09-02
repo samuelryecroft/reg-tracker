@@ -54,11 +54,11 @@ class AuditHistoryIntegrationTest extends AbstractIntegrationTest {
     private static final String PASSWORD = "CorrectHorse123!";
 
     @TempDir
-    static Path docxOutputDir;
+    static Path documentStoreDir;
 
     @DynamicPropertySource
-    static void docxOutputDir(DynamicPropertyRegistry registry) {
-        registry.add("app.docx.output-dir", () -> docxOutputDir.toString());
+    static void documentStoreDir(DynamicPropertyRegistry registry) {
+        registry.add("app.documents.local.directory", () -> documentStoreDir.toString());
     }
 
     @Autowired
