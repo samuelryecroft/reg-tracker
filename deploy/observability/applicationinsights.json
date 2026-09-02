@@ -1,0 +1,29 @@
+{
+  "$comment": [
+    "Application Insights Java 3.x agent configuration (WS-C / M4).",
+    "Attached to the JVM at deploy time via -javaagent (see README.md); it is NOT a code",
+    "dependency. The connection string is supplied out-of-band via the",
+    "APPLICATIONINSIGHTS_CONNECTION_STRING env var, sourced from Key Vault at provisioning (WS-D).",
+    "If that env var is absent the agent stays inert and the app boots identically - which is",
+    "exactly what lets this land before the live App Insights resource exists."
+  ],
+  "role": {
+    "name": "return-home-tracker"
+  },
+  "sampling": {
+    "percentage": 100
+  },
+  "instrumentation": {
+    "micrometer": { "enabled": true },
+    "logging": { "level": "INFO" },
+    "jdbc": { "enabled": true }
+  },
+  "preview": {
+    "captureControllerSpans": true,
+    "liveMetrics": { "enabled": true }
+  },
+  "selfDiagnostics": {
+    "destination": "console",
+    "level": "WARN"
+  }
+}
