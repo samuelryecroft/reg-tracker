@@ -2,6 +2,7 @@ package ninja.samryecroft.returnhome.tracker.user;
 
 import jakarta.validation.Valid;
 import java.util.HashSet;
+import ninja.samryecroft.returnhome.tracker.audit.AuditEventPublisher;
 import ninja.samryecroft.returnhome.tracker.audit.AuditHistoryService;
 import ninja.samryecroft.returnhome.tracker.home.HomeRepository;
 import ninja.samryecroft.returnhome.tracker.organisation.OrganisationRepository;
@@ -27,14 +28,16 @@ public class UserAdminController {
     private final HomeRepository homeRepository;
     private final OrganisationRepository organisationRepository;
     private final AuditHistoryService auditHistoryService;
+    private final AuditEventPublisher auditEventPublisher;
 
     public UserAdminController(UserService userService, UserRepository userRepository, HomeRepository homeRepository,
-            OrganisationRepository organisationRepository, AuditHistoryService auditHistoryService) {
+            OrganisationRepository organisationRepository, AuditHistoryService auditHistoryService, AuditEventPublisher auditEventPublisher) {
         this.userService = userService;
         this.userRepository = userRepository;
         this.homeRepository = homeRepository;
         this.organisationRepository = organisationRepository;
         this.auditHistoryService = auditHistoryService;
+        this.auditEventPublisher = auditEventPublisher;
     }
 
     @GetMapping
@@ -75,6 +78,7 @@ public class UserAdminController {
         model.addAttribute("user", user);
         model.addAttribute("form", form);
         model.addAttribute("auditHistory", auditHistoryService.historyForUser(id));
+        auditEventPublisher.auditViewOpened("User", id, principal.getOrganisationId(), null, principal);
         addPickerAttributes(principal, model);
         return "admin/user-form-edit";
     }

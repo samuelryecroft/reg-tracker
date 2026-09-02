@@ -2,6 +2,7 @@ package ninja.samryecroft.returnhome.tracker.child;
 
 import jakarta.validation.Valid;
 import java.util.List;
+import ninja.samryecroft.returnhome.tracker.audit.AuditEventPublisher;
 import ninja.samryecroft.returnhome.tracker.audit.AuditHistoryService;
 import ninja.samryecroft.returnhome.tracker.child.dto.CreateChildForm;
 import ninja.samryecroft.returnhome.tracker.home.Home;
@@ -33,15 +34,17 @@ public class ChildController {
     private final InterviewRequestRepository interviewRequestRepository;
     private final OrganisationAccessService organisationAccessService;
     private final AuditHistoryService auditHistoryService;
+    private final AuditEventPublisher auditEventPublisher;
 
     public ChildController(ChildRepository childRepository, HomeRepository homeRepository,
             InterviewRequestRepository interviewRequestRepository, OrganisationAccessService organisationAccessService,
-            AuditHistoryService auditHistoryService) {
+            AuditHistoryService auditHistoryService, AuditEventPublisher auditEventPublisher) {
         this.childRepository = childRepository;
         this.homeRepository = homeRepository;
         this.interviewRequestRepository = interviewRequestRepository;
         this.organisationAccessService = organisationAccessService;
         this.auditHistoryService = auditHistoryService;
+        this.auditEventPublisher = auditEventPublisher;
     }
 
     @GetMapping
@@ -78,6 +81,13 @@ public class ChildController {
         model.addAttribute("child", child);
         model.addAttribute("requests", requests);
         model.addAttribute("caseHistory", auditHistoryService.caseHistoryFor(requests));
+        // Opening a child's case history is professional access to a safeguarding record, and is
+        // recorded as such. A cover sheet that invites a reader to verify an export against the
+        // trail reads oddly if consulting the trail is the one thing the trail does not record.
+        auditEventPublisher.auditViewOpened("Child", id,
+                child.getHome() == null || child.getHome().getOrganisation() == null
+                        ? null : child.getHome().getOrganisation().getId(),
+                child.getHome() == null ? null : child.getHome().getId(), principal);
         return "children/detail";
     }
 

@@ -4,8 +4,12 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Set;
 import ninja.samryecroft.returnhome.tracker.audit.AuditEventPublisher;
+import ninja.samryecroft.returnhome.tracker.audit.AuditHistorySection;
+import ninja.samryecroft.returnhome.tracker.audit.AuditHistoryService;
 import ninja.samryecroft.returnhome.tracker.child.Child;
 import ninja.samryecroft.returnhome.tracker.child.ChildRepository;
+import ninja.samryecroft.returnhome.tracker.interview.InterviewRequestRepository;
+import ninja.samryecroft.returnhome.tracker.organisation.OrganisationAccessService;
 import ninja.samryecroft.returnhome.tracker.user.AppUserPrincipal;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
@@ -41,13 +45,23 @@ public class ExportController {
     private final CaseFileExportService caseFileExportService;
     private final ExportLinkService exportLinkService;
     private final ChildRepository childRepository;
+    private final InterviewRequestRepository interviewRequestRepository;
+    private final OrganisationAccessService organisationAccessService;
+    private final AuditHistoryService auditHistoryService;
+    private final AuditQueryCsvWriter auditQueryCsvWriter;
     private final AuditEventPublisher auditEventPublisher;
 
     public ExportController(CaseFileExportService caseFileExportService, ExportLinkService exportLinkService,
-            ChildRepository childRepository, AuditEventPublisher auditEventPublisher) {
+            ChildRepository childRepository, InterviewRequestRepository interviewRequestRepository,
+            OrganisationAccessService organisationAccessService, AuditHistoryService auditHistoryService,
+            AuditQueryCsvWriter auditQueryCsvWriter, AuditEventPublisher auditEventPublisher) {
         this.caseFileExportService = caseFileExportService;
         this.exportLinkService = exportLinkService;
         this.childRepository = childRepository;
+        this.interviewRequestRepository = interviewRequestRepository;
+        this.organisationAccessService = organisationAccessService;
+        this.auditHistoryService = auditHistoryService;
+        this.auditQueryCsvWriter = auditQueryCsvWriter;
         this.auditEventPublisher = auditEventPublisher;
     }
 
@@ -110,6 +124,47 @@ public class ExportController {
         }
     }
 
+    /**
+     * Exports a child's audit view as a CSV.
+     *
+     * <p>Scoped to one child, like everything else here - the CSV covers the view being looked at,
+     * not a query someone could widen. "Every export has a subject or a period" is the single rule
+     * that stops this becoming bulk extraction with a compliance label on it, and it applies to the
+     * spreadsheet format most of all, because a spreadsheet is the one people re-sort and re-send.
+     */
+    @PostMapping("/export/audit-query/{childId}")
+    public ResponseEntity<?> exportAuditQuery(@PathVariable Long childId, @RequestBody GenerateRequest body,
+            @AuthenticationPrincipal AppUserPrincipal principal) {
+        requireExportCapability(principal);
+        if (body.purpose() == null) {
+            return ResponseEntity.badRequest().body(new ErrorResponse("A purpose is required for every export"));
+        }
+        ExportPeriod period = periodOf(body.from(), body.to());
+        Long organisationId = organisationIdFor(childId);
+
+        List<AuditHistorySection> sections = auditHistoryService.caseHistoryFor(
+                interviewRequestRepository.findByChildIdOrderByCreatedAtDesc(childId).stream()
+                        .filter(request -> organisationAccessService.canViewHome(principal, request.getHome()))
+                        .filter(period::covers)
+                        .toList());
+        if (sections.isEmpty() && !interviewRequestRepository.findByChildIdOrderByCreatedAtDesc(childId).isEmpty()) {
+            // Nothing visible is not the same as nothing to show, and must not be distinguishable
+            // from it - confirming a child exists to an account that cannot see them is a disclosure.
+            requireVisibility(childId, principal);
+        }
+
+        byte[] csv = auditQueryCsvWriter.write(sections);
+        int rows = auditQueryCsvWriter.rowCount(sections);
+        ExportPack pack = new ExportPack("audit-trail-" + childId + ".csv", csv,
+                ExportPackWriter.sha256(csv), null);
+
+        auditEventPublisher.auditQueryExported(organisationId, body.purpose(), body.reference(),
+                period.label(), rows, pack.checksum(), principal);
+
+        return ResponseEntity.ok(new GenerateResponse(exportLinkService.hold(pack, principal.getUserId()),
+                pack.filename(), pack.checksum(), null, exportLinkService.lifetime().toMinutes()));
+    }
+
     /** Spends the token and streams the pack. A second attempt gets a 404, by design. */
     @GetMapping("/export/download/{token}")
     public ResponseEntity<Resource> download(@PathVariable String token,
@@ -128,6 +183,14 @@ public class ExportController {
      * Extracting records is a separate act from reading them, so it is a separate permission rather
      * than one implied by read access.
      */
+    private void requireVisibility(Long childId, AppUserPrincipal principal) {
+        boolean visible = interviewRequestRepository.findByChildIdOrderByCreatedAtDesc(childId).stream()
+                .anyMatch(request -> organisationAccessService.canViewHome(principal, request.getHome()));
+        if (!visible) {
+            throw new AccessDeniedException("You do not have access to this child's records");
+        }
+    }
+
     private void requireExportCapability(AppUserPrincipal principal) {
         if (!ExportCapability.canExport(principal)) {
             throw new AccessDeniedException("This account is not permitted to export records");
