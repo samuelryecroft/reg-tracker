@@ -60,7 +60,7 @@ class CaseFileExportServiceTest {
         Child child = new Child();
         ReflectionTestUtils.setField(child, "id", 5L);
         ReflectionTestUtils.setField(child, "localCaseReference", "CASE-001");
-        when(childRepository.findById(5L)).thenReturn(Optional.of(child));
+        when(childRepository.findDetailedById(5L)).thenReturn(Optional.of(child));
 
         requestOne = interviewRequest(1182L);
         requestTwo = interviewRequest(1191L);

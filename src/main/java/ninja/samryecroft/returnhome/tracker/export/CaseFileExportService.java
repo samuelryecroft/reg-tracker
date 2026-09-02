@@ -81,7 +81,10 @@ public class CaseFileExportService {
      * which is why generation has its own blocked/acknowledge step rather than trusting this.
      */
     public ExportManifest manifestFor(Long childId, ExportPeriod period, AppUserPrincipal principal) {
-        Child child = childRepository.findById(childId)
+        // findDetailedById rather than findById: both only read basic columns today, but this class
+        // is one added child.getHome() away from a LazyInitializationException outside the session.
+        // The eager fetch is one join on a single-row lookup - cheaper than the trap.
+        Child child = childRepository.findDetailedById(childId)
                 .orElseThrow(() -> new IllegalArgumentException("No such child"));
 
         List<InterviewRequest> allForChild =
@@ -128,7 +131,7 @@ public class CaseFileExportService {
     public ExportPack export(Long childId, ExportPeriod period, ExportPurpose purpose, String reference,
             Set<Long> acknowledgedBlocked, String passphrase, AppUserPrincipal principal) {
         ExportManifest manifest = manifestFor(childId, period, principal);
-        Child child = childRepository.findById(childId).orElseThrow();
+        Child child = childRepository.findDetailedById(childId).orElseThrow();
 
         List<ExportPackWriter.AttachedReport> attachments = new ArrayList<>();
         List<ExportManifest.ManifestEntry> blocked = new ArrayList<>();
