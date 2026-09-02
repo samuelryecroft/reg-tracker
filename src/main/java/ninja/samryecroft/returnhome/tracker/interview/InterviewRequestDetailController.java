@@ -1,5 +1,6 @@
 package ninja.samryecroft.returnhome.tracker.interview;
 
+import ninja.samryecroft.returnhome.tracker.audit.AuditEventPublisher;
 import ninja.samryecroft.returnhome.tracker.audit.AuditHistoryService;
 import ninja.samryecroft.returnhome.tracker.user.AppUserPrincipal;
 import ninja.samryecroft.returnhome.tracker.user.Role;
@@ -16,11 +17,13 @@ public class InterviewRequestDetailController {
 
     private final InterviewRequestService interviewRequestService;
     private final AuditHistoryService auditHistoryService;
+    private final AuditEventPublisher auditEventPublisher;
 
     public InterviewRequestDetailController(InterviewRequestService interviewRequestService,
-            AuditHistoryService auditHistoryService) {
+            AuditHistoryService auditHistoryService, AuditEventPublisher auditEventPublisher) {
         this.interviewRequestService = interviewRequestService;
         this.auditHistoryService = auditHistoryService;
+        this.auditEventPublisher = auditEventPublisher;
     }
 
     @GetMapping("/{id}")
@@ -54,6 +57,10 @@ public class InterviewRequestDetailController {
         model.addAttribute("canDownload", canDownload);
         model.addAttribute("canView", canDownload);
         model.addAttribute("auditHistory", auditHistoryService.historyFor(request));
+        auditEventPublisher.auditViewOpened("InterviewRequest", request.getId(),
+                request.getHome() == null || request.getHome().getOrganisation() == null
+                        ? null : request.getHome().getOrganisation().getId(),
+                request.getHome() == null ? null : request.getHome().getId(), principal);
         return "interview/detail";
     }
 }

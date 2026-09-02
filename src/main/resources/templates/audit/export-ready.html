@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Export ready — Return Home Tracker</title>
+    <th:block th:replace="~{fragments/layout :: styles}"></th:block>
+</head>
+<body>
+<div th:replace="~{fragments/layout :: nav}"></div>
+<main id="main">
+    <h1>Case activity export</h1>
+
+    <div class="card">
+        <div class="banner ok" style="margin-bottom:14px">
+            <span class="ic" aria-hidden="true">✓</span>
+            <div><strong>Export ready</strong><p>Recorded in the audit trail.</p></div>
+        </div>
+        <p style="margin:0 0 4px;font-weight:650;font-size:14px" th:text="${filename}">audit-trail.csv</p>
+        <p class="hint" style="margin-bottom:12px" th:text="${rowCount + ' row' + (rowCount == 1 ? '' : 's')}">rows</p>
+        <p class="hint" style="font-family:ui-monospace,Menlo,monospace" th:text="${'SHA-256: ' + checksum}">checksum</p>
+        <a class="btn block" th:href="@{/export/download/{token}(token=${token})}">Download CSV</a>
+        <p style="margin-top:12px;text-align:center">
+            <span class="expires" th:text="${'◷ Link expires in ' + expiresInMinutes + ' minutes'}">Expires</span>
+        </p>
+        <p class="hint" style="margin-top:14px">Re-downloading after expiry means generating again — which writes a
+            second row in the audit trail. Every extraction being separately recorded is the feature, not a limitation.</p>
+    </div>
+
+    <a class="btn ghost" href="/audit">Back to case activity</a>
+</main>
+</body>
+</html>

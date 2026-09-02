@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <title th:text="${'Export Case File: ' + child.fullName}">Export Case File</title>
+    <th:block th:replace="~{fragments/layout :: styles}"></th:block>
+</head>
+<body>
+<div th:replace="~{fragments/layout :: nav}"></div>
+<main id="main">
+    <h1>Export case file</h1>
+    <p class="sub" th:text="${child.fullName + ' · ' + child.home.name + ' · ' + child.home.organisation.name}">Child</p>
+
+    <div class="consequence">
+        <strong style="font-size:16px">This pack contains special-category personal data about a child.</strong>
+        <p style="margin:6px 0 0;font-size:14px">Once downloaded it leaves the protection this system provides —
+            it is no longer encrypted under your organisation's key, and this system cannot recall it. Handle and
+            store it under your organisation's information-governance policy.</p>
+    </div>
+
+    <div class="banner err" role="alert" th:if="${blockedMessage != null}">
+        <span class="ic" aria-hidden="true">▲</span>
+        <div>
+            <strong>The pack was not produced</strong>
+            <p th:text="${blockedMessage}">Blocked message</p>
+            <ul>
+                <li th:each="entry : ${blockedEntries}" th:text="${entry.label()}">Interview</li>
+            </ul>
+            <p style="margin-top:8px">Nothing has been downloaded. This has been recorded and needs a platform
+                administrator — the reports themselves are unaffected and still readable in the application.</p>
+        </div>
+    </div>
+
+    <div class="error" th:if="${formError != null}" th:text="${formError}">Error</div>
+
+    <div class="card">
+        <form method="post" th:action="@{/children/{id}/export(id=${child.id})}">
+            <label for="purpose">Why is this pack being produced? <span class="req" aria-hidden="true">*</span></label>
+            <p class="hint">Recorded against the export. If none of these fit, the export probably isn't the right
+                route — ask your DPO first.</p>
+            <select id="purpose" name="purpose" required>
+                <option value="">Select a purpose…</option>
+                <option th:each="p : ${purposes}" th:value="${p}" th:text="${p.label}" th:selected="${p == selectedPurpose}">Purpose</option>
+            </select>
+            <p class="hint" style="margin-top:6px">Responding to a subject access request? These packs are not SAR
+                responses — see guidance.</p>
+
+            <label for="reference">Reference <span class="hint" style="display:inline;font-weight:400">(optional)</span></label>
+            <p class="hint">An inspection or case reference, so this export can be tied to the thing that asked for it.</p>
+            <input id="reference" name="reference" type="text" th:value="${selectedReference}"/>
+
+            <label for="period">Period</label>
+            <select id="period" name="period">
+                <option value="ALL">All interviews</option>
+                <option value="LAST_12_MONTHS">Last 12 months</option>
+                <option value="LAST_24_MONTHS">Last 24 months</option>
+            </select>
+
+            <h3>What the pack will contain</h3>
+            <p class="hint" th:text="${manifest.documentCount() + ' report document(s) will be attached, as originally issued — never re-rendered.'}">Documents</p>
+            <ul class="manifest">
+                <li th:each="entry : ${manifest.included()}">
+                    <span class="mk-in" aria-hidden="true">✓</span>
+                    <span class="lbl-wrap"><span class="lbl" th:text="${entry.label()}">Interview</span></span>
+                    <span class="n" th:text="${entry.hasReport() ? 'report attached' : 'no report'}">status</span>
+                </li>
+                <li class="out" th:each="entry : ${manifest.excluded()}">
+                    <span class="mk-out" aria-hidden="true">—</span>
+                    <span class="lbl-wrap">
+                        <span class="lbl" th:text="${entry.label()}">Interview</span>
+                        <span class="why" th:text="${entry.reason()}">Reason</span>
+                    </span>
+                    <span class="n">excluded</span>
+                </li>
+                <li th:if="${#lists.isEmpty(manifest.included()) and #lists.isEmpty(manifest.excluded())}">
+                    <span class="lbl-wrap">No interviews are in scope for this period.</span>
+                </li>
+            </ul>
+            <div class="banner warn" style="margin-top:14px" th:if="${manifest.partialScope()}">
+                <span class="ic" aria-hidden="true">◆</span>
+                <div><strong>This pack is partial</strong><p th:text="${manifest.partialScopeNote()}">Partial note</p></div>
+            </div>
+
+            <h3>Options</h3>
+            <div style="display:flex;gap:10px;align-items:flex-start">
+                <input type="checkbox" id="protect" name="protect" checked style="width:auto;min-height:0;margin-top:3px"/>
+                <label for="protect" style="margin:0;font-weight:650">Protect the pack with a passphrase
+                    <span class="hint" style="display:block;font-weight:400;margin-top:3px">Shown once when the pack
+                        is ready. Send it by a different route than the file itself.</span>
+                </label>
+            </div>
+            <p class="hint">Names are role-only in this pack ("Approved by a Reviewer"), the same as the in-app
+                history — an option to name individuals is a possible fast-follow, pending a DPO decision.</p>
+
+            <div class="banner info" style="margin-top:22px">
+                <span class="ic" aria-hidden="true">◆</span>
+                <div><strong th:text="${'This export will be recorded in ' + child.fullName + '’s case history.'}">Recorded</strong>
+                    <p>Who produced it, when, the stated purpose and reference, and what it contained — visible to
+                        anyone who can already see this child's record. The pack itself is not kept: it is built,
+                        held for one download, and discarded.</p>
+                </div>
+            </div>
+
+            <div class="btn-row">
+                <button type="submit" class="btn"
+                        th:text="${blockedEntries != null ? 'Produce a pack without the affected interview(s)' : 'Produce the pack'}">Produce the pack</button>
+                <a class="btn ghost" th:href="@{/children/{id}(id=${child.id})}">Cancel</a>
+            </div>
+            <th:block th:if="${blockedEntries != null}">
+                <input type="hidden" th:each="entry : ${blockedEntries}" name="acknowledgeBlocked" th:value="${entry.interviewId()}"/>
+            </th:block>
+        </form>
+    </div>
+</main>
+</body>
+</html>

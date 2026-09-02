@@ -28,6 +28,10 @@ public interface AuditEventRepository extends JpaRepository<AuditEvent, Long> {
     @Query("select a from AuditEvent a where a.organisationId = :organisationId order by a.occurredAt desc")
     List<AuditEvent> findByOrganisationId(@Param("organisationId") Long organisationId);
 
+    /** A Supplier's case-activity feed spans every Care Provider org it serves - a Supplier org id alone matches none of them. */
+    @Query("select a from AuditEvent a where a.organisationId in :organisationIds order by a.occurredAt desc")
+    List<AuditEvent> findByOrganisationIdIn(@Param("organisationIds") Collection<Long> organisationIds);
+
     @Query("select a from AuditEvent a where a.actorId = :actorId order by a.occurredAt desc")
     List<AuditEvent> findByActorId(@Param("actorId") Long actorId);
 }
