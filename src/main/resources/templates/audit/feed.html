@@ -26,9 +26,22 @@
 
     <p class="hint" th:text="${#lists.size(rows) + ' event' + (#lists.size(rows) == 1 ? '' : 's') + ' match. Exporting produces a CSV of these ' + #lists.size(rows) + ' rows — the same columns you can see, for the same records you can already open.'}">Count</p>
 
-    <p class="btn-row">
-        <a class="btn secondary" th:href="@{/audit/export.csv(homeId=${homeId}, from=${from}, to=${to})}">Export this view</a>
-    </p>
+    <form method="post" action="/audit/export" class="card filters" style="margin-top:0">
+        <input type="hidden" name="homeId" th:if="${homeId != null}" th:value="${homeId}"/>
+        <input type="hidden" name="from" th:if="${from != null}" th:value="${from}"/>
+        <input type="hidden" name="to" th:if="${to != null}" th:value="${to}"/>
+        <div class="f">
+            <label for="purpose">Why is this export being produced?</label>
+            <select id="purpose" name="purpose" required style="min-width:220px">
+                <option th:each="p : ${purposes}" th:value="${p}" th:text="${p.label}">Purpose</option>
+            </select>
+        </div>
+        <div class="f">
+            <label for="reference">Reference <span style="font-weight:400">(optional)</span></label>
+            <input id="reference" name="reference" type="text" style="min-width:180px"/>
+        </div>
+        <button type="submit" class="btn secondary">Export this view</button>
+    </form>
 
     <div class="table-wrap responsive">
     <table>

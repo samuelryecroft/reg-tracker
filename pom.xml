@@ -132,6 +132,23 @@
             <artifactId>azure-identity</artifactId>
         </dependency>
 
+        <!--
+            Export pack assembly (2.5). PDFBox renders the narrative and cover sheet; zip4j is here
+            because java.util.zip cannot produce an encrypted archive, and the passphrase is on by
+            default. Both Apache-2.0-compatible, matching the POI/Azure choices already made.
+        -->
+        <dependency>
+            <groupId>org.apache.pdfbox</groupId>
+            <artifactId>pdfbox</artifactId>
+            <version>3.0.3</version>
+        </dependency>
+
+        <dependency>
+            <groupId>net.lingala.zip4j</groupId>
+            <artifactId>zip4j</artifactId>
+            <version>2.11.5</version>
+        </dependency>
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>

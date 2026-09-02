@@ -512,3 +512,8 @@ fieldset.step[hidden] { display: none; }
 .manifest .n { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .manifest li.out .lbl { color: var(--muted); }
 .manifest .why { display: block; font-size: var(--t-xs); color: var(--muted); margin-top: 2px; }
+
+.expires {
+    display: inline-flex; align-items: center; gap: 6px; font-size: var(--t-xs); font-weight: 700;
+    background: var(--warn-bg); color: var(--warn); padding: 3px 10px; border-radius: 999px;
+}

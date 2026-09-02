@@ -35,12 +35,19 @@ public enum AuditEventType {
     DOCUMENT_KEY_UNWRAPPED,
     DOCUMENT_CRYPTO_FAILED,
 
-    // Roadmap 2.5 - export takes children's data OUT of the encrypted boundary, so the act itself
-    // is audited (export-build-brief.md, CONFIRMED non-negotiable). Both record whether the
-    // attempt succeeded; a failed export is recorded precisely so a quoted attempt number means
-    // something.
+    // Compliance export (roadmap 2.5). Extraction is the act this whole trail exists to make
+    // reviewable: a pack leaves the building and cannot be recalled, so every attempt is recorded -
+    // including the ones that failed, because the error screen quotes an attempt number and that
+    // means nothing if the attempt was never written down.
     CASE_FILE_EXPORTED,
     AUDIT_QUERY_EXPORTED,
+    EXPORT_FAILED,
+
+    // Opening the audit trail is itself case-activity access to a child's safeguarding record - the
+    // same expectation as an access log on a health record. A cover sheet that invites someone to
+    // verify an export against the trail reads oddly if consulting the trail is the one thing the
+    // trail does not record. This is NOT sign-in monitoring and does not touch that decision.
+    AUDIT_VIEW_OPENED,
 
     ACCESS_DENIED
 }
