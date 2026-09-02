@@ -11,13 +11,19 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import ninja.samryecroft.returnhome.tracker.user.Role;
 import ninja.samryecroft.returnhome.tracker.user.User;
 import ninja.samryecroft.returnhome.tracker.user.UserRepository;
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
@@ -80,6 +86,62 @@ class AdminUserSeederTest {
         new AdminUserSeeder(userRepository, passwordEncoder, propertiesWith("admin", "irrelevant")).run(null);
 
         verify(userRepository, never()).save(any());
+    }
+
+    /**
+     * The skip is correct but silent-by-consequence: the app starts normally and serves a login
+     * page that rejects everyone, which is indistinguishable from a wrong password. So the
+     * announcement is part of the behaviour, and asserting it is what stops someone quietly
+     * demoting it back to a WARN that scrolls past.
+     */
+    @Test
+    void saysLoudlyThatNobodyCanSignInWhenItSkips() {
+        UserRepository userRepository = mock(UserRepository.class);
+        when(userRepository.existsByRole(Role.ADMIN)).thenReturn(false);
+
+        List<ILoggingEvent> events = captureLogsOf(AdminUserSeeder.class, () ->
+                new AdminUserSeeder(userRepository, passwordEncoder, propertiesWith("admin", null)).run(null));
+
+        assertThat(events)
+                .as("the skip must be announced at ERROR - a WARN is what gets scrolled past")
+                .isNotEmpty()
+                .allMatch(event -> event.getLevel() == Level.ERROR);
+
+        String announcement = events.stream().map(ILoggingEvent::getFormattedMessage)
+                .collect(Collectors.joining("\n"));
+        assertThat(announcement)
+                .as("must name the consequence, the variable, and that a restart is required")
+                .contains("NOBODY CAN SIGN IN")
+                .contains("ADMIN_SEED_PASSWORD")
+                .containsIgnoringCase("restart");
+    }
+
+    /** Nothing to announce on the happy path - a banner on every boot would train people to ignore it. */
+    @Test
+    void staysQuietAtErrorLevelWhenItActuallySeeds() {
+        UserRepository userRepository = mock(UserRepository.class);
+        when(userRepository.existsByRole(Role.ADMIN)).thenReturn(false);
+
+        List<ILoggingEvent> events = captureLogsOf(AdminUserSeeder.class, () ->
+                new AdminUserSeeder(userRepository, passwordEncoder, propertiesWith("boss", "from-the-env"))
+                        .run(null));
+
+        assertThat(events).noneMatch(event -> event.getLevel() == Level.ERROR);
+    }
+
+    private List<ILoggingEvent> captureLogsOf(Class<?> type, Runnable action) {
+        ch.qos.logback.classic.Logger logger =
+                (ch.qos.logback.classic.Logger) LoggerFactory.getLogger(type);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            action.run();
+        } finally {
+            logger.detachAppender(appender);
+            appender.stop();
+        }
+        return appender.list;
     }
 
     /**
