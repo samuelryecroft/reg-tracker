@@ -98,6 +98,33 @@ public class InterviewRequestService {
         return request.getAllocatedVisitor() != null && request.getAllocatedVisitor().getId().equals(principal.getUserId());
     }
 
+    /**
+     * The roadmap 2.1 no-clock remedy: home staff (or an admin) supplying a return time that was
+     * missing at request time. Deliberately narrower than {@link #getAuthorized} - only the home
+     * that raised the request may add it, and only while it is still missing. This is "add", not
+     * "edit"; a recorded return time is not revisable through this path.
+     */
+    @Transactional
+    public InterviewRequest recordReturnTime(Long id, LocalDateTime returnedAt, AppUserPrincipal principal) {
+        InterviewRequest request = interviewRequestRepository.findDetailedById(id)
+                .orElseThrow(() -> new IllegalArgumentException("No such interview request: " + id));
+
+        boolean allowed = principal.hasRole(Role.ADMIN)
+                || (principal.hasRole(Role.HOME_STAFF) && request.getHome().getId().equals(principal.getHomeId()));
+        if (!allowed) {
+            throw new AccessDeniedException("Not authorized to record a return time for interview request " + id);
+        }
+        if (request.getReturnedAt() != null) {
+            throw new IllegalStateException("Return time is already recorded for interview request " + id);
+        }
+
+        request.setReturnedAt(returnedAt);
+        request.setUpdatedAt(LocalDateTime.now());
+        InterviewRequest saved = interviewRequestRepository.save(request);
+        auditEventPublisher.interviewRequestReturnTimeRecorded(saved, principal);
+        return saved;
+    }
+
     @Transactional
     public InterviewRequest createRequest(NewRequestForm form, AppUserPrincipal principal) {
         Child child = childRepository.findById(form.getChildId())

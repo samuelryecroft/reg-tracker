@@ -275,6 +275,23 @@ fieldset.checkbox-fieldset > legend {
 .status.CANCELLED { background: var(--error-bg); color: #991b1b; }
 .status.warning { background: #FDE7D8; color: #9A3412; margin-left: 0.4rem; }
 
+/* Roadmap 2.1 due-state badges (ninja...interview.DueBadge). Never colour alone - each carries a
+   glyph and duration text too. Colours reuse the semantic families above; no new red. */
+.due {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: var(--t-xs);
+    font-weight: 700;
+    white-space: nowrap;
+}
+.due.overdue { background: var(--error-bg); color: #991B1B; }
+.due.soon { background: var(--warn-bg); color: var(--warn); }
+.due.ontrack { background: var(--ok-bg); color: var(--ok); }
+.due.noclock { background: var(--neutral-bg); color: var(--neutral); }
+
 .error { color: var(--error); background: var(--error-bg); padding: var(--s4); border-radius: 8px; margin-bottom: var(--s4); }
 
 .banner {

@@ -23,15 +23,20 @@ public class CoordinatorController {
 
     private final InterviewRequestService interviewRequestService;
     private final UserRepository userRepository;
+    private final DeadlineTrackingService deadlineTrackingService;
 
-    public CoordinatorController(InterviewRequestService interviewRequestService, UserRepository userRepository) {
+    public CoordinatorController(InterviewRequestService interviewRequestService, UserRepository userRepository,
+            DeadlineTrackingService deadlineTrackingService) {
         this.interviewRequestService = interviewRequestService;
         this.userRepository = userRepository;
+        this.deadlineTrackingService = deadlineTrackingService;
     }
 
     @GetMapping("/requests")
     public String list(@AuthenticationPrincipal AppUserPrincipal principal, Model model) {
-        model.addAttribute("requests", interviewRequestService.listVisible(principal));
+        List<InterviewRequest> requests = interviewRequestService.listVisible(principal);
+        model.addAttribute("requests", requests);
+        model.addAttribute("dueGroups", deadlineTrackingService.groupByUrgency(requests));
         return "coordinator/requests";
     }
 

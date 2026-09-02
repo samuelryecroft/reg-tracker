@@ -9,27 +9,32 @@
 <div th:replace="~{fragments/layout :: nav}"></div>
 <main id="main">
     <h1>All Return Home Interview Requests</h1>
+    <p class="muted">Sorted by statutory deadline: most urgent first. Deadline is 72 hours from the child's recorded return.</p>
 
     <div class="table-wrap responsive">
     <table>
-        <caption>All open and closed interview requests.</caption>
+        <caption>All open and closed interview requests, most urgent first.</caption>
         <thead>
         <tr>
             <th scope="col">Child</th>
             <th scope="col">Home</th>
+            <th scope="col">Deadline</th>
             <th scope="col">Status</th>
-            <th scope="col">Scheduled</th>
             <th scope="col">Visitor</th>
             <th scope="col">Raised</th>
-            <th scope="col" class="visually-hidden">Action</th>
+            <th scope="col">Action</th>
         </tr>
         </thead>
-        <tbody>
-        <tr th:each="r : ${requests}">
+        <tbody th:each="group : ${dueGroups}">
+        <tr class="group"><th colspan="7" scope="colgroup" th:text="${group.label()}">Group</th></tr>
+        <tr th:each="row : ${group.rows()}" th:with="r=${row.request()}">
             <td th:text="${r.child.fullName}">Child Name</td>
             <td th:text="${r.home.name}">Home</td>
+            <td>
+                <span th:if="${row.badge()} != null" class="due" th:classappend="${row.badge().cssClass()}" th:text="${row.badge().text()}">Deadline</span>
+                <span th:if="${row.badge()} == null" class="muted">—</span>
+            </td>
             <td><span class="status" th:classappend="${r.status}" th:text="${r.status.displayName}">STATUS</span></td>
-            <td th:text="${r.scheduledAt} != null ? ${#temporals.format(r.scheduledAt, 'dd MMM yyyy HH:mm')} : '—'">Scheduled</td>
             <td th:text="${r.allocatedVisitor} ? ${r.allocatedVisitor.fullName} : '—'">Visitor</td>
             <td th:text="${#temporals.format(r.createdAt, 'dd MMM yyyy HH:mm')}">Created</td>
             <td>
@@ -43,11 +48,14 @@
     </div>
 
     <div class="stack">
-        <div class="srow" th:each="r : ${requests}">
+        <th:block th:each="group : ${dueGroups}">
+        <h2 style="font-size:15px;margin:20px 0 10px" th:text="${group.label()}">Group</h2>
+        <div class="srow" th:each="row : ${group.rows()}" th:with="r=${row.request()}">
             <div class="top">
                 <span class="name" th:text="${r.child.fullName}">Child Name</span>
-                <span class="status" th:classappend="${r.status}" th:text="${r.status.displayName}">STATUS</span>
+                <span th:if="${row.badge()} != null" class="due" th:classappend="${row.badge().cssClass()}" th:text="${row.badge().text()}">Deadline</span>
             </div>
+            <span class="status" th:classappend="${r.status}" th:text="${r.status.displayName}">STATUS</span>
             <dl>
                 <dt>Home</dt><dd th:text="${r.home.name}">Home</dd>
                 <dt>Visitor</dt><dd th:text="${r.allocatedVisitor} ? ${r.allocatedVisitor.fullName} : 'Not yet allocated'">Visitor</dd>
@@ -60,6 +68,7 @@
                 <a class="btn ghost" th:href="@{/interview-requests/{id}(id=${r.id})}">View details</a>
             </div>
         </div>
+        </th:block>
     </div>
 
     <div class="empty" th:if="${#lists.isEmpty(requests)}">No requests yet.</div>
