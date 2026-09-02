@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <title th:text="${view.orgName() + ' — Dashboard'}">Dashboard</title>
+    <th:block th:replace="~{fragments/layout :: styles}"></th:block>
+</head>
+<body>
+<div th:replace="~{fragments/layout :: nav}"></div>
+<main id="main">
+    <h1 th:text="${view.orgName()}">Care Provider</h1>
+    <p class="muted" th:text="${view.homeCount() + (view.homeCount() == 1 ? ' home · ' : ' homes · ') + view.childCount() + ' children · Care Provider'}">Summary</p>
+
+    <!-- ============ LIVE ZONE ============ -->
+    <section class="zone live" aria-labelledby="z1">
+        <div class="zone-hd">
+            <h2 id="z1">Needs attention</h2>
+            <span class="when">Live, as at now</span>
+        </div>
+        <div class="tiles">
+            <a class="tile" th:each="tile : ${view.liveTiles()}" th:href="${tile.href()}" th:classappend="${tile.tone()}">
+                <span class="lab" th:text="${tile.label()}">Label</span>
+                <span class="num" th:text="${tile.value()}">0</span>
+                <span class="den" th:text="${tile.detail()}">detail</span>
+                <span class="go" th:text="${tile.linkText()}">View →</span>
+            </a>
+        </div>
+    </section>
+
+    <!-- ============ PERFORMANCE ZONE ============ -->
+    <section class="zone" aria-labelledby="z2">
+        <div class="zone-hd">
+            <h2 id="z2">Performance</h2>
+            <form method="get" style="display:flex;align-items:center;gap:12px">
+                <label for="p1" style="margin:0;font-size:14px;font-weight:650">Period</label>
+                <select id="p1" name="period" onchange="this.form.submit()">
+                    <option th:each="opt : ${periodOptions}" th:value="${opt}" th:text="${opt.name() == 'THIS_QUARTER' ? 'This quarter' : (opt.name() == 'LAST_QUARTER' ? 'Last quarter' : 'Last 12 months')}"
+                            th:selected="${opt == period}">Period</option>
+                </select>
+                <noscript><button type="submit" class="btn secondary" style="min-height:36px;padding:0 14px">Apply</button></noscript>
+            </form>
+        </div>
+        <p class="hint" th:text="${'Time basis: ' + view.period().label() + '. The 72-hour outcome below is the only figure on this screen with statutory meaning.'}">Period label</p>
+
+        <div class="tiles" style="margin-bottom:24px">
+            <div class="tile">
+                <span class="lab">Interviews completed</span>
+                <span class="num" th:text="${view.overallRate().validCompleted()}">0</span>
+                <span class="den" th:text="${'approved reports · ' + view.period().label()}">approved reports</span>
+            </div>
+            <div class="tile">
+                <span class="lab">Held within 72 hours</span>
+                <span class="num" th:if="${view.overallRate().percent().isPresent()}" th:text="${view.overallRate().percent().getAsInt()} + '%'">82%</span>
+                <span class="num" style="font-size:19px;color:var(--muted);font-weight:650" th:unless="${view.overallRate().percent().isPresent()}">Not enough data yet</span>
+                <span class="den" th:text="${view.overallRate().within72() + ' of ' + view.overallRate().validCompleted()}">41 of 50</span>
+                <span class="den" style="display:block;margin-top:8px;padding-top:8px;border-top:1px solid #E5E7EB;color:var(--warn);font-weight:650" th:if="${view.overallRate().excludedNoReturnTime() > 0}"
+                      th:text="${'◷ ' + view.overallRate().excludedNoReturnTime() + ' further interview' + (view.overallRate().excludedNoReturnTime() == 1 ? '' : 's') + ' excluded — no return time recorded'}">excluded</span>
+            </div>
+        </div>
+
+        <h3>By home — worst compliance first</h3>
+        <p class="hint" style="max-width:70ch;margin-bottom:10px">Below <span th:text="${T(ninja.samryecroft.returnhome.tracker.dashboard.RateStat).MINIMUM_REPORTABLE_BASE}">5</span> completed interviews, a home is listed as "too few to report" rather than given a misleading rate.</p>
+        <div class="table-wrap responsive">
+        <table>
+            <caption>Homes at or above the minimum base, worst compliance first.</caption>
+            <thead><tr><th scope="col">Home</th><th scope="col">Completed</th><th scope="col">Within 72h</th><th scope="col">Excluded</th><th scope="col">Overdue now</th></tr></thead>
+            <tbody>
+            <tr th:each="row : ${view.rankedHomes()}">
+                <td><a class="rowlink" th:href="${row.href()}" th:text="${row.name()}">Home</a></td>
+                <td th:text="${row.stat().validCompleted()}">0</td>
+                <td><span th:text="${row.stat().percent().getAsInt()} + '%'">82%</span>
+                    <span style="font-size:11px;color:var(--muted);display:block" th:text="${row.stat().within72() + ' of ' + row.stat().validCompleted()}">41 of 50</span></td>
+                <td th:text="${row.stat().excludedNoReturnTime()}">0</td>
+                <td th:text="${row.overdueNow()}">0</td>
+            </tr>
+            <tr th:if="${#lists.isEmpty(view.rankedHomes())}"><td colspan="5" class="muted">No home has reached the minimum base yet this period.</td></tr>
+            </tbody>
+        </table>
+        </div>
+
+        <div th:if="${not #lists.isEmpty(view.tooFewHomes())}" style="margin-top:20px">
+            <h3>Too few to report</h3>
+            <div class="table-wrap responsive">
+            <table>
+                <caption>Below the minimum base - shown, not ranked.</caption>
+                <thead><tr><th scope="col">Home</th><th scope="col">Completed</th><th scope="col">Overdue now</th></tr></thead>
+                <tbody>
+                <tr th:each="row : ${view.tooFewHomes()}">
+                    <td><a class="rowlink" th:href="${row.href()}" th:text="${row.name()}">Home</a></td>
+                    <td th:text="${row.stat().validCompleted() + ' completed'}">0 completed</td>
+                    <td th:text="${row.overdueNow()}">0</td>
+                </tr>
+                </tbody>
+            </table>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============ RECURRENCE PANEL ============ -->
+    <section class="zone" aria-labelledby="z3">
+        <div class="zone-hd">
+            <h2 id="z3">Recurring missing episodes</h2>
+            <span class="when">Flagged by the home on the request form</span>
+        </div>
+        <p class="hint" style="max-width:74ch;margin:-8px 0 18px">These flags are self-declared on the request form, not computed from episode history — read an unflagged child as "not ticked", not as "no recurrence".</p>
+        <div class="table-wrap responsive">
+        <table>
+            <caption>5-in-30-days first, then most recently flagged</caption>
+            <thead><tr><th scope="col">Child</th><th scope="col">Home</th><th scope="col">Flags</th><th scope="col">Latest request status</th></tr></thead>
+            <tbody>
+            <tr th:each="entry : ${view.recurrence()}">
+                <td><a class="rowlink" th:href="${entry.href()}" th:text="${entry.childLabel()}">Child</a></td>
+                <td th:text="${entry.homeName()}">Home</td>
+                <td>
+                    <span class="pill" th:each="flag : ${entry.flagLabels()}" th:classappend="${flag == '5+ in 30 days'} ? 'flag-high' : 'flag-mid'" th:text="${flag}">Flag</span>
+                </td>
+                <td th:text="${entry.latestSummary()}">Status</td>
+            </tr>
+            <tr th:if="${#lists.isEmpty(view.recurrence())}"><td colspan="4" class="muted">No recurring missing episodes flagged on any open or recent request.</td></tr>
+            </tbody>
+        </table>
+        </div>
+    </section>
+</main>
+</body>
+</html>

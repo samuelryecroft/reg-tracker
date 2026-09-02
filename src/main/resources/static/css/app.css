@@ -403,7 +403,10 @@ fieldset.step[hidden] { display: none; }
     .rail { border-right: none !important; padding-right: 0 !important; border-bottom: 1px solid var(--border); padding-bottom: var(--s4); margin-bottom: var(--s4); }
 }
 
-/* ============================== audit history timeline (T38, V1) ============================== */
+/* 
+}
+
+====================== audit history timeline (T38, V1) ============================== */
 .provenance {
     display: flex; gap: var(--s2); align-items: center; font-size: var(--t-xs); color: var(--muted);
     background: var(--neutral-bg); border: 1px solid var(--border); border-radius: 8px;
@@ -441,4 +444,50 @@ fieldset.step[hidden] { display: none; }
     .daysep { break-after: avoid; page-break-after: avoid; }
     .provenance { border: 1px solid #999; background: #fff; }
     .tl .dot { border-color: #333 !important; background: #fff !important; }
+=======
+/* ============================== dashboard (roadmap 2.3) ============================== */
+.zone {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    padding: var(--s5);
+    margin-bottom: var(--s5);
+}
+.zone.live { border-left: 4px solid var(--accent); }
+.zone-hd {
+    display: flex; align-items: baseline; justify-content: space-between; gap: var(--s4); flex-wrap: wrap;
+    margin-bottom: var(--s4); padding-bottom: var(--s3); border-bottom: 1px solid var(--border);
+}
+.zone-hd h2 { margin: 0; font-size: var(--t-lg); }
+.zone-hd .when {
+    font-size: var(--t-xs); font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
+    color: var(--muted); white-space: nowrap;
+}
+.zone.live .zone-hd .when { color: var(--accent-dark); }
+
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: var(--s4); }
+.tile {
+    display: flex; flex-direction: column; gap: 2px; text-decoration: none; color: inherit;
+    border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface);
+    padding: var(--s4); min-height: 44px;
+}
+.tile:hover, .tile:focus-visible { border-color: var(--accent-dark); }
+.tile .lab { display: block; font-size: var(--t-xs); font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.tile .num { display: block; font-size: 30px; font-weight: 700; line-height: 1.15; margin: 4px 0 2px; font-variant-numeric: tabular-nums; }
+.tile .den { display: block; font-size: var(--t-xs); color: var(--muted); }
+.tile .go { display: block; font-size: var(--t-xs); font-weight: 700; color: var(--accent-dark); margin-top: var(--s2); }
+.tile.urgent { border-color: #F3C0C0; background: #FFFAFA; }
+.tile.warn { border-color: #EBCF8A; background: #FFFDF6; }
+
+/* small flag chips (recurrence panel) - reuses the same neutral/semantic families as .due and .status */
+.pill {
+    display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 999px;
+    font-size: var(--t-xs); font-weight: 700; white-space: nowrap; background: var(--neutral-bg); color: var(--neutral);
+}
+.pill.flag-high { background: var(--error-bg); color: #991B1B; }
+.pill.flag-mid { background: var(--warn-bg); color: var(--warn); }
+
+@media print {
+    .no-print, .zone-hd form, .zone-hd select, .btn { display: none !important; }
+    .zone, .tile, table { break-inside: avoid; }
 }

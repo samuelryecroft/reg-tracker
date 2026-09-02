@@ -11,6 +11,19 @@
     <h1>All Return Home Interview Requests</h1>
     <p class="muted">Sorted by statutory deadline: most urgent first. Deadline is 72 hours from the child's recorded return.</p>
 
+    <div class="banner info" th:if="${homeId != null or filter != null}">
+        <span class="ic" aria-hidden="true">◆</span>
+        <div>
+            <strong>Showing a filtered view</strong>
+            <p>
+                <span th:if="${homeId != null}" th:text="${'One home only (id ' + homeId + ')'}">One home</span>
+                <span th:if="${homeId != null and filter != null}"> · </span>
+                <span th:if="${filter != null}" th:text="${'Filter: ' + filter}">Filter</span>
+                · <a href="/coordinator/requests">Clear and show everything</a>
+            </p>
+        </div>
+    </div>
+
     <div class="table-wrap responsive">
     <table>
         <caption>All open and closed interview requests, most urgent first.</caption>
