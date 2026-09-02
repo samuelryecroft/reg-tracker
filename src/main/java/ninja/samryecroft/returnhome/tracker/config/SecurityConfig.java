@@ -48,6 +48,9 @@ public class SecurityConfig {
                         .requestMatchers("/reviewer/**").hasAnyRole("REVIEWER", "ADMIN")
                         .requestMatchers("/requests/**").hasAnyRole("HOME_STAFF", "ADMIN")
                         .requestMatchers("/children/**").hasAnyRole("HOME_STAFF", "ORG_ADMIN", "VIEWER", "ADMIN")
+                        // Defence in depth only - ExportCapability is the real gate, because the
+                        // filter chain can express the role ceiling but not the per-account grant.
+                        .requestMatchers("/export/**").hasAnyRole("ADMIN", "ORG_ADMIN", "COORDINATOR", "VIEWER")
                         .requestMatchers("/interview-requests/**").authenticated()
                         .requestMatchers("/reports/**").authenticated()
                         .anyRequest().authenticated())
