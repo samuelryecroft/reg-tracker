@@ -11,6 +11,8 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import ninja.samryecroft.returnhome.tracker.user.Role;
 import ninja.samryecroft.returnhome.tracker.user.User;
 import ninja.samryecroft.returnhome.tracker.user.UserRepository;
@@ -80,16 +82,46 @@ class AdminUserSeederTest {
         verify(userRepository, never()).save(any());
     }
 
+    /**
+     * Guards the committed config itself, not just the seeder: the original bug was a baked-in
+     * default that shipped in the image. Asserted structurally rather than by blocklisting the one
+     * historical literal, so any future default - on any password property - trips this too.
+     */
     @Test
-    void applicationPropertiesContainsNoPlaintextSecret() throws IOException {
+    void noPasswordPropertyInTheCommittedConfigHasADefaultValue() throws IOException {
         String properties = Files.readString(
                 Path.of("src/main/resources/application.properties"), StandardCharsets.UTF_8);
 
-        // An env placeholder with nothing after the colon - i.e. no baked-in default.
+        // The seed password is an env placeholder with nothing after the colon - no baked default.
         assertThat(properties).contains("app.admin.password=${ADMIN_SEED_PASSWORD:}");
-        assertThat(properties).doesNotContain("ChangeMe123");
-        // Database credentials are externalised too.
-        assertThat(properties).contains("${DB_PASSWORD:");
-        assertThat(properties).contains("${DB_USERNAME:");
+        // The database password has no fallback at all, so a deployment that forgets to inject it
+        // fails to start rather than coming up on a well-known credential.
+        assertThat(properties).contains("spring.datasource.password=${DB_PASSWORD}");
+
+        Pattern passwordProperty = Pattern.compile("^\\s*([\\w.-]*password[\\w.-]*)\\s*=\\s*(.+)$",
+                Pattern.CASE_INSENSITIVE | Pattern.MULTILINE);
+        Matcher matcher = passwordProperty.matcher(properties);
+        while (matcher.find()) {
+            String key = matcher.group(1);
+            String value = matcher.group(2).trim();
+            // Either a bare placeholder, or a placeholder whose default is empty. Anything else -
+            // a literal, or ${VAR:something} - is a credential baked into the image.
+            assertThat(value)
+                    .as("%s must resolve from the environment with no default value", key)
+                    .matches("\\$\\{[A-Za-z0-9_.-]+:?\\}");
+        }
+    }
+
+    /** The local-dev credentials moved out of the base config; they must stay out of it. */
+    @Test
+    void localDevelopmentCredentialsLiveOnlyInTheDevProfile() throws IOException {
+        String base = Files.readString(
+                Path.of("src/main/resources/application.properties"), StandardCharsets.UTF_8);
+        String dev = Files.readString(
+                Path.of("src/main/resources/application-dev.properties"), StandardCharsets.UTF_8);
+
+        assertThat(base).doesNotContain("${DB_PASSWORD:");
+        assertThat(base).doesNotContain("ChangeMe123");
+        assertThat(dev).contains("spring.datasource.password=tracker");
     }
 }

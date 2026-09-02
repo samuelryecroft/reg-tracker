@@ -14,10 +14,17 @@ Spring Data JPA + PostgreSQL + Flyway, Apache POI for `.docx` generation.
 ## Running locally
 
 ```bash
-docker compose up -d                  # starts Postgres on localhost:5432
-export ADMIN_SEED_PASSWORD='LocalDev123!'   # REQUIRED on first boot - see below
-./mvnw spring-boot:run
+docker compose up -d                                    # starts Postgres on localhost:5432
+export ADMIN_SEED_PASSWORD='LocalDev123!'               # required on first boot, see below
+SPRING_PROFILES_ACTIVE=dev ./mvnw spring-boot:run
 ```
+
+The `dev` profile supplies the throwaway local database credentials that match
+`docker-compose.yml`. They are deliberately not defaults in
+`application.properties`: `spring.datasource.password` has no fallback, so a
+deployment that forgets to inject `DB_PASSWORD` fails to start instead of
+coming up on a well-known credential. Without the `dev` profile, export
+`DB_URL` / `DB_USERNAME` / `DB_PASSWORD` yourself.
 
 The app boots on `http://localhost:8080` and applies Flyway migrations on
 startup.
@@ -55,7 +62,7 @@ Log in as `admin` and go to **Users** to create the other accounts.
 | `ADMIN_SEED_USERNAME` | `admin` | Bootstrap admin username |
 | `DB_URL` | `jdbc:postgresql://localhost:5432/return_home_tracker` | Matches `docker-compose.yml` |
 | `DB_USERNAME` | `tracker` | Matches `docker-compose.yml` |
-| `DB_PASSWORD` | `tracker` | Local throwaway container only — never reuse |
+| `DB_PASSWORD` | *(none)* | **No fallback** — supplied by the `dev` profile locally, injected in deployment; unset means the app fails to start |
 
 Failed logins are throttled per-username (5 attempts, 15-minute lockout,
 in-memory — it resets on restart). If you lock yourself out during
