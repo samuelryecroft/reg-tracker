@@ -68,6 +68,21 @@ Failed logins are throttled per-username (5 attempts, 15-minute lockout,
 in-memory — it resets on restart). If you lock yourself out during
 development, restart the app.
 
+## Demo instance
+
+To show the app to someone, use the seeded demo instead of building data by
+hand:
+
+```bash
+./scripts/demo-up.sh
+```
+
+That brings up a separate `rht_demo` database populated with a complete
+fictional tenancy — two supplier organisations, their care providers, users in
+every role, and an interview in every lifecycle state. See [DEMO.md](DEMO.md)
+for the logins and what is in there. It is gated behind the `demo` Spring
+profile and never runs otherwise.
+
 ## Organisations, Homes and Children
 
 Data is scoped by **organisation**. There are two types:
