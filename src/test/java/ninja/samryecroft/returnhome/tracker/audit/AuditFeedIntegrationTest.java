@@ -120,6 +120,11 @@ class AuditFeedIntegrationTest extends AbstractIntegrationTest {
         user.setHome(userHome);
         user.setOrganisation(organisation);
         user.setEnabled(true);
+        // can_export defaults false (V12 migration) - HOME_STAFF is excluded by ExportCapability's
+        // role ceiling regardless, so setting this true for every fixture here is a test-convenience,
+        // not a security-relevant choice for this file (the role ceiling itself is Jim's
+        // ExportCapabilityTest's job to prove).
+        user.setCanExport(true);
         return user;
     }
 
@@ -182,7 +187,16 @@ class AuditFeedIntegrationTest extends AbstractIntegrationTest {
                         .param("notes", "Free text that must never reach the CSV export"))
                 .andExpect(status().is3xxRedirection());
 
-        var csvResult = mockMvc.perform(get("/audit/export.csv").with(asUser("feed-orgadmin" + suffix)))
+        String readyHtml = mockMvc.perform(post("/audit/export").with(asUser("feed-orgadmin" + suffix)).with(csrf())
+                        .param("purpose", "INTERNAL_SAFEGUARDING_REVIEW"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        java.util.regex.Matcher tokenMatch = java.util.regex.Pattern.compile("/export/download/([^\"]+)").matcher(readyHtml);
+        assertThat(tokenMatch.find()).as("download link present on the ready screen").isTrue();
+        String token = tokenMatch.group(1);
+
+        var csvResult = mockMvc.perform(get("/export/download/{token}", token).with(asUser("feed-orgadmin" + suffix)))
                 .andExpect(status().isOk())
                 .andReturn();
 
@@ -196,7 +210,7 @@ class AuditFeedIntegrationTest extends AbstractIntegrationTest {
                 .stream()
                 .filter(e -> e.getActorUsernameAtTime() != null && e.getActorUsernameAtTime().endsWith(suffix))
                 .findFirst().orElseThrow();
-        assertThat(exportEvent.getMetadata()).contains("rowCount=" + dataRows);
+        assertThat(exportEvent.getMetadata()).contains("rows=" + dataRows);
         assertThat(exportEvent.getMetadata()).doesNotContain("Free text that must never reach the CSV export");
     }
 

@@ -161,7 +161,12 @@ public class ExportController {
     }
 
     private Long organisationIdFor(Long childId) {
-        return childRepository.findById(childId)
+        // findById's home/organisation are LAZY and this method is called well outside the request
+        // that first touched them, so a plain findById throws LazyInitializationException the
+        // first time this runs against a real Hibernate session (only a full HTTP integration test
+        // surfaces it - a mocked service test never touches a real proxy). findDetailedById already
+        // eager-fetches exactly this path for the same reason elsewhere in the app.
+        return childRepository.findDetailedById(childId)
                 .map(Child::getHome)
                 .filter(home -> home.getOrganisation() != null)
                 .map(home -> home.getOrganisation().getId())

@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Pack ready — Return Home Tracker</title>
+    <th:block th:replace="~{fragments/layout :: styles}"></th:block>
+</head>
+<body>
+<div th:replace="~{fragments/layout :: nav}"></div>
+<main id="main">
+    <h1>Export case file</h1>
+    <p class="sub" th:text="${child.fullName}">Child</p>
+
+    <div class="card">
+        <div class="banner ok" style="margin-bottom:14px">
+            <span class="ic" aria-hidden="true">✓</span>
+            <div><strong>Pack ready</strong><p>Recorded in this child's case history.</p></div>
+        </div>
+        <p style="margin:0 0 4px;font-weight:650;font-size:14px" th:text="${result.filename()}">case-file.zip</p>
+        <p class="hint" style="font-family:ui-monospace,Menlo,monospace" th:text="${'SHA-256: ' + result.checksum()}">checksum</p>
+
+        <div class="readonly-val" th:if="${result.passphrase() != null and not #strings.isEmpty(result.passphrase())}"
+             style="font-family:ui-monospace,Menlo,monospace;font-size:13px;min-height:0;padding:9px 11px;margin-top:10px">
+            Passphrase: <strong th:text="${result.passphrase()}">passphrase</strong>
+        </div>
+        <p class="hint" th:if="${result.passphrase() != null and not #strings.isEmpty(result.passphrase())}" style="margin:8px 0 14px">
+            Shown once. Send it by a different route than the file.</p>
+
+        <a class="btn block" style="margin-top:12px" th:href="@{/export/download/{token}(token=${result.token()})}">Download pack</a>
+        <p style="margin-top:12px;text-align:center">
+            <span class="expires" th:text="${'◷ Link expires in ' + result.expiresInMinutes() + ' minutes'}">Expires</span>
+        </p>
+        <p class="hint" style="margin-top:14px">Re-downloading after expiry means generating again — which writes a
+            second row in this child's case history. Every extraction being separately recorded is the feature, not
+            a limitation.</p>
+    </div>
+
+    <a class="btn ghost" th:href="@{/children/{id}(id=${child.id})}">Back to the child record</a>
+</main>
+</body>
+</html>
