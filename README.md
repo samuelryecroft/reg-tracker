@@ -13,11 +13,25 @@ Spring Data JPA + PostgreSQL + Flyway, Apache POI for `.docx` generation.
 
 ## Running locally
 
+Run all three in the **same terminal**, in this order:
+
 ```bash
-docker compose up -d                                    # starts Postgres on localhost:5432
-export ADMIN_SEED_PASSWORD='LocalDev123!'               # required on first boot, see below
+docker compose up -d                          # Postgres on :5432, Azurite on :10000
+export ADMIN_SEED_PASSWORD='LocalDev123!'     # first boot only - see below
 SPRING_PROFILES_ACTIVE=dev ./mvnw spring-boot:run
 ```
+
+`export` lasts only for the shell you typed it in. If you open a new tab, or
+run the last line through a tool that starts its own shell, the variable is
+gone and **no admin account is created** - the app still starts and looks
+healthy. `echo $ADMIN_SEED_PASSWORD` in the terminal you are about to run
+Maven in should print the password.
+
+Both ports must be free before you start: if something already has `5432`,
+`docker compose up -d` cannot publish Postgres, and if something already has
+`8080` - including an earlier `spring-boot:run` you forgot to stop - the app
+fails to start. `lsof -nP -iTCP:5432 -sTCP:LISTEN`, and the same for `8080`,
+will tell you.
 
 The `dev` profile supplies the throwaway local database credentials that match
 `docker-compose.yml`. They are deliberately not defaults in
@@ -49,8 +63,30 @@ the next startup.
 - username: `admin` (override with `ADMIN_SEED_USERNAME`)
 - password: whatever you set in `ADMIN_SEED_PASSWORD`
 
-The seeder only acts when no ADMIN user exists, so changing the variable
-later will not rotate an existing admin's password.
+### Can't log in? Read this before retrying
+
+The seeder acts **only when no ADMIN user exists**. Once one exists it does
+nothing and, unlike the unset-password case above, **says nothing in the log** -
+startup looks completely normal. So if the first boot created an admin with a
+password you have since changed, mistyped, or forgotten, setting
+`ADMIN_SEED_PASSWORD` again and restarting will not help: the new value is
+ignored and the original password is still the only one that works.
+
+To get out of it, throw the database away and start over. `down -v` deletes the
+Postgres volume, so **all local data goes with it** - which is fine for local
+development, and is the only way to make the seeder run again:
+
+```bash
+docker compose down -v
+docker compose up -d
+export ADMIN_SEED_PASSWORD='LocalDev123!'
+SPRING_PROFILES_ACTIVE=dev ./mvnw spring-boot:run
+```
+
+The same reset fixes a database first created with different credentials:
+`POSTGRES_USER`/`POSTGRES_PASSWORD` in `docker-compose.yml` are only applied
+while the volume is empty, so editing them without a `down -v` leaves the old
+credentials in place and the app cannot connect.
 
 Log in as `admin` and go to **Users** to create the other accounts.
 
