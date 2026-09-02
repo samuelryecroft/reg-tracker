@@ -43,11 +43,11 @@ duplicated across `deploy/` and `terraform/`, and nothing is orphaned:
 | Old location | New home | Why |
 |---|---|---|
 | `deploy/observability/alerts.tf` | `terraform/modules/observability/` (+ the two App-Service-scoped alerts in `modules/app_service/`) | It is Terraform; all IaC lives under `terraform/`. |
-| `deploy/observability/applicationinsights.json` | `deploy/appservice/applicationinsights.json` | It is a **runtime** App Insights Java-agent config, not IaC. It is attached at deploy time via `-javaagent` and read via the `APPLICATIONINSIGHTS_CONFIGURATION_FILE` app setting — it stays a deploy artifact, **not** moved into `src/main/resources` (that would make the agent depend on reading a file from inside the Spring Boot fat jar, which is fragile). |
+| `deploy/observability/applicationinsights.json` | `src/main/resources/applicationinsights.json` | It is a **runtime** App Insights Java-agent config, not IaC, so it lives with the app source (god-approved, T63). **Deploy detail (WS-E):** the AI agent reads a *filesystem* path via `APPLICATIONINSIGHTS_CONFIGURATION_FILE`, not the fat-jar classpath, so the deploy step must surface this packaged resource to the runtime path the app setting names (`/home/site/wwwroot/applicationinsights.json`, next to the agent jar). Flagged for the pipeline; contains no secret (the connection string is injected via env). |
 | `deploy/observability/README.md` | folded into this file | One README; the durable notes are below. |
 
-`deploy/observability/` is removed. Net: TF exists **only** under `terraform/`; the runtime JSON has
-**one** clear home under `deploy/appservice/`.
+The `deploy/` folder is removed entirely. Net: TF exists **only** under `terraform/`; the runtime
+agent config lives **only** with the app under `src/main/resources/`; nothing is duplicated or orphaned.
 
 **Why the two App-Service-scoped alerts live in `app_service`, not `observability`:** they scope on
 the web app id, while `observability` produces the App Insights the app needs — putting the web-app
