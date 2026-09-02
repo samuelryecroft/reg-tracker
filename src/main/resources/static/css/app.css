@@ -14,6 +14,8 @@
     --ok: #166534; --ok-bg: #DCFCE7;
     --warn: #92400E; --warn-bg: #FEF3C7;
     --info: #1E40AF; --info-bg: #DBEAFE;
+    --neutral: #374151; --neutral-bg: #EEF2F6;
+    --sent-back: #9A3412; --sent-back-bg: #FDE7D8;
     /* 4px spacing scale + 5-step type ramp, replacing the old ad-hoc rem values */
     --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px; --s7: 48px;
     --t-xs: 12px; --t-sm: 14px; --t-md: 16px; --t-lg: 20px; --t-xl: 26px;
@@ -382,4 +384,44 @@ fieldset.step[hidden] { display: none; }
     .stack { display: flex; }
     .split { grid-template-columns: 1fr !important; }
     .rail { border-right: none !important; padding-right: 0 !important; border-bottom: 1px solid var(--border); padding-bottom: var(--s4); margin-bottom: var(--s4); }
+}
+
+/* ============================== audit history timeline (T38, V1) ============================== */
+.provenance {
+    display: flex; gap: var(--s2); align-items: center; font-size: var(--t-xs); color: var(--muted);
+    background: var(--neutral-bg); border: 1px solid var(--border); border-radius: 8px;
+    padding: var(--s2) var(--s3); margin-bottom: var(--s4);
+}
+.daysep {
+    font-size: var(--t-xs); font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--muted); margin: var(--s5) 0 var(--s3); padding-bottom: var(--s2); border-bottom: 1px solid var(--border);
+}
+.daysep:first-child { margin-top: 0; }
+.tl { list-style: none; margin: 0; padding: 0; }
+.tl li { position: relative; padding: 0 0 var(--s4) var(--s5); border-left: 2px solid var(--border); margin-left: 5px; }
+.tl li:last-child { border-left-color: transparent; padding-bottom: 0; }
+.tl .dot {
+    position: absolute; left: -7px; top: 4px; width: 12px; height: 12px; border-radius: 50%;
+    background: var(--neutral-bg); border: 2px solid var(--neutral);
+}
+.tl .dot.ok { background: var(--ok-bg); border-color: var(--ok); }
+.tl .dot.info { background: var(--info-bg); border-color: var(--info); }
+.tl .dot.back { background: var(--sent-back-bg); border-color: var(--sent-back); }
+.tl .dot.err { background: var(--error-bg); border-color: var(--error); }
+.tl .ev { display: flex; justify-content: space-between; gap: var(--s3); align-items: baseline; flex-wrap: wrap; }
+.tl .what { font-weight: 650; font-size: var(--t-md); }
+.tl .when { font-size: var(--t-xs); color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tl .who { font-size: var(--t-sm); color: var(--muted); margin: 2px 0 0; }
+.tl .who .role { font-weight: 600; }
+.tl .detail {
+    font-size: var(--t-sm); margin-top: var(--s2); display: inline-flex; align-items: center; gap: 6px;
+    background: var(--neutral-bg); border-radius: 6px; padding: 3px 10px; color: var(--neutral); font-weight: 600;
+}
+.former { font-style: italic; }
+@media print {
+    .mk-nav, .btn { display: none !important; }
+    .tl li { break-inside: avoid; page-break-inside: avoid; }
+    .daysep { break-after: avoid; page-break-after: avoid; }
+    .provenance { border: 1px solid #999; background: #fff; }
+    .tl .dot { border-color: #333 !important; background: #fff !important; }
 }
