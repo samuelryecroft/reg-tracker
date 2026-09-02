@@ -1,0 +1,14 @@
+# Local Terraform state and working dirs - never commit.
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+
+# Secrets / per-env inputs - placeholders only live in terraform.tfvars.example.
+terraform.tfvars
+*.auto.tfvars
+*.auto.tfvars.json
+backend.hcl
+
+# Keep .terraform.lock.hcl tracked (provider version pinning) - do NOT ignore it.

@@ -72,7 +72,7 @@
             probes App Service needs and Micrometer metrics. Application Insights is layered on at
             deploy time via the AI Java agent (-javaagent), NOT a code dependency: the app boots
             identically with or without a live App Insights resource - the agent only exports when
-            APPLICATIONINSIGHTS_CONNECTION_STRING is set. See deploy/observability/README.md.
+            APPLICATIONINSIGHTS_CONNECTION_STRING is set. See terraform/README.md (observability) and deploy/appservice/applicationinsights.json.
         -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
