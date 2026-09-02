@@ -64,10 +64,17 @@ public class InterviewRequestService {
     /**
      * Requests visible to a Supplier-side principal (COORDINATOR, or ORG_ADMIN of either org type):
      * every request across the Care Provider organisation(s) they can see. Platform ADMIN sees all.
+     * A VIEWER sees only their specific assigned homes, not their whole Care Provider org (roadmap
+     * 2.3 widened this list's access to VIEWER/Care-Provider-ORG_ADMIN as a dashboard drill-through
+     * target - this branch is what keeps a VIEWER's scope exactly as narrow as everywhere else).
      */
     public List<InterviewRequest> listVisible(AppUserPrincipal principal) {
         if (principal.hasRole(Role.ADMIN)) {
             return interviewRequestRepository.findAllDetailed();
+        }
+        if (principal.hasRole(Role.VIEWER)) {
+            List<Long> homeIds = userRepository.findViewerHomeIds(principal.getUserId());
+            return homeIds.isEmpty() ? List.of() : interviewRequestRepository.findByHomeIdIn(homeIds);
         }
         if (principal.hasRole(Role.ORG_ADMIN) && principal.getOrganisationType() == OrgType.CARE_PROVIDER) {
             return interviewRequestRepository.findByHomeOrganisationId(principal.getOrganisationId());

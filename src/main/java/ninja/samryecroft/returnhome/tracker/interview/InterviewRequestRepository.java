@@ -1,5 +1,6 @@
 package ninja.samryecroft.returnhome.tracker.interview;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -45,4 +46,9 @@ public interface InterviewRequestRepository extends JpaRepository<InterviewReque
     @EntityGraph(attributePaths = {"child", "home", "requestedBy", "allocatedVisitor"})
     @Query("select r from InterviewRequest r where r.child.id = :childId order by r.createdAt desc")
     List<InterviewRequest> findByChildIdOrderByCreatedAtDesc(@Param("childId") Long childId);
+
+    /** A VIEWER's dashboard/list scope: their specific set of visible homes, not a whole organisation. */
+    @EntityGraph(attributePaths = {"child", "home", "requestedBy", "allocatedVisitor"})
+    @Query("select r from InterviewRequest r where r.home.id in :homeIds order by r.createdAt desc")
+    List<InterviewRequest> findByHomeIdIn(@Param("homeIds") Collection<Long> homeIds);
 }

@@ -2,6 +2,7 @@ package ninja.samryecroft.returnhome.tracker.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -28,7 +29,13 @@ public class SecurityConfig {
                         // colours too; ThemeService itself enforces which org they're allowed to touch.
                         .requestMatchers("/admin/organisations/**").hasRole("ADMIN")
                         .requestMatchers("/admin/**").hasAnyRole("ADMIN", "ORG_ADMIN")
+                        // Roadmap 2.3: the request list is a real drill-through target for the
+                        // dashboard's tiles and breakdown rows, so Care Provider ORG_ADMIN/VIEWER
+                        // need read access to it too - narrower than /coordinator/** as a whole,
+                        // which stays allocate-capable for COORDINATOR/ADMIN only. Must come first.
+                        .requestMatchers(HttpMethod.GET, "/coordinator/requests").hasAnyRole("COORDINATOR", "ADMIN", "ORG_ADMIN", "VIEWER")
                         .requestMatchers("/coordinator/**").hasAnyRole("COORDINATOR", "ADMIN")
+                        .requestMatchers("/dashboard/**").hasAnyRole("ORG_ADMIN", "VIEWER", "COORDINATOR")
                         .requestMatchers("/visitor/**").hasAnyRole("VISITOR", "ADMIN")
                         .requestMatchers("/reviewer/**").hasAnyRole("REVIEWER", "ADMIN")
                         .requestMatchers("/requests/**").hasAnyRole("HOME_STAFF", "ADMIN")

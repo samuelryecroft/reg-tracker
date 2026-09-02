@@ -21,4 +21,7 @@ public interface OrganisationRepository extends JpaRepository<Organisation, Long
 
     @Query("select o.supplierOrganisation.id from Organisation o where o.id = :careProviderOrgId")
     Optional<Long> findSupplierOrganisationIdByCareProviderId(@Param("careProviderOrgId") Long careProviderOrgId);
+
+    /** The Care Provider organisations a given Supplier serves - the dashboard's "care provider" switcher (roadmap 2.3). */
+    List<Organisation> findBySupplierOrganisationIdOrderByName(Long supplierOrganisationId);
 }

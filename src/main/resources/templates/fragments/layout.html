@@ -21,6 +21,7 @@
 <header>
     <nav aria-label="Main">
         <a class="brand" href="/"><span class="brand-mark"></span>Return Home Tracker</a>
+        <a th:if="${#authorization.expression('hasAnyRole(''ORG_ADMIN'',''VIEWER'',''COORDINATOR'')')}" href="/dashboard">Dashboard</a>
         <a th:if="${#authorization.expression('hasRole(''HOME_STAFF'')')}" href="/requests">My Requests</a>
         <a th:if="${#authorization.expression('hasRole(''HOME_STAFF'')')}" href="/children">My Children</a>
         <a th:if="${#authorization.expression('hasRole(''COORDINATOR'')')}" href="/coordinator/requests">All Requests</a>

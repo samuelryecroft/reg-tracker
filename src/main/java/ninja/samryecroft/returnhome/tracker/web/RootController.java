@@ -1,6 +1,5 @@
 package ninja.samryecroft.returnhome.tracker.web;
 
-import ninja.samryecroft.returnhome.tracker.organisation.OrgType;
 import ninja.samryecroft.returnhome.tracker.user.AppUserPrincipal;
 import ninja.samryecroft.returnhome.tracker.user.Role;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -17,12 +16,15 @@ public class RootController {
     @GetMapping("/")
     public String root(@AuthenticationPrincipal AppUserPrincipal principal) {
         if (principal.hasRole(Role.ADMIN)) {
+            // Platform ADMIN's job is tenancy and support, not safeguarding oversight of other
+            // organisations' children - the cross-supplier dashboard view is deliberately out of
+            // MVP (Oscar's dashboard-build-brief.md D-3), so ADMIN is not routed to /dashboard.
             return "redirect:/admin/users";
         }
-        if (principal.hasRole(Role.ORG_ADMIN)) {
-            return principal.getOrganisationType() == OrgType.CARE_PROVIDER
-                    ? "redirect:/admin/homes"
-                    : "redirect:/admin/users";
+        if (principal.hasRole(Role.ORG_ADMIN) || principal.hasRole(Role.VIEWER)) {
+            // Roadmap 2.3 D-3: both audiences previously landed on a list with no starting point
+            // (a homes list, a children list) - the dashboard is now that starting point.
+            return "redirect:/dashboard";
         }
         if (principal.hasRole(Role.COORDINATOR)) {
             return "redirect:/coordinator/requests";
@@ -32,9 +34,6 @@ public class RootController {
         }
         if (principal.hasRole(Role.VISITOR)) {
             return "redirect:/visitor/interviews";
-        }
-        if (principal.hasRole(Role.VIEWER)) {
-            return "redirect:/children";
         }
         return "redirect:/requests";
     }
