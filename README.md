@@ -129,8 +129,25 @@ the Visitor submits it — because the content can still change through a
 reject/resubmit round. For the same reason, download and on-screen viewing
 are only available once the report reaches `REPORT_APPROVED`.
 
-Generated documents are written to `app.docx.output-dir` (defaults to
-`./generated-reports`, outside version control).
+Generated documents are **encrypted before they are stored** — a per-file
+AES-256-GCM data key, wrapped by the owning organisation's key. Locally
+the ciphertext lands in `app.documents.local.directory` (defaults to
+`./generated-reports`, outside version control) and the keys are derived
+in-process; deployment stores it in Azure Blob with the keys in Key Vault.
+The same code path runs in both cases — there is no unencrypted mode.
+
+You do not need to configure anything to run locally. To exercise the real
+Blob path without an Azure subscription, start the storage emulator:
+
+```bash
+docker compose up -d azurite
+./mvnw spring-boot:run -Dspring-boot.run.profiles=azurite
+```
+
+See **[DOCUMENT-KEYS.md](DOCUMENT-KEYS.md)** for what this protects against,
+the per-organisation key model, and the operational steps that go with it —
+in particular, **creating a new organisation in production requires creating
+its key first**, or its first report approval will fail closed.
 
 ## Tests
 

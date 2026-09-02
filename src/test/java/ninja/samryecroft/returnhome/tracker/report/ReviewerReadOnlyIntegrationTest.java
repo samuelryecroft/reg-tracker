@@ -58,11 +58,11 @@ class ReviewerReadOnlyIntegrationTest extends AbstractIntegrationTest {
     private static final String TAMPERED = "TAMPERED BY REVIEWER";
 
     @TempDir
-    static Path docxOutputDir;
+    static Path documentStoreDir;
 
     @DynamicPropertySource
-    static void docxOutputDir(DynamicPropertyRegistry registry) {
-        registry.add("app.docx.output-dir", () -> docxOutputDir.toString());
+    static void documentStoreDir(DynamicPropertyRegistry registry) {
+        registry.add("app.documents.local.directory", () -> documentStoreDir.toString());
     }
 
     @Autowired
@@ -144,7 +144,7 @@ class ReviewerReadOnlyIntegrationTest extends AbstractIntegrationTest {
         // The approval itself still happened...
         assertThat(after.getStatus()).isEqualTo(ReportStatus.APPROVED);
         assertThat(after.getGeneratedDocumentPath()).isNotBlank();
-        assertThat(docxOutputDir.resolve(after.getGeneratedDocumentPath())).exists();
+        assertThat(documentStoreDir.resolve(after.getGeneratedDocumentPath())).exists();
         assertThat(interviewRequestRepository.findDetailedById(requestId).orElseThrow().getStatus())
                 .isEqualTo(InterviewStatus.REPORT_APPROVED);
 

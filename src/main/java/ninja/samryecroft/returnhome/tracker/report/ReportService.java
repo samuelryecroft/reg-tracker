@@ -3,7 +3,6 @@ package ninja.samryecroft.returnhome.tracker.report;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
-import java.nio.file.Path;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -40,12 +39,13 @@ public class ReportService {
     private final AppProperties appProperties;
     private final ThemeService themeService;
     private final AuditEventPublisher auditEventPublisher;
+    private final ReportDocumentService reportDocumentService;
     private final DefaultResourceLoader resourceLoader = new DefaultResourceLoader();
 
     public ReportService(InterviewReportRepository interviewReportRepository,
             InterviewRequestService interviewRequestService, UserRepository userRepository,
             DocxReportGenerator docxReportGenerator, AppProperties appProperties, ThemeService themeService,
-            AuditEventPublisher auditEventPublisher) {
+            AuditEventPublisher auditEventPublisher, ReportDocumentService reportDocumentService) {
         this.interviewReportRepository = interviewReportRepository;
         this.interviewRequestService = interviewRequestService;
         this.userRepository = userRepository;
@@ -53,6 +53,7 @@ public class ReportService {
         this.appProperties = appProperties;
         this.themeService = themeService;
         this.auditEventPublisher = auditEventPublisher;
+        this.reportDocumentService = reportDocumentService;
     }
 
     /** The Visitor's or Reviewer's form, prefilled from an existing draft/rejected/submitted report
@@ -109,10 +110,10 @@ public class ReportService {
         report.setReviewedAt(LocalDateTime.now());
         report.setReviewComments(form.getReviewComments());
         report.setUpdatedAt(LocalDateTime.now());
-        String generatedFilename = generateDocx(report);
+        String storageKey = generateDocx(report, principal);
         report = interviewReportRepository.save(report);
         interviewRequestService.markStatus(report.getInterviewRequest(), InterviewStatus.REPORT_APPROVED);
-        auditEventPublisher.docxGenerated(report, generatedFilename, principal);
+        auditEventPublisher.docxGenerated(report, storageKey, principal);
         auditEventPublisher.reportApproved(report, principal);
         return report;
     }
@@ -133,10 +134,6 @@ public class ReportService {
         auditEventPublisher.reportRejected(report, form.getReviewComments() != null
                 && !form.getReviewComments().isBlank(), principal);
         return report;
-    }
-
-    public Path resolveDocumentPath(InterviewReport report) {
-        return Path.of(appProperties.getDocx().getOutputDir(), report.getGeneratedDocumentPath());
     }
 
     public InterviewReport getByRequestId(Long requestId) {
@@ -179,23 +176,32 @@ public class ReportService {
         return report;
     }
 
-    /** @return the generated filename, so the caller can record it on the audit event. */
-    private String generateDocx(InterviewReport report) {
+    /**
+     * Renders the document and hands it straight to the encrypted store.
+     *
+     * <p>The bytes are never written to a file on the way: the plaintext of a safeguarding report
+     * exists only in this method's local variable, and what reaches durable storage is already
+     * ciphertext. Failing to encrypt or store therefore throws out of {@link #approve}, rolling
+     * the approval back rather than recording a report whose document does not exist.
+     *
+     * @return the storage key recorded on the report row
+     */
+    private String generateDocx(InterviewReport report, AppUserPrincipal principal) {
         InterviewRequest request = report.getInterviewRequest();
-        String filename = "rhi-report-" + request.getId() + "-" + System.currentTimeMillis() + ".docx";
-        Path outputPath = Path.of(appProperties.getDocx().getOutputDir(), filename);
+        byte[] document;
         try {
             Resource template = resourceLoader.getResource(appProperties.getDocx().getTemplatePath());
             ThemeService.ThemeView theme = themeService.getForCareProviderOrg(request.getHome().getOrganisation().getId());
             try (InputStream templateStream = template.getInputStream()) {
-                docxReportGenerator.generate(templateStream, buildValues(request, report),
-                        theme.primaryColor(), theme.primaryColorDark(), theme.secondaryColor(), outputPath);
+                document = docxReportGenerator.generate(templateStream, buildValues(request, report),
+                        theme.primaryColor(), theme.primaryColorDark(), theme.secondaryColor());
             }
         } catch (IOException e) {
             throw new UncheckedIOException("Failed to generate report document", e);
         }
-        report.setGeneratedDocumentPath(filename);
-        return filename;
+        String storageKey = reportDocumentService.store(report, document, principal);
+        report.setGeneratedDocumentPath(storageKey);
+        return storageKey;
     }
 
     private SubmitReportForm blankFormFor(AppUserPrincipal principal) {

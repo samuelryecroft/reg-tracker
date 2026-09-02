@@ -25,5 +25,14 @@ public enum AuditEventType {
     DOCX_GENERATED,
     DOCX_DOWNLOADED,
 
+    // Document encryption (WS-B / DOCUMENT-ENCRYPTION-DESIGN.md §4). Key use is the closest thing
+    // we have to a tamper-evident record of document access, and Key Vault logs the same
+    // operations independently, in a place this application cannot edit - so the two can be
+    // reconciled. DOCUMENT_CRYPTO_FAILED is the fail-closed trip: a document that could not be
+    // decrypted was never served.
+    DOCUMENT_KEY_WRAPPED,
+    DOCUMENT_KEY_UNWRAPPED,
+    DOCUMENT_CRYPTO_FAILED,
+
     ACCESS_DENIED
 }

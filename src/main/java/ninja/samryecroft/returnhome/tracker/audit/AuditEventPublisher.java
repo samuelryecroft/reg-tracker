@@ -155,6 +155,52 @@ public class AuditEventPublisher {
                 .build());
     }
 
+    // --- Document encryption (WS-B) ---
+
+    /**
+     * A data key was wrapped under the organisation's KEK and the encrypted document stored.
+     * Deliberately records the key name and version, never the key or any part of the document.
+     */
+    public void documentKeyWrapped(InterviewReport report, String storageKey, String keyName,
+            String keyVersion, AppUserPrincipal principal) {
+        publish(reportEvent(AuditEventType.DOCUMENT_KEY_WRAPPED, report, principal)
+                .meta("storageKey", storageKey)
+                .meta("keyName", keyName)
+                .meta("keyVersion", keyVersion)
+                .build());
+    }
+
+    /** A stored document was successfully unwrapped and decrypted for this actor. */
+    public void documentKeyUnwrapped(InterviewRequest request, Long reportId, String storageKey,
+            AppUserPrincipal principal) {
+        publish(actor(AuditEventRecord.of(AuditEventType.DOCUMENT_KEY_UNWRAPPED), principal)
+                .target("InterviewReport", reportId)
+                .scope(organisationIdOf(request), homeIdOf(request))
+                .meta("requestId", request.getId())
+                .meta("storageKey", storageKey)
+                .build());
+    }
+
+    /**
+     * The fail-closed trip: encrypting or decrypting a document failed, so nothing was stored or
+     * served. {@code reason} is the exception type rather than its message, because a message can
+     * carry detail that does not belong in an audit row.
+     */
+    public void documentCryptoFailed(InterviewRequest request, Long reportId, String operation,
+            String reason, AppUserPrincipal principal) {
+        AuditEventRecord.Builder builder = AuditEventRecord.of(AuditEventType.DOCUMENT_CRYPTO_FAILED);
+        if (principal != null) {
+            actor(builder, principal);
+        }
+        publish(builder
+                .target("InterviewReport", reportId)
+                .scope(organisationIdOf(request), homeIdOf(request))
+                .meta("requestId", request.getId())
+                .meta("operation", operation)
+                .meta("reason", reason)
+                .build());
+    }
+
     // --- Access control (A.4) ---
 
     /** {@code principal} is null for an anonymous attempt. */

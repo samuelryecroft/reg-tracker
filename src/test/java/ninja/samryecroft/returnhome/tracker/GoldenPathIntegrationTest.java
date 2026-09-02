@@ -9,9 +9,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrlPattern;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Set;
+import ninja.samryecroft.returnhome.tracker.audit.AuditEventRepository;
+import ninja.samryecroft.returnhome.tracker.audit.AuditEventType;
 import ninja.samryecroft.returnhome.tracker.child.Child;
 import ninja.samryecroft.returnhome.tracker.child.ChildRepository;
 import ninja.samryecroft.returnhome.tracker.home.Home;
@@ -46,11 +49,11 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 class GoldenPathIntegrationTest extends AbstractIntegrationTest {
 
     @TempDir
-    static Path docxOutputDir;
+    static Path documentStoreDir;
 
     @DynamicPropertySource
-    static void docxOutputDir(DynamicPropertyRegistry registry) {
-        registry.add("app.docx.output-dir", () -> docxOutputDir.toString());
+    static void documentStoreDir(DynamicPropertyRegistry registry) {
+        registry.add("app.documents.local.directory", () -> documentStoreDir.toString());
     }
 
     @Autowired
@@ -69,8 +72,11 @@ class GoldenPathIntegrationTest extends AbstractIntegrationTest {
     private OrganisationRepository organisationRepository;
     @Autowired
     private AppUserDetailsService appUserDetailsService;
+    @Autowired
+    private AuditEventRepository auditEventRepository;
 
     private Long childId;
+    private Long careProviderOrgId;
 
     /**
      * spring-security-test 7.1 dropped the classic {@code userDetails(username)} request
@@ -89,6 +95,8 @@ class GoldenPathIntegrationTest extends AbstractIntegrationTest {
         // V5__add_organisations.sql seeds exactly one Supplier and one Care Provider org, linked.
         Organisation supplierOrg = organisationRepository.findByTypeOrderByName(OrgType.SUPPLIER).get(0);
         Organisation careProviderOrg = organisationRepository.findByTypeOrderByName(OrgType.CARE_PROVIDER).get(0);
+
+        careProviderOrgId = careProviderOrg.getId();
 
         Home home = new Home();
         home.setName("Golden Path House");
@@ -208,15 +216,40 @@ class GoldenPathIntegrationTest extends AbstractIntegrationTest {
 
         var report = interviewReportRepository.findByInterviewRequestId(requestId).orElseThrow();
         assertThat(report.getGeneratedDocumentPath()).isNotBlank();
-        assertThat(docxOutputDir.resolve(report.getGeneratedDocumentPath())).exists();
+        assertThat(documentStoreDir.resolve(report.getGeneratedDocumentPath())).exists();
 
         // 6. Home staff can now download the generated report
-        mockMvc.perform(get("/reports/{id}/download", requestId).with(asUser("gp-home")))
+        byte[] downloaded = mockMvc.perform(get("/reports/{id}/download", requestId).with(asUser("gp-home")))
                 .andExpect(status().isOk())
                 .andExpect(header().string("Content-Type",
-                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"));
+                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"))
+                .andReturn().getResponse().getContentAsByteArray();
 
-        assertThat(Files.exists(docxOutputDir.resolve(report.getGeneratedDocumentPath()))).isTrue();
+        // 6a. What was downloaded is a real .docx - a zip, so it starts "PK".
+        assertThat(downloaded).isNotEmpty();
+        assertThat(new String(downloaded, 0, 2, StandardCharsets.UTF_8)).isEqualTo("PK");
+
+        // 6b. What is actually stored is not. This is the assertion the whole encryption
+        // workstream exists for, and the only one that would catch a regression to a plain write:
+        // the download can look perfect while the bytes on disk are readable to anyone who reaches
+        // the storage account.
+        byte[] stored = Files.readAllBytes(documentStoreDir.resolve(report.getGeneratedDocumentPath()));
+        assertThat(stored).isNotEqualTo(downloaded);
+        assertThat(new String(stored, 0, 2, StandardCharsets.UTF_8)).isNotEqualTo("PK");
+
+        // 6c. The storage key names the owning organisation and carries no child identity, and the
+        // envelope is stored beside the ciphertext rather than in a key table.
+        assertThat(report.getGeneratedDocumentPath())
+                .startsWith("org-" + careProviderOrgId + "/")
+                .doesNotContain("Riley")
+                .doesNotContain("Doe");
+        assertThat(documentStoreDir.resolve(report.getGeneratedDocumentPath() + ".meta")).exists();
+
+        // 6d. Both key operations reached the audit trail, scoped to the owning organisation.
+        assertThat(auditEventRepository.findByEventTypeOrderByOccurredAtDesc(AuditEventType.DOCUMENT_KEY_WRAPPED))
+                .anyMatch(event -> careProviderOrgId.equals(event.getOrganisationId()));
+        assertThat(auditEventRepository.findByEventTypeOrderByOccurredAtDesc(AuditEventType.DOCUMENT_KEY_UNWRAPPED))
+                .anyMatch(event -> careProviderOrgId.equals(event.getOrganisationId()));
 
         // 7. The shared detail view is reachable by every role involved in this request,
         // and the old role-specific detail route no longer exists.

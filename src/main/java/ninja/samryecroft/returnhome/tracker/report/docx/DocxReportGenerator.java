@@ -71,6 +71,20 @@ public class DocxReportGenerator {
      */
     public void generate(InputStream templateStream, Map<String, String> values,
             String accentColor, String accentColorDark, String tintColor, Path outputPath) throws IOException {
+        byte[] generated = generate(templateStream, values, accentColor, accentColorDark, tintColor);
+        Files.createDirectories(outputPath.getParent());
+        Files.write(outputPath, generated);
+    }
+
+    /**
+     * Renders the document to bytes rather than a file.
+     *
+     * <p>This is the variant the application uses: the report is encrypted before it reaches
+     * storage, so it must never touch a filesystem in plaintext on the way there. The {@link Path}
+     * overload remains for the generator's own tests, which need a file to open with POI.
+     */
+    public byte[] generate(InputStream templateStream, Map<String, String> values,
+            String accentColor, String accentColorDark, String tintColor) throws IOException {
         String accent = stripHash(accentColor, DEFAULT_ACCENT);
         String tint = stripHash(tintColor, DEFAULT_TINT);
         byte[] templateBytes = applyBrandColors(templateBytesOf(templateStream), accent,
@@ -93,10 +107,9 @@ public class DocxReportGenerator {
             });
             applyDocumentProperties(document, values);
 
-            Files.createDirectories(outputPath.getParent());
-            try (OutputStream out = Files.newOutputStream(outputPath)) {
-                document.write(out);
-            }
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            document.write(out);
+            return out.toByteArray();
         }
     }
 
