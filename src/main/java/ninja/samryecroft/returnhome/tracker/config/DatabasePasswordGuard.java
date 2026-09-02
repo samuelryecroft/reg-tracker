@@ -2,6 +2,8 @@ package ninja.samryecroft.returnhome.tracker.config;
 
 import java.util.Arrays;
 import java.util.Locale;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.springframework.boot.context.event.ApplicationEnvironmentPreparedEvent;
 import org.springframework.context.ApplicationListener;
 import org.springframework.core.env.Environment;
@@ -25,8 +27,28 @@ public class DatabasePasswordGuard implements ApplicationListener<ApplicationEnv
 
     static final String PASSWORD_PROPERTY = "spring.datasource.password";
 
-    /** Local development gets its throwaway credentials from application-dev.properties. */
-    static final String DEV_PROFILE = "dev";
+    /**
+     * Profiles that only ever run on a developer's machine, against a throwaway container database
+     * whose credentials live in the matching {@code application-<profile>.properties}. They are
+     * exempt because there is nothing to inject: the password is already in the repository, on
+     * purpose, and it is not a secret.
+     *
+     * <p>This is deliberately an allow-list rather than a "deployed?" test. Adding a profile here
+     * is a visible decision with a reviewer attached; inferring locality from the absence of a
+     * marker would silently exempt any environment nobody remembered to label.
+     */
+    static final Set<String> LOCAL_PROFILES = Set.of("dev", "demo");
+
+    /**
+     * Profiles that mean a real deployment, which no local profile alongside them can excuse. This
+     * exists so that {@code SPRING_PROFILES_ACTIVE=prod,dev} does not launder a deployment through
+     * the local exemption - the point of the guard is precisely that environment.
+     *
+     * <p>Overlaps with {@code DemoProfileGuard}'s own list, and stays separate on purpose: that one
+     * asks "may fictional records be seeded here", this one asks "must a password be injected here",
+     * and {@code azure} answers them differently.
+     */
+    private static final Set<String> DEPLOYED_PROFILES = Set.of("prod", "production", "staging", "azure");
 
     @Override
     public void onApplicationEvent(ApplicationEnvironmentPreparedEvent event) {
@@ -47,13 +69,18 @@ public class DatabasePasswordGuard implements ApplicationListener<ApplicationEnv
                 "Refusing to start: no database password is configured. Set the DB_PASSWORD "
                         + "environment variable - in Azure App Service that is a Key Vault reference, "
                         + "@Microsoft.KeyVault(SecretUri=...), resolved by the app's managed identity. "
-                        + "There is deliberately no default. For local development run with "
-                        + "SPRING_PROFILES_ACTIVE=" + DEV_PROFILE + " instead.");
+                        + "There is deliberately no default. To run locally, use one of the "
+                        + "profiles that carries throwaway credentials instead: "
+                        + String.join(", ", LOCAL_PROFILES.stream().sorted().toList()) + ".");
     }
 
+
     private static boolean isExempt(Environment environment) {
-        return Arrays.stream(environment.getActiveProfiles())
-                .anyMatch(profile -> profile.trim().toLowerCase(Locale.ROOT).equals(DEV_PROFILE));
+        Set<String> active = Arrays.stream(environment.getActiveProfiles())
+                .map(profile -> profile.trim().toLowerCase(Locale.ROOT))
+                .collect(Collectors.toSet());
+        return active.stream().anyMatch(LOCAL_PROFILES::contains)
+                && active.stream().noneMatch(DEPLOYED_PROFILES::contains);
     }
 
     /**

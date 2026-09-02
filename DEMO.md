@@ -10,6 +10,12 @@ That starts Postgres, waits for it, and boots the app with the `demo` profile.
 Open <http://localhost:8080> and sign in. The first run seeds the data; later
 runs reuse it.
 
+Docker is the only prerequisite. The demo needs **no environment variables**:
+`application-demo.properties` carries its own throwaway database and login
+credentials, which is why it starts where a real deployment deliberately would
+not. If you would rather point it somewhere else, `DB_URL`, `DB_USERNAME`,
+`DB_PASSWORD` and `DEMO_PASSWORD` all override.
+
 To get back to the exact starting state:
 
 ```bash
