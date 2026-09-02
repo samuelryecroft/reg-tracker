@@ -66,6 +66,14 @@ public class User {
     @Column(nullable = false)
     private boolean enabled = true;
 
+    /**
+     * Whether this account may extract records as a portable file, which is a separate act from
+     * reading them (roadmap 2.5 / D-6). Off unless granted; role eligibility is a further, harder
+     * ceiling applied in {@code ExportCapability}.
+     */
+    @Column(name = "can_export", nullable = false)
+    private boolean canExport = false;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 
@@ -134,6 +142,14 @@ public class User {
 
     public void setViewerHomes(Set<Home> viewerHomes) {
         this.viewerHomes = viewerHomes;
+    }
+
+    public boolean isCanExport() {
+        return canExport;
+    }
+
+    public void setCanExport(boolean canExport) {
+        this.canExport = canExport;
     }
 
     public boolean isEnabled() {

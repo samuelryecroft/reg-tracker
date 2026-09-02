@@ -3,6 +3,7 @@ package ninja.samryecroft.returnhome.tracker.audit;
 import java.util.Comparator;
 import java.util.Set;
 import java.util.stream.Collectors;
+import ninja.samryecroft.returnhome.tracker.export.ExportPurpose;
 import ninja.samryecroft.returnhome.tracker.home.Home;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewRequest;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewStatus;
@@ -207,6 +208,74 @@ public class AuditEventPublisher {
                 .meta("requestId", request.getId())
                 .meta("operation", operation)
                 .meta("reason", reason)
+                .build());
+    }
+
+    // --- Compliance export (roadmap 2.5) ---
+
+    /**
+     * A child's case file left the building. Records what was taken and under what justification -
+     * purpose, reference, counts, and the pack checksum so a file someone is holding can be matched
+     * against this row. Never the passphrase; only whether one was set.
+     */
+    public void caseFileExported(Long childId, Long organisationId, ExportPurpose purpose, String reference,
+            String periodLabel, int includedCount, int excludedCount, int documentCount,
+            boolean passphraseSet, String checksum, AppUserPrincipal principal) {
+        publish(actor(AuditEventRecord.of(AuditEventType.CASE_FILE_EXPORTED), principal)
+                .target("Child", childId)
+                .scope(organisationId, null)
+                .meta("purpose", purpose.name())
+                .meta("reference", reference)
+                .meta("period", periodLabel)
+                .meta("included", includedCount)
+                .meta("excluded", excludedCount)
+                .meta("documents", documentCount)
+                .meta("passphraseSet", passphraseSet)
+                .meta("checksum", checksum)
+                .meta("actorsNamed", false)
+                .build());
+    }
+
+    /** The audit view was exported as a CSV - the row count is what makes the scope reviewable. */
+    public void auditQueryExported(Long organisationId, ExportPurpose purpose, String reference,
+            String scopeLabel, int rowCount, String checksum, AppUserPrincipal principal) {
+        publish(actor(AuditEventRecord.of(AuditEventType.AUDIT_QUERY_EXPORTED), principal)
+                .scope(organisationId, null)
+                .meta("purpose", purpose.name())
+                .meta("reference", reference)
+                .meta("scope", scopeLabel)
+                .meta("rows", rowCount)
+                .meta("checksum", checksum)
+                .meta("actorsNamed", false)
+                .build());
+    }
+
+    /**
+     * An export that did not complete. Recorded because the error screen quotes an attempt number,
+     * and an attempt number means nothing if the attempt was never written down - and because a run
+     * of failed extraction attempts is itself something a reviewer should be able to see.
+     */
+    public void exportFailed(Long subjectId, Long organisationId, String exportType, String reason,
+            AppUserPrincipal principal) {
+        publish(actor(AuditEventRecord.of(AuditEventType.EXPORT_FAILED), principal)
+                .target("Child", subjectId)
+                .scope(organisationId, null)
+                .meta("exportType", exportType)
+                .meta("reason", reason)
+                .build());
+    }
+
+    /**
+     * Someone opened a child's audit trail. This is case-activity access to a safeguarding record -
+     * the same expectation as an access log on a health record - and NOT sign-in monitoring. A cover
+     * sheet that invites a reader to verify an export against the trail reads oddly if consulting
+     * the trail is the one thing the trail does not record.
+     */
+    public void auditViewOpened(String subjectType, Long subjectId, Long organisationId, Long homeId,
+            AppUserPrincipal principal) {
+        publish(actor(AuditEventRecord.of(AuditEventType.AUDIT_VIEW_OPENED), principal)
+                .target(subjectType, subjectId)
+                .scope(organisationId, homeId)
                 .build());
     }
 
