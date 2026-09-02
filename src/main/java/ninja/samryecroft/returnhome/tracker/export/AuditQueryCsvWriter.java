@@ -21,13 +21,14 @@ import org.springframework.stereotype.Component;
 @Component
 public class AuditQueryCsvWriter {
 
-    private static final String HEADER = "Section,When,What happened,Role,Detail";
+    private static final String SECTION_HEADER = "Section,When,What happened,Role,Detail";
+    private static final String FEED_HEADER = "Home,Child,Interview,When,What happened,Role,Detail";
 
     public byte[] write(List<AuditHistorySection> sections) {
         StringBuilder csv = new StringBuilder();
         // A BOM, because these land in Excel more often than anywhere else and without it the
         // em-dashes and names in the content render as mojibake for the person reviewing them.
-        csv.append('﻿').append(HEADER).append("\r\n");
+        csv.append('﻿').append(SECTION_HEADER).append("\r\n");
         for (AuditHistorySection section : sections) {
             for (AuditHistoryEntry entry : section.entries()) {
                 csv.append(quote(section.label())).append(',')
@@ -38,6 +39,39 @@ public class AuditQueryCsvWriter {
             }
         }
         return csv.toString().getBytes(StandardCharsets.UTF_8);
+    }
+
+    /**
+     * One row per entry of the org-wide case-activity feed.
+     *
+     * <p>This is the shape the audit-query export actually needs. The feed spans several children
+     * and homes, so a flat table with those columns is what a reviewer can sort - the grouped form
+     * above suits a single record's timeline and loses its meaning once the rows are mixed.
+     *
+     * <p>Still built from {@link AuditHistoryEntry} underneath, so the allow-list that keeps
+     * free-text metadata out of the artefact governs this route too.
+     */
+    public byte[] writeFeed(List<FeedRow> rows) {
+        StringBuilder csv = new StringBuilder();
+        csv.append('﻿').append(FEED_HEADER).append("\r\n");
+        for (FeedRow row : rows) {
+            csv.append(quote(row.homeName())).append(',')
+                    .append(quote(row.childLabel())).append(',')
+                    .append(quote(row.requestId() == null ? null : "#" + row.requestId())).append(',')
+                    .append(quote(row.entry().when())).append(',')
+                    .append(quote(row.entry().headline())).append(',')
+                    .append(quote(row.entry().actorRole())).append(',')
+                    .append(quote(row.entry().detail())).append("\r\n");
+        }
+        return csv.toString().getBytes(StandardCharsets.UTF_8);
+    }
+
+    /**
+     * Deliberately declared here rather than taking the feed's own row type: this keeps the export
+     * package free of a dependency on the audit feed's view model, so the two can move
+     * independently. Callers map their row to this in one line.
+     */
+    public record FeedRow(AuditHistoryEntry entry, String homeName, String childLabel, Long requestId) {
     }
 
     public int rowCount(List<AuditHistorySection> sections) {

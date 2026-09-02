@@ -82,6 +82,32 @@ class AuditQueryCsvWriterTest {
     }
 
     @Test
+    void theFeedFormIsAFlatTableWithHomeAndChildColumns() {
+        // The audit-query export covers the org-wide feed, which spans several children and homes -
+        // so a reviewer needs those as columns to sort on. The grouped form loses its meaning once
+        // rows from different records are mixed together.
+        String output = new String(writer.writeFeed(List.of(new AuditQueryCsvWriter.FeedRow(
+                entry("Report approved", "Reviewer", "Submitted to Approved"),
+                "Elm Lodge", "CASE-001", 1182L))), StandardCharsets.UTF_8);
+
+        assertThat(output).contains("Home,Child,Interview,When,What happened,Role,Detail");
+        assertThat(output).contains("\"Elm Lodge\",\"CASE-001\",\"#1182\"");
+        assertThat(output).contains("\"Report approved\"");
+    }
+
+    @Test
+    void theFeedFormNeutralisesFormulasToo() {
+        // Same protection on both routes - it would be worth little on one of them only.
+        String output = new String(writer.writeFeed(List.of(new AuditQueryCsvWriter.FeedRow(
+                entry("=HYPERLINK(\"http://x\")", "Reviewer", null), "=cmd", "+1", 1L))),
+                StandardCharsets.UTF_8);
+
+        assertThat(output).contains("\"'=cmd\"");
+        assertThat(output).contains("\"'+1\"");
+        assertThat(output).contains("\"'=HYPERLINK");
+    }
+
+    @Test
     void anEmptyViewStillProducesAHeader() {
         String output = csv(List.of());
 
