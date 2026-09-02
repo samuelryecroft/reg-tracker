@@ -10,44 +10,62 @@
 <main id="main">
     <h1>Return Home Interview Requests</h1>
     <a class="btn" href="/requests/new">Raise new request</a>
+    <p class="muted">Sorted by statutory deadline: most urgent first. Deadline is 72 hours from the child's recorded return.</p>
 
     <div class="table-wrap responsive">
     <table>
-        <caption>Requests raised by your home.</caption>
+        <caption>Requests raised by your home, most urgent first.</caption>
         <thead>
         <tr>
             <th scope="col">Child</th>
+            <th scope="col">Deadline</th>
             <th scope="col">Status</th>
-            <th scope="col">Scheduled</th>
             <th scope="col">Visitor</th>
             <th scope="col">Raised</th>
+            <th scope="col">Action</th>
         </tr>
         </thead>
-        <tbody>
-        <tr th:each="r : ${requests}">
+        <tbody th:each="group : ${dueGroups}">
+        <tr class="group"><th colspan="6" scope="colgroup" th:text="${group.label()}">Group</th></tr>
+        <tr th:each="row : ${group.rows()}" th:with="r=${row.request()}">
             <td><a class="rowlink" th:href="@{/interview-requests/{id}(id=${r.id})}" th:text="${r.child.fullName}">Child Name</a></td>
+            <td>
+                <span th:if="${row.badge()} != null" class="due" th:classappend="${row.badge().cssClass()}" th:text="${row.badge().text()}">Deadline</span>
+                <span th:if="${row.badge()} == null" class="muted">—</span>
+            </td>
             <td><span class="status" th:classappend="${r.status}" th:text="${r.status.displayName}">STATUS</span></td>
-            <td th:text="${r.scheduledAt} != null ? ${#temporals.format(r.scheduledAt, 'dd MMM yyyy HH:mm')} : '—'">Scheduled</td>
             <td th:text="${r.allocatedVisitor} ? ${r.allocatedVisitor.fullName} : '—'">Visitor</td>
             <td th:text="${#temporals.format(r.createdAt, 'dd MMM yyyy HH:mm')}">Created</td>
+            <td>
+                <a class="rowlink" th:if="${row.badge() != null and row.badge().state().name() == 'NO_CLOCK'}"
+                   th:href="@{/requests/{id}/return-time(id=${r.id})}">Add return time</a>
+            </td>
         </tr>
         </tbody>
     </table>
     </div>
 
     <div class="stack">
-        <div class="srow" th:each="r : ${requests}">
+        <th:block th:each="group : ${dueGroups}">
+        <h2 style="font-size:15px;margin:20px 0 10px" th:text="${group.label()}">Group</h2>
+        <div class="srow" th:each="row : ${group.rows()}" th:with="r=${row.request()}">
             <div class="top">
                 <span class="name" th:text="${r.child.fullName}">Child Name</span>
-                <span class="status" th:classappend="${r.status}" th:text="${r.status.displayName}">STATUS</span>
+                <span th:if="${row.badge()} != null" class="due" th:classappend="${row.badge().cssClass()}" th:text="${row.badge().text()}">Deadline</span>
             </div>
+            <span class="status" th:classappend="${r.status}" th:text="${r.status.displayName}">STATUS</span>
             <dl>
                 <dt>Visitor</dt><dd th:text="${r.allocatedVisitor} ? ${r.allocatedVisitor.fullName} : 'Not yet allocated'">Visitor</dd>
                 <dt>Scheduled</dt><dd th:text="${r.scheduledAt} != null ? ${#temporals.format(r.scheduledAt, 'dd MMM yyyy HH:mm')} : 'Not yet scheduled'">Scheduled</dd>
                 <dt>Raised</dt><dd th:text="${#temporals.format(r.createdAt, 'dd MMM yyyy HH:mm')}">Raised</dd>
             </dl>
-            <div class="act"><a class="btn ghost" th:href="@{/interview-requests/{id}(id=${r.id})}">View details</a></div>
+            <div class="act">
+                <a class="btn secondary" th:if="${row.badge() != null and row.badge().state().name() == 'NO_CLOCK'}"
+                   th:href="@{/requests/{id}/return-time(id=${r.id})}">Add return time</a>
+                <a class="btn ghost" th:href="@{/interview-requests/{id}(id=${r.id})}">View details</a>
+            </div>
         </div>
+        </th:block>
     </div>
 
     <div class="empty" th:if="${#lists.isEmpty(requests)}">No requests yet.</div>

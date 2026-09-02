@@ -14,6 +14,7 @@
     --ok: #166534; --ok-bg: #DCFCE7;
     --warn: #92400E; --warn-bg: #FEF3C7;
     --info: #1E40AF; --info-bg: #DBEAFE;
+    --neutral: #374151; --neutral-bg: #EEF2F6;
     /* 4px spacing scale + 5-step type ramp, replacing the old ad-hoc rem values */
     --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px; --s7: 48px;
     --t-xs: 12px; --t-sm: 14px; --t-md: 16px; --t-lg: 20px; --t-xl: 26px;
@@ -272,6 +273,23 @@ fieldset.checkbox-fieldset > legend {
 .status.REPORT_APPROVED { background: var(--ok-bg); color: var(--ok); }
 .status.CANCELLED { background: var(--error-bg); color: #991b1b; }
 .status.warning { background: #FDE7D8; color: #9A3412; margin-left: 0.4rem; }
+
+/* Roadmap 2.1 due-state badges (ninja...interview.DueBadge). Never colour alone - each carries a
+   glyph and duration text too. Colours reuse the semantic families above; no new red. */
+.due {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: var(--t-xs);
+    font-weight: 700;
+    white-space: nowrap;
+}
+.due.overdue { background: var(--error-bg); color: #991B1B; }
+.due.soon { background: var(--warn-bg); color: var(--warn); }
+.due.ontrack { background: var(--ok-bg); color: var(--ok); }
+.due.noclock { background: var(--neutral-bg); color: var(--neutral); }
 
 .error { color: var(--error); background: var(--error-bg); padding: var(--s4); border-radius: 8px; margin-bottom: var(--s4); }
 

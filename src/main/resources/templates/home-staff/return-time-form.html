@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Add Return Time — Return Home Tracker</title>
+    <th:block th:replace="~{fragments/layout :: styles}"></th:block>
+</head>
+<body>
+<div th:replace="~{fragments/layout :: nav}"></div>
+<main id="main">
+    <h1 th:text="${'Add Return Time: ' + request.child.fullName}">Add Return Time</h1>
+    <p class="muted">The 72-hour interview window starts from this time - it can only be set once.</p>
+
+    <div class="card">
+        <form method="post" th:action="@{/requests/{id}/return-time(id=${request.id})}" th:object="${form}">
+            <div class="banner err" role="alert" th:if="${#fields.hasErrors('*')}">
+                <span class="ic" aria-hidden="true">▲</span>
+                <div>
+                    <strong>Before this can be saved</strong>
+                    <ul><li th:if="${#fields.hasErrors('returnedAt')}"><a href="#returnedAt" th:text="${#fields.errors('returnedAt')[0]}">Error</a></li></ul>
+                </div>
+            </div>
+
+            <label for="returnedAt">Date/time child returned <span class="req" aria-hidden="true">*</span></label>
+            <input type="datetime-local" id="returnedAt" th:field="*{returnedAt}" required
+                   th:errorclass="is-invalid" th:aria-invalid="${#fields.hasErrors('returnedAt')}" aria-describedby="returnedAt-error"/>
+            <div th:replace="~{fragments/layout :: fieldError('returnedAt')}"></div>
+
+            <button type="submit" class="btn">Save return time</button>
+            <a class="btn secondary" th:href="@{/interview-requests/{id}(id=${request.id})}">Cancel</a>
+        </form>
+    </div>
+</main>
+</body>
+</html>
