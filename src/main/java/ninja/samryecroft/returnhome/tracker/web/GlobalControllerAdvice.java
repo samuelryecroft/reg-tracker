@@ -7,6 +7,7 @@ import ninja.samryecroft.returnhome.tracker.document.DocumentSecurityException;
 import ninja.samryecroft.returnhome.tracker.document.KeyUnavailableException;
 import ninja.samryecroft.returnhome.tracker.theme.ThemeService;
 import ninja.samryecroft.returnhome.tracker.user.AppUserPrincipal;
+import ninja.samryecroft.returnhome.tracker.user.RoleMatrix;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -28,10 +29,38 @@ public class GlobalControllerAdvice {
 
     private final ThemeService themeService;
     private final AuditEventPublisher auditEventPublisher;
+    private final RoleMatrix roleMatrix;
 
-    public GlobalControllerAdvice(ThemeService themeService, AuditEventPublisher auditEventPublisher) {
+    public GlobalControllerAdvice(ThemeService themeService, AuditEventPublisher auditEventPublisher,
+            RoleMatrix roleMatrix) {
         this.themeService = themeService;
         this.auditEventPublisher = auditEventPublisher;
+        this.roleMatrix = roleMatrix;
+    }
+
+    /**
+     * The role matrix, for every page - so a template asks the same object the endpoint asks
+     * instead of reimplementing the rule in Thymeleaf.
+     *
+     * <p>Mirroring, never replacing: hiding a control is a courtesy to the person using the app, not
+     * an access control. Every action below is still refused server-side by the endpoint that owns
+     * it, and the tests assert the refusal rather than the hiding.
+     *
+     * <p>Cheap enough to expose globally: {@link RoleMatrix} only reads roles and organisation type
+     * off the principal, with no database access, so putting it on every request costs nothing and a
+     * template may safely consult it per row.
+     */
+    @ModelAttribute("can")
+    public Capabilities can(@AuthenticationPrincipal AppUserPrincipal principal) {
+        return new Capabilities(
+                roleMatrix.canCreateOrganisation(principal),
+                roleMatrix.canCreateHome(principal),
+                roleMatrix.canCreateChild(principal),
+                roleMatrix.canCreateUser(principal));
+    }
+
+    /** What the signed-in user may create. Named for how it reads in a template: {@code can.addChild}. */
+    public record Capabilities(boolean addOrganisation, boolean addHome, boolean addChild, boolean addUser) {
     }
 
     @ModelAttribute("theme")

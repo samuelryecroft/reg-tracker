@@ -14,6 +14,7 @@ import ninja.samryecroft.returnhome.tracker.organisation.OrgType;
 import ninja.samryecroft.returnhome.tracker.organisation.OrganisationAccessService;
 import ninja.samryecroft.returnhome.tracker.user.AppUserPrincipal;
 import ninja.samryecroft.returnhome.tracker.user.Role;
+import ninja.samryecroft.returnhome.tracker.user.RoleMatrix;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
@@ -36,16 +37,19 @@ public class ChildController {
     private final OrganisationAccessService organisationAccessService;
     private final AuditHistoryService auditHistoryService;
     private final AuditEventPublisher auditEventPublisher;
+    private final RoleMatrix roleMatrix;
 
     public ChildController(ChildRepository childRepository, HomeRepository homeRepository,
             InterviewRequestRepository interviewRequestRepository, OrganisationAccessService organisationAccessService,
-            AuditHistoryService auditHistoryService, AuditEventPublisher auditEventPublisher) {
+            AuditHistoryService auditHistoryService, AuditEventPublisher auditEventPublisher,
+            RoleMatrix roleMatrix) {
         this.childRepository = childRepository;
         this.homeRepository = homeRepository;
         this.interviewRequestRepository = interviewRequestRepository;
         this.organisationAccessService = organisationAccessService;
         this.auditHistoryService = auditHistoryService;
         this.auditEventPublisher = auditEventPublisher;
+        this.roleMatrix = roleMatrix;
     }
 
     @GetMapping
@@ -55,7 +59,7 @@ public class ChildController {
         if (principal.hasRole(Role.ADMIN)) {
             children = childRepository.findAllWithHome();
             showHomeColumn = true;
-        } else if (isCareProviderOrgAdmin(principal)) {
+        } else if (roleMatrix.isCareProviderOrgAdmin(principal)) {
             children = childRepository.findByHomeOrganisationIdWithHome(principal.getOrganisationId());
             showHomeColumn = true;
         } else if (principal.hasRole(Role.VIEWER)) {
@@ -106,7 +110,7 @@ public class ChildController {
 
     @GetMapping("/new")
     public String newForm(@AuthenticationPrincipal AppUserPrincipal principal, Model model) {
-        if (!canAddChild(principal)) {
+        if (!roleMatrix.canCreateChild(principal)) {
             throw new AccessDeniedException("You do not have permission to add a child");
         }
         model.addAttribute("form", new CreateChildForm());
@@ -121,7 +125,7 @@ public class ChildController {
     @PostMapping
     public String create(@AuthenticationPrincipal AppUserPrincipal principal,
             @Valid @ModelAttribute("form") CreateChildForm form, BindingResult bindingResult, Model model) {
-        if (!canAddChild(principal)) {
+        if (!roleMatrix.canCreateChild(principal)) {
             throw new AccessDeniedException("You do not have permission to add a child");
         }
         List<Home> homeOptions = homePickerOptionsFor(principal);
@@ -164,21 +168,15 @@ public class ChildController {
         return needsHomePicker ? "redirect:/children" : "redirect:/requests/new";
     }
 
-    private boolean isCareProviderOrgAdmin(AppUserPrincipal principal) {
-        return principal.hasRole(Role.ORG_ADMIN) && principal.getOrganisationType() == OrgType.CARE_PROVIDER;
-    }
 
     /** VIEWER is read-only; a Supplier-side ORG_ADMIN has no home to imply and no picker either. */
-    private boolean canAddChild(AppUserPrincipal principal) {
-        return principal.hasRole(Role.ADMIN) || isCareProviderOrgAdmin(principal) || principal.hasRole(Role.HOME_STAFF);
-    }
 
     /** Null means no picker needed - the home is implied (HOME_STAFF's own home). */
     private List<Home> homePickerOptionsFor(AppUserPrincipal principal) {
         if (principal.hasRole(Role.ADMIN)) {
             return homeRepository.findAllWithOrganisation();
         }
-        if (isCareProviderOrgAdmin(principal)) {
+        if (roleMatrix.isCareProviderOrgAdmin(principal)) {
             return homeRepository.findByOrganisationIdWithOrganisation(principal.getOrganisationId());
         }
         // Home staff attached to several homes have to say which one the child belongs to; there is

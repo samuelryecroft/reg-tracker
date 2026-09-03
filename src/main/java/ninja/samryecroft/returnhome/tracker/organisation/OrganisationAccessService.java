@@ -1,6 +1,9 @@
 package ninja.samryecroft.returnhome.tracker.organisation;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import ninja.samryecroft.returnhome.tracker.home.Home;
 import ninja.samryecroft.returnhome.tracker.user.AppUserPrincipal;
 import ninja.samryecroft.returnhome.tracker.user.Role;
@@ -77,5 +80,52 @@ public class OrganisationAccessService {
     /** Every home the principal is attached to; empty for roles that are scoped by organisation. */
     public List<Long> homeIdsFor(AppUserPrincipal principal) {
         return userRepository.findHomeIds(principal.getUserId());
+    }
+
+    /**
+     * The same decision as {@link #canViewHome}, resolved once and then answered from memory - for
+     * filtering a list.
+     *
+     * <p>{@code canViewHome} costs up to two queries per call: the home-attachment lookup, and for
+     * supplier-side roles the care-provider-to-supplier lookup. That is the right shape for a single
+     * check on a single record, and the wrong shape inside a loop, where a page listing fifty rows
+     * pays a hundred round trips. Since T116 made the database the authority on home access rather
+     * than a login-time snapshot, that cost became easy to incur without noticing (Kevin, T117).
+     *
+     * <p>The scope is a snapshot taken when this is called, so use it for one list and let it go;
+     * it is deliberately not a cache with a lifetime.
+     */
+    public HomeScope homeScopeFor(AppUserPrincipal principal) {
+        return new ResolvedHomeScope(principal, Set.copyOf(userRepository.findHomeIds(principal.getUserId())));
+    }
+
+    /** Resolved once, then answered from memory. */
+    private final class ResolvedHomeScope implements HomeScope {
+
+        private final AppUserPrincipal principal;
+        private final Set<Long> directHomeIds;
+        /** Memoised per care-provider org, because a list is usually a handful of organisations. */
+        private final Map<Long, Boolean> organisationDecisions = new HashMap<>();
+
+        private ResolvedHomeScope(AppUserPrincipal principal, Set<Long> directHomeIds) {
+            this.principal = principal;
+            this.directHomeIds = directHomeIds;
+        }
+
+        @Override
+        public boolean canView(Home home) {
+            if (home == null) {
+                return false;
+            }
+            if (directHomeIds.contains(home.getId())) {
+                return true;
+            }
+            Long orgId = home.getOrganisation() == null ? null : home.getOrganisation().getId();
+            if (orgId == null) {
+                return false;
+            }
+            return organisationDecisions.computeIfAbsent(orgId,
+                    id -> canViewCareProviderOrg(principal, id));
+        }
     }
 }

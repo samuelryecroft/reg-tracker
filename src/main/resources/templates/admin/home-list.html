@@ -9,7 +9,7 @@
 <div th:replace="~{fragments/layout :: nav}"></div>
 <main id="main">
     <h1>Homes</h1>
-    <a th:if="${canCreate}" class="btn" href="/admin/homes/new">Add home</a>
+    <a th:if="${can.addHome}" class="btn" href="/admin/homes/new">Add home</a>
 
     <div class="table-wrap responsive">
     <table>
