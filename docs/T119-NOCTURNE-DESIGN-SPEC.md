@@ -396,6 +396,130 @@ offline capability.
 
 ---
 
+## 5c · The nine detail questions — resolved (Creed, 4 Sep)
+
+Seven resolved on evidence, one escalated, one with Oscar.
+
+### R-Q6 · Semantic colour — **my earlier answer was wrong; the set must be theme-aware**
+
+§2.1 said "keep the existing semantic quartet as a separate, non-themeable layer". That is right for light
+mode and **wrong for dark**. The shipped inks are dark inks for a light page. Measured on Nocturne's ground:
+
+| role | ink | on `#161826` | on surface |
+|---|---|---|---|
+| ok | `#166534` | **2.47** | 2.13 |
+| warn | `#92400E` | **2.48** | 2.14 |
+| error | `#B91C1C` | **2.72** | 2.35 |
+| info | `#1E40AF` | **2.02** | 1.74 |
+| sent-back | `#9A3412` | **2.41** | 2.08 |
+
+Unusable as text, and the pale chip fills (`#DCFCE7` etc.) would be near-white blocks on a dark page. So
+semantic colour joins the ramps in being appearance-dependent: **keep the shipped light values exactly as
+they are — they ship, they pass, and `DocxReportGenerator` reads them — and add a dark counterpart.**
+
+Dark set, tuned so a chip sits at Nocturne's *own* elevation step (surface vs bg = 1.16:1), so a tag reads
+as a surface rather than a stain:
+
+| role | ink | ink on bg | chip | ink on chip | chip vs bg |
+|---|---|---|---|---|---|
+| ok | `#7fe9b0` | 11.89 | `#1b3a2a` | 8.42 | 1.41 |
+| warn | `#fbc76b` | 11.30 | `#3d2f14` | 8.35 | 1.35 |
+| error | `#ffa8a8` | 9.57 | `#42201f` | 7.83 | 1.22 |
+| info | `#9ecbff` | 10.43 | `#1b2c50` | 8.17 | 1.28 |
+| sent-back | `#fdc498` | 11.34 | `#3f2716` | 8.94 | 1.27 |
+| neutral | `#c3c7d4` | 10.43 | `#292b31` | 8.38 | 1.24 |
+
+Every ink also clears 8.26–10.26:1 as bare text on `--color-surface`, so a due badge on a card is safe
+without its chip. `neutral`'s chip is literally `--color-neutral-900` — already a system token.
+
+These stay **outside** the branding: an org's hue must never move "overdue".
+
+### R-Q7 · `secondaryColor` retires — and it takes the document's band tint with it
+
+Used in five places: `fragments/layout.html` (→ `--tint`), `admin/theme-form.html` (the picker),
+`ThemeAdminController`, `UpdateThemeForm`, `ThemeSettings`. Under hue-only branding it has no meaning.
+
+**Consequence that must not be missed:** the merged `.docx` uses `TINTFILLTOKEN` **six times** — one per
+section band — and it is fed from `secondaryColor` today. Retiring the field without re-pointing that token
+leaves six section bands unfilled. **`--tint` and the document's `TINTFILLTOKEN` both become
+`--color-accent-100`** (`oklch(0.975 0.02 <hue>)`). `TINTTEXTTOKEN` keeps coming from
+`ThemeService.readableForegroundOn`, which still picks correctly on a near-white tint, so D-01 holds and the
+document needs no layout change — this is a token *source* change, consistent with D-Q5's "no rebuild".
+
+### R-Q8 · Browser baseline — **escalating, but it is far less threatening than I first wrote**
+
+My spec said the browser floor "decides whether the hue-only model survives at all". That was too
+pessimistic, and the counts show why — the two features split cleanly:
+
+| Feature | Where it is actually needed | Count |
+|---|---|---|
+| `color-mix()` | **Nocturne's own component layer** — hovers, pressed states, dividers, muted text | 22 in `styles.css`, ~600 in the canvas |
+| `oklch()` | **only the hue-derived branding** — the DS itself ships flat hex ramps | 0 in `styles.css`, 17 in the canvas script |
+
+So:
+- **`oklch()` is not load-bearing.** If the baseline excludes it, the server computes the nine ramp steps
+  from the hue in Java and injects them as plain hex custom properties. **The one-input branding model
+  survives an old baseline intact** — same design, same single stored hue, no client-side OKLCH.
+- **`color-mix()` is load-bearing.** It is the design system's own interaction layer. If the baseline
+  excludes it, this is not a branding problem, it is a *Nocturne* problem, and every hover, pressed and
+  muted value needs precomputing.
+
+Baselines: `color-mix()` Chrome/Edge 111, Safari 16.2, Firefox 113 (all 2023); `oklch()` Chrome 111,
+Safari 15.4, Firefox 113. `app.css` today uses **neither** (it does use `:has()` once).
+
+**With Oscar to establish the real LA/care-provider estate baseline; to god as a human decision if old
+browsers are genuinely in scope.** Required before phase 5. Recommendation: build with both, and keep the
+server-side ramp computation documented as the fallback path so the branding model is never the thing at
+risk.
+
+### R-Q9 · Appearance — add `auto`, and default new accounts to it
+
+Three states, matching how the tokens are structured anyway: `data-appearance="light|dark|auto"`, with
+`auto` reading `prefers-color-scheme`. **Default `auto`.** Some people set a dark OS theme for photophobia
+or migraine and others set light for astigmatism; honouring the choice the user has already made is the
+accessible default, and it means a new account never lands on the wrong one. The explicit settings then win
+in both directions. Low-risk — say if you want a fixed default instead.
+
+### R-Q10 · Inter, self-hosted — because system-ui breaks the type rule
+
+Nocturne's central type instruction is **headings at weight 500, never heavier**. The Windows system stack
+that LA estates run — Segoe UI — has Regular 400 and Semibold 600 and **no 500**, so every heading either
+drops to 400 or jumps to 600, or the browser synthesises. That is the one rule the system asks us not to
+break. Self-host Inter variable, Latin subset, `woff2`, `font-display: swap`, with
+`system-ui` behind it in the stack. No CDN, no build step.
+
+### R-Q11 · Phosphor — vendor exactly these 55
+
+The canvas uses **55 distinct icons** in two weights (regular and `-fill`). Vendor those, not the family —
+the full set is ~9,000 glyphs. Full list is in §7.
+
+Every icon that is the *only* content of a control needs an accessible name; icons beside a text label take
+`aria-hidden="true"` so they are not announced twice.
+
+### R-Q12 · Cards for cases, tables for aggregates
+
+"No clunky tables" is about the *case lists* — a queue of children is not tabular data, it is a set of
+things to act on. Compliance-by-provider on 2c/6b genuinely is tabular, and Nocturne ships a `.table`.
+**Rule: cards where a row is a case you act on; tables where a row is an aggregate you compare.** Either
+way, any table that hides below the mobile breakpoint **must** render a stacked-card alternative — that
+pairing has silently dropped data on phones twice already.
+
+### R-Q13 · Empty-state copy — drafted, with Oscar
+
+Fourteen empty states across the lists. I have drafted the copy and sent it to Oscar for a product read,
+since it is user-facing wording rather than layout. It follows one shape: **what appears here · why it is
+empty · the action, where there is one.**
+
+### R-Q14 · README vs canvas — the canvas code is authoritative
+
+Three disagreements: the README says the light mirror leaves "hue and chroma unchanged" (the code mirrors
+chroma too); the README implies the whole scheme mirrors (the code excludes `--color-accent`); the dark
+neutral ramp is hex in `styles.css` and OKLCH in the canvas, and the two are not identical values.
+**Specced from the code, because it is what the prototype renders** — and note D-Q1 now overrides the
+accent's light-mode behaviour regardless.
+
+---
+
 ## 5b · Screens that must NOT be built — credential surfaces (Entra / T113)
 
 Skipping 4c is **not sufficient.** A credential flow is hidden inside an administrative screen.
@@ -431,3 +555,26 @@ fixed in the same pass:
   `reviewer/review-form.html`, `export/case-file-form.html`).
 - `error.html` uses the raw HTTP status as its `<h1>` — a user meets "500" as a page title. 6e replaces it.
 - Any `.table-wrap.responsive` without a sibling `.stack` loses its data below 720px. Worth a template test.
+
+
+---
+
+## 7 · Phosphor icons to vendor (55, regular + fill)
+
+```
+ph-archive           ph-arrow-left        ph-arrow-right       ph-arrow-u-up-left   ph-battery-medium
+ph-bell              ph-buildings         ph-calendar-blank    ph-calendar-check    ph-caret-down
+ph-caret-left        ph-caret-right       ph-caret-up-down     ph-cell-signal-medium ph-check-circle
+ph-circle-dashed     ph-clock-countdown   ph-clock-counter-clockwise ph-cloud-check ph-cloud-slash
+ph-compass           ph-dot-outline       ph-download-simple   ph-eye-slash         ph-eyedropper
+ph-file-doc          ph-file-text         ph-funnel            ph-house-line        ph-info
+ph-list              ph-list-numbers      ph-lock-simple       ph-magnifying-glass  ph-microphone
+ph-moon              ph-package           ph-paper-plane-tilt  ph-pencil-simple     ph-plus
+ph-printer           ph-prohibit          ph-quotes            ph-seal-check        ph-sign-out
+ph-squares-four      ph-sun               ph-tray              ph-user-focus        ph-users-three
+ph-warning-circle    ph-wifi-high         ph-wifi-slash        ph-x                 ph-x-circle
+```
+
+`ph-microphone` (dictate), `ph-cloud-slash` / `ph-wifi-slash` / `ph-cell-signal-medium` /
+`ph-battery-medium` (the offline affordances) belong to the **held** A1 scope — vendor them, but do not wire
+them up until A1 is answered.
