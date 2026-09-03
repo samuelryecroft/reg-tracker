@@ -20,7 +20,7 @@
         </select>
         <input type="hidden" name="period" th:value="${period}"/>
         <span class="hint" style="margin:0">Only the providers we serve. Switching re-scopes every figure below.</span>
-        <noscript><button type="submit" class="btn secondary" style="min-height:36px;padding:0 14px">Apply</button></noscript>
+        <noscript><button type="submit" class="btn secondary" style="min-height:44px;padding:0 14px">Apply</button></noscript>
     </form>
 
     <!-- ============ LIVE ZONE ============ -->
@@ -50,7 +50,7 @@
                     <option th:each="opt : ${periodOptions}" th:value="${opt}" th:text="${opt.name() == 'THIS_QUARTER' ? 'This quarter' : (opt.name() == 'LAST_QUARTER' ? 'Last quarter' : 'Last 12 months')}"
                             th:selected="${opt == period}">Period</option>
                 </select>
-                <noscript><button type="submit" class="btn secondary" style="min-height:36px;padding:0 14px">Apply</button></noscript>
+                <noscript><button type="submit" class="btn secondary" style="min-height:44px;padding:0 14px">Apply</button></noscript>
             </form>
         </div>
         <p class="hint" th:text="${'Time basis: ' + view.period().label() + '. The 72-hour outcome below is the only figure on this screen with statutory meaning.'}">Period label</p>
