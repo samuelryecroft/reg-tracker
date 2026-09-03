@@ -34,20 +34,26 @@ set -eu
 : "${DB_NAME:?}"
 : "${ADMIN_LOGIN:?}"
 : "${MIGRATOR_LOGIN:?}"
+# Kevin: guard IDENTITY_HEADER too - if the endpoint is set but the header is empty, the token call
+# 401s and surfaces as the misleading "could not read DB passwords" error instead of a clear cause.
+: "${IDENTITY_HEADER:?IDENTITY_HEADER must be set (Container Apps / App Service inject it with IDENTITY_ENDPOINT)}"
 : "${SQL_DIR:?SQL_DIR must point at the baked-in 01/02 role SQL}"
 : "${FLYWAY_LOCATIONS:?FLYWAY_LOCATIONS must point at the baked-in db/migration files}"
 
 imds() { # $1 = resource -> prints an access token for this job's user-assigned identity
   # Container Apps / App Service expose the MSI token endpoint via $IDENTITY_ENDPOINT +
   # $IDENTITY_HEADER (the "X-IDENTITY-HEADER" protocol) - NOT the VM IMDS 169.254.169.254 address,
-  # which is not reachable here. Prefer the managed endpoint; fall back to IMDS on a VM/VMSS host.
-  if [ -n "${IDENTITY_ENDPOINT:-}" ]; then
-    curl -sf -H "X-IDENTITY-HEADER: ${IDENTITY_HEADER:-}" \
-      "${IDENTITY_ENDPOINT}?api-version=2019-08-01&resource=$1&client_id=${AZURE_CLIENT_ID}" | jq -r '.access_token'
-  else
-    curl -sf -H 'Metadata: true' \
-      "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2019-08-01&resource=$1&client_id=${AZURE_CLIENT_ID}" | jq -r '.access_token'
+  # which is not reachable here. This job runs ONLY in Container Apps, so IDENTITY_ENDPOINT must be
+  # present; fail loud+specific if it isn't, rather than timing out into the misleading "could not
+  # read DB passwords" error (Kevin).
+  if [ -z "${IDENTITY_ENDPOINT:-}" ]; then
+    echo "FATAL: IDENTITY_ENDPOINT is not set. This job must run in Container Apps / App Service" \
+         "(they inject IDENTITY_ENDPOINT + IDENTITY_HEADER for managed identity). The VM IMDS" \
+         "endpoint 169.254.169.254 is unreachable here by design - not a fallback." >&2
+    exit 1
   fi
+  curl -sf -H "X-IDENTITY-HEADER: ${IDENTITY_HEADER}" \
+    "${IDENTITY_ENDPOINT}?api-version=2019-08-01&resource=$1&client_id=${AZURE_CLIENT_ID}" | jq -r '.access_token'
 }
 kv_secret() { # $1 = secret name -> prints the secret value (jq handles JSON escaping correctly)
   _t="$(imds https://vault.azure.net)"
