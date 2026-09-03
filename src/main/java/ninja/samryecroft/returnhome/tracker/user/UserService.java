@@ -91,7 +91,10 @@ public class UserService {
 
         User user = new User();
         user.setUsername(form.getUsername());
-        user.setPassword(passwordEncoder.encode(form.getPassword()));
+        // No password means no local credential, which must stay null rather than becoming the
+        // encoding of an empty string - that would be a real, matchable credential, and anyone
+        // submitting a blank password would authenticate as this account.
+        user.setPassword(form.getPassword() == null ? null : passwordEncoder.encode(form.getPassword()));
         user.setFullName(form.getFullName());
         user.setRoles(form.getRoles());
         user.setHome(form.getRoles().contains(Role.HOME_STAFF) ? resolveHome(form.getHomeId(), principal) : null);

@@ -266,6 +266,37 @@ protection ON with 90-day retention (`DOCUMENT-KEYS.md`). A KEK destroyed there 
 equally unrecoverable — deleting a KEK is destroying records, not tidying up.
 
 
+## Entra sign-in configuration (P2) — provisioned off, and the secret is not ours to set
+
+`entra_enabled` is **false**, so this stack currently creates nothing for Entra and `terraform plan`
+is unchanged by it. Setting it true creates two things and neither of them switches sign-in on:
+
+| | What |
+|---|---|
+| `azurerm_key_vault_secret.entra_client_secret` | the secret **container** named `ENTRA-CLIENT-SECRET` |
+| three app settings | `ENTRA_CLIENT_ID`, `ENTRA_ISSUER_URI`, and `ENTRA_CLIENT_SECRET` as a Key Vault reference |
+
+**The client secret's value is created with a placeholder and Terraform then ignores it forever**
+(`lifecycle { ignore_changes = [value] }`). That is deliberate, not an oversight: the real value is
+displayed exactly once, in the portal, when the human creates the client secret on the app
+registration, so Terraform cannot know it. Without `ignore_changes` every subsequent apply would
+overwrite the real secret with the placeholder and break sign-in — silently, since nothing else
+reads it.
+
+So the order is: apply with `entra_enabled = true`, then **replace the value in Key Vault by hand**,
+and **record the secret's expiry date with a calendar reminder**. An unnoticed client-secret expiry
+is a total sign-in outage with no warning. The target state removes the problem entirely — a
+federated identity credential against the app's managed identity, consistent with WS-E having
+eliminated every other long-lived credential — and that is why this is recorded as the interim
+rather than the design.
+
+**Provisioning this does not enable Entra.** `SPRING_PROFILES_ACTIVE` stays `azure`; the application
+serves form login until the `entra` profile is added, which is a deliberate cutover step gated on
+the go/no-go checklist in `ENTRA-AUTH-DESIGN.md` §8 — the key line being that an ADMIN has actually
+signed in through Entra *before* form login is disabled. The tenant, app registration, redirect
+URIs, sign-up-disabled user flow, SSPR and MFA are all human portal actions (§7(b)); none of them
+can be done from here.
+
 ## Remaining pre-go-live items
 
 - **Deployer credentials / first apply** — no apply has run; the human supplies Azure auth, the
