@@ -72,11 +72,11 @@ public class DashboardService {
         int childCount;
 
         if (principal.hasRole(Role.VIEWER)) {
-            List<Long> homeIds = userRepository.findViewerHomeIds(principal.getUserId());
+            List<Long> homeIds = userRepository.findHomeIds(principal.getUserId());
             homes = homeIds.isEmpty() ? List.of() : homeRepository.findAllById(homeIds);
             requests = homeIds.isEmpty() ? List.of() : interviewRequestRepository.findByHomeIdIn(homeIds);
             reports = homeIds.isEmpty() ? List.of() : interviewReportRepository.findByHomeIdIn(homeIds);
-            childCount = childRepository.findByViewerAccess(principal.getUserId()).size();
+            childCount = homeIds.isEmpty() ? 0 : childRepository.findByHomeIdIn(homeIds).size();
         } else {
             Long orgId = principal.getOrganisationId();
             homes = homeRepository.findByOrganisationIdWithOrganisation(orgId);

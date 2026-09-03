@@ -15,11 +15,9 @@ public class EditUserForm {
     @NotEmpty(message = "Select at least one role")
     private Set<Role> roles = new HashSet<>();
 
-    private Long homeId;
-
     private Long organisationId;
 
-    private Set<Long> viewerHomeIds = new HashSet<>();
+    private Set<Long> homeIds = new HashSet<>();
 
     private boolean enabled;
 
@@ -42,14 +40,6 @@ public class EditUserForm {
         this.roles = roles;
     }
 
-    public Long getHomeId() {
-        return homeId;
-    }
-
-    public void setHomeId(Long homeId) {
-        this.homeId = homeId;
-    }
-
     public Long getOrganisationId() {
         return organisationId;
     }
@@ -58,12 +48,12 @@ public class EditUserForm {
         this.organisationId = organisationId;
     }
 
-    public Set<Long> getViewerHomeIds() {
-        return viewerHomeIds;
+    public Set<Long> getHomeIds() {
+        return homeIds;
     }
 
-    public void setViewerHomeIds(Set<Long> viewerHomeIds) {
-        this.viewerHomeIds = viewerHomeIds;
+    public void setHomeIds(Set<Long> homeIds) {
+        this.homeIds = homeIds;
     }
 
     public boolean isEnabled() {

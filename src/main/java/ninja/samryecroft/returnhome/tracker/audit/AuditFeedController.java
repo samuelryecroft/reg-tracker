@@ -148,7 +148,7 @@ public class AuditFeedController {
             return interviewRequestRepository.findAllDetailed();
         }
         if (principal.hasRole(Role.VIEWER)) {
-            List<Long> homeIds = userRepository.findViewerHomeIds(principal.getUserId());
+            List<Long> homeIds = userRepository.findHomeIds(principal.getUserId());
             return homeIds.isEmpty() ? List.of() : interviewRequestRepository.findByHomeIdIn(homeIds);
         }
         if (principal.hasRole(Role.ORG_ADMIN) && principal.getOrganisationType() == OrgType.CARE_PROVIDER) {
@@ -162,7 +162,7 @@ public class AuditFeedController {
             return homeRepository.findAllWithOrganisation();
         }
         if (principal.hasRole(Role.VIEWER)) {
-            List<Long> homeIds = userRepository.findViewerHomeIds(principal.getUserId());
+            List<Long> homeIds = userRepository.findHomeIds(principal.getUserId());
             return homeIds.isEmpty() ? List.of() : homeRepository.findAllById(homeIds);
         }
         if (principal.hasRole(Role.ORG_ADMIN) && principal.getOrganisationType() == OrgType.CARE_PROVIDER) {

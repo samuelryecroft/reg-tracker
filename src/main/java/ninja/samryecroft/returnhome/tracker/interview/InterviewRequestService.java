@@ -43,8 +43,12 @@ public class InterviewRequestService {
     public NewRequestForm newRequestFormFor(AppUserPrincipal principal) {
         NewRequestForm form = new NewRequestForm();
         form.setSubmitterNameAndRole(principal.getUser().getFullName());
-        if (principal.getHomeId() != null) {
-            homeRepository.findById(principal.getHomeId())
+        // Pre-filled only when there is exactly one home it could mean. Home staff may now hold
+        // several, and guessing which one they are raising this request from would put a wrong
+        // address on a statutory record - blank is better than confidently wrong.
+        List<Long> homeIds = organisationAccessService.homeIdsFor(principal);
+        if (homeIds.size() == 1) {
+            homeRepository.findById(homeIds.get(0))
                     .ifPresent(home -> {
                         form.setSubmitterOrganisation(home.getName());
                         form.setSubmitterAddress(home.getFullAddress());
@@ -54,7 +58,7 @@ public class InterviewRequestService {
     }
 
     public List<InterviewRequest> listForHomeStaff(AppUserPrincipal principal) {
-        return interviewRequestRepository.findByHomeId(principal.getHomeId());
+        return interviewRequestRepository.findByHomeIdIn(organisationAccessService.homeIdsFor(principal));
     }
 
     public List<InterviewRequest> listForVisitor(AppUserPrincipal principal) {
@@ -73,7 +77,7 @@ public class InterviewRequestService {
             return interviewRequestRepository.findAllDetailed();
         }
         if (principal.hasRole(Role.VIEWER)) {
-            List<Long> homeIds = userRepository.findViewerHomeIds(principal.getUserId());
+            List<Long> homeIds = userRepository.findHomeIds(principal.getUserId());
             return homeIds.isEmpty() ? List.of() : interviewRequestRepository.findByHomeIdIn(homeIds);
         }
         if (principal.hasRole(Role.ORG_ADMIN) && principal.getOrganisationType() == OrgType.CARE_PROVIDER) {
@@ -89,7 +93,7 @@ public class InterviewRequestService {
                 .orElseThrow(() -> new IllegalArgumentException("No such interview request: " + id));
 
         boolean allowed = principal.hasRole(Role.ADMIN)
-                || (principal.hasRole(Role.HOME_STAFF) && request.getHome().getId().equals(principal.getHomeId()))
+                || (principal.hasRole(Role.HOME_STAFF) && organisationAccessService.canAccessHome(principal, request.getHome().getId()))
                 || (principal.hasRole(Role.VISITOR) && isAllocatedVisitor(request, principal))
                 || (principal.hasRole(Role.VIEWER) && organisationAccessService.canViewHome(principal, request.getHome()))
                 || ((principal.hasRole(Role.ORG_ADMIN) || principal.hasRole(Role.COORDINATOR) || principal.hasRole(Role.REVIEWER))
@@ -109,8 +113,8 @@ public class InterviewRequestService {
     public InterviewRequest createRequest(NewRequestForm form, AppUserPrincipal principal) {
         Child child = childRepository.findById(form.getChildId())
                 .orElseThrow(() -> new IllegalArgumentException("No such child: " + form.getChildId()));
-        if (!child.getHome().getId().equals(principal.getHomeId())) {
-            throw new AccessDeniedException("Child does not belong to your home");
+        if (!organisationAccessService.canAccessHome(principal, child.getHome().getId())) {
+            throw new AccessDeniedException("Child does not belong to one of your homes");
         }
         User requestedBy = userRepository.findById(principal.getUserId()).orElseThrow();
 

@@ -70,9 +70,10 @@ public class UserAdminController {
         EditUserForm form = new EditUserForm();
         form.setFullName(user.getFullName());
         form.setRoles(new HashSet<>(user.getRoles()));
-        form.setHomeId(user.getHome() != null ? user.getHome().getId() : null);
         form.setOrganisationId(user.getOrganisation() != null ? user.getOrganisation().getId() : null);
-        form.setViewerHomeIds(new HashSet<>(userRepository.findViewerHomeIds(id)));
+        // One Homes field for both roles now - queried rather than read off the detached user,
+        // whose homes are lazy.
+        form.setHomeIds(new HashSet<>(userRepository.findHomeIds(id)));
         form.setEnabled(user.isEnabled());
 
         model.addAttribute("user", user);

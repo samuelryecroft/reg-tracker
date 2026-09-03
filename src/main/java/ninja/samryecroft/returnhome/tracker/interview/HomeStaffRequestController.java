@@ -5,6 +5,7 @@ import java.util.List;
 import ninja.samryecroft.returnhome.tracker.child.Child;
 import ninja.samryecroft.returnhome.tracker.child.ChildRepository;
 import ninja.samryecroft.returnhome.tracker.interview.dto.NewRequestForm;
+import ninja.samryecroft.returnhome.tracker.organisation.OrganisationAccessService;
 import ninja.samryecroft.returnhome.tracker.user.AppUserPrincipal;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
@@ -23,12 +24,15 @@ public class HomeStaffRequestController {
     private final InterviewRequestService interviewRequestService;
     private final ChildRepository childRepository;
     private final DeadlineTrackingService deadlineTrackingService;
+    private final OrganisationAccessService organisationAccessService;
 
     public HomeStaffRequestController(InterviewRequestService interviewRequestService,
-            ChildRepository childRepository, DeadlineTrackingService deadlineTrackingService) {
+            ChildRepository childRepository, DeadlineTrackingService deadlineTrackingService,
+            OrganisationAccessService organisationAccessService) {
         this.interviewRequestService = interviewRequestService;
         this.childRepository = childRepository;
         this.deadlineTrackingService = deadlineTrackingService;
+        this.organisationAccessService = organisationAccessService;
     }
 
     @GetMapping
@@ -42,7 +46,7 @@ public class HomeStaffRequestController {
     @GetMapping("/new")
     public String newForm(@AuthenticationPrincipal AppUserPrincipal principal, Model model) {
         model.addAttribute("form", interviewRequestService.newRequestFormFor(principal));
-        model.addAttribute("children", sortedByName(childRepository.findByHomeId(principal.getHomeId())));
+        model.addAttribute("children", sortedByName(childRepository.findByHomeIdIn(organisationAccessService.homeIdsFor(principal))));
         return "home-staff/request-form";
     }
 
@@ -50,7 +54,7 @@ public class HomeStaffRequestController {
     public String create(@AuthenticationPrincipal AppUserPrincipal principal,
             @Valid @ModelAttribute("form") NewRequestForm form, BindingResult bindingResult, Model model) {
         if (bindingResult.hasErrors()) {
-            model.addAttribute("children", sortedByName(childRepository.findByHomeId(principal.getHomeId())));
+            model.addAttribute("children", sortedByName(childRepository.findByHomeIdIn(organisationAccessService.homeIdsFor(principal))));
             return "home-staff/request-form";
         }
         InterviewRequest request = interviewRequestService.createRequest(form, principal);

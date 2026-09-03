@@ -39,13 +39,6 @@
                 <p class="constraint-note" id="roleConstraintNote" aria-live="polite"></p>
             </fieldset>
 
-            <div id="homeField" th:if="${homes != null}">
-                <label for="homeId">Home</label>
-                <select id="homeId" th:field="*{homeId}">
-                    <option value="">—</option>
-                    <option th:each="h : ${homes}" th:value="${h.id}" th:text="${h.name}">Home</option>
-                </select>
-            </div>
 
             <div id="organisationField" th:if="${organisations != null}">
                 <label for="organisationId">Organisation</label>
@@ -55,11 +48,11 @@
                 </select>
             </div>
 
-            <fieldset class="checkbox-fieldset" id="viewerHomesField" th:if="${homes != null}">
-                <legend>Homes this Viewer can see</legend>
+            <fieldset class="checkbox-fieldset" id="homesField" th:if="${homes != null}">
+                <legend>Homes</legend>
                 <div class="checkbox-group">
                     <label class="checkbox-option" th:each="h : ${homes}">
-                        <input type="checkbox" th:field="*{viewerHomeIds}" th:value="${h.id}"/>
+                        <input type="checkbox" th:field="*{homeIds}" th:value="${h.id}"/>
                         <span th:text="${h.name}">Home</span>
                     </label>
                 </div>

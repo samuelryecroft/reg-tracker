@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.time.LocalDate;
+import java.util.HashSet;
 import java.util.Set;
 import ninja.samryecroft.returnhome.tracker.AbstractIntegrationTest;
 import ninja.samryecroft.returnhome.tracker.child.Child;
@@ -117,7 +118,7 @@ class AuditFeedIntegrationTest extends AbstractIntegrationTest {
         user.setPassword(passwordEncoder.encode(PASSWORD));
         user.setFullName(username);
         user.setRoles(Set.of(role));
-        user.setHome(userHome);
+        user.setHomes(userHome == null ? new HashSet<>() : new HashSet<>(Set.of(userHome)));
         user.setOrganisation(organisation);
         user.setEnabled(true);
         // can_export defaults false (V12 migration) - HOME_STAFF is excluded by ExportCapability's

@@ -26,11 +26,9 @@ public class CreateUserForm {
     @NotEmpty(message = "Select at least one role")
     private Set<Role> roles = new HashSet<>();
 
-    private Long homeId;
-
     private Long organisationId;
 
-    private Set<Long> viewerHomeIds = new HashSet<>();
+    private Set<Long> homeIds = new HashSet<>();
 
     public String getUsername() {
         return username;
@@ -70,14 +68,6 @@ public class CreateUserForm {
         this.roles = roles;
     }
 
-    public Long getHomeId() {
-        return homeId;
-    }
-
-    public void setHomeId(Long homeId) {
-        this.homeId = homeId;
-    }
-
     public Long getOrganisationId() {
         return organisationId;
     }
@@ -86,11 +76,11 @@ public class CreateUserForm {
         this.organisationId = organisationId;
     }
 
-    public Set<Long> getViewerHomeIds() {
-        return viewerHomeIds;
+    public Set<Long> getHomeIds() {
+        return homeIds;
     }
 
-    public void setViewerHomeIds(Set<Long> viewerHomeIds) {
-        this.viewerHomeIds = viewerHomeIds;
+    public void setHomeIds(Set<Long> homeIds) {
+        this.homeIds = homeIds;
     }
 }

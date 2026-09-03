@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.HashSet;
 import java.util.Set;
 import ninja.samryecroft.returnhome.tracker.AbstractIntegrationTest;
 import ninja.samryecroft.returnhome.tracker.child.Child;
@@ -104,7 +105,7 @@ class InterviewRequestRepositoryTest extends AbstractIntegrationTest {
         user.setPassword("irrelevant");
         user.setFullName(username);
         user.setRoles(Set.of(role));
-        user.setHome(home);
+        user.setHomes(home == null ? new HashSet<>() : new HashSet<>(Set.of(home)));
         return user;
     }
 }

@@ -12,6 +12,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashSet;
 import java.util.Set;
 import ninja.samryecroft.returnhome.tracker.audit.AuditEventRepository;
 import ninja.samryecroft.returnhome.tracker.audit.AuditEventType;
@@ -119,7 +120,7 @@ class GoldenPathIntegrationTest extends AbstractIntegrationTest {
         user.setPassword("irrelevant-not-checked-by-with-userDetails");
         user.setFullName(username);
         user.setRoles(Set.of(role));
-        user.setHome(home);
+        user.setHomes(home == null ? new HashSet<>() : new HashSet<>(Set.of(home)));
         user.setOrganisation(organisation);
         user.setEnabled(true);
         return user;

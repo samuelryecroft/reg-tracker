@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.HashSet;
 import java.util.Set;
 import ninja.samryecroft.returnhome.tracker.AbstractIntegrationTest;
 import ninja.samryecroft.returnhome.tracker.child.Child;
@@ -104,7 +105,7 @@ class DashboardIntegrationTest extends AbstractIntegrationTest {
         User homeStaffA1 = userRepository.save(newUser("dash-home-a1" + suffix, Role.HOME_STAFF, homeA1, null, null));
 
         User viewerA1Only = newUser("dash-viewer" + suffix, Role.VIEWER, null, careProviderA, null);
-        viewerA1Only.setViewerHomes(Set.of(homeA1));
+        viewerA1Only.setHomes(new HashSet<>(Set.of(homeA1)));
         userRepository.save(viewerA1Only);
     }
 
@@ -129,11 +130,11 @@ class DashboardIntegrationTest extends AbstractIntegrationTest {
         user.setPassword(passwordEncoder.encode(PASSWORD));
         user.setFullName(username);
         user.setRoles(Set.of(role));
-        user.setHome(home);
+        user.setHomes(home == null ? new HashSet<>() : new HashSet<>(Set.of(home)));
         user.setOrganisation(organisation);
         user.setEnabled(true);
         if (viewerHomes != null) {
-            user.setViewerHomes(viewerHomes);
+            user.setHomes(new HashSet<>(viewerHomes));
         }
         return user;
     }

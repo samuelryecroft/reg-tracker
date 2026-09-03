@@ -59,11 +59,14 @@ public class ChildController {
             children = childRepository.findByHomeOrganisationIdWithHome(principal.getOrganisationId());
             showHomeColumn = true;
         } else if (principal.hasRole(Role.VIEWER)) {
-            children = childRepository.findByViewerAccess(principal.getUserId());
+            children = childRepository.findByHomeIdIn(organisationAccessService.homeIdsFor(principal));
             showHomeColumn = true;
         } else {
-            children = childRepository.findByHomeId(principal.getHomeId());
-            showHomeColumn = false;
+            // Home staff may hold more than one home since V16, so this is the same query the
+            // viewer above runs - and the home column now earns its place whenever it is ambiguous.
+            List<Long> homeIds = organisationAccessService.homeIdsFor(principal);
+            children = childRepository.findByHomeIdIn(homeIds);
+            showHomeColumn = homeIds.size() > 1;
         }
         // Sorted here rather than by the database: the names are encrypted columns now, so an
         // ORDER BY on them would sort ciphertext. Home-grouped lists keep the home order they had.
@@ -137,7 +140,9 @@ public class ChildController {
                 }
             }
         } else {
-            home = homeRepository.findById(principal.getHomeId()).orElseThrow();
+            // Not reachable: homePickerOptionsFor returns a picker for anyone who could land here
+            // with more than one home, so the only remaining case is a single implicit home.
+            home = homeRepository.findById(organisationAccessService.homeIdsFor(principal).get(0)).orElseThrow();
         }
 
         if (bindingResult.hasErrors()) {
@@ -175,6 +180,13 @@ public class ChildController {
         }
         if (isCareProviderOrgAdmin(principal)) {
             return homeRepository.findByOrganisationIdWithOrganisation(principal.getOrganisationId());
+        }
+        // Home staff attached to several homes have to say which one the child belongs to; there is
+        // no defensible way to choose for them, and putting a child in the wrong home would put
+        // them in front of the wrong staff. One home stays implicit, as it was before V16.
+        List<Long> homeIds = organisationAccessService.homeIdsFor(principal);
+        if (homeIds.size() > 1) {
+            return homeRepository.findAllById(homeIds);
         }
         return null;
     }

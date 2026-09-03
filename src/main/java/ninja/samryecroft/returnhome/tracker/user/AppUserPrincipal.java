@@ -38,9 +38,18 @@ public class AppUserPrincipal implements UserDetails {
         return user.hasRole(role);
     }
 
-    public Long getHomeId() {
-        return user.getHome() != null ? user.getHome().getId() : null;
-    }
+    // There is deliberately no getHomeId() any more, and no getHomeIds() either.
+    //
+    // The single-valued accessor was what made the one-home-per-user assumption structural: every
+    // scoping decision that consumed it inherited the assumption without restating it, so widening
+    // the model would have left those paths quietly checking the wrong thing. Removing it forces
+    // each one to be visited (T116).
+    //
+    // The replacement is not a collection on the principal. This object is built from a
+    // session-loaded, detached User whose homes are LAZY, and the entity's own javadoc records why
+    // reading that collection here is a trap. Home access is answered by targeted queries on
+    // OrganisationAccessService, which also keeps the database - not a login-time snapshot - as the
+    // authority on who may see what.
 
     public Long getOrganisationId() {
         return user.getOrganisation() != null ? user.getOrganisation().getId() : null;
