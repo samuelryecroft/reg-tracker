@@ -7,7 +7,7 @@
 # step (WS-E) stages it next to the agent jar at that path and MUST fail loudly if it is absent
 # after deploy (Kevin) - a silent fallback to agent defaults would quietly lose sampling/role config.
 resource "azurerm_service_plan" "this" {
-  name                = "${var.name_prefix}-plan"
+  name                = "asp-${var.name_prefix}"
   resource_group_name = var.resource_group_name
   location            = var.location
   os_type             = "Linux"
@@ -16,7 +16,7 @@ resource "azurerm_service_plan" "this" {
 }
 
 resource "azurerm_linux_web_app" "this" {
-  name                = "${var.name_prefix}-app"
+  name                = "app-${var.name_prefix}-${var.unique_suffix}"
   resource_group_name = var.resource_group_name
   location            = var.location
   service_plan_id     = azurerm_service_plan.this.id
@@ -32,10 +32,16 @@ resource "azurerm_linux_web_app" "this" {
   }
 
   site_config {
-    always_on           = true
-    minimum_tls_version = "1.2"
-    ftps_state          = "Disabled"
-    health_check_path   = var.health_check_path
+    always_on                         = true
+    minimum_tls_version               = "1.2"
+    ftps_state                        = "Disabled"
+    health_check_path                 = var.health_check_path
+    health_check_eviction_time_in_min = 5 # azurerm v4 requires this alongside health_check_path
+
+    # On the VNet path, route ALL outbound through the integration subnet so DB/Blob traffic uses the
+    # private endpoints. In azurerm v4 this is a first-class argument (the old WEBSITE_VNET_ROUTE_ALL
+    # app setting is reserved and rejected in app_settings).
+    vnet_route_all_enabled = var.vnet_integration_subnet_id != null
 
     application_stack {
       java_version        = "21"
@@ -45,29 +51,26 @@ resource "azurerm_linux_web_app" "this" {
   }
 
   # HSTS itself is emitted by the application (Spring Security), not the platform; https_only here
-  # guarantees the redirect that makes HSTS meaningful. On the VNet path, WEBSITE_VNET_ROUTE_ALL=1
-  # forces ALL outbound through the integration subnet so DB/Blob traffic uses the private endpoints.
-  app_settings = merge(
-    {
-      "SPRING_PROFILES_ACTIVE"                 = var.spring_profiles_active
-      "BLOB_ENDPOINT"                          = var.blob_endpoint
-      "KEY_VAULT_URI"                          = var.key_vault_uri
-      "DB_URL"                                 = var.db_url
-      "DB_USERNAME"                            = var.db_username
-      "DB_PASSWORD"                            = "@Microsoft.KeyVault(SecretUri=${var.db_password_secret_uri})"
-      "ADMIN_SEED_PASSWORD"                    = "@Microsoft.KeyVault(SecretUri=${var.admin_seed_password_secret_uri})"
-      "APPLICATIONINSIGHTS_CONNECTION_STRING"  = "@Microsoft.KeyVault(SecretUri=${var.ai_connection_string_secret_uri})"
-      "APPLICATIONINSIGHTS_CONFIGURATION_FILE" = "/home/site/wwwroot/applicationinsights.json"
-      "JAVA_OPTS"                              = "-javaagent:/home/site/wwwroot/applicationinsights-agent.jar"
-    },
-    var.vnet_integration_subnet_id == null ? {} : { "WEBSITE_VNET_ROUTE_ALL" = "1" }
-  )
+  # guarantees the redirect that makes HSTS meaningful. Outbound VNet routing is set via
+  # vnet_route_all_enabled in site_config above (not an app setting).
+  app_settings = {
+    "SPRING_PROFILES_ACTIVE"                 = var.spring_profiles_active
+    "BLOB_ENDPOINT"                          = var.blob_endpoint
+    "KEY_VAULT_URI"                          = var.key_vault_uri
+    "DB_URL"                                 = var.db_url
+    "DB_USERNAME"                            = var.db_username
+    "DB_PASSWORD"                            = "@Microsoft.KeyVault(SecretUri=${var.db_password_secret_uri})"
+    "ADMIN_SEED_PASSWORD"                    = "@Microsoft.KeyVault(SecretUri=${var.admin_seed_password_secret_uri})"
+    "APPLICATIONINSIGHTS_CONNECTION_STRING"  = "@Microsoft.KeyVault(SecretUri=${var.ai_connection_string_secret_uri})"
+    "APPLICATIONINSIGHTS_CONFIGURATION_FILE" = "/home/site/wwwroot/applicationinsights.json"
+    "JAVA_OPTS"                              = "-javaagent:/home/site/wwwroot/applicationinsights-agent.jar"
+  }
 }
 
 # App-Service-scoped go-live alerts (error rate, health probe). Latency (App-Insights-scoped) lives
 # in the observability module. All fan out to the shared action group.
 resource "azurerm_monitor_metric_alert" "http_5xx" {
-  name                = "${var.name_prefix}-http-5xx"
+  name                = "alert-${var.name_prefix}-http-5xx"
   resource_group_name = var.resource_group_name
   scopes              = [azurerm_linux_web_app.this.id]
   description         = "App Service is returning server errors (HTTP 5xx)."
@@ -89,7 +92,7 @@ resource "azurerm_monitor_metric_alert" "http_5xx" {
 }
 
 resource "azurerm_monitor_metric_alert" "health_probe" {
-  name                = "${var.name_prefix}-health-probe-failing"
+  name                = "alert-${var.name_prefix}-health-probe"
   resource_group_name = var.resource_group_name
   scopes              = [azurerm_linux_web_app.this.id]
   description         = "App Service health check is reporting the instance unhealthy."

@@ -5,7 +5,7 @@
 #   - appservice: delegated to Web/serverFarms (App Service regional VNet integration, outbound)
 #   - endpoints : holds the storage blob private endpoint (no delegation)
 resource "azurerm_virtual_network" "this" {
-  name                = "${var.name_prefix}-vnet"
+  name                = "vnet-${var.name_prefix}"
   resource_group_name = var.resource_group_name
   location            = var.location
   address_space       = var.vnet_address_space
@@ -13,7 +13,7 @@ resource "azurerm_virtual_network" "this" {
 }
 
 resource "azurerm_subnet" "postgres" {
-  name                 = "postgres"
+  name                 = "snet-postgres"
   resource_group_name  = var.resource_group_name
   virtual_network_name = azurerm_virtual_network.this.name
   address_prefixes     = [cidrsubnet(var.vnet_address_space[0], 8, 1)]
@@ -28,7 +28,7 @@ resource "azurerm_subnet" "postgres" {
 }
 
 resource "azurerm_subnet" "app" {
-  name                 = "appservice"
+  name                 = "snet-appservice"
   resource_group_name  = var.resource_group_name
   virtual_network_name = azurerm_virtual_network.this.name
   address_prefixes     = [cidrsubnet(var.vnet_address_space[0], 8, 2)]
@@ -43,7 +43,7 @@ resource "azurerm_subnet" "app" {
 }
 
 resource "azurerm_subnet" "endpoints" {
-  name                 = "endpoints"
+  name                 = "snet-endpoints"
   resource_group_name  = var.resource_group_name
   virtual_network_name = azurerm_virtual_network.this.name
   address_prefixes     = [cidrsubnet(var.vnet_address_space[0], 8, 3)]
@@ -57,7 +57,7 @@ resource "azurerm_private_dns_zone" "postgres" {
 }
 
 resource "azurerm_private_dns_zone_virtual_network_link" "postgres" {
-  name                  = "${var.name_prefix}-pg-link"
+  name                  = "vnet-link-${var.name_prefix}-pg"
   resource_group_name   = var.resource_group_name
   private_dns_zone_name = azurerm_private_dns_zone.postgres.name
   virtual_network_id    = azurerm_virtual_network.this.id
@@ -73,7 +73,7 @@ resource "azurerm_private_dns_zone" "blob" {
 }
 
 resource "azurerm_private_dns_zone_virtual_network_link" "blob" {
-  name                  = "${var.name_prefix}-blob-link"
+  name                  = "vnet-link-${var.name_prefix}-blob"
   resource_group_name   = var.resource_group_name
   private_dns_zone_name = azurerm_private_dns_zone.blob.name
   virtual_network_id    = azurerm_virtual_network.this.id

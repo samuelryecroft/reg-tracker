@@ -3,20 +3,20 @@
 # on so an accidental delete/overwrite is recoverable.
 #
 # shared_access_key_enabled = false (Kevin F1): managed-identity auth only; account keys are an
-# unused credential path that would bypass RBAC. Two network postures, selected by whether a private
-# endpoint subnet is passed (enable_vnet):
-#  - PRIVATE (private_endpoint_subnet_id set): public network access OFF + a blob private endpoint;
-#    reachable only from inside the VNet. Consistent with the Postgres VNet path.
-#  - PUBLIC  (null): public network ON, but private container + MI RBAC + ciphertext-only (T33) -
-#    the pre-prod/synthetic path (Kevin B1: the no-VNet path must be reachable).
+# unused credential path that would bypass RBAC. Two network postures, selected by the enable_vnet
+# bool (count/attributes key off it, not the subnet id, which is known-only-after-apply):
+#  - PRIVATE (enable_vnet=true): public network access OFF + a blob private endpoint; reachable only
+#    from inside the VNet. Consistent with the Postgres VNet path.
+#  - PUBLIC  (enable_vnet=false): public network ON, but private container + MI RBAC + ciphertext-only
+#    (T33) - the pre-prod/synthetic path (Kevin B1: the no-VNet path must be reachable).
 resource "azurerm_storage_account" "this" {
-  name                            = "${var.name_prefix}reports"
+  name                            = "sa${var.name_prefix}reports${var.unique_suffix}"
   resource_group_name             = var.resource_group_name
   location                        = var.location
   account_tier                    = "Standard"
   account_replication_type        = "LRS"
   min_tls_version                 = "TLS1_2"
-  public_network_access_enabled   = var.private_endpoint_subnet_id == null
+  public_network_access_enabled   = !var.enable_vnet
   allow_nested_items_to_be_public = false
   shared_access_key_enabled       = false
 
@@ -42,14 +42,14 @@ resource "azurerm_storage_container" "reports" {
 # VNet path only: a blob private endpoint + DNS group so the app resolves the account to a private
 # IP inside the VNet.
 resource "azurerm_private_endpoint" "blob" {
-  count               = var.private_endpoint_subnet_id == null ? 0 : 1
-  name                = "${var.name_prefix}reports-pe"
+  count               = var.enable_vnet ? 1 : 0
+  name                = "pep-${var.name_prefix}-sa-reports"
   resource_group_name = var.resource_group_name
   location            = var.location
   subnet_id           = var.private_endpoint_subnet_id
 
   private_service_connection {
-    name                           = "${var.name_prefix}reports-psc"
+    name                           = "psc-${var.name_prefix}-sa-reports"
     private_connection_resource_id = azurerm_storage_account.this.id
     subresource_names              = ["blob"]
     is_manual_connection           = false

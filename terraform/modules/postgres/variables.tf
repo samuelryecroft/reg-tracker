@@ -2,6 +2,13 @@ variable "name_prefix" { type = string }
 variable "location" { type = string }
 variable "resource_group_name" { type = string }
 variable "administrator_login" { type = string }
+variable "unique_suffix" { type = string } # global-uniqueness suffix for the server name
+# Known-at-plan bool driving count/posture. delegated_subnet_id is known-only-after-apply, so count
+# must key off this instead (Terraform can't evaluate count against an unknown value).
+variable "enable_vnet" {
+  type    = bool
+  default = true
+}
 variable "administrator_password" {
   type      = string
   sensitive = true

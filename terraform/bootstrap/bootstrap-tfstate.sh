@@ -11,8 +11,8 @@ set -euo pipefail
 
 # ---- EDIT THESE (storage account name is GLOBALLY UNIQUE; pick one you control) ----
 LOCATION="uksouth"
-STATE_RG="rht-tfstate-rg"
-STATE_SA="rhttfstatechangeme"   # 3-24 lowercase alphanumeric, globally unique
+STATE_RG="rg-rht-tfstate"
+STATE_SA="sarhttfstatechangeme"   # sa-prefixed; 3-24 lowercase alphanumeric, GLOBALLY UNIQUE
 STATE_CONTAINER="tfstate"
 # ------------------------------------------------------------------------------------
 
