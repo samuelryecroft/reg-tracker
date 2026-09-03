@@ -110,6 +110,22 @@ resource "azurerm_key_vault_secret" "ai_connection_string" {
   key_vault_id = module.keyvault.vault_id
 }
 
+# WS-G least-privilege DB role passwords. Provisioned here (mirroring db_password: sensitive var in,
+# no literal, no state output) so the pre-deploy step reads the migrator password from KV to run the
+# role SQL + Flyway, and the app reads the runtime password as a Key Vault reference. The GRANT SQL
+# that actually creates the roles lives in modules/postgres/sql/ and runs VNet-side (see README).
+resource "azurerm_key_vault_secret" "migrator_db_password" {
+  name         = "MIGRATOR-DB-PASSWORD"
+  value        = var.migrator_db_password
+  key_vault_id = module.keyvault.vault_id
+}
+
+resource "azurerm_key_vault_secret" "runtime_db_password" {
+  name         = "RUNTIME-DB-PASSWORD"
+  value        = var.runtime_db_password
+  key_vault_id = module.keyvault.vault_id
+}
+
 module "app_service" {
   source = "./modules/app_service"
 
@@ -124,12 +140,15 @@ module "app_service" {
   key_vault_uri          = module.keyvault.vault_uri
 
   db_url = "jdbc:postgresql://${module.postgres.fqdn}:5432/${module.postgres.database_name}?sslmode=require"
+  # WS-G: the app connects as the least-privilege RUNTIME role, NOT the server admin. DML-only, no
+  # DDL - Flyway runs pre-deploy as the migrator role (app profile has spring.flyway.enabled=false).
   # Flexible Server uses the BARE login (not the Single-Server 'login@server' form) - the @server
   # form fails auth at boot (Kevin M2).
-  db_username = var.postgres_administrator_login
+  db_username = var.runtime_db_login
 
-  # Key Vault references (versionless, so rotation flows through without a config change).
-  db_password_secret_uri          = azurerm_key_vault_secret.db_password.versionless_id
+  # Key Vault references (versionless, so rotation flows through without a config change). db_password
+  # is the RUNTIME role's password (RUNTIME-DB-PASSWORD), not the admin's.
+  db_password_secret_uri          = azurerm_key_vault_secret.runtime_db_password.versionless_id
   admin_seed_password_secret_uri  = azurerm_key_vault_secret.admin_seed_password.versionless_id
   ai_connection_string_secret_uri = azurerm_key_vault_secret.ai_connection_string.versionless_id
 

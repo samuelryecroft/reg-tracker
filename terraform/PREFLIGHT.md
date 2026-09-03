@@ -34,6 +34,10 @@ ticked this stays **plan-only** — no apply has been run and no Azure spend has
 - [ ] `postgres_administrator_password` — a strong generated value (production: sourced from Key
       Vault / `random_password`, never committed).
 - [ ] `admin_seed_password` — set once, **rotated after first boot** (runbook).
+- [ ] `migrator_db_password` / `runtime_db_password` (WS-G) — strong generated values, one per DB
+      role, stored as the `MIGRATOR-DB-PASSWORD` / `RUNTIME-DB-PASSWORD` Key Vault secrets. The
+      pre-deploy step reads the migrator one to create the roles + run Flyway; the app reads the
+      runtime one as a KV reference. Logins default to `rht_migrator` / `rht_app`.
 - [ ] `alert_email` — a **real** monitored recipient. Validation rejects malformed values, but a
       well-formed placeholder (e.g. `oncall@example.org`) would still pass — you must supply a
       mailbox someone actually watches, or every alert fires into a void (defeats B3 / the

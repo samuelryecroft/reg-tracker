@@ -25,7 +25,9 @@ terraform/
   terraform.tfvars.example copy to terraform.tfvars (git-ignored); placeholders only
   modules/
     postgres/              Flexible Server B1ms, UK South, PITR (35d), DB; VNet-injected + private
-                           (default) or public + Azure-services firewall (pre-prod)
+                           (default) or public + Azure-services firewall (pre-prod).
+                           sql/  versioned idempotent role/grant SQL (migrator + runtime roles),
+                                 run VNet-side by the pre-deploy step (WS-G) - see below
     app_service/           Linux B1, Java 21 jar, system-assigned MI, health check, HTTPS/TLS1.2,
                            app settings (incl. the WS-B fail-fast boot vars), VNet integration,
                            + 5xx/health alerts
@@ -142,6 +144,56 @@ private DNS zones); Postgres VNet injection itself is no extra charge. **Confirm
 App Service regional VNet integration on **B1 (Basic)** — current Azure docs list Basic as
 supported; if the target subscription/region enforces Standard+, that is a tier decision
 (~£10 → ~£55/mo) — see `PREFLIGHT.md`.
+
+## Least-privilege DB roles + migration run strategy (WS-G)
+
+The app must not connect as the Postgres server admin, and migrations must not race a slot-swap.
+WS-G splits the database identity three ways and moves migrations out of app startup.
+
+### The three DB identities
+
+| Identity | Who | Privileges | Password |
+|---|---|---|---|
+| **server admin** (`postgres_administrator_login`) | pre-deploy bootstrap only | full; creates the two roles below | `DB-PASSWORD` KV secret |
+| **migrator** (`rht_migrator`) | Flyway, pre-deploy | `USAGE, CREATE` on schema `public` → CREATE table/index/**plpgsql function**/**trigger** (V11); **owns** the objects it creates, so trigger + FK-`REFERENCES` rights come with ownership. **No runtime use.** | `MIGRATOR-DB-PASSWORD` KV secret |
+| **runtime** (`rht_app`) | the application | `USAGE` on `public` but **no `CREATE`** (cannot DDL); `SELECT, INSERT, UPDATE, DELETE` on tables + `USAGE, SELECT` on sequences; **INSERT/SELECT-only on `audit_events`** (`UPDATE`/`DELETE` revoked — the V11 trigger blocks them too, this is defense in depth) | `RUNTIME-DB-PASSWORD` KV secret |
+
+All three passwords are Key Vault secrets provisioned by this config (sensitive vars in, **no
+literal, no state output** — same model as `db_password`). Terraform wires the app to
+`rht_app` + `RUNTIME-DB-PASSWORD`; the admin/migrator passwords are read from KV by the pre-deploy
+step. The **GRANT logic itself lives as versioned SQL**, not in Terraform, in
+`modules/postgres/sql/` — because the prod/private Postgres is `public_network_access_enabled=false`
+and so unreachable from a hosted `terraform apply`; the roles must be created **from inside the
+VNet**, the same place Flyway runs. Keeping the grants as reviewable idempotent SQL next to the
+migration run is the honest model and avoids coupling a second Terraform provider to DB reachability.
+
+### Migration RUN strategy (staging/prod)
+
+Flyway runs as a **pre-deploy pipeline step, NOT on app startup** (`spring.flyway.enabled=false` in
+`application-azure.properties`; `ddl-auto=validate` stays — the schema is checked, never mutated, at
+boot). This means a slot-swap or scale-out never has two instances racing to migrate, and the app —
+which connects as the DDL-less `rht_app` role — could not migrate even if asked. Migrations must be
+**backward-compatible (expand/contract)** so the currently-running jar keeps working against the
+new schema and **rollback-by-swap stays safe**.
+
+**Ordering** (the pre-deploy step, VNet-side; pipeline YAML is WS-E):
+
+1. `modules/postgres/sql/01-roles-and-grants.sql` — as **admin**. Creates/updates both roles
+   (idempotent; passwords injected via `psql -v` from KV, never literals) + baseline & default
+   grants.
+2. **Flyway migrate** — as **`rht_migrator`**. Applies `V1..Vn`; `ALTER DEFAULT PRIVILEGES` from
+   step 1 means each new table is automatically DML-granted to `rht_app`.
+3. `modules/postgres/sql/02-audit-events-hardening.sql` — as **admin**. Backstops DML grants for any
+   pre-existing tables, then **revokes `UPDATE`/`DELETE` on `audit_events`** from `rht_app`. This is
+   a separate post-migrate file because `audit_events` does not exist until V11 runs — it cannot be
+   granted in step 1.
+4. **jar swap** — the app comes up as `rht_app`, `ddl-auto=validate` confirms the schema.
+
+**Fresh vs existing DB:** the model assumes Flyway runs as `rht_migrator` so the migrator owns the
+schema objects (and can add V11's FK `REFERENCES` to `users`/`organisations`/`homes`). On a DB whose
+earlier tables were created by the admin, do a **one-time ownership handover**
+(`REASSIGN OWNED BY <admin> TO rht_migrator`, or `ALTER TABLE … OWNER TO rht_migrator`) before the
+first migrator-run migration.
 
 ## Remaining pre-go-live items
 
