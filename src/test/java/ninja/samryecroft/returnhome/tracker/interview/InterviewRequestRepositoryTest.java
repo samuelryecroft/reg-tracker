@@ -10,8 +10,6 @@ import ninja.samryecroft.returnhome.tracker.child.ChildRepository;
 import ninja.samryecroft.returnhome.tracker.home.Home;
 import ninja.samryecroft.returnhome.tracker.home.HomeRepository;
 import ninja.samryecroft.returnhome.tracker.organisation.Organisation;
-import ninja.samryecroft.returnhome.tracker.organisation.OrganisationRepository;
-import ninja.samryecroft.returnhome.tracker.organisation.OrgType;
 import ninja.samryecroft.returnhome.tracker.user.Role;
 import ninja.samryecroft.returnhome.tracker.user.User;
 import ninja.samryecroft.returnhome.tracker.user.UserRepository;
@@ -38,12 +36,10 @@ class InterviewRequestRepositoryTest extends AbstractIntegrationTest {
     private ChildRepository childRepository;
     @Autowired
     private UserRepository userRepository;
-    @Autowired
-    private OrganisationRepository organisationRepository;
 
     @Test
     void scopesRequestsByHomeAndByAllocatedVisitor() {
-        Organisation careProviderOrg = organisationRepository.findByTypeOrderByName(OrgType.CARE_PROVIDER).get(0);
+        Organisation careProviderOrg = seededCareProvider();
         Home homeA = homeRepository.save(newHome("Home A", careProviderOrg));
         Home homeB = homeRepository.save(newHome("Home B", careProviderOrg));
 

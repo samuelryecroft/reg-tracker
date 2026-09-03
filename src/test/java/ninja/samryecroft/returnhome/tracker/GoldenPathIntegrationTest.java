@@ -22,8 +22,6 @@ import ninja.samryecroft.returnhome.tracker.home.HomeRepository;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewRequestRepository;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewStatus;
 import ninja.samryecroft.returnhome.tracker.organisation.Organisation;
-import ninja.samryecroft.returnhome.tracker.organisation.OrganisationRepository;
-import ninja.samryecroft.returnhome.tracker.organisation.OrgType;
 import ninja.samryecroft.returnhome.tracker.report.InterviewReportRepository;
 import ninja.samryecroft.returnhome.tracker.user.Role;
 import ninja.samryecroft.returnhome.tracker.user.User;
@@ -69,8 +67,6 @@ class GoldenPathIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private InterviewReportRepository interviewReportRepository;
     @Autowired
-    private OrganisationRepository organisationRepository;
-    @Autowired
     private AppUserDetailsService appUserDetailsService;
     @Autowired
     private AuditEventRepository auditEventRepository;
@@ -93,8 +89,8 @@ class GoldenPathIntegrationTest extends AbstractIntegrationTest {
     @BeforeEach
     void seedData() {
         // V5__add_organisations.sql seeds exactly one Supplier and one Care Provider org, linked.
-        Organisation supplierOrg = organisationRepository.findByTypeOrderByName(OrgType.SUPPLIER).get(0);
-        Organisation careProviderOrg = organisationRepository.findByTypeOrderByName(OrgType.CARE_PROVIDER).get(0);
+        Organisation supplierOrg = seededSupplier();
+        Organisation careProviderOrg = seededCareProvider();
 
         careProviderOrgId = careProviderOrg.getId();
 

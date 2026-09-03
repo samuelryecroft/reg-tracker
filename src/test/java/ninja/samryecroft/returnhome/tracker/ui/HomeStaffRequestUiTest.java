@@ -9,8 +9,6 @@ import ninja.samryecroft.returnhome.tracker.child.ChildRepository;
 import ninja.samryecroft.returnhome.tracker.home.Home;
 import ninja.samryecroft.returnhome.tracker.home.HomeRepository;
 import ninja.samryecroft.returnhome.tracker.organisation.Organisation;
-import ninja.samryecroft.returnhome.tracker.organisation.OrganisationRepository;
-import ninja.samryecroft.returnhome.tracker.organisation.OrgType;
 import ninja.samryecroft.returnhome.tracker.user.Role;
 import ninja.samryecroft.returnhome.tracker.user.User;
 import ninja.samryecroft.returnhome.tracker.user.UserRepository;
@@ -31,12 +29,10 @@ class HomeStaffRequestUiTest extends AbstractUiTest {
     private UserRepository userRepository;
     @Autowired
     private PasswordEncoder passwordEncoder;
-    @Autowired
-    private OrganisationRepository organisationRepository;
 
     @BeforeEach
     void seedData() {
-        Organisation careProviderOrg = organisationRepository.findByTypeOrderByName(OrgType.CARE_PROVIDER).get(0);
+        Organisation careProviderOrg = seededCareProvider();
         Home home = new Home();
         home.setName("UI Test House");
         home.setOrganisation(careProviderOrg);

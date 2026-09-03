@@ -17,9 +17,7 @@ import ninja.samryecroft.returnhome.tracker.home.Home;
 import ninja.samryecroft.returnhome.tracker.home.HomeRepository;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewRequestRepository;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewStatus;
-import ninja.samryecroft.returnhome.tracker.organisation.OrgType;
 import ninja.samryecroft.returnhome.tracker.organisation.Organisation;
-import ninja.samryecroft.returnhome.tracker.organisation.OrganisationRepository;
 import ninja.samryecroft.returnhome.tracker.user.AppUserDetailsService;
 import ninja.samryecroft.returnhome.tracker.user.Role;
 import ninja.samryecroft.returnhome.tracker.user.User;
@@ -78,8 +76,6 @@ class ReviewerReadOnlyIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private InterviewReportRepository interviewReportRepository;
     @Autowired
-    private OrganisationRepository organisationRepository;
-    @Autowired
     private AppUserDetailsService appUserDetailsService;
 
     private Long childId;
@@ -95,8 +91,8 @@ class ReviewerReadOnlyIntegrationTest extends AbstractIntegrationTest {
     @BeforeEach
     void seedData() {
         suffix = "-" + System.nanoTime();
-        Organisation supplierOrg = organisationRepository.findByTypeOrderByName(OrgType.SUPPLIER).get(0);
-        Organisation careProviderOrg = organisationRepository.findByTypeOrderByName(OrgType.CARE_PROVIDER).get(0);
+        Organisation supplierOrg = seededSupplier();
+        Organisation careProviderOrg = seededCareProvider();
 
         Home home = new Home();
         home.setName("Readonly House" + suffix);

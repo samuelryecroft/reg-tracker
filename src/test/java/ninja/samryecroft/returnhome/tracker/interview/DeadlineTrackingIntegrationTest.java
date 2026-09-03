@@ -16,8 +16,6 @@ import ninja.samryecroft.returnhome.tracker.child.ChildRepository;
 import ninja.samryecroft.returnhome.tracker.home.Home;
 import ninja.samryecroft.returnhome.tracker.home.HomeRepository;
 import ninja.samryecroft.returnhome.tracker.organisation.Organisation;
-import ninja.samryecroft.returnhome.tracker.organisation.OrganisationRepository;
-import ninja.samryecroft.returnhome.tracker.organisation.OrgType;
 import ninja.samryecroft.returnhome.tracker.user.AppUserDetailsService;
 import ninja.samryecroft.returnhome.tracker.user.Role;
 import ninja.samryecroft.returnhome.tracker.user.User;
@@ -56,8 +54,6 @@ class DeadlineTrackingIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private UserRepository userRepository;
     @Autowired
-    private OrganisationRepository organisationRepository;
-    @Autowired
     private InterviewRequestRepository interviewRequestRepository;
     @Autowired
     private AppUserDetailsService appUserDetailsService;
@@ -79,8 +75,8 @@ class DeadlineTrackingIntegrationTest extends AbstractIntegrationTest {
     @BeforeEach
     void seedData() {
         suffix = "-" + System.nanoTime();
-        careProviderOrg = organisationRepository.findByTypeOrderByName(OrgType.CARE_PROVIDER).get(0);
-        Organisation supplierOrg = organisationRepository.findByTypeOrderByName(OrgType.SUPPLIER).get(0);
+        careProviderOrg = seededCareProvider();
+        Organisation supplierOrg = seededSupplier();
 
         home = saveHome("Deadline House" + suffix);
         otherHome = saveHome("Other Deadline House" + suffix);
