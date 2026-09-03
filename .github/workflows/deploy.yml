@@ -12,10 +12,22 @@ name: Deploy
 # Both created out of band by bootstrap-deployer-identity.sh; client ids + config come from the
 # Environment vars/secrets that script + PREFLIGHT set up.
 
+# GATED (T122): the push-to-main trigger is intentionally DISABLED until the deploy is actually
+# enabled. This workflow authenticates to Azure via OIDC user-assigned identities (rht-ci-plan /
+# rht-cd-prod) gated by the 'plan' and 'prod' GitHub Environments, plus their vars/secrets
+# (PLAN_CLIENT_ID, CD_CLIENT_ID, AZURE_TENANT_ID, TF_STATE_*, the four TF_VAR_* password secrets, ...).
+# None of that has been provisioned yet (bootstrap-deployer-identity.sh still has the T100 ordering
+# deadlock; go-live was a MANUAL deploy), so on every push to main the very first step - "Azure login
+# (rht-ci-plan, OIDC)" - fails and the run goes red for a deploy that never actually runs. That is
+# pure noise, so the auto-fire is off: the pipeline runs ONLY on-demand via workflow_dispatch.
+# TO RE-ENABLE once enablement (T122 scope / T110) is real: restore the `push:` block below AND make
+# sure the Environments + OIDC identities + vars/secrets exist first (see the scope note in the T122
+# report). This does NOT fake success and does NOT delete the pipeline - it just stops it firing
+# before the identities it needs exist.
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
+  # push:
+  #   branches: [main]   # <- re-enable ONLY after the OIDC identities + Environments + secrets exist.
 
 # Minimal at workflow level; each job re-declares its own (5.3). NO id-token here.
 permissions:
