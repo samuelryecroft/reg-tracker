@@ -82,6 +82,24 @@ variable "enable_vnet" {
   default     = true
 }
 
+variable "monthly_budget_amount" {
+  description = "T114 monthly Cost Management budget, in the subscription's BILLING CURRENCY (GBP for this sub). Default 30 = £30/mo, matching the rht estate estimate."
+  type        = number
+  default     = 30
+}
+
+variable "budget_alert_email" {
+  description = "Recipient for the T114 budget notifications (actual 50/90/100% + forecast 100%)."
+  type        = string
+  default     = "justsam33@gmail.com"
+}
+
+variable "budget_start_date" {
+  description = "First-of-month UTC start for the monthly budget (RFC3339). Must be the first of a month."
+  type        = string
+  default     = "2026-09-01T00:00:00Z"
+}
+
 variable "tags" {
   description = "Common tags applied to all resources."
   type        = map(string)
