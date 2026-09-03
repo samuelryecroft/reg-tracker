@@ -110,6 +110,61 @@ class DocxReportGeneratorTest {
     }
 
     @Test
+    void everyRowSpansTheFullFixedGridAndEveryStackedAnswerHoldsTheSameMeasure(@TempDir Path tempDir)
+            throws Exception {
+        // T98. This is the whole redesign in one assertion, and Creed asked for it as a permanent
+        // check rather than a one-off: the 45mm/125mm grid only holds if EVERY table and EVERY row
+        // adds up to the content width, and the answer measure is only "one measure everywhere" if
+        // every stacked answer is inset by exactly one label column. Both would rot silently the
+        // first time someone hand-edits a row into the template.
+        String xml = partOf(generateWithBrand(tempDir, "grid.docx", "F36E2A", "FFF0DD"),
+                "word/document.xml");
+
+        int tables = 0;
+        for (String table : xml.split("<w:tbl>")) {
+            if (!table.contains("<w:tblGrid>")) {
+                continue; // the text before the first table
+            }
+            tables++;
+            assertThat(sumOf("<w:gridCol w:w=\"(\\d+)\"", table))
+                    .as("table %d columns span the 170mm content width", tables)
+                    .isEqualTo(CONTENT_WIDTH_TWIPS);
+            int rows = 0;
+            for (String row : table.split("<w:tr>")) {
+                if (!row.contains("<w:tcW ")) {
+                    continue;
+                }
+                rows++;
+                assertThat(sumOf("<w:tcW w:w=\"(\\d+)\"", row))
+                        .as("table %d row %d spans the full grid", tables, rows)
+                        .isEqualTo(CONTENT_WIDTH_TWIPS);
+            }
+            assertThat(rows).as("table %d has rows", tables).isPositive();
+        }
+        // Six section tables, the head block and the signature block.
+        assertThat(tables).isEqualTo(8);
+
+        // A stacked answer is a full-width cell inset on the right by exactly one label column, so
+        // it reads at 125mm - identical to an inline answer in the 2551/7087 pair.
+        int stackedAnswers = xml.split("<w:tcMar><w:right w:w=\"2551\" w:type=\"dxa\"/></w:tcMar>", -1)
+                .length - 1;
+        assertThat(stackedAnswers)
+                .as("every stacked answer is inset by exactly one label column")
+                .isEqualTo(22);
+    }
+
+    private static final int CONTENT_WIDTH_TWIPS = 9638;
+
+    private int sumOf(String pattern, String xml) {
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile(pattern).matcher(xml);
+        int total = 0;
+        while (m.find()) {
+            total += Integer.parseInt(m.group(1));
+        }
+        return total;
+    }
+
+    @Test
     void documentPropertiesAreSet(@TempDir Path tempDir) throws Exception {
         Path docx = generateWithBrand(tempDir, "props.docx", "F36E2A", "FFF0DD");
         try (XWPFDocument document = new XWPFDocument(java.nio.file.Files.newInputStream(docx))) {
