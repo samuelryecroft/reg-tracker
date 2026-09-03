@@ -336,8 +336,40 @@ public class ReportService {
         values.put("dateReportShared", report.getDateReportShared() == null
                 ? "Not yet shared" : report.getDateReportShared().format(DATE_FMT));
 
+        // T98 head block. When the interview happened, and whether that met the 72 hours - the one
+        // fact in this document with statutory meaning, stated up front rather than eight rows into
+        // the first table. If it was not met, the reason belongs in the same breath as the "No".
+        // The template cannot branch, so the sentence is composed here.
+        values.put("interviewHeldLine", interviewHeldLine(report));
+
+        // T98 / D-02. A statutory record signed by one person for a two-person process misstates
+        // how it was produced. Generation only ever happens from approve(), which sets both of
+        // these before calling us, but neither is required by the schema - so neither is assumed.
+        values.put("approverName", report.getReviewedBy() == null
+                ? NOT_RECORDED : report.getReviewedBy().getFullName());
+        values.put("approverSignedLine", report.getReviewedBy() == null || report.getReviewedAt() == null
+                ? NOT_RECORDED
+                : "Approved electronically by " + report.getReviewedBy().getFullName()
+                        + " on " + report.getReviewedAt().format(DATETIME_FMT));
+
         values.put("generatedAt", LocalDateTime.now().format(DATETIME_FMT));
         return values;
+    }
+
+    /** The head block's "Interview held" line: when it happened and whether that met the 72 hours. */
+    private String interviewHeldLine(InterviewReport report) {
+        String date = report.getInterviewDate() == null
+                ? NOT_RECORDED : report.getInterviewDate().format(DATE_FMT);
+        Boolean within = report.getWithin72Hours();
+        if (within == null) {
+            return date + " - 72-hour outcome not recorded";
+        }
+        if (within) {
+            return date + " - within 72 hours of return";
+        }
+        String reason = report.getIfNotWhyLate();
+        return date + " - NOT within 72 hours of return"
+                + ((reason == null || reason.isBlank()) ? ", no reason recorded" : ": " + reason);
     }
 
     private String yesNo(Boolean value) {

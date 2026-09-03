@@ -56,9 +56,17 @@ class DocxReportGeneratorTest {
                 "word/document.xml");
         assertThat(darkAccent).contains("<w:color w:val=\"FFFFFF\"/>");
 
-        // The 34 white value-cell FILLS are a different thing entirely and must survive both.
-        assertThat(paleAccent.split("w:fill=\"FFFFFF\"", -1).length - 1).isEqualTo(34);
-        assertThat(darkAccent.split("w:fill=\"FFFFFF\"", -1).length - 1).isEqualTo(34);
+        // The cell FILLS the contrast rule applies to are a different thing entirely and must
+        // survive both. T98 D-3 removed the two-tone stripe - 34 tinted label cells against 34
+        // explicitly white value cells - so the tint now appears exactly six times, once per
+        // section band, and that band is what the colour above is chosen to be readable on.
+        assertThat(paleAccent.split("w:fill=\"FFF0DD\"", -1).length - 1)
+                .as("one tinted section band per section, and nothing else filled")
+                .isEqualTo(6);
+        assertThat(darkAccent.split("w:fill=\"1D4ED8\"", -1).length - 1).isEqualTo(6);
+        // The striped grid itself is gone, in both directions.
+        assertThat(paleAccent).doesNotContain("w:fill=\"FFFFFF\"");
+        assertThat(darkAccent).doesNotContain("w:fill=\"FFFFFF\"");
     }
 
     @Test
@@ -93,8 +101,67 @@ class DocxReportGeneratorTest {
         assertThat(footer).contains("Alex Smith").contains("CR-42");
         assertThat(footer).doesNotContain("${");
 
-        // D-06: an explicit font rather than whatever Word defaults to.
-        assertThat(styles).contains("w:ascii=\"Calibri\"");
+        // D-06 / T98 Q-1: an explicit font rather than whatever Word defaults to - now Aptos,
+        // with Calibri named as its fallback in the font table rather than embedded, because the
+        // file is exported and emailed and has to render on someone else's machine.
+        assertThat(styles).contains("w:ascii=\"Aptos\"");
+        String fontTable = partOf(docx, "word/fontTable.xml");
+        assertThat(fontTable).contains("w:name=\"Aptos\"").contains("<w:altName w:val=\"Calibri\"/>");
+    }
+
+    @Test
+    void everyRowSpansTheFullFixedGridAndEveryStackedAnswerHoldsTheSameMeasure(@TempDir Path tempDir)
+            throws Exception {
+        // T98. This is the whole redesign in one assertion, and Creed asked for it as a permanent
+        // check rather than a one-off: the 45mm/125mm grid only holds if EVERY table and EVERY row
+        // adds up to the content width, and the answer measure is only "one measure everywhere" if
+        // every stacked answer is inset by exactly one label column. Both would rot silently the
+        // first time someone hand-edits a row into the template.
+        String xml = partOf(generateWithBrand(tempDir, "grid.docx", "F36E2A", "FFF0DD"),
+                "word/document.xml");
+
+        int tables = 0;
+        for (String table : xml.split("<w:tbl>")) {
+            if (!table.contains("<w:tblGrid>")) {
+                continue; // the text before the first table
+            }
+            tables++;
+            assertThat(sumOf("<w:gridCol w:w=\"(\\d+)\"", table))
+                    .as("table %d columns span the 170mm content width", tables)
+                    .isEqualTo(CONTENT_WIDTH_TWIPS);
+            int rows = 0;
+            for (String row : table.split("<w:tr>")) {
+                if (!row.contains("<w:tcW ")) {
+                    continue;
+                }
+                rows++;
+                assertThat(sumOf("<w:tcW w:w=\"(\\d+)\"", row))
+                        .as("table %d row %d spans the full grid", tables, rows)
+                        .isEqualTo(CONTENT_WIDTH_TWIPS);
+            }
+            assertThat(rows).as("table %d has rows", tables).isPositive();
+        }
+        // Six section tables, the head block and the signature block.
+        assertThat(tables).isEqualTo(8);
+
+        // A stacked answer is a full-width cell inset on the right by exactly one label column, so
+        // it reads at 125mm - identical to an inline answer in the 2551/7087 pair.
+        int stackedAnswers = xml.split("<w:tcMar><w:right w:w=\"2551\" w:type=\"dxa\"/></w:tcMar>", -1)
+                .length - 1;
+        assertThat(stackedAnswers)
+                .as("every stacked answer is inset by exactly one label column")
+                .isEqualTo(22);
+    }
+
+    private static final int CONTENT_WIDTH_TWIPS = 9638;
+
+    private int sumOf(String pattern, String xml) {
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile(pattern).matcher(xml);
+        int total = 0;
+        while (m.find()) {
+            total += Integer.parseInt(m.group(1));
+        }
+        return total;
     }
 
     @Test
