@@ -10,7 +10,7 @@
 #  - PUBLIC  (null): public network ON, but private container + MI RBAC + ciphertext-only (T33) -
 #    the pre-prod/synthetic path (Kevin B1: the no-VNet path must be reachable).
 resource "azurerm_storage_account" "this" {
-  name                            = "${var.name_prefix}reports"
+  name                            = "sa${var.name_prefix}reports${var.unique_suffix}"
   resource_group_name             = var.resource_group_name
   location                        = var.location
   account_tier                    = "Standard"
@@ -43,13 +43,13 @@ resource "azurerm_storage_container" "reports" {
 # IP inside the VNet.
 resource "azurerm_private_endpoint" "blob" {
   count               = var.private_endpoint_subnet_id == null ? 0 : 1
-  name                = "${var.name_prefix}reports-pe"
+  name                = "pep-${var.name_prefix}-sa-reports"
   resource_group_name = var.resource_group_name
   location            = var.location
   subnet_id           = var.private_endpoint_subnet_id
 
   private_service_connection {
-    name                           = "${var.name_prefix}reports-psc"
+    name                           = "psc-${var.name_prefix}-sa-reports"
     private_connection_resource_id = azurerm_storage_account.this.id
     subresource_names              = ["blob"]
     is_manual_connection           = false

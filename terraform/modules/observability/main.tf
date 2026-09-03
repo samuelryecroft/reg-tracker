@@ -3,7 +3,7 @@
 # The App-Service-scoped alerts (5xx, health probe) live in the app_service module to avoid a
 # module dependency cycle. Full R5 (audit stream -> Log Analytics) is the Phase-7 fast-follow.
 resource "azurerm_log_analytics_workspace" "this" {
-  name                = "${var.name_prefix}-law"
+  name                = "log-${var.name_prefix}"
   resource_group_name = var.resource_group_name
   location            = var.location
   sku                 = "PerGB2018"
@@ -12,7 +12,7 @@ resource "azurerm_log_analytics_workspace" "this" {
 }
 
 resource "azurerm_application_insights" "this" {
-  name                = "${var.name_prefix}-ai"
+  name                = "appi-${var.name_prefix}"
   resource_group_name = var.resource_group_name
   location            = var.location
   workspace_id        = azurerm_log_analytics_workspace.this.id
@@ -21,7 +21,7 @@ resource "azurerm_application_insights" "this" {
 }
 
 resource "azurerm_monitor_action_group" "oncall" {
-  name                = "${var.name_prefix}-oncall"
+  name                = "ag-${var.name_prefix}-oncall"
   resource_group_name = var.resource_group_name
   short_name          = "rhtoncall"
 
@@ -33,7 +33,7 @@ resource "azurerm_monitor_action_group" "oncall" {
 
 # p95 server response time. AI-scoped, so it sits here rather than in app_service.
 resource "azurerm_monitor_metric_alert" "latency" {
-  name                = "${var.name_prefix}-latency"
+  name                = "alert-${var.name_prefix}-latency"
   resource_group_name = var.resource_group_name
   scopes              = [azurerm_application_insights.this.id]
   description         = "Server-side response time is degraded."

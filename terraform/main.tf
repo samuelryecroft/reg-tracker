@@ -2,8 +2,20 @@
 # First-draft IaC for WS-D of DEPLOYMENT-PLAN.md. PLAN ONLY: fmt + validate is the bar; nothing
 # here is applied. See README.md for layout and the observability-fold decision.
 
+# Azure CAF naming (human requirement): rg- resource groups, sa storage, kv- vault, app-/asp- app
+# service, psql- postgres, vnet-/snet- network, log-/appi- observability. Globally-unique names
+# (storage account, Key Vault, Postgres server, App Service) get a short random suffix so a real
+# apply doesn't collide on a common name; the suffix is stable in state across applies.
+resource "random_string" "suffix" {
+  length  = 5
+  lower   = true
+  upper   = false
+  numeric = true
+  special = false
+}
+
 resource "azurerm_resource_group" "main" {
-  name     = "${var.name_prefix}-rg"
+  name     = "rg-${var.name_prefix}"
   location = var.location
   tags     = var.tags
 }
@@ -51,6 +63,7 @@ module "keyvault" {
   location            = var.location
   resource_group_name = azurerm_resource_group.main.name
   tenant_id           = data.azurerm_client_config.current.tenant_id
+  unique_suffix       = random_string.suffix.result
   tags                = var.tags
 }
 
@@ -60,6 +73,7 @@ module "storage" {
   name_prefix         = var.name_prefix
   location            = var.location
   resource_group_name = azurerm_resource_group.main.name
+  unique_suffix       = random_string.suffix.result
   tags                = var.tags
 
   # VNet path: blob private endpoint + public access off. null -> public (pre-prod) path.
@@ -77,6 +91,7 @@ module "postgres" {
   resource_group_name    = azurerm_resource_group.main.name
   administrator_login    = var.postgres_administrator_login
   administrator_password = var.postgres_administrator_password
+  unique_suffix          = random_string.suffix.result
   tags                   = var.tags
 
   # VNet path: VNet-injected, public access off, no 0.0.0.0 firewall rule (B2 closed). null ->
@@ -132,6 +147,7 @@ module "app_service" {
   name_prefix         = var.name_prefix
   location            = var.location
   resource_group_name = azurerm_resource_group.main.name
+  unique_suffix       = random_string.suffix.result
   tags                = var.tags
 
   # WS-B fail-fast boot vars: the app refuses to start in prod without these.

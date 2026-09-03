@@ -3,7 +3,7 @@
 # unreadable, so accidental/malicious key destruction must be impossible (DOCUMENT-ENCRYPTION-DESIGN
 # decision 5). soft-delete retention 90 days.
 resource "azurerm_key_vault" "this" {
-  name                = "${var.name_prefix}-kv"
+  name                = "kv-${var.name_prefix}-${var.unique_suffix}"
   resource_group_name = var.resource_group_name
   location            = var.location
   tenant_id           = var.tenant_id

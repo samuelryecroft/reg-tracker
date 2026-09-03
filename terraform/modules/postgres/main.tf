@@ -7,7 +7,7 @@
 #  - PUBLIC  (delegated_subnet_id null): public access ON + Azure-services firewall - the
 #    pre-prod/synthetic path only.
 resource "azurerm_postgresql_flexible_server" "this" {
-  name                = "${var.name_prefix}-pg"
+  name                = "psql-${var.name_prefix}-${var.unique_suffix}"
   resource_group_name = var.resource_group_name
   location            = var.location
 

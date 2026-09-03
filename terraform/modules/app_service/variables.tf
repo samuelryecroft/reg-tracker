@@ -1,6 +1,7 @@
 variable "name_prefix" { type = string }
 variable "location" { type = string }
 variable "resource_group_name" { type = string }
+variable "unique_suffix" { type = string } # global-uniqueness suffix for the web app name
 variable "tags" {
   type    = map(string)
   default = {}

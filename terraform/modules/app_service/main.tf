@@ -7,7 +7,7 @@
 # step (WS-E) stages it next to the agent jar at that path and MUST fail loudly if it is absent
 # after deploy (Kevin) - a silent fallback to agent defaults would quietly lose sampling/role config.
 resource "azurerm_service_plan" "this" {
-  name                = "${var.name_prefix}-plan"
+  name                = "asp-${var.name_prefix}"
   resource_group_name = var.resource_group_name
   location            = var.location
   os_type             = "Linux"
@@ -16,7 +16,7 @@ resource "azurerm_service_plan" "this" {
 }
 
 resource "azurerm_linux_web_app" "this" {
-  name                = "${var.name_prefix}-app"
+  name                = "app-${var.name_prefix}-${var.unique_suffix}"
   resource_group_name = var.resource_group_name
   location            = var.location
   service_plan_id     = azurerm_service_plan.this.id
@@ -67,7 +67,7 @@ resource "azurerm_linux_web_app" "this" {
 # App-Service-scoped go-live alerts (error rate, health probe). Latency (App-Insights-scoped) lives
 # in the observability module. All fan out to the shared action group.
 resource "azurerm_monitor_metric_alert" "http_5xx" {
-  name                = "${var.name_prefix}-http-5xx"
+  name                = "alert-${var.name_prefix}-http-5xx"
   resource_group_name = var.resource_group_name
   scopes              = [azurerm_linux_web_app.this.id]
   description         = "App Service is returning server errors (HTTP 5xx)."
@@ -89,7 +89,7 @@ resource "azurerm_monitor_metric_alert" "http_5xx" {
 }
 
 resource "azurerm_monitor_metric_alert" "health_probe" {
-  name                = "${var.name_prefix}-health-probe-failing"
+  name                = "alert-${var.name_prefix}-health-probe"
   resource_group_name = var.resource_group_name
   scopes              = [azurerm_linux_web_app.this.id]
   description         = "App Service health check is reporting the instance unhealthy."

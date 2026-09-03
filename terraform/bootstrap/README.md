@@ -3,7 +3,7 @@
 The Azure Storage backend that holds Terraform state must exist **before** `terraform init` and so
 cannot be created by the Terraform config it would hold. `bootstrap-tfstate.sh` creates it once:
 
-- a dedicated resource group (`rht-tfstate-rg`) in **UK South**,
+- a dedicated resource group (`rg-rht-tfstate`) in **UK South**,
 - a Standard_LRS StorageV2 account (globally unique name — **edit `STATE_SA`**), TLS 1.2, no public
   blob access, **shared-key auth off (Entra only)**,
 - **blob versioning + 30-day soft delete** so state is recoverable,
