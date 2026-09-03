@@ -17,7 +17,7 @@ resource "azurerm_postgresql_flexible_server" "this" {
   auto_grow_enabled             = true
   backup_retention_days         = 35
   geo_redundant_backup_enabled  = false
-  public_network_access_enabled = var.delegated_subnet_id == null
+  public_network_access_enabled = !var.enable_vnet
   delegated_subnet_id           = var.delegated_subnet_id
   private_dns_zone_id           = var.private_dns_zone_id
 
@@ -45,7 +45,7 @@ resource "azurerm_postgresql_flexible_server_database" "app" {
 # created ONLY when there is no delegated subnet - i.e. the pre-prod/synthetic path. On the VNet
 # path this rule does not exist (B2 closed).
 resource "azurerm_postgresql_flexible_server_firewall_rule" "azure_services" {
-  count            = var.delegated_subnet_id == null ? 1 : 0
+  count            = var.enable_vnet ? 0 : 1
   name             = "AllowAzureServices"
   server_id        = azurerm_postgresql_flexible_server.this.id
   start_ip_address = "0.0.0.0"

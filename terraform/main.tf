@@ -74,6 +74,7 @@ module "storage" {
   location            = var.location
   resource_group_name = azurerm_resource_group.main.name
   unique_suffix       = random_string.suffix.result
+  enable_vnet         = var.enable_vnet
   tags                = var.tags
 
   # VNet path: blob private endpoint + public access off. null -> public (pre-prod) path.
@@ -92,6 +93,7 @@ module "postgres" {
   administrator_login    = var.postgres_administrator_login
   administrator_password = var.postgres_administrator_password
   unique_suffix          = random_string.suffix.result
+  enable_vnet            = var.enable_vnet
   tags                   = var.tags
 
   # VNet path: VNet-injected, public access off, no 0.0.0.0 firewall rule (B2 closed). null ->

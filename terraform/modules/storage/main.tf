@@ -16,7 +16,7 @@ resource "azurerm_storage_account" "this" {
   account_tier                    = "Standard"
   account_replication_type        = "LRS"
   min_tls_version                 = "TLS1_2"
-  public_network_access_enabled   = var.private_endpoint_subnet_id == null
+  public_network_access_enabled   = !var.enable_vnet
   allow_nested_items_to_be_public = false
   shared_access_key_enabled       = false
 
@@ -42,7 +42,7 @@ resource "azurerm_storage_container" "reports" {
 # VNet path only: a blob private endpoint + DNS group so the app resolves the account to a private
 # IP inside the VNet.
 resource "azurerm_private_endpoint" "blob" {
-  count               = var.private_endpoint_subnet_id == null ? 0 : 1
+  count               = var.enable_vnet ? 1 : 0
   name                = "pep-${var.name_prefix}-sa-reports"
   resource_group_name = var.resource_group_name
   location            = var.location

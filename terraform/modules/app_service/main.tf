@@ -32,10 +32,11 @@ resource "azurerm_linux_web_app" "this" {
   }
 
   site_config {
-    always_on           = true
-    minimum_tls_version = "1.2"
-    ftps_state          = "Disabled"
-    health_check_path   = var.health_check_path
+    always_on                         = true
+    minimum_tls_version               = "1.2"
+    ftps_state                        = "Disabled"
+    health_check_path                 = var.health_check_path
+    health_check_eviction_time_in_min = 5 # azurerm v4 requires this alongside health_check_path
 
     application_stack {
       java_version        = "21"

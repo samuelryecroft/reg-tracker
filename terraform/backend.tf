@@ -5,12 +5,8 @@
 # Left commented so the plan-only validate path (`terraform init -backend=false`) works with no
 # real backend and no cloud auth.
 #
-# terraform {
-#   backend "azurerm" {
-#     resource_group_name  = "rht-tfstate-rg"
-#     storage_account_name = "rhttfstate"   # globally unique; set at bootstrap
-#     container_name       = "tfstate"
-#     key                  = "reg-tracker.tfstate"
-#     use_azuread_auth     = true
-#   }
-# }
+terraform {
+  # Partial config: all values supplied at init via -backend-config=backend.hcl (git-ignored),
+  # so no state-account names or auth mode live in VCS.
+  backend "azurerm" {}
+}
