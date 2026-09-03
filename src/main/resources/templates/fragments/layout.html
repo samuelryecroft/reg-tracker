@@ -68,9 +68,9 @@
         <span class="shell-nav-group"
               th:if="${#authorization.expression('hasAnyRole(''ADMIN'',''ORG_ADMIN'')') or canEditTheme}">Admin</span>
         <a th:if="${#authorization.expression('hasAnyRole(''ADMIN'',''ORG_ADMIN'')')}" href="/admin/users">
-            <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-users'"></use></svg>Users</a>
+            <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-users-three'"></use></svg>Users</a>
         <a th:if="${canEditTheme}" href="/admin/theme">
-            <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-palette'"></use></svg>Branding</a>
+            <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-eyedropper'"></use></svg>Branding</a>
         <a th:if="${#authorization.expression('hasRole(''ADMIN'')')}" href="/admin/organisations">
             <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-buildings'"></use></svg>Organisations</a>
     </nav>

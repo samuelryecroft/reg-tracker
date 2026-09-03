@@ -80,6 +80,59 @@ class FrontendSourceGuardTest {
                 .isEmpty();
     }
 
+    /**
+     * T119: an explicit {@code data-appearance="light"} choice and "auto" on a light OS must
+     * resolve identically (Creed's own words: "if you change one, change the other") - the two
+     * blocks in app.css are hand-duplicated (the second is nested inside a
+     * {@code @media (prefers-color-scheme: light)} block, which can't share a selector list with
+     * a non-media rule), which is exactly the kind of duplication that drifts silently: a token
+     * added to one and not the other looks correct in whichever appearance someone happens to
+     * test. This diffs the two blocks' declarations after stripping indentation, so the check
+     * survives reformatting but not an actual value or token-name mismatch.
+     */
+    @Test
+    void lightAndAutoAppearanceBlocksStayDeclarationIdentical() throws IOException {
+        String css = Files.readString(CSS_DIR.resolve("app.css"), StandardCharsets.UTF_8);
+
+        List<String> light = declarationsOf(css, "\\[data-appearance=\"light\"\\]\\s*\\{");
+        List<String> auto = declarationsOf(css, "\\[data-appearance=\"auto\"\\]\\s*\\{");
+
+        assertThat(light).as("light appearance block").isNotEmpty();
+        assertThat(auto)
+                .as("[data-appearance=\"light\"] and [data-appearance=\"auto\"] must declare the "
+                        + "exact same custom properties in the exact same order - an explicit "
+                        + "choice and auto-on-a-light-OS have to resolve to the same thing")
+                .containsExactlyElementsOf(light);
+    }
+
+    /** Every actual {@code --token: value;} declaration between the matched selector's {@code {}
+     * and its closing {@code }} - comment-only lines and trailing {@code /* ratio *}{@code /}
+     * annotations are stripped first, since the light block carries explanatory prose the
+     * hand-duplicated auto block deliberately doesn't repeat (matching the design reference
+     * sheet's own convention); it's the tokens and values that must match, not the commentary.
+     * Deliberately naive about nested braces, which is fine since neither block nests any. */
+    private static List<String> declarationsOf(String css, String selectorPattern) {
+        Pattern selector = Pattern.compile(selectorPattern);
+        var matcher = selector.matcher(css);
+        if (!matcher.find()) {
+            return List.of();
+        }
+        int start = matcher.end();
+        int end = css.indexOf('}', start);
+        String body = css.substring(start, end);
+        // Strip /* ... */ comments (including ones spanning multiple lines) before splitting,
+        // so a standalone comment paragraph disappears entirely rather than leaving blank lines.
+        String withoutComments = body.replaceAll("(?s)/\\*.*?\\*/", "");
+        List<String> declarations = new ArrayList<>();
+        for (String line : withoutComments.split("\n")) {
+            String trimmed = line.trim();
+            if (!trimmed.isEmpty()) {
+                declarations.add(trimmed);
+            }
+        }
+        return declarations;
+    }
+
     private static List<Path> sourceFilesUnder(Path dir) throws IOException {
         try (Stream<Path> walk = Files.walk(dir)) {
             return walk.filter(Files::isRegularFile)
