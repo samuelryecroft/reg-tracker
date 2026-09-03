@@ -24,15 +24,20 @@ terraform/
   outputs.tf               hostnames, principal id, KV/blob endpoints
   terraform.tfvars.example copy to terraform.tfvars (git-ignored); placeholders only
   modules/
-    postgres/              Flexible Server B1ms, UK South, PITR (35d), DB, firewall
+    postgres/              Flexible Server B1ms, UK South, PITR (35d), DB; VNet-injected + private
+                           (default) or public + Azure-services firewall (pre-prod)
     app_service/           Linux B1, Java 21 jar, system-assigned MI, health check, HTTPS/TLS1.2,
-                           app settings (incl. the WS-B fail-fast boot vars), + 5xx/health alerts
+                           app settings (incl. the WS-B fail-fast boot vars), VNet integration,
+                           + 5xx/health alerts
     keyvault/              RBAC-auth vault, soft-delete + purge-protection ON (90d)
-    storage/               private Blob container, TLS1.2, soft-delete + versioning
+    storage/               private Blob container, TLS1.2, soft-delete + versioning; blob private
+                           endpoint on the VNet path (public + RBAC on the pre-prod path)
     observability/         Log Analytics + App Insights + action group + latency alert
     identity_rbac/         KV Crypto User + KV Secrets User + Blob Data Contributor -> App Service MI
-    network/               VNet scaffold for the private-networking upgrade; enable_vnet is gated
-                           OFF (not-yet-supported) until that path is finished (see B2 gate)
+    network/               VNet + 3 delegated/endpoint subnets + Postgres & Blob private DNS zones
+                           (created when enable_vnet=true, the default)
+  bootstrap/               out-of-band remote-state backend bootstrap (script + README)
+  PREFLIGHT.md             what the human must supply before the first apply
 ```
 
 ## Observability fold (the T63 "rethink the observability folder" decision)
@@ -58,11 +63,12 @@ Log Analytics + App Insights + action group + the AI-scoped latency alert; `app_
 
 ## Remote state (bootstrapped out of band — this config does NOT create it)
 
-State lives in an Azure Storage backend created **once, separately** (a `tfstate` resource group +
-storage account + `tfstate` container, `use_azuread_auth`, versioning on). `backend.tf` holds the
-commented shape; supply values at init via a git-ignored `backend.hcl`
-(`terraform init -backend-config=backend.hcl`). The plan-only validate path uses
-`terraform init -backend=false`, so no backend or cloud auth is needed to `validate`.
+State lives in an Azure Storage backend created **once, separately** by
+**`bootstrap/bootstrap-tfstate.sh`** (a `tfstate` resource group + storage account + `tfstate`
+container, `use_azuread_auth`, versioning + soft-delete on). `backend.tf` holds the commented shape;
+supply values at init via a git-ignored `backend.hcl` (`terraform init -backend-config=backend.hcl`).
+The plan-only validate path uses `terraform init -backend=false`, so no backend or cloud auth is
+needed to `validate`. See `PREFLIGHT.md` for the full pre-apply sequence.
 
 ## Secrets
 
@@ -103,33 +109,44 @@ authenticate via Entra — so the **deploying identity must hold `Storage Blob D
 the account (in addition to the Key Vault Secrets Officer grant above). Also a bootstrap/pipeline
 concern, not managed by this config.
 
-## Pre-go-live gates (MUST clear before real data / real users)
+## Network posture — B2 CLOSED on the default private path (T72)
 
-These are **named gates**, not aspirations. This draft is safe to `apply` into a **pre-prod / synthetic-data** environment; the following must be closed before any real children's data:
+`enable_vnet` **defaults to `true`**: the deployment provisions a VNet with delegated subnets and
+private endpoints so **Postgres and Blob are unreachable from the public internet or other Azure
+tenants**. This closes **TERRAFORM-REVIEW.md §B2** (the previous "Allow Azure services" `0.0.0.0`
+rule reachable from any tenant) and is the required posture for real children's data.
 
-- **GATE B2 — Postgres is reachable from any Azure tenant.** `postgres` sets
-  `public_network_access_enabled = true` with the firewall rule `0.0.0.0–0.0.0.0` ("Allow Azure
-  services"), which permits **any** resource in **any** Azure subscription/tenant to reach the
-  server — not an allow-list of our own resources. With special-category children's data the only
-  remaining control would be the DB password. **Before real data**, either finish the private path
-  (VNet + delegated subnet / private endpoint — the `enable_vnet` route, currently gated off) **or**
-  replace the rule with the App Service's specific outbound IPs. Owner: DevOps. Blocks: go-live with
-  real data.
-- **GATE B1 (storage) — resolved for the default path.** Blob is now reachable
-  (`public_network_access_enabled = true`, private container + MI RBAC + ciphertext-only per T33).
-  The private-endpoint upgrade rides with B2's `enable_vnet` work.
+On the private path (`enable_vnet=true`, default):
+- **Postgres** is VNet-injected on a delegated subnet, `public_network_access_enabled=false`, and
+  the `0.0.0.0` firewall rule **does not exist**; name resolution via a private DNS zone.
+- **Blob** has `public_network_access_enabled=false` and a **private endpoint** in the endpoints
+  subnet (privatelink DNS zone) — consistent with the Postgres path, resolving the B1 note too.
+- **App Service** uses regional **VNet integration** into a delegated subnet with
+  `WEBSITE_VNET_ROUTE_ALL=1`, so its outbound DB/Blob traffic uses the private endpoints.
+
+`enable_vnet=false` remains available for a **pre-prod / synthetic-data** environment only: public
+Postgres + the Azure-services firewall, and public-but-RBAC storage (the cheaper, non-private path).
+Never use it with real data.
+
+**Cost delta of the private path:** ~£6–8/mo over the public draft (one blob private endpoint + two
+private DNS zones); Postgres VNet injection itself is no extra charge. **Confirm-before-apply:**
+App Service regional VNet integration on **B1 (Basic)** — current Azure docs list Basic as
+supported; if the target subscription/region enforces Standard+, that is a tier decision
+(~£10 → ~£55/mo) — see `PREFLIGHT.md`.
+
+## Remaining pre-go-live items
+
+- **Deployer credentials / first apply** — no apply has run; the human supplies Azure auth, the
+  subscription/tenant, tfvars, and the Entra app registration per **`PREFLIGHT.md`**. Remote state
+  is bootstrapped out of band via **`bootstrap/bootstrap-tfstate.sh`**.
+- **Custom domain + managed TLS cert** (WS-I) — not in this draft; `https_only` already gives TLS on
+  `*.azurewebsites.net`. Add the hostname binding + `azurerm_app_service_managed_certificate` once a
+  domain is chosen.
 
 ## Deferred / flagged for review
 
-- **Private networking (`enable_vnet`)** — **not yet supported**: the VNet + private-endpoint +
-  App Service VNet-integration wiring is incomplete, so `enable_vnet=true` is gated off by a
-  variable validation (fails fast at plan, never a broken apply). The `network` module is the
-  scaffold for that work; finishing it is the B2 hardening upgrade.
 - **Health-indicator (Blob/Key Vault) in `/actuator/health`** — a post-merge app task (needs
   actuator + WS-B's `DocumentStorageProperties`), out of scope here.
-- **Custom domain + managed TLS cert** (WS-I) — not in this first draft; `https_only` already gives
-  TLS on `*.azurewebsites.net`. Add the hostname binding + `azurerm_app_service_managed_certificate`
-  once a domain is chosen.
 
 ## Verify (plan-only)
 

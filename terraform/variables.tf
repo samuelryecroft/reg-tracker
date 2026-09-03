@@ -44,14 +44,9 @@ variable "alert_email" {
 }
 
 variable "enable_vnet" {
-  description = "Reserved for the private-networking hardening path (VNet + private endpoints for storage & Postgres + App Service VNet integration). NOT YET SUPPORTED - the wiring is incomplete, so it is gated off to avoid a broken apply (Kevin B1). Must be false until that path is finished; see the README pre-go-live gate."
+  description = "Private-networking path (default TRUE): VNet + delegated subnets + private endpoints so Postgres and Blob are unreachable from the public internet / other Azure tenants. This is the B2 close (TERRAFORM-REVIEW.md) and the required posture for real children's data. Set false ONLY for a pre-prod/synthetic environment (public Postgres + Azure-services firewall, public-but-RBAC storage)."
   type        = bool
-  default     = false
-
-  validation {
-    condition     = var.enable_vnet == false
-    error_message = "enable_vnet=true is not yet supported: the private-endpoint + VNet-integration wiring is incomplete. Leave it false. Finishing that path is the B2 pre-go-live hardening upgrade (see README)."
-  }
+  default     = true
 }
 
 variable "tags" {

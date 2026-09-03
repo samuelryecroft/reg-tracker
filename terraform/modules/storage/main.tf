@@ -2,11 +2,13 @@
 # platform SSE is a second layer under our own encryption. TLS 1.2 floor; soft-delete + versioning
 # on so an accidental delete/overwrite is recoverable.
 #
-# public_network_access_enabled = true (Kevin B1): the no-VNet path must be REACHABLE. Defensible -
-# the container is private, access is managed-identity RBAC only, and per T33 a storage compromise
-# yields ciphertext, not reports. The private-endpoint alternative is the enable_vnet hardening path.
-# shared_access_key_enabled = false (Kevin F1): we authenticate with managed identity, so account
-# keys are an unused credential path that would bypass RBAC entirely - RBAC-only, no key auth.
+# shared_access_key_enabled = false (Kevin F1): managed-identity auth only; account keys are an
+# unused credential path that would bypass RBAC. Two network postures, selected by whether a private
+# endpoint subnet is passed (enable_vnet):
+#  - PRIVATE (private_endpoint_subnet_id set): public network access OFF + a blob private endpoint;
+#    reachable only from inside the VNet. Consistent with the Postgres VNet path.
+#  - PUBLIC  (null): public network ON, but private container + MI RBAC + ciphertext-only (T33) -
+#    the pre-prod/synthetic path (Kevin B1: the no-VNet path must be reachable).
 resource "azurerm_storage_account" "this" {
   name                            = "${var.name_prefix}reports"
   resource_group_name             = var.resource_group_name
@@ -14,7 +16,7 @@ resource "azurerm_storage_account" "this" {
   account_tier                    = "Standard"
   account_replication_type        = "LRS"
   min_tls_version                 = "TLS1_2"
-  public_network_access_enabled   = true
+  public_network_access_enabled   = var.private_endpoint_subnet_id == null
   allow_nested_items_to_be_public = false
   shared_access_key_enabled       = false
 
@@ -35,4 +37,28 @@ resource "azurerm_storage_container" "reports" {
   name                  = var.container_name
   storage_account_id    = azurerm_storage_account.this.id
   container_access_type = "private"
+}
+
+# VNet path only: a blob private endpoint + DNS group so the app resolves the account to a private
+# IP inside the VNet.
+resource "azurerm_private_endpoint" "blob" {
+  count               = var.private_endpoint_subnet_id == null ? 0 : 1
+  name                = "${var.name_prefix}reports-pe"
+  resource_group_name = var.resource_group_name
+  location            = var.location
+  subnet_id           = var.private_endpoint_subnet_id
+
+  private_service_connection {
+    name                           = "${var.name_prefix}reports-psc"
+    private_connection_resource_id = azurerm_storage_account.this.id
+    subresource_names              = ["blob"]
+    is_manual_connection           = false
+  }
+
+  private_dns_zone_group {
+    name                 = "blob"
+    private_dns_zone_ids = [var.blob_private_dns_zone_id]
+  }
+
+  tags = var.tags
 }
