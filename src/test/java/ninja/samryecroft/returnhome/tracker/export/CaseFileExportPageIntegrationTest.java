@@ -149,7 +149,7 @@ class CaseFileExportPageIntegrationTest extends AbstractIntegrationTest {
 
     private MockHttpServletRequestBuilder reportFields(MockHttpServletRequestBuilder builder) {
         return builder
-                .param("interviewDate", "2026-07-20")
+                .param("heldAt", "2026-07-20T14:00")
                 .param("interviewLocation", "Page House")
                 .param("within72Hours", "true")
                 .param("previouslyMissing", "false")

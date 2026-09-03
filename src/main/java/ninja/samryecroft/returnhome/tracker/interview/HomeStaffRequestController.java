@@ -5,7 +5,6 @@ import java.util.List;
 import ninja.samryecroft.returnhome.tracker.child.Child;
 import ninja.samryecroft.returnhome.tracker.child.ChildRepository;
 import ninja.samryecroft.returnhome.tracker.interview.dto.NewRequestForm;
-import ninja.samryecroft.returnhome.tracker.interview.dto.ReturnTimeForm;
 import ninja.samryecroft.returnhome.tracker.user.AppUserPrincipal;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
@@ -38,24 +37,6 @@ public class HomeStaffRequestController {
         model.addAttribute("requests", requests);
         model.addAttribute("dueGroups", deadlineTrackingService.groupByUrgency(requests));
         return "home-staff/request-list";
-    }
-
-    @GetMapping("/{id}/return-time")
-    public String returnTimeForm(@PathVariable Long id, @AuthenticationPrincipal AppUserPrincipal principal, Model model) {
-        model.addAttribute("request", interviewRequestService.getAuthorized(id, principal));
-        model.addAttribute("form", new ReturnTimeForm());
-        return "home-staff/return-time-form";
-    }
-
-    @PostMapping("/{id}/return-time")
-    public String recordReturnTime(@PathVariable Long id, @AuthenticationPrincipal AppUserPrincipal principal,
-            @Valid @ModelAttribute("form") ReturnTimeForm form, BindingResult bindingResult, Model model) {
-        if (bindingResult.hasErrors()) {
-            model.addAttribute("request", interviewRequestService.getAuthorized(id, principal));
-            return "home-staff/return-time-form";
-        }
-        interviewRequestService.recordReturnTime(id, form.getReturnedAt(), principal);
-        return "redirect:/interview-requests/" + id;
     }
 
     @GetMapping("/new")

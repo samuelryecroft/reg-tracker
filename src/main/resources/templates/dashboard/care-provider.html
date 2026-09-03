@@ -53,8 +53,8 @@
                 <span class="num" th:if="${view.overallRate().percent().isPresent()}" th:text="${view.overallRate().percent().getAsInt()} + '%'">82%</span>
                 <span class="num" style="font-size:19px;color:var(--muted);font-weight:650" th:unless="${view.overallRate().percent().isPresent()}">Not enough data yet</span>
                 <span class="den" th:text="${view.overallRate().within72() + ' of ' + view.overallRate().validCompleted()}">41 of 50</span>
-                <span class="den" style="display:block;margin-top:8px;padding-top:8px;border-top:1px solid var(--border);color:var(--warn);font-weight:650" th:if="${view.overallRate().excludedNoReturnTime() > 0}"
-                      th:text="${'◷ ' + view.overallRate().excludedNoReturnTime() + ' further interview' + (view.overallRate().excludedNoReturnTime() == 1 ? '' : 's') + ' excluded — no return time recorded'}">excluded</span>
+                <span class="den" style="display:block;margin-top:8px;padding-top:8px;border-top:1px solid var(--border);color:var(--warn);font-weight:650" th:if="${view.overallRate().excludedNotMeasurable() > 0}"
+                      th:text="${'◷ ' + view.overallRate().excludedNotMeasurable() + ' further interview' + (view.overallRate().excludedNotMeasurable() == 1 ? '' : 's') + ' excluded — interview time not recorded'}">excluded</span>
             </div>
         </div>
 
@@ -70,7 +70,7 @@
                 <td th:text="${row.stat().validCompleted()}">0</td>
                 <td><span th:text="${row.stat().percent().getAsInt()} + '%'">82%</span>
                     <span style="font-size:11px;color:var(--muted);display:block" th:text="${row.stat().within72() + ' of ' + row.stat().validCompleted()}">41 of 50</span></td>
-                <td th:text="${row.stat().excludedNoReturnTime()}">0</td>
+                <td th:text="${row.stat().excludedNotMeasurable()}">0</td>
                 <td th:text="${row.overdueNow()}">0</td>
             </tr>
             <tr th:if="${#lists.isEmpty(view.rankedHomes())}"><td colspan="5" class="muted">No home has reached the minimum base yet this period.</td></tr>
@@ -84,7 +84,7 @@
                 <dl>
                     <dt>Completed</dt><dd th:text="${row.stat().validCompleted()}">0</dd>
                     <dt>Within 72h</dt><dd th:text="${row.stat().percent().getAsInt() + '% (' + row.stat().within72() + ' of ' + row.stat().validCompleted() + ')'}">82% (41 of 50)</dd>
-                    <dt>Excluded</dt><dd th:text="${row.stat().excludedNoReturnTime()}">0</dd>
+                    <dt>Excluded</dt><dd th:text="${row.stat().excludedNotMeasurable()}">0</dd>
                     <dt>Overdue now</dt><dd th:text="${row.overdueNow()}">0</dd>
                 </dl>
             </div>

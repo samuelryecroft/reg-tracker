@@ -37,8 +37,6 @@
             <td th:text="${r.allocatedVisitor} ? ${r.allocatedVisitor.fullName} : '—'">Visitor</td>
             <td th:text="${#temporals.format(r.createdAt, 'dd MMM yyyy HH:mm')}">Created</td>
             <td>
-                <a class="rowlink" th:if="${row.badge() != null and row.badge().state().name() == 'NO_CLOCK'}"
-                   th:href="@{/requests/{id}/return-time(id=${r.id})}">Add return time</a>
             </td>
         </tr>
         </tbody>
@@ -60,8 +58,6 @@
                 <dt>Raised</dt><dd th:text="${#temporals.format(r.createdAt, 'dd MMM yyyy HH:mm')}">Raised</dd>
             </dl>
             <div class="act">
-                <a class="btn secondary" th:if="${row.badge() != null and row.badge().state().name() == 'NO_CLOCK'}"
-                   th:href="@{/requests/{id}/return-time(id=${r.id})}">Add return time</a>
                 <a class="btn ghost" th:href="@{/interview-requests/{id}(id=${r.id})}">View details</a>
             </div>
         </div>

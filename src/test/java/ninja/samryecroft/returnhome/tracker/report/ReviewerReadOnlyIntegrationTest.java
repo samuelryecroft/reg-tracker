@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.nio.file.Path;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Set;
 import ninja.samryecroft.returnhome.tracker.AbstractIntegrationTest;
 import ninja.samryecroft.returnhome.tracker.child.Child;
@@ -152,9 +153,13 @@ class ReviewerReadOnlyIntegrationTest extends AbstractIntegrationTest {
         assertThat(after.getInterviewLocation()).doesNotContain(TAMPERED);
         assertThat(after.getInterviewerComments()).doesNotContain(TAMPERED);
         // Booleans a read-only select never submits must survive rather than being nulled.
-        assertThat(after.getWithin72Hours()).isTrue();
         assertThat(after.getConfidentialityExplained()).isTrue();
         assertThat(after.getPreviouslyMissing()).isFalse();
+
+        // T97: the 72-hour outcome is measured from heldAt, not declared, so the interesting
+        // question is whether a reviewer can move the measurement. tamperedFields posts a heldAt
+        // six months earlier; it must not land.
+        assertThat(after.getHeldAt()).isEqualTo(LocalDateTime.of(2026, 7, 20, 14, 0));
 
         // The docx signature names the visitor at their own submission time, and that is now
         // truthful precisely because the content is guaranteed to still be theirs.
@@ -182,7 +187,6 @@ class ReviewerReadOnlyIntegrationTest extends AbstractIntegrationTest {
         // not one with its unsubmitted boolean answers wiped to null.
         assertThat(after.getInterviewLocation()).isEqualTo(VISITOR_LOCATION);
         assertThat(after.getInterviewerComments()).isEqualTo(VISITOR_COMMENTS);
-        assertThat(after.getWithin72Hours()).isTrue();
         assertThat(after.getConfidentialityExplained()).isTrue();
         assertThat(after.getPreviouslyMissing()).isFalse();
     }
@@ -199,14 +203,14 @@ class ReviewerReadOnlyIntegrationTest extends AbstractIntegrationTest {
         // T25 redesign: the reviewer's copy renders each answer as a record (.readonly-val), not a
         // disabled/readonly input - a disabled <select> silently drops its value from a POST, and a
         // "readonly" field still looks like something that ought to be typeable. So there is no
-        // editable interviewLocation/interviewerComments/within72Hours element on this page at all;
+        // editable interviewLocation/interviewerComments/previouslyMissing element on this page at all;
         // instead each one has a plain label (id="<field>-label") describing the read-only value.
         assertThat(reviewerHtml).doesNotContain("id=\"interviewLocation\"");
         assertThat(reviewerHtml).contains("id=\"interviewLocation-label\"");
         assertThat(reviewerHtml).doesNotContain("id=\"interviewerComments\"");
         assertThat(reviewerHtml).contains("id=\"interviewerComments-label\"");
-        assertThat(reviewerHtml).doesNotContain("id=\"within72Hours\"");
-        assertThat(reviewerHtml).contains("id=\"within72Hours-label\"");
+        assertThat(reviewerHtml).doesNotContain("id=\"previouslyMissing\"");
+        assertThat(reviewerHtml).contains("id=\"previouslyMissing-label\"");
         assertThat(reviewerHtml).contains("can't be edited here");
         // The one thing a reviewer must still be able to type.
         assertThat(tagWithId(reviewerHtml, "reviewComments")).doesNotContain("readonly");
@@ -218,7 +222,7 @@ class ReviewerReadOnlyIntegrationTest extends AbstractIntegrationTest {
                 .andReturn().getResponse().getContentAsString();
         assertThat(tagWithId(visitorHtml, "interviewLocation")).doesNotContain("readonly");
         assertThat(tagWithId(visitorHtml, "interviewerComments")).doesNotContain("readonly");
-        assertThat(tagWithId(visitorHtml, "within72Hours")).doesNotContain("disabled");
+        assertThat(tagWithId(visitorHtml, "previouslyMissing")).doesNotContain("disabled");
     }
 
     /**
@@ -253,9 +257,8 @@ class ReviewerReadOnlyIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(post("/visitor/interviews/{id}/report", requestId)
                         .with(asUser("ro-visitor" + suffix)).with(csrf())
                         .param("action", "submit")
-                        .param("interviewDate", "2026-07-20")
+                        .param("heldAt", "2026-07-20T14:00")
                         .param("interviewLocation", VISITOR_LOCATION)
-                        .param("within72Hours", "true")
                         .param("previouslyMissing", "false")
                         .param("confidentialityExplained", "true")
                         .param("interviewAccepted", "true")
@@ -277,7 +280,7 @@ class ReviewerReadOnlyIntegrationTest extends AbstractIntegrationTest {
      */
     private MockHttpServletRequestBuilder tamperedFields(MockHttpServletRequestBuilder builder) {
         return builder
-                .param("interviewDate", "2026-01-01")
+                .param("heldAt", "2026-01-01T09:00")
                 .param("interviewLocation", TAMPERED)
                 .param("whereWereYouWhileMissing", TAMPERED)
                 .param("interviewerComments", TAMPERED)

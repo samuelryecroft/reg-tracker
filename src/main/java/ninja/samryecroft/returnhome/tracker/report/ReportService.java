@@ -206,7 +206,7 @@ public class ReportService {
 
     private SubmitReportForm blankFormFor(AppUserPrincipal principal) {
         SubmitReportForm form = new SubmitReportForm();
-        form.setInterviewDate(LocalDate.now());
+        form.setHeldAt(LocalDateTime.now().withSecond(0).withNano(0));
         form.setConductedByStatement("This interview was conducted by, or under guidance of, "
                 + principal.getUser().getFullName()
                 + ", an independent, non-statutory agent with no direct involvement in the care "
@@ -216,10 +216,9 @@ public class ReportService {
 
     private SubmitReportForm toForm(InterviewReport report) {
         SubmitReportForm form = new SubmitReportForm();
-        form.setInterviewDate(report.getInterviewDate());
+        form.setHeldAt(report.getHeldAt());
         form.setInterviewLocation(report.getInterviewLocation());
 
-        form.setWithin72Hours(report.getWithin72Hours());
         form.setIfNotWhyLate(report.getIfNotWhyLate());
         form.setConsultationWithHomeStaff(report.getConsultationWithHomeStaff());
         form.setPreviouslyMissing(report.getPreviouslyMissing());
@@ -254,10 +253,9 @@ public class ReportService {
     }
 
     private void applyFormValues(InterviewReport report, SubmitReportForm form) {
-        report.setInterviewDate(form.getInterviewDate());
+        report.setHeldAt(form.getHeldAt());
         report.setInterviewLocation(form.getInterviewLocation());
 
-        report.setWithin72Hours(form.getWithin72Hours());
         report.setIfNotWhyLate(form.getIfNotWhyLate());
         report.setConsultationWithHomeStaff(form.getConsultationWithHomeStaff());
         report.setPreviouslyMissing(form.getPreviouslyMissing());

@@ -19,6 +19,7 @@ import ninja.samryecroft.returnhome.tracker.fieldcrypto.EncryptedEntity;
 import ninja.samryecroft.returnhome.tracker.fieldcrypto.EncryptedFieldListener;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import ninja.samryecroft.returnhome.tracker.interview.DeadlineTracker;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewRequest;
 import ninja.samryecroft.returnhome.tracker.user.User;
 
@@ -39,8 +40,6 @@ public class InterviewReport implements EncryptedEntity {
     @JoinColumn(name = "visitor_id", nullable = false)
     private User visitor;
 
-    @Column(name = "interview_date")
-    private LocalDate interviewDate;
 
     @Column(name = "interview_location_enc", columnDefinition = "TEXT")
     private String interviewLocationCiphertext;
@@ -51,8 +50,15 @@ public class InterviewReport implements EncryptedEntity {
 
     // --- Details ---
 
-    @Column(name = "within_72_hours")
-    private Boolean within72Hours;
+    /**
+     * When the interview was actually held - the end of the statutory 72-hour clock, whose start is
+     * the request's {@code returnedAt}. Captured at submission.
+     *
+     * <p>Not encrypted, deliberately: the compliance rate aggregates this across an organisation,
+     * and a bare timestamp carries no name, location or narrative. See V15.
+     */
+    @Column(name = "held_at")
+    private LocalDateTime heldAt;
 
     @Column(name = "if_not_why_late_enc", columnDefinition = "TEXT")
     private String ifNotWhyLateCiphertext;
@@ -271,12 +277,14 @@ public class InterviewReport implements EncryptedEntity {
         this.visitor = visitor;
     }
 
+    /**
+     * The calendar date the interview was held - derived, so it can never disagree with the
+     * timestamp the compliance rate is measured from. Everything that only wants to display a date
+     * (the docx, the report view) keeps working unchanged.
+     */
+    @Transient
     public LocalDate getInterviewDate() {
-        return interviewDate;
-    }
-
-    public void setInterviewDate(LocalDate interviewDate) {
-        this.interviewDate = interviewDate;
+        return heldAt == null ? null : heldAt.toLocalDate();
     }
 
     public String getInterviewLocation() {
@@ -287,12 +295,33 @@ public class InterviewReport implements EncryptedEntity {
         this.interviewLocation = interviewLocation;
     }
 
-    public Boolean getWithin72Hours() {
-        return within72Hours;
+    public LocalDateTime getHeldAt() {
+        return heldAt;
     }
 
-    public void setWithin72Hours(Boolean within72Hours) {
-        this.within72Hours = within72Hours;
+    public void setHeldAt(LocalDateTime heldAt) {
+        this.heldAt = heldAt;
+    }
+
+    /**
+     * Whether the interview met the statutory 72 hours - <em>derived</em>, never declared.
+     *
+     * <p>It used to be a stored Yes/No/Unknown the interviewer answered about their own compliance.
+     * Two things were wrong with that: it asked someone to grade their own work, and its Unknown
+     * state was counted as a breach while still sitting in the denominator, so an unanswered
+     * question cost an organisation exactly what a real failure did.
+     *
+     * <p>Null means "not measurable" - the interview has no recorded {@code heldAt}. That is an
+     * exclusion from the rate, not a failure, and {@link ninja.samryecroft.returnhome.tracker.dashboard.RateStat}
+     * keeps it visible rather than folding it into either side. The clock's start cannot be missing:
+     * {@code returned_at} is NOT NULL as of V15.
+     */
+    @Transient
+    public Boolean getWithin72Hours() {
+        if (heldAt == null || interviewRequest == null || interviewRequest.getReturnedAt() == null) {
+            return null;
+        }
+        return !heldAt.isAfter(interviewRequest.getReturnedAt().plus(DeadlineTracker.RETURN_WINDOW));
     }
 
     public String getIfNotWhyLate() {

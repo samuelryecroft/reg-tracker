@@ -128,58 +128,47 @@ class DeadlineTrackingIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void homeStaffListGroupsRequestsByUrgencyAndOffersAddReturnTimeForTheNoClockState() throws Exception {
+    void aRequestCannotBeRaisedWithoutTheReturnTimeThatStartsTheClock() throws Exception {
+        // T97 made returned_at NOT NULL. Enforced in the form as well as the schema so the person
+        // raising the request gets a field error, not a constraint violation - and so the "no
+        // clock" state, which the deadline tracker used to have to describe, cannot arise at all.
+        Child child = saveChild("Clockless Cara" + suffix, home);
+
+        String html = mockMvc.perform(post("/requests").with(asUser("dl-home" + suffix)).with(csrf())
+                        .param("childId", child.getId().toString()))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(html).contains("returnedAt");
+        assertThat(interviewRequestRepository.findAllDetailed()).isEmpty();
+
+        // ...and it succeeds the moment the clock has a start.
+        mockMvc.perform(post("/requests").with(asUser("dl-home" + suffix)).with(csrf())
+                        .param("childId", child.getId().toString())
+                        .param("returnedAt", "2026-07-16T20:30"))
+                .andExpect(status().is3xxRedirection());
+
+        assertThat(interviewRequestRepository.findAllDetailed()).hasSize(1);
+    }
+
+    @Test
+    void homeStaffListGroupsRequestsByUrgency() throws Exception {
+        // The no-clock group that used to sit between these two is gone with T97: returned_at is
+        // NOT NULL, so a request without a deadline can no longer be created, and the "Add return
+        // time" remedy it existed to offer went with it.
         LocalDateTime now = LocalDateTime.now();
         saveRequest("Overdue Ollie" + suffix, home, InterviewStatus.REQUESTED, now.minusHours(80));
-        saveRequest("Noclock Nadia" + suffix, home, InterviewStatus.REQUESTED, null);
         saveRequest("OnTrack Otis" + suffix, home, InterviewStatus.ALLOCATED, now.minusHours(1));
 
         String html = mockMvc.perform(get("/requests").with(asUser("dl-home" + suffix)))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
 
-        assertThat(html).contains("Overdue").contains("Return time not recorded").contains("On track");
-        assertThat(html).contains("Add return time");
-        assertThat(html).contains("overdue");
+        assertThat(html).contains("Overdue").contains("On track");
+        assertThat(html).doesNotContain("Add return time");
 
-        // Never silently sorted to the bottom: the overdue group heads the page, and the no-clock
-        // group comes before the on-track group.
-        int overdueIdx = html.indexOf("Overdue");
-        int noClockIdx = html.indexOf("Return time not recorded");
-        int onTrackIdx = html.indexOf("On track");
-        assertThat(overdueIdx).isLessThan(noClockIdx);
-        assertThat(noClockIdx).isLessThan(onTrackIdx);
-    }
-
-    @Test
-    void addingAReturnTimeClearsTheNoClockStateAndCannotBeDoneTwice() throws Exception {
-        InterviewRequest request = saveRequest("Fixable Fiona" + suffix, home, InterviewStatus.REQUESTED, null);
-
-        mockMvc.perform(post("/requests/{id}/return-time", request.getId())
-                        .with(asUser("dl-home" + suffix)).with(csrf())
-                        .param("returnedAt", "2026-07-16T20:30"))
-                .andExpect(status().is3xxRedirection());
-
-        InterviewRequest reloaded = interviewRequestRepository.findById(request.getId()).orElseThrow();
-        assertThat(reloaded.getReturnedAt()).isEqualTo(LocalDateTime.of(2026, 7, 16, 20, 30));
-
-        // Already recorded - this is "add", not "edit".
-        mockMvc.perform(post("/requests/{id}/return-time", request.getId())
-                        .with(asUser("dl-home" + suffix)).with(csrf())
-                        .param("returnedAt", "2026-07-17T09:00"))
-                .andExpect(status().isConflict());
-    }
-
-    @Test
-    void anotherHomesStaffCannotAddAReturnTime() throws Exception {
-        InterviewRequest request = saveRequest("Guarded Gabe" + suffix, home, InterviewStatus.REQUESTED, null);
-
-        mockMvc.perform(post("/requests/{id}/return-time", request.getId())
-                        .with(asUser("dl-other-home" + suffix)).with(csrf())
-                        .param("returnedAt", "2026-07-16T20:30"))
-                .andExpect(status().isForbidden());
-
-        assertThat(interviewRequestRepository.findById(request.getId()).orElseThrow().getReturnedAt()).isNull();
+        // Never silently sorted to the bottom: the overdue group still heads the page.
+        assertThat(html.indexOf("Overdue")).isLessThan(html.indexOf("On track"));
     }
 
     @Test

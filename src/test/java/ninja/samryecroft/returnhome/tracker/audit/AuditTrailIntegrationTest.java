@@ -402,7 +402,7 @@ class AuditTrailIntegrationTest extends AbstractIntegrationTest {
     /** The report fields the submit/approve paths validate as required. */
     private MockHttpServletRequestBuilder reportFields(MockHttpServletRequestBuilder builder) {
         return builder
-                .param("interviewDate", "2026-07-20")
+                .param("heldAt", "2026-07-20T14:00")
                 .param("interviewLocation", "Audit House")
                 .param("within72Hours", "true")
                 .param("previouslyMissing", "false")

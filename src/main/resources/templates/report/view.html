@@ -19,13 +19,13 @@
             <dd th:text="${report.visitor.fullName}">Visitor</dd>
 
             <dt>Date of interview</dt>
-            <dd th:text="${report.interviewDate} != null ? ${#temporals.format(report.interviewDate, 'dd MMM yyyy')} : '—'">Date</dd>
+            <dd th:text="${report.heldAt} != null ? ${#temporals.format(report.heldAt, 'dd MMM yyyy HH:mm')} : '—'">Date</dd>
 
             <dt>Location of this interview</dt>
             <dd th:text="${report.interviewLocation} ?: '—'">Location</dd>
 
             <dt>Was this interview offered and completed within 72 hours of return?</dt>
-            <dd th:text="${report.within72Hours} == null ? 'Unknown' : (${report.within72Hours} ? 'Yes' : 'No')">—</dd>
+            <dd th:text="${report.within72Hours} == null ? 'Not measurable — interview time not recorded' : (${report.within72Hours} ? 'Yes' : 'No')">—</dd>
 
             <dt>If not, why?</dt>
             <dd th:text="${report.ifNotWhyLate} ?: '—'">—</dd>
@@ -34,13 +34,13 @@
             <dd th:text="${report.consultationWithHomeStaff} ?: '—'">—</dd>
 
             <dt>Has this young person previously been missing?</dt>
-            <dd th:text="${report.previouslyMissing} == null ? 'Unknown' : (${report.previouslyMissing} ? 'Yes' : 'No')">—</dd>
+            <dd th:text="${report.previouslyMissing} == null ? 'Not answered' : (${report.previouslyMissing} ? 'Yes' : 'No')">—</dd>
 
             <dt>How many occasions of missing has there been in the last 30 days?</dt>
             <dd th:text="${report.missingOccasionsLast30Days} ?: '—'">—</dd>
 
             <dt>Confidentiality explained to the young person regarding safeguarding duty of care?</dt>
-            <dd th:text="${report.confidentialityExplained} == null ? 'Unknown' : (${report.confidentialityExplained} ? 'Yes' : 'No')">—</dd>
+            <dd th:text="${report.confidentialityExplained} == null ? 'Not answered' : (${report.confidentialityExplained} ? 'Yes' : 'No')">—</dd>
         </dl>
     </div>
 
@@ -48,7 +48,7 @@
         <h3>Return Home Interview</h3>
         <dl class="detail">
             <dt>Interview accepted?</dt>
-            <dd th:text="${report.interviewAccepted} == null ? 'Unknown' : (${report.interviewAccepted} ? 'Yes' : 'No')">—</dd>
+            <dd th:text="${report.interviewAccepted} == null ? 'Not answered' : (${report.interviewAccepted} ? 'Yes' : 'No')">—</dd>
 
             <dt>If not, why?</dt>
             <dd th:text="${report.interviewDeclinedReason} ?: '—'">—</dd>
@@ -66,7 +66,7 @@
             <dd th:text="${report.whatCanBeDoneToAddressReasons} ?: '—'">—</dd>
 
             <dt>Did you consider yourself to be missing?</dt>
-            <dd th:text="${report.consideredSelfMissing} == null ? 'Unknown' : (${report.consideredSelfMissing} ? 'Yes' : 'No')">—</dd>
+            <dd th:text="${report.consideredSelfMissing} == null ? 'Not answered' : (${report.consideredSelfMissing} ? 'Yes' : 'No')">—</dd>
 
             <dt>What did you do while you were missing?</dt>
             <dd th:text="${report.whatDidYouDoWhileMissing} ?: '—'">—</dd>

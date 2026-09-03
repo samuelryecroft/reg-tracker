@@ -214,11 +214,33 @@ public class DashboardService {
     }
 
     private RateStat combinedRate(List<InterviewReport> completed) {
-        int within72 = (int) completed.stream()
-                .filter(r -> r.getInterviewRequest().getReturnedAt() != null && Boolean.TRUE.equals(r.getWithin72Hours()))
-                .count();
-        int excluded = (int) completed.stream().filter(r -> r.getInterviewRequest().getReturnedAt() == null).count();
-        return new RateStat(within72, completed.size() - excluded, excluded);
+        return rateOf(completed);
+    }
+
+    /**
+     * The compliance rate, measured rather than declared.
+     *
+     * <p>It used to count {@code Boolean.TRUE.equals(getWithin72Hours())} against every completed
+     * report with a return time. That quietly scored an unanswered question as a breach: a null
+     * ("Unknown") failed the TRUE test but still sat in the denominator, so a report nobody had
+     * finished cost an organisation exactly what a genuine late interview did. Now the answer is
+     * computed from the two timestamps, and a report that cannot be measured is excluded from both
+     * sides instead of counted against one.
+     */
+    private RateStat rateOf(List<InterviewReport> reports) {
+        int measurable = 0;
+        int within72 = 0;
+        for (InterviewReport report : reports) {
+            Boolean met = report.getWithin72Hours();
+            if (met == null) {
+                continue;
+            }
+            measurable++;
+            if (met) {
+                within72++;
+            }
+        }
+        return new RateStat(within72, measurable, reports.size() - measurable);
     }
 
     private <K> Map<K, List<InterviewRequest>> liveRequestsByKey(List<InterviewRequest> requests, java.util.function.Function<InterviewRequest, K> key) {
@@ -234,12 +256,7 @@ public class DashboardService {
     private BreakdownRow rowFor(Long id, String name, String subLabel, String href,
             List<InterviewRequest> liveRequests, List<InterviewReport> completedReports, LocalDateTime now) {
         int overdueNow = countByState(liveRequests, now, DueState.OVERDUE);
-        int within72 = (int) completedReports.stream()
-                .filter(r -> r.getInterviewRequest().getReturnedAt() != null && Boolean.TRUE.equals(r.getWithin72Hours()))
-                .count();
-        int excluded = (int) completedReports.stream().filter(r -> r.getInterviewRequest().getReturnedAt() == null).count();
-        RateStat stat = new RateStat(within72, completedReports.size() - excluded, excluded);
-        return new BreakdownRow(id, name, subLabel, href, overdueNow, stat);
+        return new BreakdownRow(id, name, subLabel, href, overdueNow, rateOf(completedReports));
     }
 
     private List<BreakdownRow> homeBreakdown(List<Home> homes, List<InterviewRequest> requests,

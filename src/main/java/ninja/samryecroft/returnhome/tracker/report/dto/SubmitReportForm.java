@@ -1,12 +1,19 @@
 package ninja.samryecroft.returnhome.tracker.report.dto;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 public class SubmitReportForm {
 
-    /** Required to submit for review, but not to save a draft - enforced manually by the
-     * controller rather than with a Bean Validation annotation, since this DTO backs both actions. */
-    private LocalDate interviewDate;
+    /**
+     * When the interview was held - a date AND a time, because the statutory window is 72 hours and
+     * a date alone leaves up to 24 hours of ambiguity, straddling the boundary it is meant to
+     * measure.
+     *
+     * <p>Required to submit for review, but not to save a draft - enforced manually by the
+     * controller rather than with a Bean Validation annotation, since this DTO backs both actions.
+     */
+    private LocalDateTime heldAt;
 
     private String interviewLocation;
 
@@ -51,12 +58,12 @@ public class SubmitReportForm {
     /** Only used by the Reviewer's approve/reject action - required (non-blank) to reject. */
     private String reviewComments;
 
-    public LocalDate getInterviewDate() {
-        return interviewDate;
+    public LocalDateTime getHeldAt() {
+        return heldAt;
     }
 
-    public void setInterviewDate(LocalDate interviewDate) {
-        this.interviewDate = interviewDate;
+    public void setHeldAt(LocalDateTime heldAt) {
+        this.heldAt = heldAt;
     }
 
     public String getInterviewLocation() {

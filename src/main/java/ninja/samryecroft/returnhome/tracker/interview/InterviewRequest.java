@@ -53,8 +53,22 @@ public class InterviewRequest implements EncryptedEntity {
     @Column(name = "scheduled_at")
     private LocalDateTime scheduledAt;
 
-    @Column(name = "returned_at")
+    /**
+     * When the child returned - the start of the statutory 72-hour clock, and required as of V15.
+     *
+     * <p>Made non-null while the database was still empty. Afterwards it becomes a backfill with a
+     * policy question attached ("what return time do we invent for a record that never had one?"),
+     * and there is no honest answer to that for a statutory record.
+     */
+    @Column(name = "returned_at", nullable = false)
     private LocalDateTime returnedAt;
+
+    /**
+     * When a coordinator allocated this request to a visitor. Not encrypted, for the same reason as
+     * {@code heldAt}: allocation latency is only measurable if it can be aggregated (see V15).
+     */
+    @Column(name = "allocated_at")
+    private LocalDateTime allocatedAt;
 
     @Column(name = "notes_enc", columnDefinition = "TEXT")
     private String notesCiphertext;
@@ -249,6 +263,14 @@ public class InterviewRequest implements EncryptedEntity {
 
     public void setReturnedAt(LocalDateTime returnedAt) {
         this.returnedAt = returnedAt;
+    }
+
+    public LocalDateTime getAllocatedAt() {
+        return allocatedAt;
+    }
+
+    public void setAllocatedAt(LocalDateTime allocatedAt) {
+        this.allocatedAt = allocatedAt;
     }
 
     public String getNotes() {

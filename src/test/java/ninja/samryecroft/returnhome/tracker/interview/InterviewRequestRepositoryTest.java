@@ -3,6 +3,7 @@ package ninja.samryecroft.returnhome.tracker.interview;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Set;
 import ninja.samryecroft.returnhome.tracker.AbstractIntegrationTest;
 import ninja.samryecroft.returnhome.tracker.child.Child;
@@ -54,6 +55,7 @@ class InterviewRequestRepositoryTest extends AbstractIntegrationTest {
         requestA.setHome(homeA);
         requestA.setRequestedBy(staffA);
         requestA.setStatus(InterviewStatus.SCHEDULED);
+        requestA.setReturnedAt(LocalDateTime.now().minusHours(4));
         requestA.setAllocatedVisitor(visitor);
         interviewRequestRepository.save(requestA);
 
@@ -62,6 +64,7 @@ class InterviewRequestRepositoryTest extends AbstractIntegrationTest {
         requestB.setHome(homeB);
         requestB.setRequestedBy(staffA);
         requestB.setStatus(InterviewStatus.REQUESTED);
+        requestB.setReturnedAt(LocalDateTime.now().minusHours(4));
         interviewRequestRepository.save(requestB);
 
         assertThat(interviewRequestRepository.findByHomeId(homeA.getId()))

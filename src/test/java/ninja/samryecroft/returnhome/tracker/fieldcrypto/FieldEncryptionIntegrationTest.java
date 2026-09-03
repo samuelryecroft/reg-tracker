@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import ninja.samryecroft.returnhome.tracker.AbstractIntegrationTest;
 import ninja.samryecroft.returnhome.tracker.child.Child;
 import ninja.samryecroft.returnhome.tracker.child.ChildRepository;
@@ -213,6 +214,7 @@ class FieldEncryptionIntegrationTest extends AbstractIntegrationTest {
         request.setChild(child);
         request.setHome(home);
         request.setRequestedBy(staff);
+        request.setReturnedAt(LocalDateTime.now().minusHours(4));
         request = interviewRequestRepository.save(request);
 
         InterviewReport report = new InterviewReport();

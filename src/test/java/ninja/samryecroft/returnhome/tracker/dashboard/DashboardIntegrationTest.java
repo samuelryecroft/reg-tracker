@@ -148,7 +148,16 @@ class DashboardIntegrationTest extends AbstractIntegrationTest {
     }
 
     /** A request already resolved (interview held, report approved) - only the report's data drives the Performance zone. */
+    /**
+     * A completed interview whose 72-hour outcome is now a measured fact: heldAt sits either
+     * comfortably inside the window or well outside it, rather than being declared by a boolean.
+     */
     private void saveApprovedReport(Home home, LocalDateTime returnedAt, boolean within72) {
+        saveApprovedReport(home, returnedAt, returnedAt.plusHours(within72 ? 10 : 100));
+    }
+
+    /** {@code heldAt} null means the window has no end, so the interview is not measurable. */
+    private void saveApprovedReport(Home home, LocalDateTime returnedAt, LocalDateTime heldAt) {
         Child child = saveChild("Child", home);
         InterviewRequest request = new InterviewRequest();
         request.setChild(child);
@@ -163,7 +172,7 @@ class DashboardIntegrationTest extends AbstractIntegrationTest {
         report.setVisitor(visitor);
         report.setStatus(ReportStatus.APPROVED);
         report.setReviewedAt(LocalDateTime.now());
-        report.setWithin72Hours(within72);
+        report.setHeldAt(heldAt);
         interviewReportRepository.save(report);
     }
 
@@ -230,11 +239,14 @@ class DashboardIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void excludedNoReturnTimeIsCountedSeparatelyFromTheRateNotFoldedIntoEitherSide() throws Exception {
+    void anUnmeasurableInterviewIsExcludedFromTheRateRatherThanCountedAgainstIt() throws Exception {
         for (int i = 0; i < 5; i++) {
             saveApprovedReport(homeA1, LocalDateTime.now().minusHours(10), true); // 5 valid, all within 72h
         }
-        saveApprovedReport(homeA1, null, true); // completed but no returnedAt - excluded, not counted either way
+        // Completed, but nobody recorded when the interview was held, so the window has no end.
+        // The old implementation scored exactly this case as a breach: its self-declared answer was
+        // null, which failed the "is TRUE" test while still sitting in the denominator.
+        saveApprovedReport(homeA1, LocalDateTime.now().minusHours(10), (LocalDateTime) null);
 
         String html = mockMvc.perform(get("/dashboard").with(asUser("dash-orgadmin-a" + suffix)))
                 .andExpect(status().isOk())
