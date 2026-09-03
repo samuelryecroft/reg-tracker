@@ -19,11 +19,15 @@ STATE_CONTAINER="tfstate"
 echo ">> Resource group $STATE_RG ($LOCATION)"
 az group create --name "$STATE_RG" --location "$LOCATION" --output none
 
-echo ">> Storage account $STATE_SA (TLS1.2, no public blob access, key auth left on for bootstrap only)"
+echo ">> Storage account $STATE_SA (TLS1.2, no public blob access, shared-key auth OFF - Entra only)"
+# --allow-shared-key-access false: the state store holds all four plaintext DB/admin creds, so read
+# access to it equals full database access - it must be the MOST hardened account in the estate, not
+# the least. The backend uses use_azuread_auth=true (Entra), and every az call below uses
+# --auth-mode login / the management plane, so turning shared-key off breaks nothing here.
 az storage account create \
   --name "$STATE_SA" --resource-group "$STATE_RG" --location "$LOCATION" \
   --sku Standard_LRS --kind StorageV2 --min-tls-version TLS1_2 \
-  --allow-blob-public-access false --output none
+  --allow-blob-public-access false --allow-shared-key-access false --output none
 
 echo ">> Blob versioning + 30-day soft delete (so state is recoverable)"
 az storage account blob-service-properties update \

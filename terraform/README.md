@@ -193,7 +193,9 @@ new schema and **rollback-by-swap stays safe**.
 schema objects (and can add V11's FK `REFERENCES` to `users`/`organisations`/`homes`). On a DB whose
 earlier tables were created by the admin, do a **one-time ownership handover**
 (`REASSIGN OWNED BY <admin> TO rht_migrator`, or `ALTER TABLE … OWNER TO rht_migrator`) before the
-first migrator-run migration.
+first migrator-run migration. This **must include `flyway_schema_history`** — the easiest table to
+forget, and if the migrator does not own it the first migrator-run migration fails with a confusing
+permissions error rather than an obvious one.
 
 ## Remaining pre-go-live items
 
