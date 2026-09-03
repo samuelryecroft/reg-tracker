@@ -2,6 +2,7 @@ package ninja.samryecroft.returnhome.tracker;
 
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 import javax.sql.DataSource;
 import ninja.samryecroft.returnhome.tracker.config.AdminUserSeeder;
 import ninja.samryecroft.returnhome.tracker.fieldcrypto.FieldKeyService;
@@ -39,16 +40,19 @@ public abstract class AbstractIntegrationTest {
 
     /**
      * Tables that must survive a reset: Flyway's own bookkeeping, plus the reference data seeded by
-     * V4/V5/V9 that the tests read rather than write. Emptying those would leave the schema in a
-     * state no real deployment is ever in.
+     * V4/V5/V9. Emptying those would leave the schema in a state no real deployment is ever in.
      *
      * <p>Everything else is discovered from the database rather than listed, so a table added by a
      * future migration is reset automatically instead of silently leaking rows between classes.
+     *
+     * <p>Preserving a table is not the same as it being read-only, which is what
+     * {@link #dropNonReferenceOrganisations} exists to handle.
      */
     private static final Set<String> PRESERVED_TABLES =
             Set.of("flyway_schema_history", "organisations", "theme_settings");
 
     private static volatile String truncateStatement;
+    private static volatile List<Long> referenceOrganisationIds;
 
     @Autowired
     private DataSource dataSource;
@@ -78,6 +82,7 @@ public abstract class AbstractIntegrationTest {
         // One statement so the cascade and the identity restart apply atomically; TRUNCATE takes an
         // ACCESS EXCLUSIVE lock per table and doing them separately invites deadlocks.
         jdbc.execute(truncateStatement(jdbc));
+        dropNonReferenceOrganisations(jdbc);
         if (fieldKeyService != null) {
             fieldKeyService.clearCache();
         }
@@ -102,5 +107,49 @@ public abstract class AbstractIntegrationTest {
             truncateStatement = statement;
         }
         return statement;
+    }
+
+    /**
+     * Puts {@code organisations} back to just the rows the migrations seeded.
+     *
+     * <p>{@code organisations} is preserved from the truncate because V5's two rows are reference
+     * data, and nine test classes read them as such - they take
+     * {@code findByTypeOrderByName(type).get(0)} to mean "the one V5 seeded". But three classes
+     * (dashboard, audit-feed, case-file-export) also <em>create</em> organisations, and a preserved
+     * table never gives those back. Once a leftover sorts ahead of the seeded row by name, that
+     * {@code get(0)} silently starts returning somebody else's organisation.
+     *
+     * <p>That is worse than an ordinary leak, because the supplier and the care provider are looked
+     * up separately. Take "Feed Supplier" as the first supplier while "Default Care Provider" is
+     * still the first care provider, and the pair is no longer linked: the coordinator now belongs
+     * to a supplier that does not serve the request's home, so allocating one correctly fails
+     * {@code OrganisationAccessService} with a 403. Whether it happens depends on class ordering,
+     * which is filesystem order and therefore differs between a macOS laptop and a Linux CI runner
+     * - the suite passed locally and failed on CI for exactly this reason (T120).
+     *
+     * <p>The reference ids are read on the first reset rather than hard-coded, so a migration that
+     * seeds a third organisation needs no change here. That first reset is safe to snapshot from:
+     * it runs before any test body, and this superclass hook runs before the subclass's own
+     * {@code @BeforeEach}, so nothing has written yet.
+     */
+    private static void dropNonReferenceOrganisations(JdbcTemplate jdbc) {
+        List<Long> reference = referenceOrganisationIds;
+        if (reference == null) {
+            referenceOrganisationIds = jdbc.queryForList("SELECT id FROM organisations", Long.class);
+            return;
+        }
+        String ids = reference.isEmpty() ? "NULL"
+                : reference.stream().map(String::valueOf).collect(Collectors.joining(", "));
+        // theme_settings is preserved too and carries an FK to organisations, so its rows for a
+        // test-created organisation have to go first.
+        jdbc.update("DELETE FROM theme_settings WHERE organisation_id IS NOT NULL"
+                + " AND organisation_id NOT IN (" + ids + ")");
+        // Parent and child organisations go in one statement so the self-referencing
+        // supplier_organisation_id FK is only checked once both have gone.
+        jdbc.update("DELETE FROM organisations WHERE id NOT IN (" + ids + ")");
+        // RESTART IDENTITY covered the truncated tables; this is the preserved table's equivalent,
+        // so a test-created organisation gets the same id every run rather than climbing.
+        jdbc.execute("SELECT setval('organisations_id_seq',"
+                + " COALESCE((SELECT MAX(id) FROM organisations), 1), true)");
     }
 }
