@@ -189,7 +189,15 @@ The human wants the whole programme, not phases. Dependency order within it:
 6. **The rest** — 4b, 5a–5d, 6a, 6b, 6e.
 7. **Empty states (5e)** last, across every list — they are cheap once the components exist and expensive if
    done per-screen as you go.
-8. **3b** only after **Q5** is answered.
+8. **3b** is now just the accent swap (D-Q5) — one token, no document work.
+
+**Held / gated within that order**
+- **1c/1d offline affordances** wait on A1. Everything else in 3 proceeds; build with server autosave.
+- **Step 1 carries the light-mode accent fix (D-Q1)** — it is one declaration, and every screen after it
+  inherits a focus ring that passes. Doing it later means re-checking every screen.
+- **Step 1 also carries the type floor (D-Q4)** — lifting 95 sub-11px instances is cheap in the component
+  layer and expensive once 27 screens have been drawn at the canvas's sizes.
+- **44px targets (D-Q3)** likewise belong in the component layer, not per screen.
 
 Return-time-required (decision 1) is a data/flow change Kevin owns, but it lands in 2e and deletes
 `return-time-form.html`, so sequence it with step 4.
@@ -198,7 +206,8 @@ Return-time-required (decision 1) is a data/flow change Kevin owns, but it lands
 
 ## 5 · Design questions for the human
 
-Nothing below is guessed at. Grouped by whether it blocks.
+Nothing below is guessed at. **The five blocking questions are now answered — see §5a.** The detail
+questions below remain open.
 
 ### Blocking
 
@@ -288,6 +297,102 @@ and chroma unchanged" — the code mirrors chroma too. The README implies the wh
 excludes `--color-accent`. The README's dark neutral ramp is hex; the canvas's is OKLCH, and they are not
 identical values. **Which is authoritative, the prose or the canvas code?** I have specced from the code,
 because it is what the prototype actually renders.
+
+---
+
+## 5a · Decisions locked (god, 3 Sep) — these supersede the blocking questions below
+
+### D-Q1 · Light-mode accent: `oklch(0.48 0.125 <hue>)`
+
+Approved fix — fixed light-mode lightness, hue still free, accent role **not** mirrored. The value is
+derived, not picked. Sweeping all 360 hues at the accent's own chroma (0.125) against both light grounds:
+
+| Accent L | Worst case over **every** hue (vs bg and surface) | |
+|---|---|---|
+| 0.46 | 5.49 | safe, but darker than needed — loses accent character |
+| **0.48** | **5.06** | **chosen** — +0.56 headroom over AA text |
+| 0.50 | 4.66 | +0.16 headroom — too tight to survive gamut mapping |
+| 0.509 | 4.50 | the exact ceiling for 4.5:1 at every hue |
+| 0.614 | 3.00 | the exact ceiling for 3:1 — the focus-ring floor |
+
+**0.48 is the pick.** Worst hue is ~190 (cyan); at the two real suppliers it lands well clear — Beacon
+(289) `#5d4f9f` at 6.00:1, Northgate (232) `#006797` at 5.41:1. That satisfies god's requirement that the
+focus ring hold ≥3:1 at *every* hue an admin can pick, with the stronger 4.5:1 text threshold met too, so
+links and the primary button's label pass as body copy rather than merely as UI.
+
+```css
+:root[data-appearance="light"] {
+  --color-accent: oklch(0.48 0.125 var(--brand-hue));
+}
+```
+
+Hover and pressed steps take one step either side at the same fixed lightness rather than reading from the
+mirrored ramp, whose 600/700 steps are *lighter* than the base on a light ground and produce 1.84:1.
+
+**Dark mode needs no change and is safe at every hue** — I swept it too: worst case 5.31:1 against the
+background and 4.58:1 against surface, at hue 352. The handoff's dark side is genuinely robust; only the
+light path was broken.
+
+### D-Q2 · Both variants per pair, and the routes they live on
+
+| Variant | Route | Template |
+|---|---|---|
+| **1a** record, history in a 316px right column | `GET /interview-requests/{id}` | `interview/detail.html` (absorbing `report/view.html`) |
+| **1b** document-first, sticky approve/send-back bar, self-review guard | `GET /reviewer/reports/{id}/review` | `reviewer/review-form.html` |
+| **1c** capture, long scroll | `GET /visitor/interviews/{id}/report` | `visitor/report-form.html` |
+| **1d** capture, section index | **same route** — a panel toggled from the sticky progress bar | same template |
+| **2a** queue as deadline-grouped cards | `GET /coordinator/requests` | `coordinator/requests.html` |
+| **2b** queue as a dated feed | **same route**, `?view=feed`, remembered per user | same template |
+
+1a and 1b are genuinely two routes for two audiences. **1c/1d and 2a/2b are two views of one thing** and
+should share a route: giving 1d its own URL would split the stepper's autosave state across two pages, and
+giving 2b its own URL would fork the queue's filter state. Both get a control — 1d a panel, 2b a segmented
+toggle persisted like the appearance and reveal preferences. Say if you want four routes instead of two.
+
+### D-Q3 · 44px on anything tappable
+
+Nocturne's density everywhere else. Affects `.btn` (30px → 44), `.btn-icon` (36 → 44), `.input` (36 → 44),
+and any card action or chip that is a control rather than a label.
+
+### D-Q4 · The readability floor
+
+god delegated the exact numbers. **Nothing interactive or data-bearing below 13px; nothing at all below
+11px.** Body copy takes Nocturne's own `body` default of 15px, so this is mostly a matter of lifting the
+bottom of the scale rather than redrawing it.
+
+| Role | Size | Was |
+|---|---|---|
+| Page title | 27px | |
+| Section heading | 19px | |
+| Card / sub-heading | 15–17px | |
+| **Body and content** | **15px** | Nocturne's `body` default — unchanged |
+| **Interactive** — button, input, select, tab, link, form label | **14px** | `.btn`/`.input` already 14; `.field > label` was 12 |
+| **Data** — table cell, card meta, list value, deadline, a timestamp that *is* the datum | **13px** | often 11–12 |
+| **Status tags** | **13px** | `.tag` was **11px** |
+| Micro-labels and chrome — uppercase eyebrows, avatar initials, secondary metadata | **11px floor** | 9.5–10.5 |
+
+**Retired outright: 9px, 9.5px, 10px, 10.5px — 95 instances across the canvas.**
+
+The one judgement call worth naming: **a status tag is data, not chrome.** "Overdue", "Sent back",
+"Approved" is frequently the most important word on a card, and Nocturne sets `.tag` at 11px. It goes to
+13px. Tags also keep a glyph or distinct text — never colour alone — which the mono palette makes
+non-negotiable, since Nocturne supplies no semantic hues (see Q6).
+
+### D-Q5 · The generated document: accent only
+
+Keep the layout that merged today (T88/T98). Take only
+`--doc-accent = oklch(0.46 0.09 <hue>)` — ramp step 700 — in place of `primaryColorDark`. No document
+rebuild. Note this is the *dark-ramp* 700 in both appearances: the document is paper either way, so it does
+not follow the user's light/dark setting.
+
+### A1 · HELD — offline report capture
+
+The offline behaviour of 1c/1d is on hold pending a data-protection decision (children's Article 9 data
+cached on visitor phones). **Draw the distinction when building:** server-side autosave-per-field is *not*
+held and can proceed — it is ordinary form persistence. What is held is **local persistence on the device**:
+the offline banner, the "works offline and syncs" promise, and any queue written to the phone. Build 1c/1d
+with server autosave, leave the offline affordances out until answered, and do not ship copy that promises
+offline capability.
 
 ---
 
