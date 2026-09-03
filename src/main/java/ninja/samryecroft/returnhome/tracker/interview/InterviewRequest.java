@@ -2,6 +2,7 @@ package ninja.samryecroft.returnhome.tracker.interview;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EntityListeners;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
@@ -11,6 +12,10 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
+import ninja.samryecroft.returnhome.tracker.fieldcrypto.Encrypted;
+import ninja.samryecroft.returnhome.tracker.fieldcrypto.EncryptedEntity;
+import ninja.samryecroft.returnhome.tracker.fieldcrypto.EncryptedFieldListener;
 import java.time.LocalDateTime;
 import ninja.samryecroft.returnhome.tracker.child.Child;
 import ninja.samryecroft.returnhome.tracker.home.Home;
@@ -18,7 +23,8 @@ import ninja.samryecroft.returnhome.tracker.user.User;
 
 @Entity
 @Table(name = "interview_requests")
-public class InterviewRequest {
+@EntityListeners(EncryptedFieldListener.class)
+public class InterviewRequest implements EncryptedEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -50,24 +56,44 @@ public class InterviewRequest {
     @Column(name = "returned_at")
     private LocalDateTime returnedAt;
 
-    @Column(columnDefinition = "TEXT")
+    @Column(name = "notes_enc", columnDefinition = "TEXT")
+    private String notesCiphertext;
+
+    @Transient
+    @Encrypted(ciphertextField = "notesCiphertext")
     private String notes;
 
     // --- Details of the Young Person ---
 
-    @Column(name = "legal_status")
+    @Column(name = "legal_status_enc", columnDefinition = "TEXT")
+    private String legalStatusCiphertext;
+
+    @Transient
+    @Encrypted(ciphertextField = "legalStatusCiphertext")
     private String legalStatus;
 
     @Column(name = "missing_since")
     private LocalDateTime missingSince;
 
-    @Column(name = "known_risks", columnDefinition = "TEXT")
+    @Column(name = "known_risks_enc", columnDefinition = "TEXT")
+    private String knownRisksCiphertext;
+
+    @Transient
+    @Encrypted(ciphertextField = "knownRisksCiphertext")
     private String knownRisks;
 
-    @Column(name = "childs_comments", columnDefinition = "TEXT")
+    @Column(name = "childs_comments_enc", columnDefinition = "TEXT")
+    private String childsCommentsCiphertext;
+
+    @Transient
+    @Encrypted(ciphertextField = "childsCommentsCiphertext")
     private String childsComments;
 
-    @Column(name = "missing_episode_details", columnDefinition = "TEXT")
+    @Column(name = "missing_episode_details_enc", columnDefinition = "TEXT")
+    private String missingEpisodeDetailsCiphertext;
+
+    @Transient
+    @Encrypted(ciphertextField = "missingEpisodeDetailsCiphertext")
     private String missingEpisodeDetails;
 
     @Column(name = "missing_in_last_6_months")
@@ -79,24 +105,44 @@ public class InterviewRequest {
     @Column(name = "strategy_meeting_requested")
     private Boolean strategyMeetingRequested;
 
-    @Column(name = "important_people", columnDefinition = "TEXT")
+    @Column(name = "important_people_enc", columnDefinition = "TEXT")
+    private String importantPeopleCiphertext;
+
+    @Transient
+    @Encrypted(ciphertextField = "importantPeopleCiphertext")
     private String importantPeople;
 
-    @Column(name = "about_young_person", columnDefinition = "TEXT")
+    @Column(name = "about_young_person_enc", columnDefinition = "TEXT")
+    private String aboutYoungPersonCiphertext;
+
+    @Transient
+    @Encrypted(ciphertextField = "aboutYoungPersonCiphertext")
     private String aboutYoungPerson;
 
     // --- Details of Professionals ---
 
-    @Column(name = "social_worker_details", columnDefinition = "TEXT")
+    @Column(name = "social_worker_details_enc", columnDefinition = "TEXT")
+    private String socialWorkerDetailsCiphertext;
+
+    @Transient
+    @Encrypted(ciphertextField = "socialWorkerDetailsCiphertext")
     private String socialWorkerDetails;
 
     @Column(name = "consent_provided")
     private Boolean consentProvided;
 
-    @Column(name = "placing_local_authority")
+    @Column(name = "placing_local_authority_enc", columnDefinition = "TEXT")
+    private String placingLocalAuthorityCiphertext;
+
+    @Transient
+    @Encrypted(ciphertextField = "placingLocalAuthorityCiphertext")
     private String placingLocalAuthority;
 
-    @Column(name = "police_mfh_coordinator_details", columnDefinition = "TEXT")
+    @Column(name = "police_mfh_coordinator_details_enc", columnDefinition = "TEXT")
+    private String policeMfhCoordinatorDetailsCiphertext;
+
+    @Transient
+    @Encrypted(ciphertextField = "policeMfhCoordinatorDetailsCiphertext")
     private String policeMfhCoordinatorDetails;
 
     @Column(name = "parents_details", columnDefinition = "TEXT")
@@ -130,6 +176,20 @@ public class InterviewRequest {
 
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt = LocalDateTime.now();
+
+    /**
+     * The canonical walk - request to home to organisation - resolved from the domain model rather
+     * than from the request that asked for it, so the key is chosen independently of the access
+     * check. This is the same path the document encryption uses, deliberately: two encryption
+     * schemes that disagree about who owns a record would be worse than either alone.
+     */
+    @Override
+    public Long owningOrganisationId() {
+        if (home == null || home.getOrganisation() == null) {
+            return null;
+        }
+        return home.getOrganisation().getId();
+    }
 
     public Long getId() {
         return id;

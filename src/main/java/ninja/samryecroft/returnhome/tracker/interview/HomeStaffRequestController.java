@@ -2,6 +2,7 @@ package ninja.samryecroft.returnhome.tracker.interview;
 
 import jakarta.validation.Valid;
 import java.util.List;
+import ninja.samryecroft.returnhome.tracker.child.Child;
 import ninja.samryecroft.returnhome.tracker.child.ChildRepository;
 import ninja.samryecroft.returnhome.tracker.interview.dto.NewRequestForm;
 import ninja.samryecroft.returnhome.tracker.interview.dto.ReturnTimeForm;
@@ -60,7 +61,7 @@ public class HomeStaffRequestController {
     @GetMapping("/new")
     public String newForm(@AuthenticationPrincipal AppUserPrincipal principal, Model model) {
         model.addAttribute("form", interviewRequestService.newRequestFormFor(principal));
-        model.addAttribute("children", childRepository.findByHomeIdOrderByLastNameAscFirstNameAsc(principal.getHomeId()));
+        model.addAttribute("children", sortedByName(childRepository.findByHomeId(principal.getHomeId())));
         return "home-staff/request-form";
     }
 
@@ -68,10 +69,15 @@ public class HomeStaffRequestController {
     public String create(@AuthenticationPrincipal AppUserPrincipal principal,
             @Valid @ModelAttribute("form") NewRequestForm form, BindingResult bindingResult, Model model) {
         if (bindingResult.hasErrors()) {
-            model.addAttribute("children", childRepository.findByHomeIdOrderByLastNameAscFirstNameAsc(principal.getHomeId()));
+            model.addAttribute("children", sortedByName(childRepository.findByHomeId(principal.getHomeId())));
             return "home-staff/request-form";
         }
         InterviewRequest request = interviewRequestService.createRequest(form, principal);
         return "redirect:/interview-requests/" + request.getId();
+    }
+
+    /** The name order the database used to provide, now that the names are ciphertext there. */
+    private List<Child> sortedByName(List<Child> children) {
+        return children.stream().sorted(ChildRepository.BY_NAME).toList();
     }
 }

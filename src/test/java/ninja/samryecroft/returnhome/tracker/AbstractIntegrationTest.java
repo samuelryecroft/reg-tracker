@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Set;
 import javax.sql.DataSource;
 import ninja.samryecroft.returnhome.tracker.config.AdminUserSeeder;
+import ninja.samryecroft.returnhome.tracker.fieldcrypto.FieldKeyService;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
@@ -57,6 +58,17 @@ public abstract class AbstractIntegrationTest {
     private AdminUserSeeder adminUserSeeder;
 
     /**
+     * The field-key cache outlives the truncate below, because the Spring context is reused across
+     * test classes while the database is emptied between them. Left alone, a later test would
+     * encrypt under a cached key whose wrapped copy in {@code org_field_key} had just been deleted -
+     * columns nothing could ever unwrap again. Nothing truncates that table in production, so this
+     * is a test-harness concern rather than a live one, but the cache and the row have to be
+     * discarded together wherever one of them goes.
+     */
+    @Autowired(required = false)
+    private FieldKeyService fieldKeyService;
+
+    /**
      * Runs before any subclass {@code @BeforeEach} - JUnit invokes superclass lifecycle methods
      * first - so a test's own seed data is written into an empty database.
      */
@@ -66,6 +78,9 @@ public abstract class AbstractIntegrationTest {
         // One statement so the cascade and the identity restart apply atomically; TRUNCATE takes an
         // ACCESS EXCLUSIVE lock per table and doing them separately invites deadlocks.
         jdbc.execute(truncateStatement(jdbc));
+        if (fieldKeyService != null) {
+            fieldKeyService.clearCache();
+        }
         if (adminUserSeeder != null) {
             // Re-create the bootstrap admin the truncate just removed, so a context that seeded one
             // at startup still has it. Skips itself when no seed password is configured, which is

@@ -59,13 +59,17 @@ public class ChildController {
             children = childRepository.findByHomeOrganisationIdWithHome(principal.getOrganisationId());
             showHomeColumn = true;
         } else if (principal.hasRole(Role.VIEWER)) {
-            children = childRepository.findByViewerAccessOrderByHome(principal.getUserId());
+            children = childRepository.findByViewerAccess(principal.getUserId());
             showHomeColumn = true;
         } else {
-            children = childRepository.findByHomeIdOrderByLastNameAscFirstNameAsc(principal.getHomeId());
+            children = childRepository.findByHomeId(principal.getHomeId());
             showHomeColumn = false;
         }
-        model.addAttribute("children", children);
+        // Sorted here rather than by the database: the names are encrypted columns now, so an
+        // ORDER BY on them would sort ciphertext. Home-grouped lists keep the home order they had.
+        model.addAttribute("children", children.stream()
+                .sorted(showHomeColumn ? ChildRepository.BY_HOME_THEN_NAME : ChildRepository.BY_NAME)
+                .toList());
         model.addAttribute("isAdmin", showHomeColumn);
         return "children/list";
     }
