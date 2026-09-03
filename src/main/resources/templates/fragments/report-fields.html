@@ -18,17 +18,17 @@
     <fieldset class="step" data-step="1">
     <legend class="section-title">Details</legend>
 
-    <label th:id="${readonly} ? 'interviewDate-label' : null" th:for="${readonly} ? null : 'interviewDate'">
-        Date of interview
+    <label th:id="${readonly} ? 'heldAt-label' : null" th:for="${readonly} ? null : 'heldAt'">
+        Date and time the interview was held
         <span class="req" aria-hidden="true" th:unless="${readonly}">*</span>
     </label>
-    <p class="hint" th:unless="${readonly}">Needed before this report can be submitted for review — you can save a draft without it.</p>
-    <div class="readonly-val" th:classappend="${form.interviewDate == null} ? ' empty' : ''" role="group" aria-labelledby="interviewDate-label"
-         th:if="${readonly}" th:text="${form.interviewDate != null} ? ${#temporals.format(form.interviewDate, 'dd MMMM yyyy')} : 'Not answered'">Date</div>
-    <input type="date" id="interviewDate" th:field="*{interviewDate}" th:unless="${readonly}"
-           th:errorclass="is-invalid" th:aria-invalid="${#fields.hasErrors('interviewDate')}"
-           aria-describedby="interviewDate-error"/>
-    <div th:unless="${readonly}" th:replace="~{fragments/layout :: fieldError('interviewDate')}"></div>
+    <p class="hint" th:unless="${readonly}">The 72-hour window is measured from the child's return to this time, so the time of day matters. Needed before this report can be submitted for review — you can save a draft without it.</p>
+    <div class="readonly-val" th:classappend="${form.heldAt == null} ? ' empty' : ''" role="group" aria-labelledby="heldAt-label"
+         th:if="${readonly}" th:text="${form.heldAt != null} ? ${#temporals.format(form.heldAt, 'dd MMMM yyyy HH:mm')} : 'Not answered'">Date</div>
+    <input type="datetime-local" id="heldAt" th:field="*{heldAt}" th:unless="${readonly}"
+           th:errorclass="is-invalid" th:aria-invalid="${#fields.hasErrors('heldAt')}"
+           aria-describedby="heldAt-error"/>
+    <div th:unless="${readonly}" th:replace="~{fragments/layout :: fieldError('heldAt')}"></div>
 
     <label th:id="${readonly} ? 'interviewLocation-label' : null" th:for="${readonly} ? null : 'interviewLocation'">
         Location of this interview
@@ -40,15 +40,6 @@
            th:errorclass="is-invalid" th:aria-invalid="${#fields.hasErrors('interviewLocation')}"
            aria-describedby="interviewLocation-error"/>
     <div th:unless="${readonly}" th:replace="~{fragments/layout :: fieldError('interviewLocation')}"></div>
-
-    <label th:id="${readonly} ? 'within72Hours-label' : null" th:for="${readonly} ? null : 'within72Hours'">Was this interview offered and completed within 72 hours of return?</label>
-    <div class="readonly-val" role="group" aria-labelledby="within72Hours-label" th:if="${readonly}"
-         th:text="${form.within72Hours == null} ? 'Unknown' : (${form.within72Hours} ? 'Yes' : 'No')">Answer</div>
-    <select id="within72Hours" th:field="*{within72Hours}" th:unless="${readonly}">
-        <option value="">Unknown</option>
-        <option value="true">Yes</option>
-        <option value="false">No</option>
-    </select>
 
     <label th:id="${readonly} ? 'ifNotWhyLate-label' : null" th:for="${readonly} ? null : 'ifNotWhyLate'">If not, why?</label>
     <div class="readonly-val" th:classappend="${#strings.isEmpty(form.ifNotWhyLate)} ? ' empty' : ''" role="group" aria-labelledby="ifNotWhyLate-label"
@@ -62,9 +53,9 @@
 
     <label th:id="${readonly} ? 'previouslyMissing-label' : null" th:for="${readonly} ? null : 'previouslyMissing'">Has this young person previously been missing?</label>
     <div class="readonly-val" role="group" aria-labelledby="previouslyMissing-label" th:if="${readonly}"
-         th:text="${form.previouslyMissing == null} ? 'Unknown' : (${form.previouslyMissing} ? 'Yes' : 'No')">Answer</div>
+         th:text="${form.previouslyMissing == null} ? 'Not answered' : (${form.previouslyMissing} ? 'Yes' : 'No')">Answer</div>
     <select id="previouslyMissing" th:field="*{previouslyMissing}" th:unless="${readonly}">
-        <option value="">Unknown</option>
+        <option value="">Choose an answer</option>
         <option value="true">Yes</option>
         <option value="false">No</option>
     </select>
@@ -76,9 +67,9 @@
 
     <label th:id="${readonly} ? 'confidentialityExplained-label' : null" th:for="${readonly} ? null : 'confidentialityExplained'">Confidentiality explained to the young person regarding safeguarding duty of care?</label>
     <div class="readonly-val" role="group" aria-labelledby="confidentialityExplained-label" th:if="${readonly}"
-         th:text="${form.confidentialityExplained == null} ? 'Unknown' : (${form.confidentialityExplained} ? 'Yes' : 'No')">Answer</div>
+         th:text="${form.confidentialityExplained == null} ? 'Not answered' : (${form.confidentialityExplained} ? 'Yes' : 'No')">Answer</div>
     <select id="confidentialityExplained" th:field="*{confidentialityExplained}" th:unless="${readonly}">
-        <option value="">Unknown</option>
+        <option value="">Choose an answer</option>
         <option value="true">Yes</option>
         <option value="false">No</option>
     </select>
@@ -89,9 +80,9 @@
 
     <label th:id="${readonly} ? 'interviewAccepted-label' : null" th:for="${readonly} ? null : 'interviewAccepted'">Interview accepted?</label>
     <div class="readonly-val" role="group" aria-labelledby="interviewAccepted-label" th:if="${readonly}"
-         th:text="${form.interviewAccepted == null} ? 'Unknown' : (${form.interviewAccepted} ? 'Yes' : 'No')">Answer</div>
+         th:text="${form.interviewAccepted == null} ? 'Not answered' : (${form.interviewAccepted} ? 'Yes' : 'No')">Answer</div>
     <select id="interviewAccepted" th:field="*{interviewAccepted}" th:unless="${readonly}">
-        <option value="">Unknown</option>
+        <option value="">Choose an answer</option>
         <option value="true">Yes</option>
         <option value="false">No</option>
     </select>
@@ -123,9 +114,9 @@
 
     <label th:id="${readonly} ? 'consideredSelfMissing-label' : null" th:for="${readonly} ? null : 'consideredSelfMissing'">Did you consider yourself to be missing?</label>
     <div class="readonly-val" role="group" aria-labelledby="consideredSelfMissing-label" th:if="${readonly}"
-         th:text="${form.consideredSelfMissing == null} ? 'Unknown' : (${form.consideredSelfMissing} ? 'Yes' : 'No')">Answer</div>
+         th:text="${form.consideredSelfMissing == null} ? 'Not answered' : (${form.consideredSelfMissing} ? 'Yes' : 'No')">Answer</div>
     <select id="consideredSelfMissing" th:field="*{consideredSelfMissing}" th:unless="${readonly}">
-        <option value="">Unknown</option>
+        <option value="">Choose an answer</option>
         <option value="true">Yes</option>
         <option value="false">No</option>
     </select>

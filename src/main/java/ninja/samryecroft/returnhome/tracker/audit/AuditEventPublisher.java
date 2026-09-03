@@ -110,13 +110,6 @@ public class AuditEventPublisher {
     }
 
     /** Home staff (or an admin) supplying a missing return time - the roadmap 2.1 no-clock remedy, never a general edit. */
-    public void interviewRequestReturnTimeRecorded(InterviewRequest request, AppUserPrincipal principal) {
-        publish(actor(AuditEventRecord.of(AuditEventType.INTERVIEW_REQUEST_RETURN_TIME_RECORDED), principal)
-                .target("InterviewRequest", request.getId())
-                .scope(organisationIdOf(request), homeIdOf(request))
-                .meta("returnedAt", request.getReturnedAt())
-                .build());
-    }
 
     // --- Report lifecycle (A.3) ---
 

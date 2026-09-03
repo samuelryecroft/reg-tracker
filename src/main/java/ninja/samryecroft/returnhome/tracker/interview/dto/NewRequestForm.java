@@ -8,6 +8,12 @@ public class NewRequestForm {
     @NotNull
     private Long childId;
 
+    /**
+     * Required as of T97: it starts the statutory 72-hour clock, so a request without it has no
+     * deadline to be measured against. Enforced here as well as by the NOT NULL in V15, so the
+     * person filling the form gets a field error rather than a constraint violation.
+     */
+    @NotNull
     private LocalDateTime returnedAt;
 
     // --- Details of the Young Person ---

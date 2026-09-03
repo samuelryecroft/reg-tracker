@@ -54,13 +54,13 @@
             <dd th:text="${request.missingEpisodeDetails} ?: '—'">Missing episode details</dd>
 
             <dt>Missing in the last 6 months?</dt>
-            <dd th:text="${request.missingInLast6Months} == null ? 'Unknown' : (${request.missingInLast6Months} ? 'Yes' : 'No')">—</dd>
+            <dd th:text="${request.missingInLast6Months} == null ? 'Not answered' : (${request.missingInLast6Months} ? 'Yes' : 'No')">—</dd>
 
             <dt>Missing 5+ times in the last 30 days?</dt>
-            <dd th:text="${request.missingFiveTimesIn30Days} == null ? 'Unknown' : (${request.missingFiveTimesIn30Days} ? 'Yes' : 'No')">—</dd>
+            <dd th:text="${request.missingFiveTimesIn30Days} == null ? 'Not answered' : (${request.missingFiveTimesIn30Days} ? 'Yes' : 'No')">—</dd>
 
             <dt>Strategy meeting requested?</dt>
-            <dd th:text="${request.strategyMeetingRequested} == null ? 'Unknown' : (${request.strategyMeetingRequested} ? 'Yes' : 'No')">—</dd>
+            <dd th:text="${request.strategyMeetingRequested} == null ? 'Not answered' : (${request.strategyMeetingRequested} ? 'Yes' : 'No')">—</dd>
 
             <dt>Important people to the young person</dt>
             <dd th:text="${request.importantPeople} ?: '—'">Important people</dd>
@@ -77,7 +77,7 @@
             <dd th:text="${request.socialWorkerDetails} ?: '—'">Social worker</dd>
 
             <dt>Consent for IRHI provided?</dt>
-            <dd th:text="${request.consentProvided} == null ? 'Unknown' : (${request.consentProvided} ? 'Yes' : 'No')">—</dd>
+            <dd th:text="${request.consentProvided} == null ? 'Not answered' : (${request.consentProvided} ? 'Yes' : 'No')">—</dd>
 
             <dt>Placing local authority</dt>
             <dd th:text="${request.placingLocalAuthority} ?: '—'">Local authority</dd>

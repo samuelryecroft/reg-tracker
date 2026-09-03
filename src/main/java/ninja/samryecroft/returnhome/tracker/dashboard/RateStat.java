@@ -6,19 +6,19 @@ import java.util.OptionalInt;
 /**
  * The "held within 72 hours" compliance rate, honestly - Oscar's dashboard-build-brief.md D-4/D-5.
  *
- * <p>{@code excludedNoReturnTime} interviews are completed but have no recorded return time, so the
+ * <p>{@code excludedNotMeasurable} interviews are completed but have no recorded return time, so the
  * 72-hour clock never had a start - they are absent from both {@code within72} and
  * {@code validCompleted}, never silently folded into either side. Below the minimum reportable base
  * the rate is withheld entirely rather than shown as a misleadingly precise (or bare {@code 0%})
  * percentage.
  */
-public record RateStat(int within72, int validCompleted, int excludedNoReturnTime) {
+public record RateStat(int within72, int validCompleted, int excludedNotMeasurable) {
 
     /** Oscar's D-5: below this many interviews with a usable clock, don't publish a rate at all. */
     public static final int MINIMUM_REPORTABLE_BASE = 5;
 
     public int totalCompleted() {
-        return validCompleted + excludedNoReturnTime;
+        return validCompleted + excludedNotMeasurable;
     }
 
     public boolean tooFewToReport() {
@@ -40,7 +40,7 @@ public record RateStat(int within72, int validCompleted, int excludedNoReturnTim
         for (RateStat part : parts) {
             within72 += part.within72();
             validCompleted += part.validCompleted();
-            excluded += part.excludedNoReturnTime();
+            excluded += part.excludedNotMeasurable();
         }
         return new RateStat(within72, validCompleted, excluded);
     }

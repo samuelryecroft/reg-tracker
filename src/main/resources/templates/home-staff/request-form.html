@@ -36,8 +36,12 @@
             <label for="missingSince">Date of missing episode</label>
             <input type="datetime-local" id="missingSince" th:field="*{missingSince}"/>
 
-            <label for="returnedAt">Date/time child returned</label>
-            <input type="datetime-local" id="returnedAt" th:field="*{returnedAt}"/>
+            <label for="returnedAt">Date/time child returned <span class="req" aria-hidden="true">*</span></label>
+            <p class="hint">This starts the statutory 72-hour clock, so a request cannot be raised without it.</p>
+            <input type="datetime-local" id="returnedAt" th:field="*{returnedAt}" required
+                   th:errorclass="is-invalid" th:aria-invalid="${#fields.hasErrors('returnedAt')}"
+                   aria-describedby="returnedAt-error"/>
+            <div th:replace="~{fragments/layout :: fieldError('returnedAt')}"></div>
 
             <label for="knownRisks">Any known risks</label>
             <p class="hint">Any known risks to the young person, or that the interviewer needs to be aware of prior to their visit.</p>
@@ -53,14 +57,14 @@
 
             <label for="missingInLast6Months">Missing in the last 6 months?</label>
             <select id="missingInLast6Months" th:field="*{missingInLast6Months}">
-                <option value="">Unknown</option>
+                <option value="">Choose an answer</option>
                 <option value="true">Yes</option>
                 <option value="false">No</option>
             </select>
 
             <label for="missingFiveTimesIn30Days">Missing 5+ times in the last 30 days?</label>
             <select id="missingFiveTimesIn30Days" th:field="*{missingFiveTimesIn30Days}">
-                <option value="">Unknown</option>
+                <option value="">Choose an answer</option>
                 <option value="true">Yes</option>
                 <option value="false">No</option>
             </select>
@@ -68,7 +72,7 @@
             <label for="strategyMeetingRequested">Strategy meeting requested?</label>
             <p class="hint">Only relevant if the above is Yes.</p>
             <select id="strategyMeetingRequested" th:field="*{strategyMeetingRequested}">
-                <option value="">Unknown / not applicable</option>
+                <option value="">Not applicable</option>
                 <option value="true">Yes</option>
                 <option value="false">No</option>
             </select>
@@ -87,7 +91,7 @@
 
             <label for="consentProvided">Has consent for IRHI's been provided?</label>
             <select id="consentProvided" th:field="*{consentProvided}">
-                <option value="">Unknown</option>
+                <option value="">Choose an answer</option>
                 <option value="true">Yes</option>
                 <option value="false">No</option>
             </select>

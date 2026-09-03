@@ -132,7 +132,7 @@ class AuditHistoryIntegrationTest extends AbstractIntegrationTest {
 
     private MockHttpServletRequestBuilder reportFields(MockHttpServletRequestBuilder builder) {
         return builder
-                .param("interviewDate", "2026-07-20")
+                .param("heldAt", "2026-07-20T14:00")
                 .param("interviewLocation", "History House")
                 .param("within72Hours", "true")
                 .param("previouslyMissing", "false")

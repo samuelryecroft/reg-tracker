@@ -41,6 +41,6 @@ class RateStatTest {
         RateStat combined = RateStat.combine(List.of(new RateStat(11, 18, 3), new RateStat(9, 11, 1), new RateStat(15, 16, 0)));
         assertThat(combined.within72()).isEqualTo(35);
         assertThat(combined.validCompleted()).isEqualTo(45);
-        assertThat(combined.excludedNoReturnTime()).isEqualTo(4);
+        assertThat(combined.excludedNotMeasurable()).isEqualTo(4);
     }
 }

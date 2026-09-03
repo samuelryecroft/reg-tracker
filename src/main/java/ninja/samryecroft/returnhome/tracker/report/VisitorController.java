@@ -64,8 +64,8 @@ public class VisitorController {
             @ModelAttribute("form") SubmitReportForm form, BindingResult bindingResult,
             @RequestParam("action") String action, Model model) {
         if ("submit".equals(action)) {
-            if (form.getInterviewDate() == null) {
-                bindingResult.rejectValue("interviewDate", "required", "Date of interview is required to submit for review");
+            if (form.getHeldAt() == null) {
+                bindingResult.rejectValue("heldAt", "required", "Date and time the interview was held is required to submit for review");
             }
             if (form.getInterviewLocation() == null || form.getInterviewLocation().isBlank()) {
                 bindingResult.rejectValue("interviewLocation", "required", "Location is required to submit for review");

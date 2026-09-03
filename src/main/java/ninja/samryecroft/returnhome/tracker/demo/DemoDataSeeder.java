@@ -308,7 +308,7 @@ public class DemoDataSeeder implements ApplicationRunner {
                 seed.homeStaff, now.minusDays(3), "Third episode; strategy meeting requested."),
                 seed.visitor, now.minusDays(1).withHour(11).withMinute(30));
         InterviewReport draft = report(drafting, seed.visitor, ReportStatus.DRAFT,
-                now.minusDays(1).withHour(11).withMinute(30).toLocalDate());
+                now.minusDays(1).withHour(11).withMinute(30));
         draft.setInterviewerComments("Notes captured at the visit; to be written up before submission.");
         draft.setRecommendations(null);
         interviewReportRepository.save(draft);
@@ -319,7 +319,7 @@ public class DemoDataSeeder implements ApplicationRunner {
                 seed.homeStaff, now.minusDays(5), "Missing for 14 hours; returned by police."),
                 seed.visitor, now.minusDays(4).withHour(14).withMinute(0));
         InterviewReport awaitingReview = report(submitted, seed.visitor, ReportStatus.SUBMITTED,
-                now.minusDays(4).toLocalDate());
+                now.minusDays(4).withHour(14).withMinute(0));
         awaitingReview.setSubmittedAt(now.minusDays(4).withHour(17).withMinute(20));
         interviewReportRepository.save(awaitingReview);
         seed.markStatus(interviewRequestRepository, submitted, InterviewStatus.REPORT_SUBMITTED);
@@ -330,7 +330,7 @@ public class DemoDataSeeder implements ApplicationRunner {
                 seed.homeStaff, now.minusDays(12), "Returned voluntarily after 6 hours."),
                 seed.visitor2, now.minusDays(11).withHour(10).withMinute(0));
         InterviewReport toApprove = report(approved, seed.visitor2, ReportStatus.SUBMITTED,
-                now.minusDays(11).toLocalDate());
+                now.minusDays(11).withHour(14).withMinute(0));
         toApprove.setSubmittedAt(now.minusDays(11).withHour(16).withMinute(45));
         interviewReportRepository.save(toApprove);
         seed.markStatus(interviewRequestRepository, approved, InterviewStatus.REPORT_SUBMITTED);
@@ -343,7 +343,7 @@ public class DemoDataSeeder implements ApplicationRunner {
                 seed.homeStaff2, now.minusDays(9), "Returned after two nights away."),
                 seed.visitor, now.minusDays(8).withHour(9).withMinute(30));
         InterviewReport toReject = report(rejected, seed.visitor, ReportStatus.SUBMITTED,
-                now.minusDays(8).toLocalDate());
+                now.minusDays(8).withHour(14).withMinute(0));
         toReject.setSubmittedAt(now.minusDays(8).withHour(13).withMinute(5));
         interviewReportRepository.save(toReject);
         seed.markStatus(interviewRequestRepository, rejected, InterviewStatus.REPORT_SUBMITTED);
@@ -422,14 +422,13 @@ public class DemoDataSeeder implements ApplicationRunner {
 
     /** A fully-answered report body, so the generated .docx has content in every section. */
     private InterviewReport report(InterviewRequest request, User visitor, ReportStatus status,
-            LocalDate interviewDate) {
+            LocalDateTime heldAt) {
         InterviewReport report = new InterviewReport();
         report.setInterviewRequest(request);
         report.setVisitor(visitor);
         report.setStatus(status);
-        report.setInterviewDate(interviewDate);
+        report.setHeldAt(heldAt);
         report.setInterviewLocation(request.getHome().getName() + " - quiet room");
-        report.setWithin72Hours(true);
         report.setConsultationWithHomeStaff("Spoke with the key worker on arrival; no new concerns "
                 + "raised beyond those in the request.");
         report.setPreviouslyMissing(true);
@@ -465,7 +464,7 @@ public class DemoDataSeeder implements ApplicationRunner {
         report.setRecommendations("Review the phone arrangement; confirm the identity of the adult "
                 + "at the address; repeat this interview if a further episode occurs within 30 days.");
         report.setConductedByStatement(visitor.getFullName() + ", Independent Return Home Interviewer");
-        report.setDateReportShared(interviewDate.plusDays(1));
+        report.setDateReportShared(heldAt.toLocalDate().plusDays(1));
         return report;
     }
 
