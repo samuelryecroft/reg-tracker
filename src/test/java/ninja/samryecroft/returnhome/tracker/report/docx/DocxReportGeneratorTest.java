@@ -56,9 +56,17 @@ class DocxReportGeneratorTest {
                 "word/document.xml");
         assertThat(darkAccent).contains("<w:color w:val=\"FFFFFF\"/>");
 
-        // The 34 white value-cell FILLS are a different thing entirely and must survive both.
-        assertThat(paleAccent.split("w:fill=\"FFFFFF\"", -1).length - 1).isEqualTo(34);
-        assertThat(darkAccent.split("w:fill=\"FFFFFF\"", -1).length - 1).isEqualTo(34);
+        // The cell FILLS the contrast rule applies to are a different thing entirely and must
+        // survive both. T98 D-3 removed the two-tone stripe - 34 tinted label cells against 34
+        // explicitly white value cells - so the tint now appears exactly six times, once per
+        // section band, and that band is what the colour above is chosen to be readable on.
+        assertThat(paleAccent.split("w:fill=\"FFF0DD\"", -1).length - 1)
+                .as("one tinted section band per section, and nothing else filled")
+                .isEqualTo(6);
+        assertThat(darkAccent.split("w:fill=\"1D4ED8\"", -1).length - 1).isEqualTo(6);
+        // The striped grid itself is gone, in both directions.
+        assertThat(paleAccent).doesNotContain("w:fill=\"FFFFFF\"");
+        assertThat(darkAccent).doesNotContain("w:fill=\"FFFFFF\"");
     }
 
     @Test
@@ -93,8 +101,12 @@ class DocxReportGeneratorTest {
         assertThat(footer).contains("Alex Smith").contains("CR-42");
         assertThat(footer).doesNotContain("${");
 
-        // D-06: an explicit font rather than whatever Word defaults to.
-        assertThat(styles).contains("w:ascii=\"Calibri\"");
+        // D-06 / T98 Q-1: an explicit font rather than whatever Word defaults to - now Aptos,
+        // with Calibri named as its fallback in the font table rather than embedded, because the
+        // file is exported and emailed and has to render on someone else's machine.
+        assertThat(styles).contains("w:ascii=\"Aptos\"");
+        String fontTable = partOf(docx, "word/fontTable.xml");
+        assertThat(fontTable).contains("w:name=\"Aptos\"").contains("<w:altName w:val=\"Calibri\"/>");
     }
 
     @Test
