@@ -16,9 +16,7 @@ import ninja.samryecroft.returnhome.tracker.child.ChildRepository;
 import ninja.samryecroft.returnhome.tracker.home.Home;
 import ninja.samryecroft.returnhome.tracker.home.HomeRepository;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewRequestRepository;
-import ninja.samryecroft.returnhome.tracker.organisation.OrgType;
 import ninja.samryecroft.returnhome.tracker.organisation.Organisation;
-import ninja.samryecroft.returnhome.tracker.organisation.OrganisationRepository;
 import ninja.samryecroft.returnhome.tracker.user.AppUserDetailsService;
 import ninja.samryecroft.returnhome.tracker.user.Role;
 import ninja.samryecroft.returnhome.tracker.user.User;
@@ -74,8 +72,6 @@ class AuditHistoryIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private InterviewRequestRepository interviewRequestRepository;
     @Autowired
-    private OrganisationRepository organisationRepository;
-    @Autowired
     private AppUserDetailsService appUserDetailsService;
     @Autowired
     private PasswordEncoder passwordEncoder;
@@ -96,8 +92,8 @@ class AuditHistoryIntegrationTest extends AbstractIntegrationTest {
     @BeforeEach
     void seedData() {
         suffix = "-" + System.nanoTime();
-        supplierOrg = organisationRepository.findByTypeOrderByName(OrgType.SUPPLIER).get(0);
-        careProviderOrg = organisationRepository.findByTypeOrderByName(OrgType.CARE_PROVIDER).get(0);
+        supplierOrg = seededSupplier();
+        careProviderOrg = seededCareProvider();
 
         home = new Home();
         home.setName("History House" + suffix);

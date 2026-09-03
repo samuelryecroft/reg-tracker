@@ -6,8 +6,6 @@ import java.util.Set;
 import ninja.samryecroft.returnhome.tracker.home.Home;
 import ninja.samryecroft.returnhome.tracker.home.HomeRepository;
 import ninja.samryecroft.returnhome.tracker.organisation.Organisation;
-import ninja.samryecroft.returnhome.tracker.organisation.OrgType;
-import ninja.samryecroft.returnhome.tracker.organisation.OrganisationRepository;
 import ninja.samryecroft.returnhome.tracker.user.Role;
 import ninja.samryecroft.returnhome.tracker.user.User;
 import ninja.samryecroft.returnhome.tracker.user.UserRepository;
@@ -29,8 +27,6 @@ class DashboardCssRenderingUiTest extends AbstractUiTest {
     private static final String PASSWORD = "CorrectHorse123!";
 
     @Autowired
-    private OrganisationRepository organisationRepository;
-    @Autowired
     private HomeRepository homeRepository;
     @Autowired
     private UserRepository userRepository;
@@ -43,7 +39,7 @@ class DashboardCssRenderingUiTest extends AbstractUiTest {
         // AbstractIntegrationTest) - other tests index into it with .get(0), so reuse the seeded
         // reference organisation rather than inserting a new one that would permanently shift
         // that ordering for every test that runs afterwards in this JVM.
-        Organisation careProvider = organisationRepository.findByTypeOrderByName(OrgType.CARE_PROVIDER).get(0);
+        Organisation careProvider = seededCareProvider();
 
         Home home = new Home();
         home.setName("CSS Render Test Home");
