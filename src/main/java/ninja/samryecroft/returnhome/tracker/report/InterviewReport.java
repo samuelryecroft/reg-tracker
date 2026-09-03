@@ -2,6 +2,7 @@ package ninja.samryecroft.returnhome.tracker.report;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EntityListeners;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
@@ -12,6 +13,10 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
+import ninja.samryecroft.returnhome.tracker.fieldcrypto.Encrypted;
+import ninja.samryecroft.returnhome.tracker.fieldcrypto.EncryptedEntity;
+import ninja.samryecroft.returnhome.tracker.fieldcrypto.EncryptedFieldListener;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewRequest;
@@ -19,7 +24,8 @@ import ninja.samryecroft.returnhome.tracker.user.User;
 
 @Entity
 @Table(name = "interview_reports")
-public class InterviewReport {
+@EntityListeners(EncryptedFieldListener.class)
+public class InterviewReport implements EncryptedEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -36,7 +42,11 @@ public class InterviewReport {
     @Column(name = "interview_date")
     private LocalDate interviewDate;
 
-    @Column(name = "interview_location")
+    @Column(name = "interview_location_enc", columnDefinition = "TEXT")
+    private String interviewLocationCiphertext;
+
+    @Transient
+    @Encrypted(ciphertextField = "interviewLocationCiphertext")
     private String interviewLocation;
 
     // --- Details ---
@@ -44,10 +54,18 @@ public class InterviewReport {
     @Column(name = "within_72_hours")
     private Boolean within72Hours;
 
-    @Column(name = "if_not_why_late", columnDefinition = "TEXT")
+    @Column(name = "if_not_why_late_enc", columnDefinition = "TEXT")
+    private String ifNotWhyLateCiphertext;
+
+    @Transient
+    @Encrypted(ciphertextField = "ifNotWhyLateCiphertext")
     private String ifNotWhyLate;
 
-    @Column(name = "consultation_with_home_staff", columnDefinition = "TEXT")
+    @Column(name = "consultation_with_home_staff_enc", columnDefinition = "TEXT")
+    private String consultationWithHomeStaffCiphertext;
+
+    @Transient
+    @Encrypted(ciphertextField = "consultationWithHomeStaffCiphertext")
     private String consultationWithHomeStaff;
 
     @Column(name = "previously_missing")
@@ -64,62 +82,130 @@ public class InterviewReport {
     @Column(name = "interview_accepted")
     private Boolean interviewAccepted;
 
-    @Column(name = "interview_declined_reason", columnDefinition = "TEXT")
+    @Column(name = "interview_declined_reason_enc", columnDefinition = "TEXT")
+    private String interviewDeclinedReasonCiphertext;
+
+    @Transient
+    @Encrypted(ciphertextField = "interviewDeclinedReasonCiphertext")
     private String interviewDeclinedReason;
 
-    @Column(name = "where_were_you_while_missing", columnDefinition = "TEXT")
+    @Column(name = "where_were_you_while_missing_enc", columnDefinition = "TEXT")
+    private String whereWereYouWhileMissingCiphertext;
+
+    @Transient
+    @Encrypted(ciphertextField = "whereWereYouWhileMissingCiphertext")
     private String whereWereYouWhileMissing;
 
-    @Column(name = "who_were_you_with_while_missing", columnDefinition = "TEXT")
+    @Column(name = "who_were_you_with_while_missing_enc", columnDefinition = "TEXT")
+    private String whoWereYouWithWhileMissingCiphertext;
+
+    @Transient
+    @Encrypted(ciphertextField = "whoWereYouWithWhileMissingCiphertext")
     private String whoWereYouWithWhileMissing;
 
-    @Column(name = "what_made_you_go_missing", columnDefinition = "TEXT")
+    @Column(name = "what_made_you_go_missing_enc", columnDefinition = "TEXT")
+    private String whatMadeYouGoMissingCiphertext;
+
+    @Transient
+    @Encrypted(ciphertextField = "whatMadeYouGoMissingCiphertext")
     private String whatMadeYouGoMissing;
 
-    @Column(name = "what_can_be_done_to_address_reasons", columnDefinition = "TEXT")
+    @Column(name = "what_can_be_done_to_address_reasons_enc", columnDefinition = "TEXT")
+    private String whatCanBeDoneToAddressReasonsCiphertext;
+
+    @Transient
+    @Encrypted(ciphertextField = "whatCanBeDoneToAddressReasonsCiphertext")
     private String whatCanBeDoneToAddressReasons;
 
     @Column(name = "considered_self_missing")
     private Boolean consideredSelfMissing;
 
-    @Column(name = "what_did_you_do_while_missing", columnDefinition = "TEXT")
+    @Column(name = "what_did_you_do_while_missing_enc", columnDefinition = "TEXT")
+    private String whatDidYouDoWhileMissingCiphertext;
+
+    @Transient
+    @Encrypted(ciphertextField = "whatDidYouDoWhileMissingCiphertext")
     private String whatDidYouDoWhileMissing;
 
-    @Column(name = "what_happened_when_returned", columnDefinition = "TEXT")
+    @Column(name = "what_happened_when_returned_enc", columnDefinition = "TEXT")
+    private String whatHappenedWhenReturnedCiphertext;
+
+    @Transient
+    @Encrypted(ciphertextField = "whatHappenedWhenReturnedCiphertext")
     private String whatHappenedWhenReturned;
 
-    @Column(name = "prevent_future_missing_suggestions", columnDefinition = "TEXT")
+    @Column(name = "prevent_future_missing_suggestions_enc", columnDefinition = "TEXT")
+    private String preventFutureMissingSuggestionsCiphertext;
+
+    @Transient
+    @Encrypted(ciphertextField = "preventFutureMissingSuggestionsCiphertext")
     private String preventFutureMissingSuggestions;
 
-    @Column(name = "additional_comments_from_young_person", columnDefinition = "TEXT")
+    @Column(name = "additional_comments_from_young_person_enc", columnDefinition = "TEXT")
+    private String additionalCommentsFromYoungPersonCiphertext;
+
+    @Transient
+    @Encrypted(ciphertextField = "additionalCommentsFromYoungPersonCiphertext")
     private String additionalCommentsFromYoungPerson;
 
-    @Column(name = "additional_info_from_parent_carer", columnDefinition = "TEXT")
+    @Column(name = "additional_info_from_parent_carer_enc", columnDefinition = "TEXT")
+    private String additionalInfoFromParentCarerCiphertext;
+
+    @Transient
+    @Encrypted(ciphertextField = "additionalInfoFromParentCarerCiphertext")
     private String additionalInfoFromParentCarer;
 
     // --- Future Incidents ---
 
-    @Column(name = "risks_identified_during_episode", columnDefinition = "TEXT")
+    @Column(name = "risks_identified_during_episode_enc", columnDefinition = "TEXT")
+    private String risksIdentifiedDuringEpisodeCiphertext;
+
+    @Transient
+    @Encrypted(ciphertextField = "risksIdentifiedDuringEpisodeCiphertext")
     private String risksIdentifiedDuringEpisode;
 
-    @Column(name = "risks_increase_future_episodes", columnDefinition = "TEXT")
+    @Column(name = "risks_increase_future_episodes_enc", columnDefinition = "TEXT")
+    private String risksIncreaseFutureEpisodesCiphertext;
+
+    @Transient
+    @Encrypted(ciphertextField = "risksIncreaseFutureEpisodesCiphertext")
     private String risksIncreaseFutureEpisodes;
 
-    @Column(name = "safeguarding_concerns_to_explore", columnDefinition = "TEXT")
+    @Column(name = "safeguarding_concerns_to_explore_enc", columnDefinition = "TEXT")
+    private String safeguardingConcernsToExploreCiphertext;
+
+    @Transient
+    @Encrypted(ciphertextField = "safeguardingConcernsToExploreCiphertext")
     private String safeguardingConcernsToExplore;
 
-    @Column(name = "info_to_help_locate_future", columnDefinition = "TEXT")
+    @Column(name = "info_to_help_locate_future_enc", columnDefinition = "TEXT")
+    private String infoToHelpLocateFutureCiphertext;
+
+    @Transient
+    @Encrypted(ciphertextField = "infoToHelpLocateFutureCiphertext")
     private String infoToHelpLocateFuture;
 
     // --- Interviewer's Comments / Recommendations / Declaration ---
 
-    @Column(name = "interviewer_comments", columnDefinition = "TEXT")
+    @Column(name = "interviewer_comments_enc", columnDefinition = "TEXT")
+    private String interviewerCommentsCiphertext;
+
+    @Transient
+    @Encrypted(ciphertextField = "interviewerCommentsCiphertext")
     private String interviewerComments;
 
-    @Column(name = "recommendations", columnDefinition = "TEXT")
+    @Column(name = "recommendations_enc", columnDefinition = "TEXT")
+    private String recommendationsCiphertext;
+
+    @Transient
+    @Encrypted(ciphertextField = "recommendationsCiphertext")
     private String recommendations;
 
-    @Column(name = "conducted_by_statement", columnDefinition = "TEXT")
+    @Column(name = "conducted_by_statement_enc", columnDefinition = "TEXT")
+    private String conductedByStatementCiphertext;
+
+    @Transient
+    @Encrypted(ciphertextField = "conductedByStatementCiphertext")
     private String conductedByStatement;
 
     @Column(name = "date_report_shared")
@@ -135,7 +221,11 @@ public class InterviewReport {
     @Column(nullable = false)
     private ReportStatus status;
 
-    @Column(name = "review_comments", columnDefinition = "TEXT")
+    @Column(name = "review_comments_enc", columnDefinition = "TEXT")
+    private String reviewCommentsCiphertext;
+
+    @Transient
+    @Encrypted(ciphertextField = "reviewCommentsCiphertext")
     private String reviewComments;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -150,6 +240,16 @@ public class InterviewReport {
 
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt = LocalDateTime.now();
+
+    /**
+     * Delegates to the request, which is where the home and therefore the organisation live. A
+     * report has no organisation of its own, and inventing one here would be a second opinion about
+     * ownership that could disagree with the first.
+     */
+    @Override
+    public Long owningOrganisationId() {
+        return interviewRequest == null ? null : interviewRequest.owningOrganisationId();
+    }
 
     public Long getId() {
         return id;

@@ -231,6 +231,41 @@ Kevin F1. AcrPull (job) + AcrPush (CD/deploy) live in `bootstrap-deployer-identi
 **One open item** (see `PREFLIGHT.md`): slot-swap needs App Service **S1** (B1 has no slots — ships a
 direct-deploy fallback with redeploy-previous-artifact rollback). ACR adds ~£4/mo.
 
+## Restoring the database and Key Vault is a COUPLED operation (field encryption)
+
+Since field-level encryption landed, the database and Key Vault are **one restore unit, not two**.
+Every encrypted column is readable only via that organisation's wrapped data key in
+`org_field_key`, which in turn is only unwrappable by that organisation's KEK in Key Vault. Restore
+either one to a point the other does not agree with and the result can be permanently unreadable
+data.
+
+The dangerous case is specific, and it is exactly what somebody does at 3am during an incident:
+
+> **Restoring the database to a point in time before an organisation's `org_field_key` row existed,
+> while keeping (or re-importing) rows encrypted after it, is unrecoverable by any means.** The
+> ciphertext survives, the wrapped key that opens it does not, and no backup of the ciphertext can
+> reconstruct it. Key Vault is not a copy of that row — it holds the KEK that wraps it, which is a
+> different thing.
+
+It gets worse quietly rather than loudly: the application creates an organisation's key on first
+use, so a restored database missing the row does not raise an error. It mints a **new** key, writes
+new records happily under it, and every value written before the restore point simply stops being
+readable — while the app reports itself healthy. The `org_field_key_no_delete` trigger (V13) stops
+the row being deleted, but it cannot stop a restore rolling the whole table backwards.
+
+**So, before any PITR restore of the database (35d retention — see `postgres/`):**
+
+1. Note the current contents of `org_field_key` first. It is a handful of rows; capture them.
+2. Restore.
+3. Compare. If the restore has fewer rows than you captured, **stop** — do not start the
+   application against it. Starting it is what mints replacement keys and makes the loss permanent.
+4. Re-insert the missing wrapped rows before the app is allowed to connect.
+
+Key Vault's own protection is the other half and is already provisioned: soft-delete and purge
+protection ON with 90-day retention (`DOCUMENT-KEYS.md`). A KEK destroyed there is equally fatal and
+equally unrecoverable — deleting a KEK is destroying records, not tidying up.
+
+
 ## Remaining pre-go-live items
 
 - **Deployer credentials / first apply** — no apply has run; the human supplies Azure auth, the

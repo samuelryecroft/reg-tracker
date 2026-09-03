@@ -17,11 +17,17 @@ import ninja.samryecroft.returnhome.tracker.user.User;
 import ninja.samryecroft.returnhome.tracker.user.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
-import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
+import org.springframework.boot.test.context.SpringBootTest;
 
-@DataJpaTest
-@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
+/**
+ * A full application context rather than a {@code @DataJpaTest} slice, and that is a consequence of
+ * field encryption rather than a preference. The narrative columns on InterviewRequest and the
+ * names on Child are ciphertext now, written by a Hibernate insert listener that is registered when
+ * the application's own Hibernate configuration is in play. A slice builds its SessionFactory
+ * without it, so rows would be written with null ciphertext and read back undecryptable - the test
+ * would be exercising an entity that does not exist in production.
+ */
+@SpringBootTest
 class InterviewRequestRepositoryTest extends AbstractIntegrationTest {
 
     @Autowired
