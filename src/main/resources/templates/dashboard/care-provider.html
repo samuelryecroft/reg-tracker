@@ -78,6 +78,19 @@
         </table>
         </div>
 
+        <div class="stack">
+            <div class="srow" th:each="row : ${view.rankedHomes()}">
+                <div class="top"><a class="rowlink name" th:href="${row.href()}" th:text="${row.name()}">Home</a></div>
+                <dl>
+                    <dt>Completed</dt><dd th:text="${row.stat().validCompleted()}">0</dd>
+                    <dt>Within 72h</dt><dd th:text="${row.stat().percent().getAsInt() + '% (' + row.stat().within72() + ' of ' + row.stat().validCompleted() + ')'}">82% (41 of 50)</dd>
+                    <dt>Excluded</dt><dd th:text="${row.stat().excludedNoReturnTime()}">0</dd>
+                    <dt>Overdue now</dt><dd th:text="${row.overdueNow()}">0</dd>
+                </dl>
+            </div>
+            <div class="empty" th:if="${#lists.isEmpty(view.rankedHomes())}">No home has reached the minimum base yet this period.</div>
+        </div>
+
         <div th:if="${not #lists.isEmpty(view.tooFewHomes())}" style="margin-top:20px">
             <h3>Too few to report</h3>
             <div class="table-wrap responsive">
@@ -92,6 +105,16 @@
                 </tr>
                 </tbody>
             </table>
+            </div>
+
+            <div class="stack">
+                <div class="srow" th:each="row : ${view.tooFewHomes()}">
+                    <div class="top"><a class="rowlink name" th:href="${row.href()}" th:text="${row.name()}">Home</a></div>
+                    <dl>
+                        <dt>Completed</dt><dd th:text="${row.stat().validCompleted() + ' completed'}">0 completed</dd>
+                        <dt>Overdue now</dt><dd th:text="${row.overdueNow()}">0</dd>
+                    </dl>
+                </div>
             </div>
         </div>
     </section>
@@ -119,6 +142,18 @@
             <tr th:if="${#lists.isEmpty(view.recurrence())}"><td colspan="4" class="muted">No recurring missing episodes flagged on any open or recent request.</td></tr>
             </tbody>
         </table>
+        </div>
+
+        <div class="stack">
+            <div class="srow" th:each="entry : ${view.recurrence()}">
+                <div class="top"><a class="rowlink name" th:href="${entry.href()}" th:text="${entry.childLabel()}">Child</a></div>
+                <dl>
+                    <dt>Home</dt><dd th:text="${entry.homeName()}">Home</dd>
+                    <dt>Flags</dt><dd><span class="pill" th:each="flag : ${entry.flagLabels()}" th:classappend="${flag == '5+ in 30 days'} ? 'flag-high' : 'flag-mid'" th:text="${flag}">Flag</span></dd>
+                    <dt>Latest request status</dt><dd th:text="${entry.latestSummary()}">Status</dd>
+                </dl>
+            </div>
+            <div class="empty" th:if="${#lists.isEmpty(view.recurrence())}">No recurring missing episodes flagged on any open or recent request.</div>
         </div>
     </section>
 </main>

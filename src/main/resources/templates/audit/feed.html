@@ -71,6 +71,22 @@
     </table>
     </div>
 
+    <div class="stack">
+        <div class="srow" th:each="row : ${rows}">
+            <div class="top">
+                <span class="name" th:text="${row.entry().headline()}">Event</span>
+                <span class="muted" th:text="${row.entry().when()}">Date</span>
+            </div>
+            <dl>
+                <dt>Home</dt><dd th:text="${row.homeName()}">Home</dd>
+                <dt>Child</dt><dd th:text="${row.childLabel()}">Child</dd>
+                <dt>Role</dt><dd th:text="${row.entry().actorRole()} ?: '—'">Role</dd>
+                <dt>Detail</dt><dd th:text="${row.entry().detail()} ?: '—'">Detail</dd>
+            </dl>
+            <div class="act"><a class="rowlink" th:href="@{/interview-requests/{id}(id=${row.requestId()})}">View</a></div>
+        </div>
+    </div>
+
     <div class="empty" th:if="${#lists.isEmpty(rows)}">No case activity matches these filters.</div>
 </main>
 </body>

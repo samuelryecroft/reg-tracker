@@ -403,10 +403,7 @@ fieldset.step[hidden] { display: none; }
     .rail { border-right: none !important; padding-right: 0 !important; border-bottom: 1px solid var(--border); padding-bottom: var(--s4); margin-bottom: var(--s4); }
 }
 
-/* 
-}
-
-====================== audit history timeline (T38, V1) ============================== */
+/* ============================== audit history timeline (T38, V1) ============================== */
 .provenance {
     display: flex; gap: var(--s2); align-items: center; font-size: var(--t-xs); color: var(--muted);
     background: var(--neutral-bg); border: 1px solid var(--border); border-radius: 8px;
@@ -444,7 +441,8 @@ fieldset.step[hidden] { display: none; }
     .daysep { break-after: avoid; page-break-after: avoid; }
     .provenance { border: 1px solid #999; background: #fff; }
     .tl .dot { border-color: #333 !important; background: #fff !important; }
-=======
+}
+
 /* ============================== dashboard (roadmap 2.3) ============================== */
 .zone {
     border: 1px solid var(--border);
