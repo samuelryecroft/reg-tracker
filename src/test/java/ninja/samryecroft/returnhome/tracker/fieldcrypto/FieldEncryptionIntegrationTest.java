@@ -1,12 +1,21 @@
 package ninja.samryecroft.returnhome.tracker.fieldcrypto;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.LocalDate;
 import ninja.samryecroft.returnhome.tracker.AbstractIntegrationTest;
 import ninja.samryecroft.returnhome.tracker.child.Child;
 import ninja.samryecroft.returnhome.tracker.child.ChildRepository;
 import ninja.samryecroft.returnhome.tracker.home.Home;
+import ninja.samryecroft.returnhome.tracker.interview.InterviewRequest;
+import ninja.samryecroft.returnhome.tracker.interview.InterviewRequestRepository;
+import ninja.samryecroft.returnhome.tracker.report.InterviewReport;
+import ninja.samryecroft.returnhome.tracker.report.InterviewReportRepository;
+import ninja.samryecroft.returnhome.tracker.report.ReportStatus;
+import ninja.samryecroft.returnhome.tracker.user.Role;
+import ninja.samryecroft.returnhome.tracker.user.User;
+import ninja.samryecroft.returnhome.tracker.user.UserRepository;
 import ninja.samryecroft.returnhome.tracker.home.HomeRepository;
 import ninja.samryecroft.returnhome.tracker.organisation.OrgType;
 import ninja.samryecroft.returnhome.tracker.organisation.Organisation;
@@ -39,6 +48,15 @@ class FieldEncryptionIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private JdbcTemplate jdbc;
+
+    @Autowired
+    private InterviewRequestRepository interviewRequestRepository;
+
+    @Autowired
+    private InterviewReportRepository interviewReportRepository;
+
+    @Autowired
+    private UserRepository userRepository;
 
     private Child saveChild(String first, String last, LocalDate dob, Home home) {
         Child child = new Child();
@@ -144,5 +162,96 @@ class FieldEncryptionIntegrationTest extends AbstractIntegrationTest {
                 organisationId);
 
         assertThat(keys).isEqualTo(1);
+    }
+
+    /**
+     * The wrapped key is the one row whose loss is unrecoverable, and losing it fails <em>quietly</em>:
+     * the application creates an organisation's key on first use, so a missing row looks like a new
+     * organisation rather than an error. It would mint a fresh key and every value written before
+     * would stop being readable while everything reported itself healthy. The trigger is what turns
+     * that into a loud refusal, so it is worth an actual attempt to delete rather than trust.
+     */
+    @Test
+    void refusesToDeleteAWrappedKey() {
+        Home home = anyHome();
+        saveChild("Rae", "Iwu", LocalDate.of(2011, 3, 3), home);
+        Long organisationId = home.getOrganisation().getId();
+
+        assertThatThrownBy(() -> jdbc.update("delete from org_field_key where organisation_id = ?",
+                organisationId))
+                .hasMessageContaining("cannot be deleted");
+
+        assertThat(jdbc.queryForObject("select count(*) from org_field_key where organisation_id = ?",
+                Integer.class, organisationId)).isEqualTo(1);
+    }
+
+    /**
+     * Rotation re-wraps this row under a new KEK version, so UPDATE has to stay permitted - the
+     * trigger must refuse deletion without also making rotation impossible.
+     */
+    @Test
+    void stillAllowsAWrappedKeyToBeReWrappedForRotation() {
+        Home home = anyHome();
+        saveChild("Rae", "Iwu", LocalDate.of(2011, 3, 3), home);
+        Long organisationId = home.getOrganisation().getId();
+
+        int updated = jdbc.update("update org_field_key set key_version = ? where organisation_id = ?",
+                "a-newer-version", organisationId);
+
+        assertThat(updated).isEqualTo(1);
+    }
+
+    /**
+     * The four columns added on review (T103). Worth an end-to-end rather than trusting the shared
+     * mechanism, because reviewComments is the one field authored by a SUPPLIER reviewer while
+     * encrypting under the CARE PROVIDER's key - the key follows the row's owning organisation,
+     * which is the data owner. Asserting it here pins that intent.
+     */
+    @Test
+    void encryptsTheReviewerAuthoredNarrativeToo() {
+        Home home = anyHome();
+        Child child = saveChild("Nia", "Adeyemi", LocalDate.of(2010, 6, 1), home);
+        User staff = userRepository.save(newUser("staff-" + System.nanoTime()));
+
+        InterviewRequest request = new InterviewRequest();
+        request.setChild(child);
+        request.setHome(home);
+        request.setRequestedBy(staff);
+        request = interviewRequestRepository.save(request);
+
+        InterviewReport report = new InterviewReport();
+        report.setInterviewRequest(request);
+        report.setVisitor(staff);
+        report.setStatus(ReportStatus.DRAFT);
+        report.setReviewComments("Approved; the safeguarding actions are proportionate.");
+        report.setRecommendations("Review the placement plan at the next meeting.");
+        report = interviewReportRepository.save(report);
+
+        String storedReview = jdbc.queryForObject(
+                "select review_comments_enc from interview_reports where id = ?", String.class,
+                report.getId());
+        String storedRecommendations = jdbc.queryForObject(
+                "select recommendations_enc from interview_reports where id = ?", String.class,
+                report.getId());
+
+        assertThat(storedReview).isNotNull().doesNotContain("proportionate")
+                .startsWith(FieldCipher.PREFIX);
+        assertThat(storedRecommendations).isNotNull().doesNotContain("placement");
+
+        InterviewReport reloaded = interviewReportRepository.findById(report.getId()).orElseThrow();
+        assertThat(reloaded.getReviewComments())
+                .isEqualTo("Approved; the safeguarding actions are proportionate.");
+        assertThat(reloaded.getRecommendations())
+                .isEqualTo("Review the placement plan at the next meeting.");
+    }
+
+    private User newUser(String username) {
+        User user = new User();
+        user.setUsername(username);
+        user.setPassword("irrelevant-to-this-test");
+        user.setFullName("Test Staff");
+        user.setRoles(java.util.Set.of(Role.HOME_STAFF));
+        user.setEnabled(true);
+        return user;
     }
 }

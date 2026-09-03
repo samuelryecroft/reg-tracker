@@ -9,8 +9,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 import ninja.samryecroft.returnhome.tracker.document.DocumentSecurityException;
-import ninja.samryecroft.returnhome.tracker.document.WrappedKey;
-import ninja.samryecroft.returnhome.tracker.document.DocumentSecurityException;
 import ninja.samryecroft.returnhome.tracker.document.KeyProvider;
 import ninja.samryecroft.returnhome.tracker.document.WrappedKey;
 import org.springframework.beans.factory.annotation.Value;

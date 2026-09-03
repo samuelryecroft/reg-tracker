@@ -187,13 +187,25 @@ public class InterviewReport implements EncryptedEntity {
 
     // --- Interviewer's Comments / Recommendations / Declaration ---
 
-    @Column(name = "interviewer_comments", columnDefinition = "TEXT")
+    @Column(name = "interviewer_comments_enc", columnDefinition = "TEXT")
+    private String interviewerCommentsCiphertext;
+
+    @Transient
+    @Encrypted(ciphertextField = "interviewerCommentsCiphertext")
     private String interviewerComments;
 
-    @Column(name = "recommendations", columnDefinition = "TEXT")
+    @Column(name = "recommendations_enc", columnDefinition = "TEXT")
+    private String recommendationsCiphertext;
+
+    @Transient
+    @Encrypted(ciphertextField = "recommendationsCiphertext")
     private String recommendations;
 
-    @Column(name = "conducted_by_statement", columnDefinition = "TEXT")
+    @Column(name = "conducted_by_statement_enc", columnDefinition = "TEXT")
+    private String conductedByStatementCiphertext;
+
+    @Transient
+    @Encrypted(ciphertextField = "conductedByStatementCiphertext")
     private String conductedByStatement;
 
     @Column(name = "date_report_shared")
@@ -209,7 +221,11 @@ public class InterviewReport implements EncryptedEntity {
     @Column(nullable = false)
     private ReportStatus status;
 
-    @Column(name = "review_comments", columnDefinition = "TEXT")
+    @Column(name = "review_comments_enc", columnDefinition = "TEXT")
+    private String reviewCommentsCiphertext;
+
+    @Transient
+    @Encrypted(ciphertextField = "reviewCommentsCiphertext")
     private String reviewComments;
 
     @ManyToOne(fetch = FetchType.LAZY)

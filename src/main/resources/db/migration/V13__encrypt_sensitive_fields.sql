@@ -1,5 +1,13 @@
 -- Field-level encryption, phase 1 (COLUMN-ENCRYPTION-OPTIONS.md).
 --
+-- ============================================================================================
+-- THIS MIGRATION IS FOR AN EMPTY DATABASE ONLY, BY DESIGN. It DROPS the plaintext columns. Run
+-- against a populated database it destroys every value in them, with no backup inside this file
+-- and no way to reconstruct them afterwards. Against real data the expand/contract procedure in
+-- COLUMN-ENCRYPTION-OPTIONS.md §5 is the correct path - add, dual-write, backfill through the
+-- application, flip reads, drop, VACUUM FULL - because only the application can encrypt.
+-- ============================================================================================
+--
 -- Every column here holds AES-256-GCM ciphertext, encrypted in the application under the owning
 -- organisation's field data key, which is itself wrapped by that organisation's Key Vault KEK. The
 -- database never sees a key and never sees plaintext for these columns.
@@ -118,3 +126,47 @@ ALTER TABLE interview_reports
     ADD COLUMN info_to_help_locate_future_enc TEXT,
     DROP COLUMN interview_location,
     ADD COLUMN interview_location_enc TEXT;
+
+-- The reviewer-authored narrative. Added on review (Kevin FLAG 2): same class of free-text as the
+-- rest, and no repository query touches any of them.
+--
+-- review_comments is written by a SUPPLIER reviewer but encrypts under the CARE PROVIDER's key,
+-- because the key follows the row's owning organisation and the care provider is the data owner.
+-- That is correct rather than incidental: per-organisation keys exist to bound the blast radius of
+-- a key compromise, not to express who may read a field. Access is OrganisationAccessService's job.
+ALTER TABLE interview_reports
+    DROP COLUMN interviewer_comments,
+    ADD COLUMN interviewer_comments_enc TEXT,
+    DROP COLUMN recommendations,
+    ADD COLUMN recommendations_enc TEXT,
+    DROP COLUMN conducted_by_statement,
+    ADD COLUMN conducted_by_statement_enc TEXT,
+    DROP COLUMN review_comments,
+    ADD COLUMN review_comments_enc TEXT;
+
+-- Refuse to delete a wrapped key.
+--
+-- These rows are the single point of permanent data loss this design introduces. Lose one and every
+-- encrypted column belonging to that organisation is unrecoverable - not degraded, not restorable
+-- from a backup of the rows themselves, gone. Worse, the loss is silent: the application creates an
+-- organisation's key on first use, so a missing row does not look like an error, it looks like a new
+-- organisation. It would mint a fresh key, encrypt happily under it, and every value written before
+-- would quietly stop being readable while the app reported itself healthy.
+--
+-- So deletion is refused outright, in the same shape V11 uses to keep audit_events append-only. A
+-- key that genuinely must go needs a deliberate act - dropping this trigger - rather than an ON
+-- DELETE CASCADE from an organisation someone tidied up, or a stray DELETE in a console.
+--
+-- UPDATE is deliberately still allowed: re-wrapping a data key under a rotated KEK writes this row,
+-- and rotation must stay cheap.
+CREATE OR REPLACE FUNCTION org_field_key_reject_delete() RETURNS TRIGGER AS $$
+BEGIN
+    RAISE EXCEPTION 'org_field_key rows cannot be deleted: removing the wrapped key for '
+                    'organisation % would make every encrypted column it owns permanently '
+                    'unreadable', OLD.organisation_id;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER org_field_key_no_delete
+    BEFORE DELETE ON org_field_key
+    FOR EACH ROW EXECUTE FUNCTION org_field_key_reject_delete();
