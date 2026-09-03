@@ -111,3 +111,28 @@ variable "tags" {
     managed_by  = "terraform"
   }
 }
+
+# --- Entra External ID sign-in (ENTRA-AUTH-DESIGN.md §6 P2). ---
+#
+# All of this is inert while entra_enabled is false, which is the default and the current state:
+# nothing is created, no app setting is written, and `terraform plan` is unchanged. The application
+# is inert independently of Terraform too - app.auth.entra.enabled is false unless the `entra`
+# Spring profile is active, and this stack does not activate it. Flipping both is the P7 cutover,
+# gated on the §8 checklist.
+variable "entra_enabled" {
+  description = "Provision the Entra sign-in configuration (Key Vault secret container + app settings). Leave false until the tenant and app registration exist."
+  type        = bool
+  default     = false
+}
+
+variable "entra_client_id" {
+  description = "Application (client) ID of the Entra External ID app registration. NOT a secret - recorded by the human at registration time (design §7(b) item 2)."
+  type        = string
+  default     = ""
+}
+
+variable "entra_issuer_uri" {
+  description = "OIDC issuer URI for the External ID tenant, used for discovery. NOT a secret."
+  type        = string
+  default     = ""
+}

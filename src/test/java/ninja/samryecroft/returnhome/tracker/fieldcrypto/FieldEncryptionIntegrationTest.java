@@ -17,9 +17,7 @@ import ninja.samryecroft.returnhome.tracker.user.Role;
 import ninja.samryecroft.returnhome.tracker.user.User;
 import ninja.samryecroft.returnhome.tracker.user.UserRepository;
 import ninja.samryecroft.returnhome.tracker.home.HomeRepository;
-import ninja.samryecroft.returnhome.tracker.organisation.OrgType;
 import ninja.samryecroft.returnhome.tracker.organisation.Organisation;
-import ninja.samryecroft.returnhome.tracker.organisation.OrganisationRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -43,8 +41,6 @@ class FieldEncryptionIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private HomeRepository homeRepository;
 
-    @Autowired
-    private OrganisationRepository organisationRepository;
 
     @Autowired
     private JdbcTemplate jdbc;
@@ -74,7 +70,7 @@ class FieldEncryptionIntegrationTest extends AbstractIntegrationTest {
      */
     private Home anyHome() {
         Organisation organisation =
-                organisationRepository.findByTypeOrderByName(OrgType.CARE_PROVIDER).get(0);
+                seededCareProvider();
         Home home = new Home();
         home.setName("Encryption Test House");
         home.setOrganisation(organisation);

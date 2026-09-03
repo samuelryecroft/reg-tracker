@@ -32,8 +32,26 @@ public class User {
     @Column(nullable = false, unique = true)
     private String username;
 
-    @Column(nullable = false)
+    /**
+     * Null for an account that has no local credential - one created for Entra sign-in, before
+     * {@code password} is dropped altogether in P8. Form login fails closed for such a row:
+     * {@code BCryptPasswordEncoder.matches} rejects a null encoding rather than matching anything.
+     */
     private String password;
+
+    /**
+     * Entra's {@code sub} (or {@code oid}) claim once this account has been linked to a directory
+     * identity, null until then. Unique when present.
+     *
+     * <p>This is the persistent identity key and the only value a login may link on. Email is the
+     * admin-entered identifier and the lookup for the one-time link, never the join key - it is
+     * mutable and addresses get recycled, so binding identity to it would let a new starter inherit
+     * a leaver's access (ENTRA-AUTH-DESIGN.md §3).
+     *
+     * <p>Nothing reads or writes this yet; the link is P4.
+     */
+    @Column(name = "idp_subject", unique = true)
+    private String idpSubject;
 
     @Column(name = "full_name", nullable = false)
     private String fullName;
@@ -98,6 +116,14 @@ public class User {
 
     public void setPassword(String password) {
         this.password = password;
+    }
+
+    public String getIdpSubject() {
+        return idpSubject;
+    }
+
+    public void setIdpSubject(String idpSubject) {
+        this.idpSubject = idpSubject;
     }
 
     public String getFullName() {
