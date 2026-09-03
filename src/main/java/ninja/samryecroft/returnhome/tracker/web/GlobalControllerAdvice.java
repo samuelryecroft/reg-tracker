@@ -5,6 +5,9 @@ import ninja.samryecroft.returnhome.tracker.audit.AuditEventPublisher;
 import ninja.samryecroft.returnhome.tracker.document.DocumentNotFoundException;
 import ninja.samryecroft.returnhome.tracker.document.DocumentSecurityException;
 import ninja.samryecroft.returnhome.tracker.document.KeyUnavailableException;
+import ninja.samryecroft.returnhome.tracker.home.Home;
+import ninja.samryecroft.returnhome.tracker.organisation.Organisation;
+import ninja.samryecroft.returnhome.tracker.organisation.OrgType;
 import ninja.samryecroft.returnhome.tracker.theme.ThemeService;
 import ninja.samryecroft.returnhome.tracker.user.AppUserPrincipal;
 import ninja.samryecroft.returnhome.tracker.user.RoleMatrix;
@@ -71,6 +74,55 @@ public class GlobalControllerAdvice {
     @ModelAttribute("canEditTheme")
     public boolean canEditTheme(@AuthenticationPrincipal AppUserPrincipal principal) {
         return themeService.canEditOwnTheme(principal);
+    }
+
+    /**
+     * T119 shell: the sidebar's org box (kicker + name), source of truth for whichever
+     * organisation/home scopes the signed-in user. Same lazy-association access pattern already
+     * proven safe by {@link ThemeService#canEditOwnTheme} above (a principal's {@code User} carries
+     * LAZY {@code organisation}/{@code home}, and this runs with no wrapping transaction - see that
+     * method's own use of {@code getOrganisationType()} for the precedent).
+     */
+    @ModelAttribute("shellOrg")
+    public ShellOrg shellOrg(@AuthenticationPrincipal AppUserPrincipal principal) {
+        if (principal == null) {
+            return null;
+        }
+        Organisation organisation = principal.getUser().getOrganisation();
+        if (organisation != null) {
+            String kicker = organisation.getType() == OrgType.SUPPLIER ? "Supplier" : "Care provider";
+            return new ShellOrg(kicker, organisation.getName());
+        }
+        Home home = principal.getUser().getHome();
+        if (home != null) {
+            return new ShellOrg("Home", home.getName());
+        }
+        return new ShellOrg("Platform", "Return Home Tracker");
+    }
+
+    public record ShellOrg(String kicker, String name) {
+    }
+
+    /** T119 shell: the sidebar footer's avatar initials. Staff are never masked (spec §2.5), so this
+     * is a plain display convenience, not a masking projection - unlike a child's initials, which
+     * Kevin's data half computes server-side as an actual privacy control. */
+    @ModelAttribute("shellUserInitials")
+    public String shellUserInitials(@AuthenticationPrincipal AppUserPrincipal principal) {
+        if (principal == null) {
+            return "";
+        }
+        String fullName = principal.getUser().getFullName();
+        if (fullName == null || fullName.isBlank()) {
+            return "";
+        }
+        StringBuilder initials = new StringBuilder();
+        for (String word : fullName.trim().split("\\s+")) {
+            String letters = word.replaceAll("[^\\p{L}]", "");
+            if (!letters.isEmpty() && initials.length() < 2) {
+                initials.append(Character.toUpperCase(letters.charAt(0)));
+            }
+        }
+        return initials.toString();
     }
 
     /**
