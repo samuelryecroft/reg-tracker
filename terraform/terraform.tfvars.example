@@ -10,6 +10,15 @@ postgres_administrator_login    = "rhtadmin"
 postgres_administrator_password = "REPLACE_ME_placeholder_not_a_real_secret"
 admin_seed_password             = "REPLACE_ME_placeholder_rotate_after_first_boot"
 
+# WS-G least-privilege DB roles. Logins have defaults (rht_migrator / rht_app); override only if
+# you must. Passwords are PLACEHOLDERS - generated and sourced from Key Vault in production. The
+# migrator password is used by the pre-deploy step to run migrations; the runtime password is what
+# the app connects with (both stored as KV secrets by this config).
+# migrator_db_login  = "rht_migrator"
+# runtime_db_login   = "rht_app"
+migrator_db_password = "REPLACE_ME_placeholder_migrator_role_secret"
+runtime_db_password  = "REPLACE_ME_placeholder_runtime_role_secret"
+
 alert_email = "REPLACE_ME_real_monitored_recipient"
 # Leave true for real data (private networking; Postgres+Blob not publicly reachable). Set false
 # ONLY for a pre-prod/synthetic environment - and even then a plan-time guard blocks false when

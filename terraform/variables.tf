@@ -33,6 +33,33 @@ variable "admin_seed_password" {
   sensitive   = true
 }
 
+# --- WS-G least-privilege DB roles (created VNet-side by the pre-deploy step; see README §WS-G). ---
+# The server admin login/password (above) is used ONLY by the pre-deploy bootstrap to create these
+# two in-database roles and grant them. The app never connects as the admin.
+variable "migrator_db_login" {
+  description = "In-database role that runs Flyway migrations (DDL: CREATE table/index/function/trigger). Distinct from the runtime role; never used by the app at runtime."
+  type        = string
+  default     = "rht_migrator"
+}
+
+variable "runtime_db_login" {
+  description = "In-database role the application connects as. DML-only (no CREATE), INSERT/SELECT-only on audit_events. Least privilege."
+  type        = string
+  default     = "rht_app"
+}
+
+variable "migrator_db_password" {
+  description = "PLACEHOLDER ONLY. Password for the migrator role; in production generated and sourced from Key Vault (MIGRATOR-DB-PASSWORD), never committed. The pre-deploy step reads it from KV to run the role SQL + Flyway. Sensitive."
+  type        = string
+  sensitive   = true
+}
+
+variable "runtime_db_password" {
+  description = "PLACEHOLDER ONLY. Password for the runtime (app) role; in production generated and sourced from Key Vault (RUNTIME-DB-PASSWORD), never committed. The app reads it as a Key Vault reference. Sensitive."
+  type        = string
+  sensitive   = true
+}
+
 variable "alert_email" {
   description = "Email / distribution list for the observability action group. REQUIRED (no default, Kevin B3): apply must fail until a real recipient is set - an alert nobody receives is the same as no alert (closes the operational half of R5)."
   type        = string
