@@ -1,0 +1,14 @@
+# Copy to terraform.tfvars and fill in. NEVER commit real secrets - the password lines below are
+# PLACEHOLDERS. In production the Postgres and admin-seed passwords are generated and sourced from
+# Key Vault, and terraform.tfvars is git-ignored.
+
+subscription_id = "00000000-0000-0000-0000-000000000000"
+location        = "uksouth"
+name_prefix     = "rht"
+
+postgres_administrator_login    = "rhtadmin"
+postgres_administrator_password = "REPLACE_ME_placeholder_not_a_real_secret"
+admin_seed_password             = "REPLACE_ME_placeholder_rotate_after_first_boot"
+
+alert_email = "oncall@example.org"
+enable_vnet = false
