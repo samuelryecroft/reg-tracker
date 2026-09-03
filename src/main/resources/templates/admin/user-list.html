@@ -19,7 +19,7 @@
             <th scope="col">Username</th>
             <th scope="col">Full name</th>
             <th scope="col">Roles</th>
-            <th scope="col">Home</th>
+            <th scope="col">Homes</th>
             <th scope="col">Organisation</th>
             <th scope="col">Enabled</th>
             <th scope="col" class="visually-hidden">Action</th>
@@ -30,7 +30,7 @@
             <td th:text="${u.username}">username</td>
             <td th:text="${u.fullName}">Full Name</td>
             <td th:text="${#strings.setJoin(u.roles, ', ')}">ROLES</td>
-            <td th:text="${u.home} ? ${u.home.name} : '—'">Home</td>
+            <td th:text="${#lists.isEmpty(u.homes)} ? '—' : ${#strings.listJoin(u.homes.![name], ', ')}">Homes</td>
             <td th:text="${u.organisation} ? ${u.organisation.name} : '—'">Organisation</td>
             <td th:text="${u.enabled} ? 'Yes' : 'No'">Enabled</td>
             <td><a class="rowlink" th:href="@{/admin/users/{id}/edit(id=${u.id})}">Edit</a></td>
@@ -45,7 +45,7 @@
             <dl>
                 <dt>Full name</dt><dd th:text="${u.fullName}">Full Name</dd>
                 <dt>Roles</dt><dd th:text="${#strings.setJoin(u.roles, ', ')}">ROLES</dd>
-                <dt th:if="${u.home}">Home</dt><dd th:if="${u.home}" th:text="${u.home.name}">Home</dd>
+                <dt th:unless="${#lists.isEmpty(u.homes)}">Homes</dt><dd th:unless="${#lists.isEmpty(u.homes)}" th:text="${#strings.listJoin(u.homes.![name], ', ')}">Homes</dd>
                 <dt th:if="${u.organisation}">Organisation</dt><dd th:if="${u.organisation}" th:text="${u.organisation.name}">Organisation</dd>
                 <dt>Enabled</dt><dd th:text="${u.enabled} ? 'Yes' : 'No'">Enabled</dd>
             </dl>

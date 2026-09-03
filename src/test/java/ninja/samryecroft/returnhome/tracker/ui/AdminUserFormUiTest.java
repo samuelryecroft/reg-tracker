@@ -11,12 +11,14 @@ class AdminUserFormUiTest extends AbstractUiTest {
         login(ADMIN_USERNAME, ADMIN_PASSWORD);
         page.navigate(url("/admin/users/new"));
 
+        // One Homes field now serves HOME_STAFF and VIEWER alike (T116) - they used to be two
+        // controls backed by two tables.
         // No checkbox is checked yet, so both conditional fields start hidden.
-        assertThat(page.locator("#homeField").isVisible()).isFalse();
+        assertThat(page.locator("#homesField").isVisible()).isFalse();
         assertThat(page.locator("#organisationField").isVisible()).isFalse();
 
         page.check("input[name=roles][value=HOME_STAFF]");
-        assertThat(page.locator("#homeField").isVisible()).isTrue();
+        assertThat(page.locator("#homesField").isVisible()).isTrue();
         assertThat(page.locator("#organisationField").isVisible()).isFalse();
         // HOME_STAFF is a solo role - every org-scoped checkbox is aria-disabled while it's checked.
         // T25 redesign (FE-07): a real disabled attribute pulls the option out of the tab order and
@@ -25,7 +27,7 @@ class AdminUserFormUiTest extends AbstractUiTest {
         assertThat(ariaDisabled("COORDINATOR")).isEqualTo("true");
 
         page.uncheck("input[name=roles][value=HOME_STAFF]");
-        assertThat(page.locator("#homeField").isVisible()).isFalse();
+        assertThat(page.locator("#homesField").isVisible()).isFalse();
         assertThat(ariaDisabled("COORDINATOR")).isEqualTo("false");
 
         // Org-scoped roles (ORG_ADMIN/COORDINATOR/VISITOR) can be combined with each other, and

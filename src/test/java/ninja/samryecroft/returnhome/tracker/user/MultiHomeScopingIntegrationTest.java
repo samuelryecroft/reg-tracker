@@ -146,6 +146,18 @@ class MultiHomeScopingIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void theAdminUserListRendersEveryHomeAUserCovers() throws Exception {
+        // Also a coverage fix. This template read User.home, and nothing in the required gate
+        // rendered it - only a Playwright test in the non-blocking quarantine job did, so the page
+        // could have merged throwing a SpEL error on a property that no longer exists.
+        String html = mockMvc.perform(get("/admin/users").with(asUser(adminUsername())))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(html).contains("Alpha House" + suffix).contains("Beta House" + suffix);
+    }
+
+    @Test
     void bothRolesAreStoredInTheOneTable() {
         Long staffId = userRepository.findByUsername("mh-staff" + suffix).orElseThrow().getId();
         Long viewerId = userRepository.findByUsername("mh-viewer" + suffix).orElseThrow().getId();
@@ -215,6 +227,15 @@ class MultiHomeScopingIntegrationTest extends AbstractIntegrationTest {
         return mockMvc.perform(post("/requests").with(asUser("mh-staff" + suffix)).with(csrf())
                 .param("childId", child.getId().toString())
                 .param("returnedAt", "2026-07-16T20:30"));
+    }
+
+    /** A signed-in platform admin, for the pages only they can reach. */
+    private String adminUsername() {
+        String username = "mh-admin-user" + suffix;
+        if (userRepository.findByUsername(username).isEmpty()) {
+            saveUser(username, Role.ADMIN, Set.of());
+        }
+        return username;
     }
 
     private AppUserPrincipal adminPrincipal() {
