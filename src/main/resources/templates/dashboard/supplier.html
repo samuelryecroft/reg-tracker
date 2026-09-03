@@ -66,7 +66,7 @@
                 <span class="num" th:if="${view.overallRate().percent().isPresent()}" th:text="${view.overallRate().percent().getAsInt()} + '%'">82%</span>
                 <span class="num" style="font-size:19px;color:var(--muted);font-weight:650" th:unless="${view.overallRate().percent().isPresent()}">Not enough data yet</span>
                 <span class="den" th:text="${view.overallRate().within72() + ' of ' + view.overallRate().validCompleted()}">41 of 50</span>
-                <span class="den" style="display:block;margin-top:8px;padding-top:8px;border-top:1px solid #E5E7EB;color:var(--warn);font-weight:650" th:if="${view.overallRate().excludedNoReturnTime() > 0}"
+                <span class="den" style="display:block;margin-top:8px;padding-top:8px;border-top:1px solid var(--border);color:var(--warn);font-weight:650" th:if="${view.overallRate().excludedNoReturnTime() > 0}"
                       th:text="${'◷ ' + view.overallRate().excludedNoReturnTime() + ' further interview' + (view.overallRate().excludedNoReturnTime() == 1 ? '' : 's') + ' excluded — no return time recorded, distorts this figure for the home responsible too'}">excluded</span>
             </div>
         </div>
