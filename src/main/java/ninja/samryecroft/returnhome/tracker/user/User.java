@@ -62,24 +62,31 @@ public class User {
     @Column(name = "role", nullable = false)
     private Set<Role> roles = new HashSet<>();
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "home_id")
-    private Home home;
-
     /** Used by ORG_ADMIN, COORDINATOR, VISITOR, REVIEWER, VIEWER. Null for ADMIN (platform-wide)
-     * and HOME_STAFF (scoped via home). */
+     * and HOME_STAFF (scoped via {@link #homes}). */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "organisation_id")
     private Organisation organisation;
 
-    /** Only meaningful for VIEWER: which specific homes (within their Care Provider org) they can
-     * see reports for. Never read directly off a session-loaded/detached User - every access-control
-     * check uses a dedicated targeted repository query instead, to avoid the lazy-loading trap that
-     * the (EAGER, but still order-of-operations-sensitive) roles collection hit earlier. */
+    /**
+     * The homes this user is attached to - the one mechanism, for every role that has one.
+     *
+     * <p>HOME_STAFF used to hold a single {@code home_id} while VIEWER held this collection: the
+     * same relationship expressed two ways, which is how one of them silently stops being checked.
+     * Both now live here (V16). For HOME_STAFF these are the homes they work in; for VIEWER, the
+     * homes they may see reports for. Empty for every other role.
+     *
+     * <p>All of a user's homes belong to one Care Provider organisation - {@code UserService}
+     * enforces that on the way in, and org-level scoping and theme resolution both depend on it.
+     *
+     * <p>Never read directly off a session-loaded/detached User - every access-control check uses a
+     * dedicated targeted repository query instead, to avoid the lazy-loading trap that the (EAGER,
+     * but still order-of-operations-sensitive) roles collection hit earlier.
+     */
     @ManyToMany(fetch = FetchType.LAZY)
-    @JoinTable(name = "user_viewer_homes", joinColumns = @JoinColumn(name = "user_id"),
+    @JoinTable(name = "user_homes", joinColumns = @JoinColumn(name = "user_id"),
             inverseJoinColumns = @JoinColumn(name = "home_id"))
-    private Set<Home> viewerHomes = new HashSet<>();
+    private Set<Home> homes = new HashSet<>();
 
     @Column(nullable = false)
     private boolean enabled = true;
@@ -146,13 +153,6 @@ public class User {
         return roles.contains(role);
     }
 
-    public Home getHome() {
-        return home;
-    }
-
-    public void setHome(Home home) {
-        this.home = home;
-    }
 
     public Organisation getOrganisation() {
         return organisation;
@@ -162,12 +162,12 @@ public class User {
         this.organisation = organisation;
     }
 
-    public Set<Home> getViewerHomes() {
-        return viewerHomes;
+    public Set<Home> getHomes() {
+        return homes;
     }
 
-    public void setViewerHomes(Set<Home> viewerHomes) {
-        this.viewerHomes = viewerHomes;
+    public void setHomes(Set<Home> homes) {
+        this.homes = homes;
     }
 
     public boolean isCanExport() {

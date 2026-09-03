@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.nio.file.Path;
 import java.util.List;
+import java.util.HashSet;
 import java.util.Set;
 import ninja.samryecroft.returnhome.tracker.AbstractIntegrationTest;
 import ninja.samryecroft.returnhome.tracker.child.Child;
@@ -144,7 +145,7 @@ class AuditTrailIntegrationTest extends AbstractIntegrationTest {
         user.setPassword(passwordEncoder.encode(PASSWORD));
         user.setFullName(username);
         user.setRoles(Set.of(role));
-        user.setHome(userHome);
+        user.setHomes(userHome == null ? new HashSet<>() : new HashSet<>(Set.of(userHome)));
         user.setOrganisation(organisation);
         user.setEnabled(true);
         return user;

@@ -246,7 +246,7 @@ public class DemoDataSeeder implements ApplicationRunner {
 
         // A Viewer has no org of its own: it is granted read access to a named set of homes.
         seed.viewer = user("viewer", "Local Authority Liaison", Set.of(Role.VIEWER), null, null);
-        seed.viewer.setViewerHomes(new LinkedHashSet<>(List.of(seed.oakwood, seed.marisco)));
+        seed.viewer.setHomes(new LinkedHashSet<>(List.of(seed.oakwood, seed.marisco)));
         userRepository.save(seed.viewer);
 
         // Northgate's own coordinator, to show cross-Supplier separation in the demo.
@@ -270,7 +270,7 @@ public class DemoDataSeeder implements ApplicationRunner {
         user.setPassword(passwordEncoder.encode(demoProperties.getPassword()));
         user.setRoles(new LinkedHashSet<>(roles));
         user.setOrganisation(org);
-        user.setHome(home);
+        user.setHomes(home == null ? new LinkedHashSet<>() : new LinkedHashSet<>(List.of(home)));
         user.setEnabled(true);
         return userRepository.save(user);
     }

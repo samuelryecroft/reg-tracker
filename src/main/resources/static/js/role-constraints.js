@@ -3,9 +3,8 @@
     var CARE_PROVIDER_ROLES = ['VIEWER'];
     var SUPPLIER_ROLES = ['COORDINATOR', 'VISITOR', 'REVIEWER'];
     var roleCheckboxes = document.querySelectorAll('input[name="roles"]');
-    var homeField = document.getElementById('homeField');
     var organisationField = document.getElementById('organisationField');
-    var viewerHomesField = document.getElementById('viewerHomesField');
+    var homesField = document.getElementById('homesField');
     var constraintNote = document.getElementById('roleConstraintNote');
     function selectedRoles() {
         return Array.from(roleCheckboxes).filter(function (cb) { return cb.checked; }).map(function (cb) { return cb.value; });
@@ -44,15 +43,15 @@
     }
     function toggleFields() {
         var selected = selectedRoles();
-        if (homeField) {
-            homeField.style.display = selected.indexOf('HOME_STAFF') !== -1 ? '' : 'none';
-        }
         if (organisationField) {
             var needsOrg = selected.some(function (r) { return r !== 'HOME_STAFF' && r !== 'ADMIN'; });
             organisationField.style.display = needsOrg ? '' : 'none';
         }
-        if (viewerHomesField) {
-            viewerHomesField.style.display = selected.indexOf('VIEWER') !== -1 ? '' : 'none';
+        if (homesField) {
+            // One Homes field for both roles that have homes (T116): HOME_STAFF and VIEWER used to
+            // be two separate controls backed by two separate tables.
+            var needsHomes = selected.indexOf('HOME_STAFF') !== -1 || selected.indexOf('VIEWER') !== -1;
+            homesField.style.display = needsHomes ? '' : 'none';
         }
     }
     roleCheckboxes.forEach(function (cb) {

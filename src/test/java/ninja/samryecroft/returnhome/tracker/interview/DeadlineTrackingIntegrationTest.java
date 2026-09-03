@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.HashSet;
 import java.util.Set;
 import ninja.samryecroft.returnhome.tracker.AbstractIntegrationTest;
 import ninja.samryecroft.returnhome.tracker.child.Child;
@@ -108,7 +109,7 @@ class DeadlineTrackingIntegrationTest extends AbstractIntegrationTest {
         user.setPassword(passwordEncoder.encode(PASSWORD));
         user.setFullName(username);
         user.setRoles(Set.of(role));
-        user.setHome(userHome);
+        user.setHomes(userHome == null ? new HashSet<>() : new HashSet<>(Set.of(userHome)));
         user.setOrganisation(organisation);
         user.setEnabled(true);
         return user;

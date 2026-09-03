@@ -9,6 +9,8 @@ import ninja.samryecroft.returnhome.tracker.interview.InterviewRequest;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewStatus;
 import ninja.samryecroft.returnhome.tracker.report.InterviewReport;
 import ninja.samryecroft.returnhome.tracker.user.AppUserPrincipal;
+import ninja.samryecroft.returnhome.tracker.user.UserRepository;
+import java.util.List;
 import ninja.samryecroft.returnhome.tracker.user.Role;
 import ninja.samryecroft.returnhome.tracker.user.User;
 import org.springframework.context.ApplicationEventPublisher;
@@ -28,9 +30,12 @@ import org.springframework.stereotype.Component;
 public class AuditEventPublisher {
 
     private final ApplicationEventPublisher applicationEventPublisher;
+    private final UserRepository userRepository;
 
-    public AuditEventPublisher(ApplicationEventPublisher applicationEventPublisher) {
+    public AuditEventPublisher(ApplicationEventPublisher applicationEventPublisher,
+            UserRepository userRepository) {
         this.applicationEventPublisher = applicationEventPublisher;
+        this.userRepository = userRepository;
     }
 
     // --- Authentication (A.1) ---
@@ -38,7 +43,7 @@ public class AuditEventPublisher {
     public void loginSuccess(AppUserPrincipal principal) {
         publish(actor(AuditEventRecord.of(AuditEventType.LOGIN_SUCCESS), principal)
                 .target("User", principal.getUserId())
-                .scope(principal.getOrganisationId(), principal.getHomeId())
+                .scope(principal.getOrganisationId(), actorHomeId(principal))
                 .build());
     }
 
@@ -282,11 +287,24 @@ public class AuditEventPublisher {
                 .meta("path", path)
                 .meta("reason", message);
         if (principal != null) {
-            actor(builder, principal).scope(principal.getOrganisationId(), principal.getHomeId());
+            actor(builder, principal).scope(principal.getOrganisationId(), actorHomeId(principal));
         } else {
             builder.actor(null, "anonymous", null);
         }
         publish(builder.build());
+    }
+
+    /**
+     * The actor's home, for the events whose scope is the person rather than a record.
+     *
+     * <p>Null unless they are attached to exactly one. Home staff may hold several since V16, and
+     * this column is recorded context - nothing filters on it - so picking one of several would be
+     * inventing a fact about where an action happened rather than narrowing anything. Events about
+     * a specific request or report stamp that record's own home instead, which is unambiguous.
+     */
+    private Long actorHomeId(AppUserPrincipal principal) {
+        List<Long> homeIds = userRepository.findHomeIds(principal.getUserId());
+        return homeIds.size() == 1 ? homeIds.get(0) : null;
     }
 
     private void publish(AuditEventRecord record) {
@@ -340,11 +358,18 @@ public class AuditEventPublisher {
         if (user.getOrganisation() != null) {
             return user.getOrganisation().getId();
         }
-        return user.getHome() == null || user.getHome().getOrganisation() == null
-                ? null : user.getHome().getOrganisation().getId();
+        // A user's homes all belong to one Care Provider org (UserService enforces it), so any of
+        // them answers "which organisation was this change made to".
+        return user.getHomes().stream()
+                .map(Home::getOrganisation)
+                .filter(java.util.Objects::nonNull)
+                .map(org -> org.getId())
+                .findFirst()
+                .orElse(null);
     }
 
+    /** Only when unambiguous - see {@link #actorHomeId}. */
     private Long homeIdOf(User user) {
-        return user.getHome() == null ? null : user.getHome().getId();
+        return user.getHomes().size() == 1 ? user.getHomes().iterator().next().getId() : null;
     }
 }

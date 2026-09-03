@@ -3,6 +3,7 @@ package ninja.samryecroft.returnhome.tracker.ui;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.LocalDate;
+import java.util.HashSet;
 import java.util.Set;
 import ninja.samryecroft.returnhome.tracker.child.Child;
 import ninja.samryecroft.returnhome.tracker.child.ChildRepository;
@@ -50,7 +51,7 @@ class HomeStaffRequestUiTest extends AbstractUiTest {
         staff.setPassword(passwordEncoder.encode(PASSWORD));
         staff.setFullName("UI Test Staff");
         staff.setRoles(Set.of(Role.HOME_STAFF));
-        staff.setHome(home);
+        staff.setHomes(home == null ? new HashSet<>() : new HashSet<>(Set.of(home)));
         staff.setEnabled(true);
         userRepository.save(staff);
     }

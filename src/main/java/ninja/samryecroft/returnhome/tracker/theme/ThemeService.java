@@ -7,6 +7,7 @@ import ninja.samryecroft.returnhome.tracker.organisation.OrganisationRepository;
 import ninja.samryecroft.returnhome.tracker.organisation.OrgType;
 import ninja.samryecroft.returnhome.tracker.theme.dto.UpdateThemeForm;
 import ninja.samryecroft.returnhome.tracker.user.AppUserPrincipal;
+import ninja.samryecroft.returnhome.tracker.user.UserRepository;
 import ninja.samryecroft.returnhome.tracker.user.Role;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
@@ -32,12 +33,15 @@ public class ThemeService {
     private final ThemeSettingsRepository themeSettingsRepository;
     private final OrganisationRepository organisationRepository;
     private final HomeRepository homeRepository;
+    private final UserRepository userRepository;
 
     public ThemeService(ThemeSettingsRepository themeSettingsRepository,
-            OrganisationRepository organisationRepository, HomeRepository homeRepository) {
+            OrganisationRepository organisationRepository, HomeRepository homeRepository,
+            UserRepository userRepository) {
         this.themeSettingsRepository = themeSettingsRepository;
         this.organisationRepository = organisationRepository;
         this.homeRepository = homeRepository;
+        this.userRepository = userRepository;
     }
 
     /** The theme that should apply to everything the given principal sees: nav, buttons, tables. */
@@ -114,11 +118,13 @@ public class ThemeService {
             return organisationRepository.findSupplierOrganisationIdByCareProviderId(principal.getOrganisationId())
                     .orElse(null);
         }
-        // HOME_STAFF have no organisation of their own - it's derived through their home.
-        if (principal.getHomeId() != null) {
-            return homeRepository.findSupplierOrganisationIdByHomeId(principal.getHomeId()).orElse(null);
-        }
-        return null;
+        // HOME_STAFF have no organisation of their own - it's derived through their homes. Any one
+        // of them answers this: UserService enforces that a user's homes all sit under the same
+        // Care Provider organisation, so they cannot disagree about which Supplier to brand as.
+        return userRepository.findHomeIds(principal.getUserId()).stream()
+                .findFirst()
+                .flatMap(homeRepository::findSupplierOrganisationIdByHomeId)
+                .orElse(null);
     }
 
     private ThemeSettings resolveForViewing(Long organisationId) {

@@ -140,7 +140,7 @@ class CaseFileExportPageIntegrationTest extends AbstractIntegrationTest {
         user.setPassword(passwordEncoder.encode(PASSWORD));
         user.setFullName(username);
         user.setRoles(Set.of(role));
-        user.setHome(userHome);
+        user.setHomes(userHome == null ? new HashSet<>() : new HashSet<>(Set.of(userHome)));
         user.setOrganisation(organisation);
         user.setEnabled(true);
         user.setCanExport(canExport);

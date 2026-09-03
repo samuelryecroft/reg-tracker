@@ -1,5 +1,6 @@
 package ninja.samryecroft.returnhome.tracker.organisation;
 
+import java.util.List;
 import ninja.samryecroft.returnhome.tracker.home.Home;
 import ninja.samryecroft.returnhome.tracker.user.AppUserPrincipal;
 import ninja.samryecroft.returnhome.tracker.user.Role;
@@ -51,14 +52,30 @@ public class OrganisationAccessService {
         return false;
     }
 
-    /** Whether the principal can see the given Home (its Care Provider org, or their own Home for HOME_STAFF). */
+    /** Whether the principal can see the given Home (its Care Provider org, or one of their own). */
     public boolean canViewHome(AppUserPrincipal principal, Home home) {
-        if (principal.hasRole(Role.HOME_STAFF) && home.getId().equals(principal.getHomeId())) {
-            return true;
-        }
-        if (principal.hasRole(Role.VIEWER) && userRepository.hasViewerAccessToHome(principal.getUserId(), home.getId())) {
+        // HOME_STAFF and VIEWER used to be answered by two different mechanisms here - a field
+        // comparison against the principal's single home, and a query against the viewer join
+        // table. Since V16 they are the same relationship, so this is one check (T116).
+        if (canAccessHome(principal, home.getId())) {
             return true;
         }
         return canViewCareProviderOrg(principal, home.getOrganisation().getId());
+    }
+
+    /**
+     * Whether this home is one the principal is directly attached to.
+     *
+     * <p>Answered from the database rather than from anything carried on the principal: the
+     * attachment is a set now, the principal is built from a detached entity whose homes are lazy,
+     * and the database is the thing that changes when an administrator revokes access.
+     */
+    public boolean canAccessHome(AppUserPrincipal principal, Long homeId) {
+        return homeId != null && userRepository.hasHomeAccess(principal.getUserId(), homeId);
+    }
+
+    /** Every home the principal is attached to; empty for roles that are scoped by organisation. */
+    public List<Long> homeIdsFor(AppUserPrincipal principal) {
+        return userRepository.findHomeIds(principal.getUserId());
     }
 }

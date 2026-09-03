@@ -2,6 +2,7 @@ package ninja.samryecroft.returnhome.tracker.user;
 
 import java.util.EnumSet;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import ninja.samryecroft.returnhome.tracker.audit.AuditEventPublisher;
@@ -73,8 +74,8 @@ public class UserService {
         }
         boolean visible;
         if (isCareProviderOrgAdmin(principal)) {
-            visible = user.hasRole(Role.HOME_STAFF) && user.getHome() != null
-                    && organisationAccessService.canViewHome(principal, user.getHome());
+            visible = user.hasRole(Role.HOME_STAFF) && !user.getHomes().isEmpty()
+                    && user.getHomes().stream().allMatch(h -> organisationAccessService.canViewHome(principal, h));
         } else {
             visible = user.getOrganisation() != null
                     && user.getOrganisation().getId().equals(principal.getOrganisationId());
@@ -97,9 +98,8 @@ public class UserService {
         user.setPassword(form.getPassword() == null ? null : passwordEncoder.encode(form.getPassword()));
         user.setFullName(form.getFullName());
         user.setRoles(form.getRoles());
-        user.setHome(form.getRoles().contains(Role.HOME_STAFF) ? resolveHome(form.getHomeId(), principal) : null);
         user.setOrganisation(needsOrganisation(form.getRoles()) ? resolveOrganisation(form.getOrganisationId(), principal) : null);
-        user.setViewerHomes(form.getRoles().contains(Role.VIEWER) ? resolveViewerHomes(form.getViewerHomeIds(), principal) : new HashSet<>());
+        user.setHomes(resolveHomes(form.getRoles(), form.getHomeIds(), principal));
         user.setEnabled(true);
         User saved = userRepository.save(user);
         auditEventPublisher.userCreated(saved, principal);
@@ -118,9 +118,8 @@ public class UserService {
 
         user.setFullName(form.getFullName());
         user.setRoles(form.getRoles());
-        user.setHome(form.getRoles().contains(Role.HOME_STAFF) ? resolveHome(form.getHomeId(), principal) : null);
         user.setOrganisation(needsOrganisation(form.getRoles()) ? resolveOrganisation(form.getOrganisationId(), principal) : null);
-        user.setViewerHomes(form.getRoles().contains(Role.VIEWER) ? resolveViewerHomes(form.getViewerHomeIds(), principal) : new HashSet<>());
+        user.setHomes(resolveHomes(form.getRoles(), form.getHomeIds(), principal));
         user.setEnabled(form.isEnabled());
         boolean passwordChanged = form.getNewPassword() != null && !form.getNewPassword().isBlank();
         if (passwordChanged) {
@@ -160,9 +159,32 @@ public class UserService {
         return principal.hasRole(Role.ORG_ADMIN) && principal.getOrganisationType() == OrgType.CARE_PROVIDER;
     }
 
+    /**
+     * The homes to attach, for whichever role needs them - one path since V16, where HOME_STAFF and
+     * VIEWER stopped being two different relationships.
+     *
+     * <p>Both roles may hold several. Every id is validated against the caller's own scope, so an
+     * org-admin cannot attach a user to a home they cannot see themselves.
+     */
+    private Set<Home> resolveHomes(Set<Role> roles, Set<Long> homeIds, AppUserPrincipal principal) {
+        boolean needsHomes = roles.contains(Role.HOME_STAFF) || roles.contains(Role.VIEWER);
+        if (!needsHomes) {
+            return new HashSet<>();
+        }
+        if (homeIds == null || homeIds.isEmpty()) {
+            throw new IllegalArgumentException("Select at least one home");
+        }
+        Set<Home> homes = new LinkedHashSet<>();
+        for (Long homeId : homeIds) {
+            homes.add(resolveHome(homeId, principal));
+        }
+        requireOneCareProviderOrganisation(homes);
+        return homes;
+    }
+
     private Home resolveHome(Long homeId, AppUserPrincipal principal) {
         if (homeId == null) {
-            throw new IllegalArgumentException("Home is required for Home Staff");
+            throw new IllegalArgumentException("Home is required");
         }
         Home home = homeRepository.findById(homeId)
                 .orElseThrow(() -> new IllegalArgumentException("No such home: " + homeId));
@@ -172,15 +194,24 @@ public class UserService {
         return home;
     }
 
-    private Set<Home> resolveViewerHomes(Set<Long> homeIds, AppUserPrincipal principal) {
-        if (homeIds == null || homeIds.isEmpty()) {
-            throw new IllegalArgumentException("Select at least one home for a Viewer");
+    /**
+     * A user's homes must all sit under one Care Provider organisation.
+     *
+     * <p>Not a tidiness rule. Home staff have no organisation of their own - theirs is derived
+     * through a home - so a user spanning two organisations would have no single answer to "which
+     * organisation are you in", and the places that ask (audit scoping, theme resolution) would
+     * each silently pick whichever home they happened to see first. Refusing at the point of entry
+     * is the only place this is cheap to say.
+     */
+    private void requireOneCareProviderOrganisation(Set<Home> homes) {
+        long distinctOrgs = homes.stream()
+                .map(home -> home.getOrganisation() == null ? null : home.getOrganisation().getId())
+                .distinct()
+                .count();
+        if (distinctOrgs > 1) {
+            throw new IllegalArgumentException(
+                    "All of a user's homes must belong to the same care provider organisation");
         }
-        Set<Home> homes = new HashSet<>();
-        for (Long homeId : homeIds) {
-            homes.add(resolveHome(homeId, principal));
-        }
-        return homes;
     }
 
     /** ADMIN picks any organisation explicitly; an org-admin's new users are always pinned to their own org. */

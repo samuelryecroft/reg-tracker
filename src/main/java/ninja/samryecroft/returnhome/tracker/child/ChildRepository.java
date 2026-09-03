@@ -1,5 +1,6 @@
 package ninja.samryecroft.returnhome.tracker.child;
 
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
@@ -36,8 +37,9 @@ public interface ChildRepository extends JpaRepository<Child, Long> {
                     Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER))
             .thenComparing(BY_NAME);
 
+    /** Children in any of the caller's homes - the one query both HOME_STAFF and VIEWER use (V16). */
     @EntityGraph(attributePaths = "home")
-    List<Child> findByHomeId(Long homeId);
+    List<Child> findByHomeIdIn(Collection<Long> homeIds);
 
     @EntityGraph(attributePaths = "home")
     @Query("select c from Child c")
@@ -51,7 +53,4 @@ public interface ChildRepository extends JpaRepository<Child, Long> {
     @Query("select c from Child c where c.id = :id")
     Optional<Child> findDetailedById(@Param("id") Long id);
 
-    @EntityGraph(attributePaths = "home")
-    @Query("select c from Child c where c.home.id in (select h.id from User u join u.viewerHomes h where u.id = :userId)")
-    List<Child> findByViewerAccess(@Param("userId") Long userId);
 }
