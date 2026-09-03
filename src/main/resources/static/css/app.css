@@ -1,6 +1,14 @@
 :root {
     color-scheme: light;
     --border: #E5E7EB;
+    /* T124 / WCAG 2.2 AA 1.4.11. --border is a *decorative* hairline: at 1.24:1 on the
+       surface it is fine for a rule between rows, which the criterion does not cover, and
+       far below the 3:1 a boundary needs when that boundary is what identifies a control.
+       Anything a person can operate takes this token instead. Ink mixed 56% toward white,
+       so it keeps the palette's cool cast rather than being an arbitrary grey: 3.76:1 on
+       --surface, 3.61:1 on --bg, 3.36:1 on --tint (a checked chip sits on tint).
+       Becomes --color-control-border under the Nocturne redesign; same rule, same reason. */
+    --control-border: #828487;
     --muted: #686F7D;
     --ink: #1F2328;
     --accent: #F36E2A;
@@ -93,7 +101,7 @@ header a.brand:hover { color: var(--ink); }
 header form { display: inline; }
 header button {
     background: var(--surface);
-    border: 1px solid var(--border);
+    border: 1px solid var(--control-border);
     color: var(--ink);
     border-radius: 6px;
     padding: 0.5rem 0.9rem;
@@ -144,7 +152,7 @@ input, select, textarea {
     width: 100%;
     min-height: 44px;
     padding: 0.6rem 0.75rem;
-    border: 1px solid var(--border);
+    border: 1px solid var(--control-border);
     border-radius: 8px;
     font-size: var(--t-md);
     box-sizing: border-box;
@@ -212,7 +220,7 @@ fieldset.checkbox-fieldset > legend {
     gap: var(--s2);
     margin: 0;
     padding: 0.5rem var(--s3);
-    border: 1px solid var(--border);
+    border: 1px solid var(--control-border);
     border-radius: 8px;
     background: var(--surface);
     font-weight: 500;
@@ -249,7 +257,7 @@ fieldset.checkbox-fieldset > legend {
 .btn:hover { background: var(--accent-dark); color: #fff; }
 .btn.secondary { background: var(--surface); color: var(--accent-dark); border-color: var(--accent-dark); box-shadow: none; }
 .btn.secondary:hover { background: var(--tint); }
-.btn.ghost { background: transparent; color: var(--muted); border-color: var(--border); box-shadow: none; }
+.btn.ghost { background: transparent; color: var(--muted); border-color: var(--control-border); box-shadow: none; }
 .btn.ghost:hover { border-color: var(--accent-dark); color: var(--accent-dark); }
 .btn.danger { background: var(--surface); color: var(--error); border-color: var(--error); box-shadow: none; }
 .btn.danger:hover { background: var(--error-bg); }
