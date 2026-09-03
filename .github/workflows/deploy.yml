@@ -1,0 +1,230 @@
+name: Deploy
+
+# WS-E deploy pipeline. Execution is SPLIT (design fork 2c): the control plane (terraform, Key Vault
+# writes, App Service deploy, smoke, rollback) runs on hosted runners over public ARM endpoints; only
+# the three DB-plane steps run VNet-side, in the Container Apps job (see the migrator_job module and
+# deploy/db-plane/run-db-plane.sh). No standing credentialed host inside the VNet.
+#
+# Identity: two user-assigned managed identities via OIDC, gated by GitHub Environments so protection
+# rules are evaluated BEFORE a token is minted (environment: subjects, not ref:/pull_request):
+#   - plan job -> rht-ci-plan   (environment 'plan', branch-restricted)
+#   - deploy   -> rht-cd-prod   (environment 'prod', required reviewers, main only)
+# Both created out of band by bootstrap-deployer-identity.sh; client ids + config come from the
+# Environment vars/secrets that script + PREFLIGHT set up.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+# Minimal at workflow level; each job re-declares its own (5.3). NO id-token here.
+permissions:
+  contents: read
+
+# Never cancel an in-flight production deploy.
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+env:
+  TF_DIR: terraform
+  TF_VERSION: 1.5.7
+
+jobs:
+  plan:
+    name: terraform plan
+    runs-on: ubuntu-latest
+    environment: plan
+    permissions:
+      contents: read
+      id-token: write # OIDC to Azure - job level only
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Azure login (rht-ci-plan, OIDC)
+        uses: azure/login@7184910d9eb2b1c5e48f7073824a90609bb9b6d6 # v2.3.1
+        with:
+          client-id: ${{ vars.PLAN_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+      # NOTE (Kevin 5.4): the plan tier is NOT low-privilege - state holds all four DB passwords in
+      # clear, so anyone who can run this can read them. Fenced by the 'plan' environment's branch
+      # restriction until 5.4 (generate secrets VNet-side, keep them out of state) lands.
+      - name: Terraform init + plan
+        working-directory: ${{ env.TF_DIR }}
+        env:
+          ARM_USE_OIDC: "true"
+          TF_VAR_subscription_id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          TF_VAR_alert_email: ${{ vars.ALERT_EMAIL }}
+          TF_VAR_postgres_administrator_password: ${{ secrets.TF_VAR_POSTGRES_ADMINISTRATOR_PASSWORD }}
+          TF_VAR_admin_seed_password: ${{ secrets.TF_VAR_ADMIN_SEED_PASSWORD }}
+          TF_VAR_migrator_db_password: ${{ secrets.TF_VAR_MIGRATOR_DB_PASSWORD }}
+          TF_VAR_runtime_db_password: ${{ secrets.TF_VAR_RUNTIME_DB_PASSWORD }}
+        run: |
+          terraform init \
+            -backend-config="resource_group_name=${{ vars.TF_STATE_RG }}" \
+            -backend-config="storage_account_name=${{ vars.TF_STATE_SA }}" \
+            -backend-config="container_name=${{ vars.TF_STATE_CONTAINER }}" \
+            -backend-config="key=reg-tracker.tfstate" \
+            -backend-config="use_azuread_auth=true"
+          terraform plan -input=false -out=tfplan
+      - name: Upload plan
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: tfplan
+          path: ${{ env.TF_DIR }}/tfplan
+          if-no-files-found: error
+          retention-days: 1
+
+  deploy:
+    name: apply + migrate + deploy
+    runs-on: ubuntu-latest
+    needs: plan
+    if: github.ref == 'refs/heads/main'
+    environment: prod # required reviewers - every prod deploy waits for a human
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Azure login (rht-cd-prod, OIDC)
+        uses: azure/login@7184910d9eb2b1c5e48f7073824a90609bb9b6d6 # v2.3.1
+        with:
+          client-id: ${{ vars.CD_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+      - name: Set up JDK 21
+        uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4.9.1
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      # --- Control plane: terraform apply (creates/updates infra + writes KV secrets) ---
+      - name: Terraform init + apply
+        id: tf
+        working-directory: ${{ env.TF_DIR }}
+        env:
+          ARM_USE_OIDC: "true"
+          TF_VAR_subscription_id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          TF_VAR_alert_email: ${{ vars.ALERT_EMAIL }}
+          TF_VAR_postgres_administrator_password: ${{ secrets.TF_VAR_POSTGRES_ADMINISTRATOR_PASSWORD }}
+          TF_VAR_admin_seed_password: ${{ secrets.TF_VAR_ADMIN_SEED_PASSWORD }}
+          TF_VAR_migrator_db_password: ${{ secrets.TF_VAR_MIGRATOR_DB_PASSWORD }}
+          TF_VAR_runtime_db_password: ${{ secrets.TF_VAR_RUNTIME_DB_PASSWORD }}
+        run: |
+          terraform init \
+            -backend-config="resource_group_name=${{ vars.TF_STATE_RG }}" \
+            -backend-config="storage_account_name=${{ vars.TF_STATE_SA }}" \
+            -backend-config="container_name=${{ vars.TF_STATE_CONTAINER }}" \
+            -backend-config="key=reg-tracker.tfstate" \
+            -backend-config="use_azuread_auth=true"
+          terraform apply -input=false -auto-approve
+          {
+            echo "rg=$(terraform output -raw resource_group_name)"
+            echo "app_name=$(terraform output -raw app_service_name)"
+            echo "job_name=$(terraform output -raw container_app_job_name)"
+            echo "acr=$(terraform output -raw container_registry_login_server)"
+          } >> "$GITHUB_OUTPUT"
+
+      # --- 5.1: assert the app is pinned to the 'azure' profile and NEVER 'demo' (fail closed). ---
+      # The allowlist is {azure} (Terraform passes the literal "azure"; there is no 'prod' profile).
+      # This is the pipeline half of the two-layer demo guard - DemoProfileGuard is the in-app half.
+      - name: Assert SPRING_PROFILES_ACTIVE
+        run: |
+          profiles="$(az webapp config appsettings list \
+            -g '${{ steps.tf.outputs.rg }}' -n '${{ steps.tf.outputs.app_name }}' \
+            --query "[?name=='SPRING_PROFILES_ACTIVE'].value | [0]" -o tsv)"
+          echo "SPRING_PROFILES_ACTIVE=${profiles}"
+          case ",${profiles}," in
+            *,demo,*) echo "FATAL: 'demo' profile present on a real deployment - refusing." >&2; exit 1 ;;
+          esac
+          if [ "${profiles}" != "azure" ]; then
+            echo "FATAL: SPRING_PROFILES_ACTIVE='${profiles}', expected exactly 'azure' (allowlist)." >&2
+            exit 1
+          fi
+
+      # --- DB-plane image: build the custom flyway+psql+jq image with the migration payload baked in
+      # (deploy/db-plane/Dockerfile), push to ACR, and DIGEST-PIN it into the job. The CD identity has
+      # AcrPush (out-of-band bootstrap). No registry credential: az acr login uses the OIDC session.
+      - name: Build + push + pin DB-plane image
+        run: |
+          acr='${{ steps.tf.outputs.acr }}'                 # e.g. crrht<sfx>.azurecr.io
+          tag="${GITHUB_SHA}"
+          az acr login --name "${acr%%.*}"
+          docker build -f deploy/db-plane/Dockerfile -t "${acr}/rht-db-plane:${tag}" .
+          docker push "${acr}/rht-db-plane:${tag}"
+          digest="$(az acr repository show --name "${acr%%.*}" \
+            --image "rht-db-plane:${tag}" --query digest -o tsv)"
+          echo "pinning ${acr}/rht-db-plane@${digest}"
+          az containerapp job update -g '${{ steps.tf.outputs.rg }}' -n '${{ steps.tf.outputs.job_name }}' \
+            --image "${acr}/rht-db-plane@${digest}"
+
+      # --- DB plane: run 01 SQL -> Flyway -> 02 SQL VNet-side, BEFORE the new jar goes live ---
+      # (expand/contract migrations keep the running jar valid, so rollback-by-swap stays safe).
+      # M2 (Kevin T89): 'az containerapp job start' returns as soon as the execution is CREATED, so we
+      # MUST poll to Succeeded and FAIL on Failed before deploying the jar - otherwise the jar races
+      # the migration and the WS-G ordering (01 -> Flyway -> 02 -> jar) is lost.
+      - name: Run DB-plane migration job (VNet-side) and wait for success
+        run: |
+          rg='${{ steps.tf.outputs.rg }}'; job='${{ steps.tf.outputs.job_name }}'
+          exec_name="$(az containerapp job start -g "$rg" -n "$job" --query name -o tsv)"
+          echo "started execution: $exec_name"
+          for i in $(seq 1 60); do
+            status="$(az containerapp job execution show -g "$rg" -n "$job" \
+              --job-execution-name "$exec_name" --query properties.status -o tsv 2>/dev/null || echo Unknown)"
+            echo "attempt $i: $status"
+            case "$status" in
+              Succeeded) echo "migration succeeded"; exit 0 ;;
+              Failed|Degraded) echo "FATAL: DB-plane job execution $status - aborting before jar deploy." >&2; exit 1 ;;
+            esac
+            sleep 15
+          done
+          echo "FATAL: DB-plane job did not reach Succeeded within ~15min." >&2; exit 1
+
+      # --- Deploy the jar. TARGET DESIGN = staging-slot deploy + swap (zero-downtime, instant ---
+      # rollback-by-swap). Slots need App Service STANDARD+ (S1); WS-D provisions B1 (Basic) which has
+      # NO slots. Until the S1 tier decision (a T83 cost item) lands, this uses the B1-compatible
+      # DIRECT deploy below; rollback is redeploy-previous-artifact. Swap in the slot flow once on S1.
+      - name: Build deployable jar (tests already gated by CI)
+        run: ./mvnw -B -ntp -DskipTests package
+      - name: Deploy jar to App Service (B1 direct deploy)
+        run: |
+          # The *.jar glob matches only the repackaged boot jar (the thin jar is *.jar.original).
+          set -- target/*.jar
+          jar="$1"
+          az webapp deploy --type jar \
+            -g '${{ steps.tf.outputs.rg }}' -n '${{ steps.tf.outputs.app_name }}' --src-path "$jar"
+      # On S1, replace the two steps above with:
+      #   az webapp deploy ... --slot staging
+      #   (smoke the staging slot)
+      #   az webapp deployment slot swap -g <rg> -n <app> --slot staging --target-slot production
+      #   rollback: az webapp deployment slot swap ... (swap back)
+
+      # --- Smoke: readiness probe must be green after deploy, else roll back ---
+      - name: Smoke test /actuator/health/readiness
+        run: |
+          host="$(az webapp show -g '${{ steps.tf.outputs.rg }}' -n '${{ steps.tf.outputs.app_name }}' \
+            --query defaultHostName -o tsv)"
+          for i in $(seq 1 30); do
+            code="$(curl -s -o /dev/null -w '%{http_code}' "https://${host}/actuator/health/readiness" || true)"
+            [ "$code" = "200" ] && { echo "readiness OK"; exit 0; }
+            echo "attempt $i: HTTP ${code}, retrying..."; sleep 10
+          done
+          echo "FATAL: readiness never returned 200 after deploy." >&2
+          exit 1
+      - name: Rollback on failure
+        if: failure()
+        run: |
+          echo "Deploy/smoke failed. On S1: 'az webapp deployment slot swap' back to the previous"
+          echo "slot for an instant rollback. On B1: redeploy the previous known-good artifact."
+          echo "TODO(WS-E enablement): wire the concrete rollback for the chosen tier."

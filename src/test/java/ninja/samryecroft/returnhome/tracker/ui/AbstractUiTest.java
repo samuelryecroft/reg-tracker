@@ -10,11 +10,17 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
+// WS-E: the Playwright UI suite (real browser + Hikari pool + Testcontainers Postgres) is the
+// infra-timing category quarantined out of the CI required gate (T21). JUnit 5 inherits a
+// class-level @Tag to subclasses, so every *UiTest is tagged by tagging this base. Quarantined,
+// not deleted: the tests still run in ci.yml's non-blocking flaky-infra lane.
+@Tag("flaky-infra")
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 public abstract class AbstractUiTest extends AbstractIntegrationTest {
 
