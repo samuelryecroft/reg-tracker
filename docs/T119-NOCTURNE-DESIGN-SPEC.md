@@ -5,10 +5,12 @@ Source: `design_handoff_return_home_tracker/` — README.md, `RHT Mockups.dc.htm
 `_ds/nocturne-8f532d75-.../styles.css` + `readme.md`.
 Target: `src/main/resources/templates/**` + `src/main/resources/static/css/app.css`, `main` @ `e1ec8d8`.
 
-> **Where the bundle is.** "UI mockups request.zip" is **not in the working tree**. It was committed and then
-> removed; I recovered it from git (`git cat-file -p 58a6c518866b104cc244d6e328fd168f814844a5`). Whoever
-> builds this needs it restored, or it will not be there. Blob is safe in history for now, but a `gc` on a
-> repo where it is unreachable would lose it.
+> **Where the bundle is.** The canonical copy is
+> `/Users/sam/HarnessAgents/hive/shared-handoff/design_handoff_return_home_tracker/`. It is **byte-identical**
+> (sha256, all four files) to the copy I first reviewed, which I had to recover from git history because
+> "UI mockups request.zip" was committed to the repo and then removed and is **not in the working tree**
+> (`git cat-file -p 58a6c518866b104cc244d6e328fd168f814844a5`). Use the shared path; the repo copy exists
+> only as an unreferenced blob and a `gc` would lose it.
 
 ---
 
@@ -286,6 +288,31 @@ and chroma unchanged" — the code mirrors chroma too. The README implies the wh
 excludes `--color-accent`. The README's dark neutral ramp is hex; the canvas's is OKLCH, and they are not
 identical values. **Which is authoritative, the prose or the canvas code?** I have specced from the code,
 because it is what the prototype actually renders.
+
+---
+
+## 5b · Screens that must NOT be built — credential surfaces (Entra / T113)
+
+Skipping 4c is **not sufficient.** A credential flow is hidden inside an administrative screen.
+
+| Where | What it carries | Disposition |
+|---|---|---|
+| **6d — Add a user** | `Username *` and `Password *` ("At least 8 characters"), under the intro *"You set the first password and pass it on; the person can change it afterwards."* | **Build 6d without the credential block.** The app provisions a *person* — name, email, contact number, roles, homes — never a credential. |
+| **6d — that same sentence** | promises an end-user change-password flow | **Delete the sentence.** No screen is drawn for it, but the copy commits us to one. Entra SSPR owns it. |
+| **4c — Sign in** | username/password, 5-attempt lockout, "Trouble signing in? Contact your organisation's administrator." | Already skipped. Note the support routing is wrong under Entra too, but moot. |
+| **4d — Users editor** | Roles and Homes only — **no password control** | **Clean as drawn.** Build as-is. |
+
+**Design consequence worth deciding now:** if the app no longer sets credentials, *Username* stops being an
+identifier and **email/UPN becomes the key**. 6d currently draws both `Email *` and `Username *`; the
+username field should go rather than being built and then removed. `admin/user-form-edit.html` also titles
+itself "Edit User: {username}" today and would need the same change.
+
+For completeness — the credential fields that exist in the app **today** and that T113 removes (not mine to
+build, and not to be redrawn): `admin/user-form.html` (username + password, `minlength=8`),
+`admin/user-form-edit.html` ("Reset password (leave blank to keep current password)"), and `login.html`.
+
+No forgot-password, password-reset, first-time-setup, invitation, activation or MFA screen appears anywhere
+in the handoff — I swept the canvas for all of those terms. 6d is the only hidden one.
 
 ---
 
