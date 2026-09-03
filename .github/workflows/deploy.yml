@@ -29,6 +29,13 @@ concurrency:
 env:
   TF_DIR: terraform
   TF_VERSION: 1.5.7
+  # App Insights Java agent, PINNED + checksum-verified (supply chain). The 46MB agent jar is NOT
+  # committed; it is fetched from Maven Central at deploy time and staged next to the app jar. Bump
+  # both together (get the sha256 from <mavenurl>/applicationinsights-agent-<ver>.jar.sha256). The
+  # JVM attaches it via JAVA_OPTS=-javaagent:.../applicationinsights-agent.jar, which is set in the
+  # Terraform app_service module (the durable source of truth for the setting; the version lives here).
+  AI_AGENT_VERSION: "3.7.9"
+  AI_AGENT_SHA256: "4ab7a442bf9defc7475d026c6b49042793ebb010c391a1db91ae07da0c04d848"
 
 jobs:
   plan:
@@ -197,13 +204,56 @@ jobs:
       # DIRECT deploy below; rollback is redeploy-previous-artifact. Swap in the slot flow once on S1.
       - name: Build deployable jar (tests already gated by CI)
         run: ./mvnw -B -ntp -DskipTests package
+
+      # --- Stage the App Insights Java agent + its config NEXT TO the jar, BEFORE the jar deploy so the
+      # files are present when the container boots with -javaagent. The agent attaches via
+      # JAVA_OPTS=-javaagent:/home/site/wwwroot/applicationinsights-agent.jar, set in Terraform's
+      # app_service module (durable source of truth). The 46MB agent jar is NOT committed: it is fetched
+      # at the PINNED AI_AGENT_VERSION and checksum-verified (supply chain), then staged together with
+      # applicationinsights.json (deploy/appservice/ - Kevin's ruling: a filesystem file the agent reads
+      # via APPLICATIONINSIGHTS_CONFIGURATION_FILE, never baked into the classpath). --clean false so
+      # neither this step nor the jar deploy below wipes the other's files.
+      - name: Stage App Insights agent + config
+        run: |
+          agent="applicationinsights-agent-${AI_AGENT_VERSION}.jar"
+          url="https://repo1.maven.org/maven2/com/microsoft/azure/applicationinsights-agent/${AI_AGENT_VERSION}/${agent}"
+          curl -fsSL -o "$agent" "$url"
+          echo "${AI_AGENT_SHA256}  ${agent}" | sha256sum -c -
+          az webapp deploy --type static --clean false --restart false \
+            -g '${{ steps.tf.outputs.rg }}' -n '${{ steps.tf.outputs.app_name }}' \
+            --target-path /home/site/wwwroot/applicationinsights-agent.jar --src-path "$agent"
+          az webapp deploy --type static --clean false --restart false \
+            -g '${{ steps.tf.outputs.rg }}' -n '${{ steps.tf.outputs.app_name }}' \
+            --target-path /home/site/wwwroot/applicationinsights.json \
+            --src-path deploy/appservice/applicationinsights.json
+
       - name: Deploy jar to App Service (B1 direct deploy)
         run: |
           # The *.jar glob matches only the repackaged boot jar (the thin jar is *.jar.original).
+          # --clean false: keep the App Insights agent jar + config staged in the step above.
           set -- target/*.jar
           jar="$1"
-          az webapp deploy --type jar \
+          az webapp deploy --type jar --clean false \
             -g '${{ steps.tf.outputs.rg }}' -n '${{ steps.tf.outputs.app_name }}' --src-path "$jar"
+
+      # --- Fail LOUDLY if either agent artifact is missing after deploy (Kevin/README). A missing jar
+      # crash-loops the JVM (JAVA_OPTS points at it, so smoke would also fail); a missing
+      # applicationinsights.json is worse-because-silent: the agent falls back to defaults, quietly
+      # dropping the 100% sampling + role name and degrading R5 detection. Kudu VFS returns 200 iff the
+      # file exists; auth is the CD identity's ARM token (no publish profile).
+      - name: Verify App Insights agent + config are staged
+        run: |
+          app='${{ steps.tf.outputs.app_name }}'
+          token="$(az account get-access-token --resource https://management.azure.com --query accessToken -o tsv)"
+          for f in applicationinsights-agent.jar applicationinsights.json; do
+            code="$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer ${token}" \
+              "https://${app}.scm.azurewebsites.net/api/vfs/site/wwwroot/${f}")"
+            echo "${f}: HTTP ${code}"
+            if [ "${code}" != "200" ]; then
+              echo "FATAL: ${f} is not present in /home/site/wwwroot after deploy (agent would not attach / config silently lost)." >&2
+              exit 1
+            fi
+          done
       # On S1, replace the two steps above with:
       #   az webapp deploy ... --slot staging
       #   (smoke the staging slot)
