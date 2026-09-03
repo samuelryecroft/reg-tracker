@@ -11,4 +11,7 @@ postgres_administrator_password = "REPLACE_ME_placeholder_not_a_real_secret"
 admin_seed_password             = "REPLACE_ME_placeholder_rotate_after_first_boot"
 
 alert_email = "oncall@example.org"
-enable_vnet = false
+# Leave true for real data (private networking; Postgres+Blob not publicly reachable). Set false
+# ONLY for a pre-prod/synthetic environment - and even then a plan-time guard blocks false when
+# tags.environment=prod, so it cannot silently reopen B2.
+enable_vnet = true

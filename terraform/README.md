@@ -123,10 +123,19 @@ On the private path (`enable_vnet=true`, default):
   subnet (privatelink DNS zone) — consistent with the Postgres path, resolving the B1 note too.
 - **App Service** uses regional **VNet integration** into a delegated subnet with
   `WEBSITE_VNET_ROUTE_ALL=1`, so its outbound DB/Blob traffic uses the private endpoints.
+- **Key Vault** deliberately keeps `public_network_access_enabled=true` even on the private path —
+  an **explicit accepted decision**, not an oversight. Its data plane is already RBAC-only with
+  **purge-protection on**, and App Service Key Vault references + the deployer both reach it over the
+  public endpoint; a KV private endpoint would add ~£6/mo and a third private DNS zone
+  (`privatelink.vaultcore.azure.net`) for marginal benefit at this scale. Revisit if a commissioner
+  mandates no public control-plane exposure.
+- A **plan-time guard** (`terraform_data.network_posture_guard`) fails the plan if
+  `enable_vnet=false` while `tags.environment="prod"`, so the public path can never be selected for
+  a prod environment.
 
 `enable_vnet=false` remains available for a **pre-prod / synthetic-data** environment only: public
 Postgres + the Azure-services firewall, and public-but-RBAC storage (the cheaper, non-private path).
-Never use it with real data.
+Never use it with real data — the guard above enforces this for `prod`.
 
 **Cost delta of the private path:** ~£6–8/mo over the public draft (one blob private endpoint + two
 private DNS zones); Postgres VNet injection itself is no extra charge. **Confirm-before-apply:**

@@ -16,7 +16,7 @@ resource "azurerm_subnet" "postgres" {
   name                 = "postgres"
   resource_group_name  = var.resource_group_name
   virtual_network_name = azurerm_virtual_network.this.name
-  address_prefixes     = ["10.20.1.0/24"]
+  address_prefixes     = [cidrsubnet(var.vnet_address_space[0], 8, 1)]
 
   delegation {
     name = "fs"
@@ -31,7 +31,7 @@ resource "azurerm_subnet" "app" {
   name                 = "appservice"
   resource_group_name  = var.resource_group_name
   virtual_network_name = azurerm_virtual_network.this.name
-  address_prefixes     = ["10.20.2.0/24"]
+  address_prefixes     = [cidrsubnet(var.vnet_address_space[0], 8, 2)]
 
   delegation {
     name = "webapp"
@@ -46,7 +46,7 @@ resource "azurerm_subnet" "endpoints" {
   name                 = "endpoints"
   resource_group_name  = var.resource_group_name
   virtual_network_name = azurerm_virtual_network.this.name
-  address_prefixes     = ["10.20.3.0/24"]
+  address_prefixes     = [cidrsubnet(var.vnet_address_space[0], 8, 3)]
 }
 
 # Postgres Flexible Server private DNS zone (name must end in .postgres.database.azure.com) + link.

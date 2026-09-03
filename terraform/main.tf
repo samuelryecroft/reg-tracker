@@ -8,6 +8,18 @@ resource "azurerm_resource_group" "main" {
   tags     = var.tags
 }
 
+# Plan-time guard (Kevin F2): a prod environment must NEVER run the public network path. This makes
+# M1 impossible to reintroduce - turns "docs say synthetic only" into enforcement. A precondition on
+# terraform_data fails at plan (cross-variable validation isn't available on Terraform 1.5).
+resource "terraform_data" "network_posture_guard" {
+  lifecycle {
+    precondition {
+      condition     = !(var.enable_vnet == false && lookup(var.tags, "environment", "") == "prod")
+      error_message = "enable_vnet=false (public Postgres/Blob) is not allowed when tags.environment=\"prod\": the public path is for synthetic data only. Set enable_vnet=true for prod (private networking, B2 closed)."
+    }
+  }
+}
+
 # Private networking. Default ON (enable_vnet=true) - this is the B2 close for real children's data:
 # VNet + delegated subnets + private endpoints so Postgres and Blob are unreachable from the public
 # internet / other Azure tenants. Set enable_vnet=false only for a pre-prod/synthetic environment.
@@ -111,8 +123,10 @@ module "app_service" {
   blob_endpoint          = module.storage.primary_blob_endpoint
   key_vault_uri          = module.keyvault.vault_uri
 
-  db_url      = "jdbc:postgresql://${module.postgres.fqdn}:5432/${module.postgres.database_name}?sslmode=require"
-  db_username = "${var.postgres_administrator_login}@${module.postgres.server_name}"
+  db_url = "jdbc:postgresql://${module.postgres.fqdn}:5432/${module.postgres.database_name}?sslmode=require"
+  # Flexible Server uses the BARE login (not the Single-Server 'login@server' form) - the @server
+  # form fails auth at boot (Kevin M2).
+  db_username = var.postgres_administrator_login
 
   # Key Vault references (versionless, so rotation flows through without a config change).
   db_password_secret_uri          = azurerm_key_vault_secret.db_password.versionless_id
