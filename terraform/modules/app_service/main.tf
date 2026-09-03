@@ -53,7 +53,10 @@ resource "azurerm_linux_web_app" "this" {
   # HSTS itself is emitted by the application (Spring Security), not the platform; https_only here
   # guarantees the redirect that makes HSTS meaningful. Outbound VNet routing is set via
   # vnet_route_all_enabled in site_config above (not an app setting).
-  app_settings = {
+  # Entra settings are merged rather than listed, because while entra_app_settings is empty the
+  # resulting map is byte-for-byte what it was before this phase - so P2 provisions nothing and
+  # changes nothing until someone deliberately turns it on.
+  app_settings = merge(var.entra_app_settings, {
     "SPRING_PROFILES_ACTIVE"                 = var.spring_profiles_active
     "BLOB_ENDPOINT"                          = var.blob_endpoint
     "KEY_VAULT_URI"                          = var.key_vault_uri
@@ -64,7 +67,7 @@ resource "azurerm_linux_web_app" "this" {
     "APPLICATIONINSIGHTS_CONNECTION_STRING"  = "@Microsoft.KeyVault(SecretUri=${var.ai_connection_string_secret_uri})"
     "APPLICATIONINSIGHTS_CONFIGURATION_FILE" = "/home/site/wwwroot/applicationinsights.json"
     "JAVA_OPTS"                              = "-javaagent:/home/site/wwwroot/applicationinsights-agent.jar"
-  }
+  })
 }
 
 # App-Service-scoped go-live alerts (error rate, health probe). Latency (App-Insights-scoped) lives
