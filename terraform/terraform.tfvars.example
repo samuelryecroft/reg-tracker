@@ -24,3 +24,7 @@ alert_email = "REPLACE_ME_real_monitored_recipient"
 # ONLY for a pre-prod/synthetic environment - and even then a plan-time guard blocks false when
 # tags.environment=prod, so it cannot silently reopen B2.
 enable_vnet = true
+
+# T114 budget notifications recipient. REQUIRED (no default) so a real mailbox is always chosen
+# deliberately - the human's is justsam33@gmail.com. Set it here (this file's real copy is git-ignored).
+budget_alert_email = "you@example.org"

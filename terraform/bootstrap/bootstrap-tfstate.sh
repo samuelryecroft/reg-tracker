@@ -11,6 +11,9 @@ set -euo pipefail
 
 # ---- EDIT THESE (storage account name is GLOBALLY UNIQUE; pick one you control) ----
 LOCATION="uksouth"
+# COUPLING: terraform/budget.tf's Cost Management budget filters on this exact RG name
+# (rg-<prefix>-tfstate). If you rename it here, update budget.tf too - otherwise the state RG
+# silently drops out of budget coverage with no error (Kevin T114).
 STATE_RG="rg-rht-tfstate"
 STATE_SA="sarhttfstatechangeme"   # sa-prefixed; 3-24 lowercase alphanumeric, GLOBALLY UNIQUE
 STATE_CONTAINER="tfstate"
