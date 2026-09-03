@@ -197,6 +197,34 @@ first migrator-run migration. This **must include `flyway_schema_history`** — 
 forget, and if the migrator does not own it the first migrator-run migration fails with a confusing
 permissions error rather than an obvious one.
 
+## CI/CD (WS-E)
+
+Two GitHub Actions workflows + one out-of-band bootstrap:
+
+- **`.github/workflows/ci.yml`** — build + test, **no Azure identity** (a token never issued can't be
+  abused by a malicious dep during `mvn verify`). Required gate excludes `flaky-infra`; a non-blocking
+  lane still runs those. Actions pinned to commit SHAs; job-level permissions.
+- **`.github/workflows/deploy.yml`** — **split execution**. Control plane (terraform plan/apply, KV
+  writes, App Service deploy, `/actuator/health` smoke, rollback) on hosted runners via OIDC; the
+  three **DB-plane** steps (`01 SQL → Flyway → 02 SQL`) run VNet-side in the Container Apps job
+  (`modules/migrator_job` + `deploy/db-plane/run-db-plane.sh`). `plan` job → `rht-ci-plan`
+  (environment `plan`); `deploy` job → `rht-cd-prod` (environment `prod`, required reviewers). The
+  demo guard's pipeline half asserts `SPRING_PROFILES_ACTIVE == azure` and fails closed on `demo`.
+- **`bootstrap/bootstrap-deployer-identity.sh`** — out of band, human, idempotent: the two
+  user-assigned identities, their **environment-scoped** federated credentials, least-privilege roles
+  (incl. RBAC Administrator scoped to the RG, ABAC-conditioned to only the 3 app roles — never
+  Owner/UAA/subscription), and the GitHub Environments + protection rules. See `PREFLIGHT.md §2`.
+
+**DB-plane secret handling (Kevin F2):** the job reads the passwords from Key Vault via its managed
+identity (no DB credential through GitHub); the script keeps passwords off the process arg list
+(psql via stdin `\set`, Flyway via `FLYWAY_PASSWORD`) — **F2b** — and **asserts `log_statement` is
+`none`/`mod` before setting role passwords** so `ALTER ROLE` is never logged in clear to Log
+Analytics — **F2a** (the must-not-drop half).
+
+**Two open items** (see `PREFLIGHT.md`): slot-swap needs App Service **S1** (B1 has no slots — ships
+a direct-deploy fallback); and the migration **payload delivery** to the public flyway image
+(Azure Files mount) awaits sign-off before it is modelled in Terraform.
+
 ## Remaining pre-go-live items
 
 - **Deployer credentials / first apply** — no apply has run; the human supplies Azure auth, the

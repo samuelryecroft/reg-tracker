@@ -70,6 +70,12 @@ variable "alert_email" {
   }
 }
 
+variable "cd_identity_name" {
+  description = "Name of the CD user-assigned managed identity (rht-cd-prod) created out of band by bootstrap-deployer-identity.sh. The Container Apps DB-plane job assumes it to read the migrator/admin passwords from Key Vault, so no DB credential transits GitHub. Must exist before apply (WS-E)."
+  type        = string
+  default     = "rht-cd-prod"
+}
+
 variable "enable_vnet" {
   description = "Private-networking path (default TRUE): VNet + delegated subnets + private endpoints so Postgres and Blob are unreachable from the public internet / other Azure tenants. This is the B2 close (TERRAFORM-REVIEW.md) and the required posture for real children's data. Set false ONLY for a pre-prod/synthetic environment (public Postgres + Azure-services firewall, public-but-RBAC storage)."
   type        = bool

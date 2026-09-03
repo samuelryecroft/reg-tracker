@@ -177,6 +177,35 @@ module "app_service" {
   vnet_integration_subnet_id = var.enable_vnet ? module.network[0].app_subnet_id : null
 }
 
+# WS-E DB-plane runner: Container Apps job that runs 01 SQL -> Flyway -> 02 SQL VNet-side. Only on
+# the private path (enable_vnet) - the public/pre-prod path has no private DB, so its migrations run
+# from the hosted runner directly. Reads the migration payload from a mount (see module note) and the
+# DB passwords from Key Vault via the CD managed identity (no DB credential through GitHub).
+module "migrator_job" {
+  source = "./modules/migrator_job"
+  count  = var.enable_vnet ? 1 : 0
+
+  name_prefix         = var.name_prefix
+  location            = var.location
+  resource_group_name = azurerm_resource_group.main.name
+  tags                = var.tags
+
+  infrastructure_subnet_id   = module.network[0].containerapps_subnet_id
+  log_analytics_workspace_id = module.observability.log_analytics_workspace_id
+  key_vault_uri              = module.keyvault.vault_uri
+  cd_identity_name           = var.cd_identity_name
+
+  postgres_fqdn                = module.postgres.fqdn
+  database_name                = module.postgres.database_name
+  postgres_administrator_login = var.postgres_administrator_login
+  migrator_db_login            = var.migrator_db_login
+
+  # The reviewable DB-plane script (no secrets), embedded as the job command.
+  db_plane_script = file("${path.module}/../deploy/db-plane/run-db-plane.sh")
+
+  depends_on = [module.network, module.keyvault, module.postgres]
+}
+
 # Least-privilege data-plane RBAC for the App Service managed identity (T47 shape).
 module "identity_rbac" {
   source = "./modules/identity_rbac"

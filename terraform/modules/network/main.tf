@@ -49,6 +49,25 @@ resource "azurerm_subnet" "endpoints" {
   address_prefixes     = [cidrsubnet(var.vnet_address_space[0], 8, 3)]
 }
 
+# Container Apps job runner (WS-E DB-plane: 01 SQL -> Flyway -> 02 SQL, VNet-side). A Consumption
+# Container Apps environment requires a dedicated /23 delegated to Microsoft.App/environments.
+# cidrsubnet(10.20.0.0/16, 7, 8) = 10.20.16.0/23 - clear of the existing /24s at .1/.2/.3, so no
+# change to any existing subnet.
+resource "azurerm_subnet" "containerapps" {
+  name                 = "containerapps"
+  resource_group_name  = var.resource_group_name
+  virtual_network_name = azurerm_virtual_network.this.name
+  address_prefixes     = [cidrsubnet(var.vnet_address_space[0], 7, 8)]
+
+  delegation {
+    name = "aca"
+    service_delegation {
+      name    = "Microsoft.App/environments"
+      actions = ["Microsoft.Network/virtualNetworks/subnets/join/action"]
+    }
+  }
+}
+
 # Postgres Flexible Server private DNS zone (name must end in .postgres.database.azure.com) + link.
 resource "azurerm_private_dns_zone" "postgres" {
   name                = "${var.name_prefix}.private.postgres.database.azure.com"
