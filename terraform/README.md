@@ -97,6 +97,12 @@ needs the **pipeline/deployer** identity to hold **Key Vault Secrets Officer** o
 the app its three read/use roles; the deployer's Officer grant is a bootstrap/pipeline concern (the
 CI OIDC principal), not managed by this config.
 
+**Deployer storage permission:** because the storage account has `shared_access_key_enabled = false`
+and the provider sets `storage_use_azuread = true`, storage data-plane operations at apply time
+authenticate via Entra — so the **deploying identity must hold `Storage Blob Data Contributor`** on
+the account (in addition to the Key Vault Secrets Officer grant above). Also a bootstrap/pipeline
+concern, not managed by this config.
+
 ## Pre-go-live gates (MUST clear before real data / real users)
 
 These are **named gates**, not aspirations. This draft is safe to `apply` into a **pre-prod / synthetic-data** environment; the following must be closed before any real children's data:
