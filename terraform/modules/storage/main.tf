@@ -3,12 +3,12 @@
 # on so an accidental delete/overwrite is recoverable.
 #
 # shared_access_key_enabled = false (Kevin F1): managed-identity auth only; account keys are an
-# unused credential path that would bypass RBAC. Two network postures, selected by whether a private
-# endpoint subnet is passed (enable_vnet):
-#  - PRIVATE (private_endpoint_subnet_id set): public network access OFF + a blob private endpoint;
-#    reachable only from inside the VNet. Consistent with the Postgres VNet path.
-#  - PUBLIC  (null): public network ON, but private container + MI RBAC + ciphertext-only (T33) -
-#    the pre-prod/synthetic path (Kevin B1: the no-VNet path must be reachable).
+# unused credential path that would bypass RBAC. Two network postures, selected by the enable_vnet
+# bool (count/attributes key off it, not the subnet id, which is known-only-after-apply):
+#  - PRIVATE (enable_vnet=true): public network access OFF + a blob private endpoint; reachable only
+#    from inside the VNet. Consistent with the Postgres VNet path.
+#  - PUBLIC  (enable_vnet=false): public network ON, but private container + MI RBAC + ciphertext-only
+#    (T33) - the pre-prod/synthetic path (Kevin B1: the no-VNet path must be reachable).
 resource "azurerm_storage_account" "this" {
   name                            = "sa${var.name_prefix}reports${var.unique_suffix}"
   resource_group_name             = var.resource_group_name

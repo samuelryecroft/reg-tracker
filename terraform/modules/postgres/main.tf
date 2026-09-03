@@ -1,11 +1,11 @@
 # Azure Database for PostgreSQL Flexible Server - Burstable B1ms, right-sized for ~20 users
 # (ARCHITECTURE.md). PITR via backup_retention_days; geo-redundant backup off at this scale.
 #
-# Two access postures, selected by whether a delegated subnet is passed (enable_vnet):
-#  - PRIVATE (delegated_subnet_id set): VNet-injected, public access OFF, no firewall rule -
-#    reachable only from inside the VNet. This is the B2 close for real data.
-#  - PUBLIC  (delegated_subnet_id null): public access ON + Azure-services firewall - the
-#    pre-prod/synthetic path only.
+# Two access postures, selected by the enable_vnet bool (count/attributes must key off it, not the
+# subnet id, which is known-only-after-apply):
+#  - PRIVATE (enable_vnet=true, delegated_subnet_id set): VNet-injected, public access OFF, no
+#    firewall rule - reachable only from inside the VNet. This is the B2 close for real data.
+#  - PUBLIC  (enable_vnet=false): public access ON + Azure-services firewall - pre-prod/synthetic only.
 resource "azurerm_postgresql_flexible_server" "this" {
   name                = "psql-${var.name_prefix}-${var.unique_suffix}"
   resource_group_name = var.resource_group_name
