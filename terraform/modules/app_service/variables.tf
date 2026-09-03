@@ -6,7 +6,18 @@ variable "tags" {
   default = {}
 }
 
-variable "spring_profiles_active" { type = string }
+variable "spring_profiles_active" {
+  type = string
+
+  # Belt-and-braces at the IaC layer: the demo profile seeds fake children's records and must NEVER
+  # reach prod. The root passes the literal "azure" (no tfvars path sets this), and both
+  # DemoProfileGuard and DocumentStorageConfig fail-closed at boot too - this validation makes an
+  # accidental demo value impossible to even plan.
+  validation {
+    condition     = !can(regex("(^|,)\\s*demo\\s*(,|$)", var.spring_profiles_active))
+    error_message = "spring_profiles_active must never include the 'demo' profile in this deployment - it seeds fictional records."
+  }
+}
 variable "blob_endpoint" { type = string }
 variable "key_vault_uri" { type = string }
 variable "db_url" { type = string }

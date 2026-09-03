@@ -1,9 +1,11 @@
 # Linux App Service (B1) running the Spring Boot Java 21 jar. System-assigned managed identity is
 # the credential for Key Vault + Blob (no secrets in config). HTTPS only, TLS 1.2 floor, readiness
 # health check for the platform probe. App Insights is attached at runtime via the AI Java agent
-# (-javaagent). The agent config lives with the app at src/main/resources/applicationinsights.json;
-# the deploy step (WS-E) surfaces it to the filesystem path in APPLICATIONINSIGHTS_CONFIGURATION_FILE
-# below, because the agent reads a FILE path, not the fat-jar classpath. See the README fold note.
+# (-javaagent). The agent config is a standalone deploy artifact at deploy/appservice/
+# applicationinsights.json (architect's ruling - a plain repo file, NOT in the fat jar; the agent
+# reads a FILE path via APPLICATIONINSIGHTS_CONFIGURATION_FILE below, not the classpath). The deploy
+# step (WS-E) stages it next to the agent jar at that path and MUST fail loudly if it is absent
+# after deploy (Kevin) - a silent fallback to agent defaults would quietly lose sampling/role config.
 resource "azurerm_service_plan" "this" {
   name                = "${var.name_prefix}-plan"
   resource_group_name = var.resource_group_name

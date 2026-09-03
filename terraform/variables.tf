@@ -34,15 +34,24 @@ variable "admin_seed_password" {
 }
 
 variable "alert_email" {
-  description = "Email / distribution list for the observability action group."
+  description = "Email / distribution list for the observability action group. REQUIRED (no default, Kevin B3): apply must fail until a real recipient is set - an alert nobody receives is the same as no alert (closes the operational half of R5)."
   type        = string
-  default     = "oncall@example.org"
+
+  validation {
+    condition     = can(regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$", var.alert_email))
+    error_message = "alert_email must be a real email address - the go-live alert recipient cannot be a placeholder."
+  }
 }
 
 variable "enable_vnet" {
-  description = "Provision the optional VNet + private networking (network module). Off for the single-env first draft; Postgres uses public access + firewall instead."
+  description = "Reserved for the private-networking hardening path (VNet + private endpoints for storage & Postgres + App Service VNet integration). NOT YET SUPPORTED - the wiring is incomplete, so it is gated off to avoid a broken apply (Kevin B1). Must be false until that path is finished; see the README pre-go-live gate."
   type        = bool
   default     = false
+
+  validation {
+    condition     = var.enable_vnet == false
+    error_message = "enable_vnet=true is not yet supported: the private-endpoint + VNet-integration wiring is incomplete. Leave it false. Finishing that path is the B2 pre-go-live hardening upgrade (see README)."
+  }
 }
 
 variable "tags" {

@@ -31,7 +31,8 @@ terraform/
     storage/               private Blob container, TLS1.2, soft-delete + versioning
     observability/         Log Analytics + App Insights + action group + latency alert
     identity_rbac/         KV Crypto User + KV Secrets User + Blob Data Contributor -> App Service MI
-    network/               OPTIONAL VNet scaffold (enable_vnet=true); off in the single-env draft
+    network/               VNet scaffold for the private-networking upgrade; enable_vnet is gated
+                           OFF (not-yet-supported) until that path is finished (see B2 gate)
 ```
 
 ## Observability fold (the T63 "rethink the observability folder" decision)
@@ -43,11 +44,11 @@ duplicated across `deploy/` and `terraform/`, and nothing is orphaned:
 | Old location | New home | Why |
 |---|---|---|
 | `deploy/observability/alerts.tf` | `terraform/modules/observability/` (+ the two App-Service-scoped alerts in `modules/app_service/`) | It is Terraform; all IaC lives under `terraform/`. |
-| `deploy/observability/applicationinsights.json` | `src/main/resources/applicationinsights.json` | It is a **runtime** App Insights Java-agent config, not IaC, so it lives with the app source (god-approved, T63). **Deploy detail (WS-E):** the AI agent reads a *filesystem* path via `APPLICATIONINSIGHTS_CONFIGURATION_FILE`, not the fat-jar classpath, so the deploy step must surface this packaged resource to the runtime path the app setting names (`/home/site/wwwroot/applicationinsights.json`, next to the agent jar). Flagged for the pipeline; contains no secret (the connection string is injected via env). |
+| `deploy/observability/applicationinsights.json` | `deploy/appservice/applicationinsights.json` | It is a **runtime** App Insights Java-agent config, not IaC. **Architect's ruling (Kevin, T66/T68):** a plain repo file, **not** baked into the fat jar — `src/main/resources` reads as a classpath resource, but the agent starts before the app and reads a *filesystem* path via `APPLICATIONINSIGHTS_CONFIGURATION_FILE`, so a jar copy is inert and its divergence silent. **Deploy detail (WS-E):** the step stages this file next to the agent jar at `/home/site/wwwroot/applicationinsights.json` **and must fail loudly if it is absent after deploy** (a silent fallback to agent defaults would quietly drop sampling/role config, degrading R5 detection). Contains no secret (connection string is env-injected). |
 | `deploy/observability/README.md` | folded into this file | One README; the durable notes are below. |
 
-The `deploy/` folder is removed entirely. Net: TF exists **only** under `terraform/`; the runtime
-agent config lives **only** with the app under `src/main/resources/`; nothing is duplicated or orphaned.
+`deploy/observability/` is removed. Net: TF exists **only** under `terraform/`; the runtime agent
+config lives **only** under `deploy/appservice/`; nothing is duplicated or orphaned.
 
 **Why the two App-Service-scoped alerts live in `app_service`, not `observability`:** they scope on
 the web app id, while `observability` produces the App Insights the app needs — putting the web-app
@@ -90,15 +91,39 @@ identity gets **Key Vault Crypto User** (wrap/unwrap the per-org RSA-2048 KEKs �
 are pre-provisioned at org onboarding by a separate Crypto Officer identity), **Key Vault Secrets
 User**, and **Storage Blob Data Contributor**.
 
+**Deployer vs app separation (confirmed, Kevin):** creating the Key Vault secrets at apply time
+needs the **pipeline/deployer** identity to hold **Key Vault Secrets Officer** on the vault; the
+**app** managed identity holds only **Secrets User** (read) — never Officer. `identity_rbac` grants
+the app its three read/use roles; the deployer's Officer grant is a bootstrap/pipeline concern (the
+CI OIDC principal), not managed by this config.
+
+## Pre-go-live gates (MUST clear before real data / real users)
+
+These are **named gates**, not aspirations. This draft is safe to `apply` into a **pre-prod / synthetic-data** environment; the following must be closed before any real children's data:
+
+- **GATE B2 — Postgres is reachable from any Azure tenant.** `postgres` sets
+  `public_network_access_enabled = true` with the firewall rule `0.0.0.0–0.0.0.0` ("Allow Azure
+  services"), which permits **any** resource in **any** Azure subscription/tenant to reach the
+  server — not an allow-list of our own resources. With special-category children's data the only
+  remaining control would be the DB password. **Before real data**, either finish the private path
+  (VNet + delegated subnet / private endpoint — the `enable_vnet` route, currently gated off) **or**
+  replace the rule with the App Service's specific outbound IPs. Owner: DevOps. Blocks: go-live with
+  real data.
+- **GATE B1 (storage) — resolved for the default path.** Blob is now reachable
+  (`public_network_access_enabled = true`, private container + MI RBAC + ciphertext-only per T33).
+  The private-endpoint upgrade rides with B2's `enable_vnet` work.
+
 ## Deferred / flagged for review
 
+- **Private networking (`enable_vnet`)** — **not yet supported**: the VNet + private-endpoint +
+  App Service VNet-integration wiring is incomplete, so `enable_vnet=true` is gated off by a
+  variable validation (fails fast at plan, never a broken apply). The `network` module is the
+  scaffold for that work; finishing it is the B2 hardening upgrade.
 - **Health-indicator (Blob/Key Vault) in `/actuator/health`** — a post-merge app task (needs
   actuator + WS-B's `DocumentStorageProperties`), out of scope here.
-- **Private networking** — the `network` module is a scaffold; the single-env draft runs Postgres
-  with public access + an Azure-services firewall rule. Set `enable_vnet=true` and wire the private
-  endpoint/DNS as the hardening upgrade.
-- **Custom domain + managed TLS cert** (WS-I) — not in this first draft; add the hostname binding +
-  `azurerm_app_service_managed_certificate` once a domain is chosen.
+- **Custom domain + managed TLS cert** (WS-I) — not in this first draft; `https_only` already gives
+  TLS on `*.azurewebsites.net`. Add the hostname binding + `azurerm_app_service_managed_certificate`
+  once a domain is chosen.
 
 ## Verify (plan-only)
 
