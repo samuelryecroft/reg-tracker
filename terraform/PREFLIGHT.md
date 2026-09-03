@@ -34,7 +34,11 @@ ticked this stays **plan-only** — no apply has been run and no Azure spend has
 - [ ] `postgres_administrator_password` — a strong generated value (production: sourced from Key
       Vault / `random_password`, never committed).
 - [ ] `admin_seed_password` — set once, **rotated after first boot** (runbook).
-- [ ] `alert_email` — a **real** monitored recipient (validation rejects placeholders).
+- [ ] `alert_email` — a **real** monitored recipient. Validation rejects malformed values, but a
+      well-formed placeholder (e.g. `oncall@example.org`) would still pass — you must supply a
+      mailbox someone actually watches, or every alert fires into a void (defeats B3 / the
+      operational half of R5). The example file ships a `REPLACE_ME_...` value that fails the regex
+      so apply stops until you set a real one.
 - [ ] `enable_vnet` — leave **true** for real data (private networking / B2 closed). Set false ONLY
       for a pre-prod/synthetic environment.
 - [ ] `name_prefix` if the default `rht` collides (storage account name must be globally unique).
