@@ -12,6 +12,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -50,7 +51,7 @@ class AdminUserSeederTest {
     @Test
     void failsSafeAndSeedsNothingWhenTheSeedPasswordIsUnset() {
         UserRepository userRepository = mock(UserRepository.class);
-        when(userRepository.existsByRole(Role.ADMIN)).thenReturn(false);
+        when(userRepository.findByRoleOrderByFullName(Role.ADMIN)).thenReturn(List.of());
 
         new AdminUserSeeder(userRepository, passwordEncoder, propertiesWith("admin", null)).run(null);
         new AdminUserSeeder(userRepository, passwordEncoder, propertiesWith("admin", "")).run(null);
@@ -64,7 +65,7 @@ class AdminUserSeederTest {
     @Test
     void seedsAdminWithTheSuppliedSecretWhenItIsProvided() {
         UserRepository userRepository = mock(UserRepository.class);
-        when(userRepository.existsByRole(Role.ADMIN)).thenReturn(false);
+        when(userRepository.findByRoleOrderByFullName(Role.ADMIN)).thenReturn(List.of());
 
         new AdminUserSeeder(userRepository, passwordEncoder, propertiesWith("boss", "from-the-env")).run(null);
 
@@ -81,11 +82,44 @@ class AdminUserSeederTest {
     @Test
     void doesNothingWhenAnAdminAlreadyExists() {
         UserRepository userRepository = mock(UserRepository.class);
-        when(userRepository.existsByRole(Role.ADMIN)).thenReturn(true);
+        when(userRepository.findByRoleOrderByFullName(Role.ADMIN)).thenReturn(List.of(existingAdmin("boss")));
 
         new AdminUserSeeder(userRepository, passwordEncoder, propertiesWith("admin", "irrelevant")).run(null);
 
         verify(userRepository, never()).save(any());
+    }
+
+    /**
+     * The lockout branch, and the one that used to be silent: an admin exists but nobody knows its
+     * password, so setting ADMIN_SEED_PASSWORD and restarting looks like the fix and changes
+     * nothing. Saying so is the whole point of the branch.
+     */
+    @Test
+    void saysWhyTheSeedPasswordIsIgnoredWhenAnAdminAlreadyExists() {
+        UserRepository userRepository = mock(UserRepository.class);
+        when(userRepository.findByRoleOrderByFullName(Role.ADMIN)).thenReturn(List.of(existingAdmin("boss")));
+
+        List<ILoggingEvent> events = captureLogsOf(AdminUserSeeder.class, () ->
+                new AdminUserSeeder(userRepository, passwordEncoder, propertiesWith("admin", "irrelevant"))
+                        .run(null));
+
+        assertThat(events).as("the skip must not be silent - a silent no-op is what stranded people")
+                .isNotEmpty();
+        String announcement = events.stream().map(ILoggingEvent::getFormattedMessage)
+                .collect(Collectors.joining("\n"));
+        assertThat(announcement)
+                .contains("ADMIN_SEED_PASSWORD")
+                .containsIgnoringCase("never rotates");
+        // The account that actually holds the role, not the configured app.admin.username - those
+        // differ here on purpose, and the real one is what a locked-out reader needs.
+        assertThat(announcement).contains("boss").doesNotContain("'admin'");
+    }
+
+    private User existingAdmin(String username) {
+        User admin = new User();
+        admin.setUsername(username);
+        admin.setRoles(Set.of(Role.ADMIN));
+        return admin;
     }
 
     /**
@@ -97,7 +131,7 @@ class AdminUserSeederTest {
     @Test
     void saysLoudlyThatNobodyCanSignInWhenItSkips() {
         UserRepository userRepository = mock(UserRepository.class);
-        when(userRepository.existsByRole(Role.ADMIN)).thenReturn(false);
+        when(userRepository.findByRoleOrderByFullName(Role.ADMIN)).thenReturn(List.of());
 
         List<ILoggingEvent> events = captureLogsOf(AdminUserSeeder.class, () ->
                 new AdminUserSeeder(userRepository, passwordEncoder, propertiesWith("admin", null)).run(null));
@@ -120,7 +154,7 @@ class AdminUserSeederTest {
     @Test
     void staysQuietAtErrorLevelWhenItActuallySeeds() {
         UserRepository userRepository = mock(UserRepository.class);
-        when(userRepository.existsByRole(Role.ADMIN)).thenReturn(false);
+        when(userRepository.findByRoleOrderByFullName(Role.ADMIN)).thenReturn(List.of());
 
         List<ILoggingEvent> events = captureLogsOf(AdminUserSeeder.class, () ->
                 new AdminUserSeeder(userRepository, passwordEncoder, propertiesWith("boss", "from-the-env"))

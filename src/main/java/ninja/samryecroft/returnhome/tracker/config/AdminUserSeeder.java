@@ -1,6 +1,8 @@
 package ninja.samryecroft.returnhome.tracker.config;
 
+import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 import ninja.samryecroft.returnhome.tracker.user.Role;
 import ninja.samryecroft.returnhome.tracker.user.User;
 import ninja.samryecroft.returnhome.tracker.user.UserRepository;
@@ -39,7 +41,9 @@ public class AdminUserSeeder implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
-        if (userRepository.existsByRole(Role.ADMIN)) {
+        List<User> existingAdmins = userRepository.findByRoleOrderByFullName(Role.ADMIN);
+        if (!existingAdmins.isEmpty()) {
+            logSeedingIsAlreadyDone(existingAdmins);
             return;
         }
 
@@ -58,6 +62,27 @@ public class AdminUserSeeder implements ApplicationRunner {
         admin.setEnabled(true);
         userRepository.save(admin);
         log.info("Seeded initial platform admin '{}' from the configured environment secret.", username);
+    }
+
+    /**
+     * The other way to be stranded, and until now the silent one: an admin exists but nobody knows
+     * its password. Setting {@code ADMIN_SEED_PASSWORD} and restarting looks like the obvious fix
+     * and does nothing, because this seeder only ever creates the <em>first</em> admin - it has no
+     * rotate path, deliberately, since a running app that reassigns its own admin password from an
+     * environment variable is a worse problem than a lockout.
+     *
+     * <p>Names the accounts that actually hold the role rather than the configured
+     * {@code app.admin.username}. Those two can differ - the check is by role, not by name - and
+     * someone locked out assuming the account is called "admin" is exactly the person reading this.
+     * That is also why this reads the rows instead of {@code existsByRole}: one small query at
+     * startup buys the only detail that ends the confusion.
+     */
+    private void logSeedingIsAlreadyDone(List<User> existingAdmins) {
+        String usernames = existingAdmins.stream().map(User::getUsername).collect(Collectors.joining(", "));
+        log.info("Platform admin already exists ({}), so ADMIN_SEED_PASSWORD is ignored - this seeder "
+                + "only creates the first admin and never rotates an existing password. If you are "
+                + "locked out, reset it in the database directly; locally, 'docker compose down -v' "
+                + "starts over from empty.", usernames);
     }
 
     /**
