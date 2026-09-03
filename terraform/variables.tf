@@ -83,9 +83,9 @@ variable "enable_vnet" {
 }
 
 variable "monthly_budget_amount" {
-  description = "T114 monthly Cost Management budget, in the subscription's BILLING CURRENCY (GBP for this sub). Default 30 = £30/mo, matching the rht estate estimate."
+  description = "T114 monthly Cost Management budget, in the subscription's BILLING CURRENCY (GBP for this sub). Default 50 = £50/mo (raised from £30 on the human's decision, once an itemised run-cost breakdown was confirmed; steady-state estimate is ~£30-35, so £50 leaves headroom without masking real bill-shock)."
   type        = number
-  default     = 30
+  default     = 50
 }
 
 variable "budget_alert_email" {
