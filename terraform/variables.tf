@@ -89,13 +89,15 @@ variable "monthly_budget_amount" {
 }
 
 variable "budget_alert_email" {
-  description = "Recipient for the T114 budget notifications (actual 50/90/100% + forecast 100%)."
+  description = "Recipient for the T114 budget notifications (actual 50/90/100% + forecast 100%). REQUIRED, no default (Kevin): a personal address must not be a committed default that lands in the repo + state - supply it via git-ignored tfvars, same as alert_email. Apply fails until set."
   type        = string
-  default     = "justsam33@gmail.com"
 }
 
 variable "budget_start_date" {
-  description = "First-of-month UTC start for the monthly budget (RFC3339). Must be the first of a month."
+  # NOTE: Azure Cost Management rejects a budget start_date more than ~3 months in the past at CREATE
+  # time. This is pinned to the month the budget was first created (2026-09); a fresh apply/rebuild
+  # after ~Dec 2026 will fail on this value and must bump it to the then-current month's first day.
+  description = "First-of-month UTC start for the monthly budget (RFC3339). Must be the first of a month; see the note above about Azure's ~3-month-in-the-past create limit."
   type        = string
   default     = "2026-09-01T00:00:00Z"
 }
