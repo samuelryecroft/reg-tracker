@@ -35,9 +35,36 @@ az storage account blob-service-properties update \
   --enable-versioning true --enable-delete-retention true --delete-retention-days 30 \
   --output none
 
-echo ">> Container $STATE_CONTAINER (Entra/AAD auth)"
-az storage container create \
-  --name "$STATE_CONTAINER" --account-name "$STATE_SA" --auth-mode login --output none
+# Grant the OPERATOR data-plane access before the (Entra-authenticated) container create below.
+# With shared-key auth off there is no fallback, and Azure blob data access is NOT implied by Owner
+# or Contributor - it needs an explicit Storage Blob Data role. Without this, the container create is
+# the first command of the first preflight step and it fails with AuthorizationPermissionMismatch.
+# (Assumes a human operator; `az ad signed-in-user` does not resolve for a service principal.)
+# NOTE: creating a role assignment itself requires Owner or User Access Administrator on the scope.
+echo ">> Granting the operator Storage Blob Data Contributor on $STATE_SA (data-plane access)"
+SA_ID=$(az storage account show -n "$STATE_SA" -g "$STATE_RG" --query id -o tsv)
+OPERATOR_ID=$(az ad signed-in-user show --query id -o tsv)
+az role assignment create --role "Storage Blob Data Contributor" \
+  --assignee "$OPERATOR_ID" --scope "$SA_ID" --output none
+
+# Role assignments are eventually consistent (typically 30s-2min to propagate), so retry rather than
+# a bare sleep: an immediate call is usually too early, a fixed sleep is sometimes too short.
+echo ">> Container $STATE_CONTAINER (Entra/AAD auth; retrying while the role assignment propagates)"
+for attempt in $(seq 1 12); do
+  if az storage container create \
+       --name "$STATE_CONTAINER" --account-name "$STATE_SA" --auth-mode login --output none 2>/dev/null; then
+    echo "   container ready"
+    break
+  fi
+  if [ "$attempt" -eq 12 ]; then
+    echo "!! Container create still failing after ~3min." >&2
+    echo "!! If this is AuthorizationPermissionMismatch, the Storage Blob Data Contributor grant" >&2
+    echo "!! above has not propagated yet - wait a moment and re-run this script (it is idempotent)." >&2
+    exit 1
+  fi
+  echo "   waiting for the role assignment to propagate (attempt $attempt/12)..."
+  sleep 15
+done
 
 cat <<NOTE
 

@@ -22,3 +22,11 @@ then fills in a git-ignored `../backend.hcl` and runs `terraform init -backend-c
 
 The identity that runs Terraform needs **Storage Blob Data Contributor** on the state account
 (state access uses `use_azuread_auth`, not the account key).
+
+**Operator prerequisites for the script itself:** because shared-key auth is off, the `tfstate`
+container is created over Entra, and Azure blob data access is **not** implied by Owner/Contributor.
+The script therefore grants the **signed-in operator** *Storage Blob Data Contributor* on the new
+account and retries the container create while that assignment propagates (≈30s–2min). Creating a
+role assignment needs **Owner or User Access Administrator** on the scope, so the operator must hold
+one of those; and `az ad signed-in-user` assumes a **human** operator (it does not resolve for a
+service principal). The script is idempotent — if propagation is slow, just re-run it.
