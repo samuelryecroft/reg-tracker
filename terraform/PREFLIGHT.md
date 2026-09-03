@@ -54,6 +54,12 @@ ticked this stays **plan-only** — no apply has been run and no Azure spend has
       role, stored as the `MIGRATOR-DB-PASSWORD` / `RUNTIME-DB-PASSWORD` Key Vault secrets. The
       pre-deploy step reads the migrator one to create the roles + run Flyway; the app reads the
       runtime one as a KV reference. Logins default to `rht_migrator` / `rht_app`.
+- [ ] **DB password character set (WS-E F1)** — the three DB passwords the DB-plane job handles
+      (`postgres_administrator_password`, `migrator_db_password`, `runtime_db_password`) must
+      **exclude `'` `"` `\` and `/`**: the runner reads them from Key Vault and substitutes them into
+      psql (`\set`) and connection use, and those characters would break the value silently (wrong
+      value, confusing auth failure). Generate from `[A-Za-z0-9]` (the T74 apply already did). A quote
+      or backslash here fails **silently**, not loudly — so this is a real constraint, not a nicety.
 - [ ] `alert_email` — a **real** monitored recipient. Validation rejects malformed values, but a
       well-formed placeholder (e.g. `oncall@example.org`) would still pass — you must supply a
       mailbox someone actually watches, or every alert fires into a void (defeats B3 / the
@@ -85,7 +91,12 @@ ticked this stays **plan-only** — no apply has been run and no Azure spend has
   direct deploy (rollback = redeploy previous artifact); zero-downtime slot-swap + instant
   rollback-by-swap needs a staging slot, which Basic does not support (~£10 → ~£55/mo). A tier
   decision for the human; the workflow documents the swap steps to switch on once S1 is chosen.
-- **WS-E DB-plane payload delivery (open)**: the Container Apps job pulls the public `flyway/flyway`
-  image, so the 01/02 SQL + `db/migration` files must reach it at the `/payload` mount — recommended
-  via an Azure Files share the deploy step uploads before triggering the job. The share/upload is not
-  yet modelled in Terraform pending sign-off on the mechanism (flagged in the `migrator_job` module).
+- **WS-E DB-plane image: ACR (~£4/mo, new line item)** — resolved (Kevin T89): the job pulls a
+  custom, digest-pinned image (`deploy/db-plane/Dockerfile`, flyway + psql + jq + the payload baked
+  in) from an ACR Basic registry, using its managed identity (AcrPull). Chosen over an Azure Files
+  mount, which needs a storage **account key** and would reverse F1. `deploy.yml` builds + pushes it.
+- **WS-E plan tier reads all Key Vault secrets (F4)** — the `plan` identity holds *Key Vault Secrets
+  User* because `terraform plan` refreshes the secret resources, so it can read every KV secret
+  directly, not only via state. Justified, but it means the `plan` environment (branch-restricted)
+  is a genuine secret-read surface. This + the state exposure are **one decision** for the human:
+  WS-E-DESIGN §5.4 (generate the DB passwords VNet-side, out of Terraform) removes both at once.

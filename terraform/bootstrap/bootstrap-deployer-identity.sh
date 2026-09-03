@@ -12,13 +12,16 @@
 # privilege role assignments, and the GitHub Environments + protection rules the workflows key on.
 set -euo pipefail
 
-# ---- EDIT THESE ----
-GITHUB_REPO="OWNER/REPO"            # e.g. samuelryecroft/return-home-tracker
-APP_RG="rht-rg"                     # the app resource group (name_prefix + -rg)
+# ---- EDIT THESE (CAF names; the *-suffixed ones are known after the first apply picks the random
+#      suffix - the KV/ACR grants below need those resources to exist, so run this AFTER the RG,
+#      Key Vault and ACR are created, then re-run is a no-op) ----
+GITHUB_REPO="OWNER/REPO"            # e.g. samuelryecroft/reg-tracker
+APP_RG="rg-rht"                     # the app resource group (rg-<name_prefix>)
 LOCATION="uksouth"
-KEY_VAULT_NAME="CHANGEME-kv"        # the app Key Vault name
-STATE_RG="rht-tfstate-rg"           # from bootstrap-tfstate.sh
-STATE_SA="rhttfstatechangeme"       # from bootstrap-tfstate.sh
+KEY_VAULT_NAME="kv-rht-CHANGEME"    # kv-<name_prefix>-<suffix> (from the deployed vault)
+ACR_NAME="crrhtCHANGEME"            # cr<name_prefix><suffix> (from the deployed registry)
+STATE_RG="rg-rht-tfstate"           # from bootstrap-tfstate.sh
+STATE_SA="sarhttfstatechangeme"     # from bootstrap-tfstate.sh
 PLAN_IDENTITY="rht-ci-plan"
 CD_IDENTITY="rht-cd-prod"
 # --------------------
@@ -29,6 +32,7 @@ SUBSCRIPTION_ID="$(az account show --query id -o tsv)"
 RG_ID="/subscriptions/${SUBSCRIPTION_ID}/resourceGroups/${APP_RG}"
 STATE_SA_ID="$(az storage account show -n "$STATE_SA" -g "$STATE_RG" --query id -o tsv)"
 KV_ID="$(az keyvault show -n "$KEY_VAULT_NAME" -g "$APP_RG" --query id -o tsv)"
+ACR_ID="$(az acr show -n "$ACR_NAME" -g "$APP_RG" --query id -o tsv)"
 
 # Built-in role definition IDs (stable, global) for the three roles the app identity is ever allowed.
 ROLE_KV_CRYPTO_USER="12338af0-0e69-4776-bea7-57ae8d297424"
@@ -43,9 +47,14 @@ ensure_fic() { # $1 = identity name, $2 = fic name, $3 = subject
   az identity federated-credential create --identity-name "$1" -g "$APP_RG" --name "$2" \
     --issuer "$ISSUER" --audience "$AUDIENCE" --subject "$3" --output none
 }
-assign() { # $1 = principalId, $2 = role, $3 = scope
+assign() { # $1 = principalId, $2 = role, $3 = scope. Idempotent, but fails LOUDLY on a real error
+  # (Kevin F2: the old '2>/dev/null || true' swallowed genuine permission failures - the exact F5
+  # lesson. Check for the existing assignment, then let a real create error abort under set -e.)
+  if az role assignment list --assignee "$1" --role "$2" --scope "$3" --query "[0].id" -o tsv 2>/dev/null | grep -q .; then
+    return 0
+  fi
   az role assignment create --assignee-object-id "$1" --assignee-principal-type ServicePrincipal \
-    --role "$2" --scope "$3" --output none 2>/dev/null || true
+    --role "$2" --scope "$3" --output none
 }
 
 echo ">> User-assigned identities"
@@ -73,6 +82,13 @@ assign "$CD_PID" "Contributor" "$RG_ID"
 assign "$CD_PID" "Key Vault Secrets Officer" "$KV_ID"
 assign "$CD_PID" "Storage Blob Data Contributor" "$STATE_SA_ID"
 
+# WS-E DB-plane image (Kevin T89): the CD identity both PUSHES the custom image (deploy.yml) and, as
+# the Container Apps job's identity, PULLS it. These live HERE, out of band - NOT in identity_rbac,
+# whose ABAC condition permits only the 3 app roles and would (correctly) refuse an AcrPull/AcrPush
+# write. Do NOT widen that condition to make Terraform do this.
+assign "$CD_PID" "AcrPush" "$ACR_ID"
+assign "$CD_PID" "AcrPull" "$ACR_ID"
+
 # The one grant under pressure: identity_rbac creates role assignments, needing
 # Microsoft.Authorization/roleAssignments/write, which Contributor lacks. Owner/UAA would let the
 # deployer grant itself Owner - so instead: 'Role Based Access Control Administrator' scoped to the
@@ -97,9 +113,13 @@ AND
   @Resource[Microsoft.Authorization/roleAssignments:RoleDefinitionId] ForAnyOfAnyValues:GuidEquals {${ROLE_KV_CRYPTO_USER}, ${ROLE_KV_SECRETS_USER}, ${ROLE_BLOB_DATA_CONTRIB}}
  )
 )"
-az role assignment create --assignee-object-id "$CD_PID" --assignee-principal-type ServicePrincipal \
-  --role "Role Based Access Control Administrator" --scope "$RG_ID" \
-  --condition "$RBAC_ADMIN_CONDITION" --condition-version "2.0" --output none 2>/dev/null || true
+# Fail LOUDLY on a real error (F2), idempotent on re-run: skip if the conditioned assignment exists.
+if ! az role assignment list --assignee "$CD_PID" --role "Role Based Access Control Administrator" \
+     --scope "$RG_ID" --query "[0].id" -o tsv 2>/dev/null | grep -q .; then
+  az role assignment create --assignee-object-id "$CD_PID" --assignee-principal-type ServicePrincipal \
+    --role "Role Based Access Control Administrator" --scope "$RG_ID" \
+    --condition "$RBAC_ADMIN_CONDITION" --condition-version "2.0" --output none
+fi
 
 echo ">> GitHub Environments + protection rules"
 # 'plan': restrict to the main branch (branch policy). 'prod': required reviewers + main only.

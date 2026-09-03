@@ -69,3 +69,20 @@ jobs:
           cache: maven
       - name: Run only flaky-infra tests (reported, not required)
         run: ./mvnw -B -ntp verify -Dgroups=flaky-infra
+
+  actionlint:
+    name: actionlint (workflow lint)
+    runs-on: ubuntu-latest
+    # These workflows mint cloud credentials; the properties we rely on (job-level id-token,
+    # environment: on the credentialed jobs) are exactly what a later edit loosens by accident.
+    # actionlint catches malformed permissions blocks + expression-injection patterns, runs in
+    # seconds, needs no credentials — so it lives here in ci.yml (which has no Azure identity), not
+    # in deploy.yml (Kevin T89). shellcheck is bundled in the actionlint image, so run: blocks are
+    # linted too.
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Run actionlint
+        run: docker run --rm -v "${PWD}:/repo" -w /repo rhysd/actionlint:1.7.7 -color

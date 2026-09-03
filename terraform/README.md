@@ -221,9 +221,15 @@ identity (no DB credential through GitHub); the script keeps passwords off the p
 `none`/`mod` before setting role passwords** so `ALTER ROLE` is never logged in clear to Log
 Analytics — **F2a** (the must-not-drop half).
 
-**Two open items** (see `PREFLIGHT.md`): slot-swap needs App Service **S1** (B1 has no slots — ships
-a direct-deploy fallback); and the migration **payload delivery** to the public flyway image
-(Azure Files mount) awaits sign-off before it is modelled in Terraform.
+**DB-plane image (Kevin T89):** the job pulls a **custom, digest-pinned image** from ACR
+(`deploy/db-plane/Dockerfile`: flyway + psql + curl + jq, with the 01/02 SQL + `db/migration` baked
+in), using its **managed identity (AcrPull)** — no registry credential, no runtime `apk add`. Chosen
+over an Azure Files mount, which authenticates with a storage **account key** and would reverse
+Kevin F1. AcrPull (job) + AcrPush (CD/deploy) live in `bootstrap-deployer-identity.sh`, **not**
+`identity_rbac` — they are outside the ABAC role condition, which must not be widened for them.
+
+**One open item** (see `PREFLIGHT.md`): slot-swap needs App Service **S1** (B1 has no slots — ships a
+direct-deploy fallback with redeploy-previous-artifact rollback). ACR adds ~£4/mo.
 
 ## Remaining pre-go-live items
 

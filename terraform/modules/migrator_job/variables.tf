@@ -27,12 +27,14 @@ variable "database_name" { type = string }
 variable "postgres_administrator_login" { type = string }
 variable "migrator_db_login" { type = string }
 
-# The reviewable DB-plane orchestration script (deploy/db-plane/run-db-plane.sh), embedded as the
-# container command. Contains no secret - it reads them at runtime via the managed identity.
-variable "db_plane_script" { type = string }
+# ACR login server (e.g. crrhtxxxxx.azurecr.io) the job pulls the DB-plane image from, using its
+# managed identity (AcrPull). From the container_registry module.
+variable "acr_login_server" { type = string }
 
-# Public image (no ACR line item). Alpine tag so the script can add psql/curl at start.
-variable "flyway_image" {
+# The custom DB-plane image reference (repository[:tag|@digest]) built from deploy/db-plane/Dockerfile
+# and pushed to ACR by deploy.yml, which pins the digest before triggering the job. The default here
+# is a bootstrap placeholder for plan/validate; the real digest is set at deploy time.
+variable "db_plane_image" {
   type    = string
-  default = "flyway/flyway:11-alpine"
+  default = "rht-db-plane:bootstrap"
 }

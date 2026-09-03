@@ -133,6 +133,7 @@ jobs:
             echo "rg=$(terraform output -raw resource_group_name)"
             echo "app_name=$(terraform output -raw app_service_name)"
             echo "job_name=$(terraform output -raw container_app_job_name)"
+            echo "acr=$(terraform output -raw container_registry_login_server)"
           } >> "$GITHUB_OUTPUT"
 
       # --- 5.1: assert the app is pinned to the 'azure' profile and NEVER 'demo' (fail closed). ---
@@ -152,20 +153,43 @@ jobs:
             exit 1
           fi
 
+      # --- DB-plane image: build the custom flyway+psql+jq image with the migration payload baked in
+      # (deploy/db-plane/Dockerfile), push to ACR, and DIGEST-PIN it into the job. The CD identity has
+      # AcrPush (out-of-band bootstrap). No registry credential: az acr login uses the OIDC session.
+      - name: Build + push + pin DB-plane image
+        run: |
+          acr='${{ steps.tf.outputs.acr }}'                 # e.g. crrht<sfx>.azurecr.io
+          tag="${GITHUB_SHA}"
+          az acr login --name "${acr%%.*}"
+          docker build -f deploy/db-plane/Dockerfile -t "${acr}/rht-db-plane:${tag}" .
+          docker push "${acr}/rht-db-plane:${tag}"
+          digest="$(az acr repository show --name "${acr%%.*}" \
+            --image "rht-db-plane:${tag}" --query digest -o tsv)"
+          echo "pinning ${acr}/rht-db-plane@${digest}"
+          az containerapp job update -g '${{ steps.tf.outputs.rg }}' -n '${{ steps.tf.outputs.job_name }}' \
+            --image "${acr}/rht-db-plane@${digest}"
+
       # --- DB plane: run 01 SQL -> Flyway -> 02 SQL VNet-side, BEFORE the new jar goes live ---
       # (expand/contract migrations keep the running jar valid, so rollback-by-swap stays safe).
-      - name: Upload migration payload to the job's Azure Files share
+      # M2 (Kevin T89): 'az containerapp job start' returns as soon as the execution is CREATED, so we
+      # MUST poll to Succeeded and FAIL on Failed before deploying the jar - otherwise the jar races
+      # the migration and the WS-G ordering (01 -> Flyway -> 02 -> jar) is lost.
+      - name: Run DB-plane migration job (VNet-side) and wait for success
         run: |
-          echo "TODO(WS-E execution): upload terraform/modules/postgres/sql/{01,02}*.sql and"
-          echo "src/main/resources/db/migration/ to the Azure Files share mounted at /payload in the"
-          echo "Container Apps job (SQL_DIR=/payload/sql, FLYWAY_LOCATIONS=/payload/migration)."
-          echo "Delivery mechanism (Azure Files vs alternative) is the one open item flagged in the"
-          echo "migrator_job module - resolve before enabling this workflow."
-      - name: Run DB-plane migration job (VNet-side) and wait
-        run: |
-          az containerapp job start -g '${{ steps.tf.outputs.rg }}' -n '${{ steps.tf.outputs.job_name }}'
-          echo "Poll the execution to completion; fail the deploy if the job fails."
-          # az containerapp job execution list ... --query '...Succeeded...'  (poll loop at WS-E enablement)
+          rg='${{ steps.tf.outputs.rg }}'; job='${{ steps.tf.outputs.job_name }}'
+          exec_name="$(az containerapp job start -g "$rg" -n "$job" --query name -o tsv)"
+          echo "started execution: $exec_name"
+          for i in $(seq 1 60); do
+            status="$(az containerapp job execution show -g "$rg" -n "$job" \
+              --job-execution-name "$exec_name" --query properties.status -o tsv 2>/dev/null || echo Unknown)"
+            echo "attempt $i: $status"
+            case "$status" in
+              Succeeded) echo "migration succeeded"; exit 0 ;;
+              Failed|Degraded) echo "FATAL: DB-plane job execution $status - aborting before jar deploy." >&2; exit 1 ;;
+            esac
+            sleep 15
+          done
+          echo "FATAL: DB-plane job did not reach Succeeded within ~15min." >&2; exit 1
 
       # --- Deploy the jar. TARGET DESIGN = staging-slot deploy + swap (zero-downtime, instant ---
       # rollback-by-swap). Slots need App Service STANDARD+ (S1); WS-D provisions B1 (Basic) which has
@@ -175,7 +199,9 @@ jobs:
         run: ./mvnw -B -ntp -DskipTests package
       - name: Deploy jar to App Service (B1 direct deploy)
         run: |
-          jar="$(ls target/*.jar | grep -v '\.original$' | head -n1)"
+          # The *.jar glob matches only the repackaged boot jar (the thin jar is *.jar.original).
+          set -- target/*.jar
+          jar="$1"
           az webapp deploy --type jar \
             -g '${{ steps.tf.outputs.rg }}' -n '${{ steps.tf.outputs.app_name }}' --src-path "$jar"
       # On S1, replace the two steps above with:
