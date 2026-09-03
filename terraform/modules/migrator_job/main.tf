@@ -13,6 +13,10 @@
 # and would reverse Kevin F1 (shared_access_key_enabled = false). deploy.yml builds + pushes the
 # image and pins the digest before triggering the job; var.db_plane_image carries the reference.
 
+# T100 ordering: this is a DATA source, so the cd user-assigned identity MUST already exist when this
+# module is applied - otherwise the plan fails to resolve it (the WS-E deadlock Kevin found). Create
+# it first (manual runbook: `az identity create` + grant KV Secrets User; or bootstrap-deployer-
+# identity.sh out of band), THEN apply this.
 data "azurerm_user_assigned_identity" "cd" {
   name                = var.cd_identity_name
   resource_group_name = var.resource_group_name
@@ -105,4 +109,12 @@ resource "azurerm_container_app_job" "migrator" {
   }
 
   tags = var.tags
+
+  # T100: deploy.yml (or the manual runbook) pins the exact image DIGEST via
+  # `az containerapp job update --image <acr>/rht-db-plane@<digest>` after building it. Without this,
+  # the next `terraform apply` would revert the image to var.db_plane_image (the bootstrap tag) and
+  # fight the pin. Terraform owns the job's shape; the pipeline owns which digest runs.
+  lifecycle {
+    ignore_changes = [template[0].container[0].image]
+  }
 }
