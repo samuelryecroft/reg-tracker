@@ -23,6 +23,10 @@ resource "azurerm_linux_web_app" "this" {
   https_only          = true
   tags                = var.tags
 
+  # VNet path: regional VNet integration into the delegated App Service subnet, so outbound traffic
+  # to the private Postgres + Blob endpoints stays inside the VNet. null on the pre-prod path.
+  virtual_network_subnet_id = var.vnet_integration_subnet_id
+
   identity {
     type = "SystemAssigned"
   }
@@ -41,19 +45,23 @@ resource "azurerm_linux_web_app" "this" {
   }
 
   # HSTS itself is emitted by the application (Spring Security), not the platform; https_only here
-  # guarantees the redirect that makes HSTS meaningful.
-  app_settings = {
-    "SPRING_PROFILES_ACTIVE"                 = var.spring_profiles_active
-    "BLOB_ENDPOINT"                          = var.blob_endpoint
-    "KEY_VAULT_URI"                          = var.key_vault_uri
-    "DB_URL"                                 = var.db_url
-    "DB_USERNAME"                            = var.db_username
-    "DB_PASSWORD"                            = "@Microsoft.KeyVault(SecretUri=${var.db_password_secret_uri})"
-    "ADMIN_SEED_PASSWORD"                    = "@Microsoft.KeyVault(SecretUri=${var.admin_seed_password_secret_uri})"
-    "APPLICATIONINSIGHTS_CONNECTION_STRING"  = "@Microsoft.KeyVault(SecretUri=${var.ai_connection_string_secret_uri})"
-    "APPLICATIONINSIGHTS_CONFIGURATION_FILE" = "/home/site/wwwroot/applicationinsights.json"
-    "JAVA_OPTS"                              = "-javaagent:/home/site/wwwroot/applicationinsights-agent.jar"
-  }
+  # guarantees the redirect that makes HSTS meaningful. On the VNet path, WEBSITE_VNET_ROUTE_ALL=1
+  # forces ALL outbound through the integration subnet so DB/Blob traffic uses the private endpoints.
+  app_settings = merge(
+    {
+      "SPRING_PROFILES_ACTIVE"                 = var.spring_profiles_active
+      "BLOB_ENDPOINT"                          = var.blob_endpoint
+      "KEY_VAULT_URI"                          = var.key_vault_uri
+      "DB_URL"                                 = var.db_url
+      "DB_USERNAME"                            = var.db_username
+      "DB_PASSWORD"                            = "@Microsoft.KeyVault(SecretUri=${var.db_password_secret_uri})"
+      "ADMIN_SEED_PASSWORD"                    = "@Microsoft.KeyVault(SecretUri=${var.admin_seed_password_secret_uri})"
+      "APPLICATIONINSIGHTS_CONNECTION_STRING"  = "@Microsoft.KeyVault(SecretUri=${var.ai_connection_string_secret_uri})"
+      "APPLICATIONINSIGHTS_CONFIGURATION_FILE" = "/home/site/wwwroot/applicationinsights.json"
+      "JAVA_OPTS"                              = "-javaagent:/home/site/wwwroot/applicationinsights-agent.jar"
+    },
+    var.vnet_integration_subnet_id == null ? {} : { "WEBSITE_VNET_ROUTE_ALL" = "1" }
+  )
 }
 
 # App-Service-scoped go-live alerts (error rate, health probe). Latency (App-Insights-scoped) lives

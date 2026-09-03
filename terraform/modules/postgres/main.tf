@@ -1,5 +1,11 @@
 # Azure Database for PostgreSQL Flexible Server - Burstable B1ms, right-sized for ~20 users
 # (ARCHITECTURE.md). PITR via backup_retention_days; geo-redundant backup off at this scale.
+#
+# Two access postures, selected by whether a delegated subnet is passed (enable_vnet):
+#  - PRIVATE (delegated_subnet_id set): VNet-injected, public access OFF, no firewall rule -
+#    reachable only from inside the VNet. This is the B2 close for real data.
+#  - PUBLIC  (delegated_subnet_id null): public access ON + Azure-services firewall - the
+#    pre-prod/synthetic path only.
 resource "azurerm_postgresql_flexible_server" "this" {
   name                = "${var.name_prefix}-pg"
   resource_group_name = var.resource_group_name
@@ -11,7 +17,9 @@ resource "azurerm_postgresql_flexible_server" "this" {
   auto_grow_enabled             = true
   backup_retention_days         = 35
   geo_redundant_backup_enabled  = false
-  public_network_access_enabled = true
+  public_network_access_enabled = var.delegated_subnet_id == null
+  delegated_subnet_id           = var.delegated_subnet_id
+  private_dns_zone_id           = var.private_dns_zone_id
 
   administrator_login    = var.administrator_login
   administrator_password = var.administrator_password
@@ -22,7 +30,6 @@ resource "azurerm_postgresql_flexible_server" "this" {
   tags = var.tags
 
   lifecycle {
-    # Storage can only grow; guard against an accidental shrink in a later plan.
     ignore_changes = [zone]
   }
 }
@@ -34,9 +41,11 @@ resource "azurerm_postgresql_flexible_server_database" "app" {
   collation = "en_US.utf8"
 }
 
-# First-draft public-access posture: allow Azure services only. Tighten to a VNet/private endpoint
-# by setting enable_vnet=true (network module) - flagged as the hardening upgrade in the README.
+# PUBLIC path only. "Allow Azure services" (0.0.0.0) is reachable from any Azure tenant, so it is
+# created ONLY when there is no delegated subnet - i.e. the pre-prod/synthetic path. On the VNet
+# path this rule does not exist (B2 closed).
 resource "azurerm_postgresql_flexible_server_firewall_rule" "azure_services" {
+  count            = var.delegated_subnet_id == null ? 1 : 0
   name             = "AllowAzureServices"
   server_id        = azurerm_postgresql_flexible_server.this.id
   start_ip_address = "0.0.0.0"

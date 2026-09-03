@@ -7,3 +7,12 @@ output "postgres_subnet_id" {
 output "app_subnet_id" {
   value = azurerm_subnet.app.id
 }
+output "endpoints_subnet_id" {
+  value = azurerm_subnet.endpoints.id
+}
+output "postgres_private_dns_zone_id" {
+  value = azurerm_private_dns_zone.postgres.id
+}
+output "blob_private_dns_zone_id" {
+  value = azurerm_private_dns_zone.blob.id
+}

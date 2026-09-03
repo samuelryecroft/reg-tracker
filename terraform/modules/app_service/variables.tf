@@ -29,6 +29,13 @@ variable "ai_connection_string_secret_uri" { type = string }
 
 variable "action_group_id" { type = string }
 
+# Set on the VNet path: the delegated App Service subnet to integrate into (regional VNet
+# integration). null on the pre-prod path (no integration).
+variable "vnet_integration_subnet_id" {
+  type    = string
+  default = null
+}
+
 variable "health_check_path" {
   type    = string
   default = "/actuator/health/readiness"
