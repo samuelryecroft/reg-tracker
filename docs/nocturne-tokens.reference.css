@@ -44,8 +44,20 @@
   --color-bg: #161826;
   --color-surface: #232532;
   --color-text: #e9e9ed;
+  /* Every color-mix() is preceded by a flat value. An unsupported function makes the
+     DECLARATION invalid and it is dropped, so without this a 2023-or-older browser
+     inherits whatever came before — and for muted text and control borders that lands
+     as a contrast failure on a product committed to WCAG 2.2 AA. Oscar's call: degraded
+     polish, never degraded legibility. */
+  --color-divider: #383946;
   --color-divider: color-mix(in srgb, var(--color-text) 16%, transparent);
-  --color-text-muted: color-mix(in srgb, var(--color-text) 70%, transparent); /* 7.62:1 — never 45% */
+  --color-text-muted: #aaaab1;                                        /* 7.64:1 */
+  --color-text-muted: color-mix(in srgb, var(--color-text) 70%, transparent);
+  /* NOT --color-divider. A divider is decoration (1.4.11 does not apply); the boundary of
+     an input or a secondary button IS the component, and needs 3:1. Nocturne uses
+     --color-divider for both, which measures 1.55:1 dark and 1.35:1 light. */
+  --color-control-border: #6f707a;                                    /* 3.57:1 vs bg, 3.43 vs surface */
+  --color-control-border: color-mix(in srgb, var(--color-text) 42%, transparent);
 
   --shadow-sm: 0 0 0 1px #3f424d;
   --shadow-md: 0 0 0 1px #595d6c, 0 6px 18px rgba(0,0,0,0.55);
@@ -124,8 +136,12 @@
   --color-bg:      oklch(0.955 0.009 265);
   --color-surface: oklch(0.995 0.004 265);
   --color-text:    oklch(0.280 0.014 265);
+  --color-divider: #cdd0d7;
   --color-divider: color-mix(in srgb, var(--color-text) 16%, transparent);
+  --color-text-muted: #61656c;                                        /* 5.15:1 */
   --color-text-muted: color-mix(in srgb, var(--color-text) 70%, transparent);
+  --color-control-border: #7d8187;                                    /* 3.45:1 vs bg, 3.58 vs surface */
+  --color-control-border: color-mix(in srgb, var(--color-text) 56%, transparent);
 
   --shadow-sm: 0 0 0 1px oklch(0.86 0.02 265);
   --shadow-md: 0 0 0 1px oklch(0.90 0.016 265), 0 6px 18px oklch(0.28 0.014 265 / 0.10);
@@ -166,8 +182,12 @@
     --color-bg:      oklch(0.955 0.009 265);
     --color-surface: oklch(0.995 0.004 265);
     --color-text:    oklch(0.280 0.014 265);
+    --color-divider: #cdd0d7;
     --color-divider: color-mix(in srgb, var(--color-text) 16%, transparent);
+    --color-text-muted: #61656c;
     --color-text-muted: color-mix(in srgb, var(--color-text) 70%, transparent);
+    --color-control-border: #7d8187;
+    --color-control-border: color-mix(in srgb, var(--color-text) 56%, transparent);
 
     --shadow-sm: 0 0 0 1px oklch(0.86 0.02 265);
     --shadow-md: 0 0 0 1px oklch(0.90 0.016 265), 0 6px 18px oklch(0.28 0.014 265 / 0.10);
@@ -193,6 +213,13 @@
 .btn, .input, select, textarea, .btn-icon,
 a.card-action, .chip-control { min-height: var(--control-min); }
 .btn-icon { min-width: var(--control-min); }
+
+/* WCAG 2.2 AA 1.4.11: the boundary that identifies a control needs 3:1. Nocturne bounds
+   .input and .btn-secondary with --color-divider, which is 1.55:1 on the dark ground and
+   1.35:1 on the light one — so in the shipped system every form field and every secondary
+   action has a boundary a low-vision user cannot see. Dividers between rows keep
+   --color-divider; anything that bounds a control takes --color-control-border. */
+.input, select, textarea, .btn-secondary { border-color: var(--color-control-border); }
 
 /* A status tag is DATA, not chrome — "Overdue" is often the most important word
    on a card. Nocturne sets .tag at 11px; here it is 13px, and it always carries

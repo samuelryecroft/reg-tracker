@@ -545,6 +545,84 @@ in the handoff — I swept the canvas for all of those terms. 6d is the only hid
 
 ---
 
+## 5d · Determined after review (Oscar, 4 Sep) + a second accessibility defect
+
+### R-Q8 CLOSED · Build with `color-mix()`, with a flat fallback before every use
+
+Oscar's determination, and he was straight that it is a commitment we *choose* rather than something we can
+measure — no telemetry, no population at scale. The cohorts: LA desktops almost certainly clear (Win10 died
+Oct 2025, estates run auto-updating Chromium Edge that councils rarely pin because pinning breaks M365); the
+tail is **end-of-life machines in small care homes** (Windows 8.1 caps Chrome at 109, below `color-mix()`'s
+111) and **older personal iPhones** (Safari 16.2 needs iOS 16, so an iPhone 7 is stuck below it). Those are
+the two groups we control least and most need to reach — a supplier can tell a coordinator to use a
+different machine; nobody can tell a self-employed visitor to buy a new phone.
+
+**So the baseline stops gating anything.** Every `color-mix()` gets a plain declaration immediately before
+it. An unsupported function makes the *declaration* invalid and it is dropped, so without a fallback the
+value falls back to whatever it inherits — and for muted text and control borders that lands as a **contrast
+failure** on a product committed to WCAG 2.2 AA. With one, it is a cosmetic difference nobody reports.
+Degraded polish, never degraded legibility. In the token sheet already.
+
+`oklch()` stands as not load-bearing: server-computed hex from the stored hue is the same design.
+
+### NEW · `--color-divider` as a control boundary fails 1.4.11, in both themes
+
+Found while implementing the fallbacks. Nocturne bounds `.input` **and** `.btn-secondary` with
+`--color-divider`:
+
+| | vs background | vs surface | needs |
+|---|---|---|---|
+| dark | **1.55** | 1.58 | 3.0 |
+| light | **1.35** | 1.36 | 3.0 |
+
+So in the system as shipped, **every form field and every secondary action has a boundary a low-vision user
+cannot see**. This is separate from the light-accent defect and it is present in *both* appearances.
+
+The fix is not to darken `--color-divider` — a divider between rows is decoration and 1.4.11 does not apply
+to it, and thickening every hairline would fight the quietness that is the point of the system. Instead a
+dedicated token used only where the boundary *is* the component:
+
+```
+--color-control-border   dark  #6f707a (text 42%)  3.57:1 vs bg, 3.43 vs surface
+                         light #7d8187 (text 56%)  3.45:1 vs bg, 3.58 vs surface
+applied to: .input, select, textarea, .btn-secondary
+--color-divider          unchanged, for rules between rows
+```
+
+### R-Q13 CLOSED · Empty-state copy, final
+
+Oscar kept the shape and the voice, edited 10, added a 17th. Three principles he applied: an empty list in a
+safeguarding tool is ambiguous between "nothing to do" and "the system isn't showing me things", and the
+reader needs certainty which; never let an empty state read as a rebuke; and where the reader is likely there
+*because* something just happened, prompt the action rather than describe when it would apply.
+
+| Where | Copy |
+|---|---|
+| Coordinator queue | "No interviews are waiting. New requests appear here as homes raise them, most urgent first." |
+| Coordinator queue, filtered | "No interviews match these filters." + [Clear filters] |
+| Reviewer queue | "Nothing is waiting for review. Reports appear here when a visitor submits them." |
+| Reviewer queue, all self-submitted | "The reports waiting were all submitted by you, so you can't review them yourself. Another reviewer will pick them up." |
+| Visitor's interviews | "No interviews have been allocated to you yet. Your coordinator will assign them here." |
+| **Visitor's interviews, all complete** *(new)* | "Nothing outstanding. Interviews you've completed stay on each child's record." |
+| Home staff's requests | "No open requests for this home. If a child has returned from being missing, raise a request now." + [Raise a request] |
+| Home staff's requests, all closed | "No open requests. Approved reports stay on the child's record, where you can still read them." |
+| Children list | "No children added yet. Add a child before you can raise an interview request." + [Add a child] |
+| Children list, no search results | "No children match \"&lt;term&gt;\". Check the spelling, or clear the search to see all." + [Clear search] |
+| Child record, no interviews | "No return home interviews for this child yet. They'll appear here once one is raised." |
+| Users | "No accounts yet." + [Add a user] |
+| Organisations and homes | "No care providers yet. Add one, then add its homes." + [Add a care provider] |
+| Audit | "No recorded activity matches these filters. Try widening the date range." + [Clear filters] |
+| Dashboard, no recurrence flags | "No recurring missing episodes have been flagged on open or recent requests. These are flagged by the home on the request form, so this doesn't rule out recurrence." |
+| Dashboard, too few to report | shipped wording stands |
+| Export expired | "This export has expired. You can generate it again from the child's record — each export is recorded separately." + [Back to record] |
+
+**The 18th is not needed.** Oscar asked whether a brand-new org with no completed interviews is covered.
+It is, in code: `RateStat.percent()` returns empty whenever `validCompleted < 5`, zero included, and
+`dashboard/care-provider.html:54` already renders **"Not enough data yet"** rather than 0%, with
+`:76`/`:91` covering the breakdown. His T52 requirement is met by what shipped.
+
+---
+
 ## 6 · Carried forward from the T86 review — template bugs Nocturne does not fix
 
 These are defects in the templates, not the design, so a restyle will carry them across unless they are
