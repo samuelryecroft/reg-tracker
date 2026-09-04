@@ -10,17 +10,25 @@
 <main id="main">
     <h1>Raise a Return Home Interview Request</h1>
 
+    <!--
+      2e is four groups with a sticky rail. The rail is jump links in a nav landmark - the same
+      answer as D-1a-3 and for the same reason: this form is long, is read and checked in full, and
+      real tab semantics would hide three quarters of it from Ctrl-F and from print. It is a way
+      through the form, not a way to see less of it.
+    -->
+    <div class="form-layout">
+    <nav class="form-rail" aria-label="Sections of this request">
+        <a href="#young-person">Young person</a>
+        <a href="#missing-episode">Missing episode</a>
+        <a href="#professionals">Professionals</a>
+        <a href="#your-details">Your details</a>
+    </nav>
+
     <div class="card">
         <form method="post" th:action="@{/requests}" th:object="${form}">
-            <div class="banner err" role="alert" th:if="${#fields.hasErrors('*')}">
-                <span class="ic" aria-hidden="true">▲</span>
-                <div>
-                    <strong>Before this request can be raised</strong>
-                    <ul><li th:if="${#fields.hasErrors('childId')}"><a href="#childId" th:text="${#fields.errors('childId')[0]}">Error</a></li></ul>
-                </div>
-            </div>
+            <div th:replace="~{fragments/layout :: errorSummary('Before this request can be raised')}"></div>
 
-            <h3>Young Person</h3>
+            <h3 id="young-person" tabindex="-1">Young person</h3>
             <label for="childId">Child <span class="req" aria-hidden="true">*</span></label>
             <select id="childId" th:field="*{childId}" required
                     th:errorclass="is-invalid" th:aria-invalid="${#fields.hasErrors('childId')}" aria-describedby="childId-error">
@@ -39,6 +47,18 @@
 
             <label for="legalStatus">Legal status</label>
             <input type="text" id="legalStatus" th:field="*{legalStatus}"/>
+
+            <label for="importantPeople">Important people to the young person</label>
+            <textarea id="importantPeople" th:field="*{importantPeople}"></textarea>
+
+            <label for="aboutYoungPerson">About the young person</label>
+            <p class="hint">Likes/dislikes and any potential barriers to completing the RHI.</p>
+            <textarea id="aboutYoungPerson" th:field="*{aboutYoungPerson}"></textarea>
+
+            <!-- The two clock fields head this group rather than sitting under "Young person":
+                 they are facts about the EPISODE, and returnedAt is the one the statutory 72-hour
+                 window is measured from, so it belongs where someone recording an episode looks. -->
+            <h3 id="missing-episode" tabindex="-1">Missing episode</h3>
 
             <label for="missingSince">Date of missing episode</label>
             <input type="datetime-local" id="missingSince" th:field="*{missingSince}"/>
@@ -84,14 +104,7 @@
                 <option value="false">No</option>
             </select>
 
-            <label for="importantPeople">Important people to the young person</label>
-            <textarea id="importantPeople" th:field="*{importantPeople}"></textarea>
-
-            <label for="aboutYoungPerson">About the young person</label>
-            <p class="hint">Likes/dislikes and any potential barriers to completing the RHI.</p>
-            <textarea id="aboutYoungPerson" th:field="*{aboutYoungPerson}"></textarea>
-
-            <h3>Details of Professionals</h3>
+            <h3 id="professionals" tabindex="-1">Professionals</h3>
 
             <label for="socialWorkerDetails">Social worker details</label>
             <textarea id="socialWorkerDetails" th:field="*{socialWorkerDetails}"></textarea>
@@ -115,7 +128,7 @@
             <label for="otherProfessionals">Any other professionals</label>
             <textarea id="otherProfessionals" th:field="*{otherProfessionals}"></textarea>
 
-            <h3>Your Details</h3>
+            <h3 id="your-details" tabindex="-1">Your details</h3>
 
             <label for="submitterOrganisation">Organisation</label>
             <input type="text" id="submitterOrganisation" th:field="*{submitterOrganisation}"/>
@@ -144,6 +157,7 @@
                 <a class="btn ghost" href="/requests">Cancel</a>
             </div>
         </form>
+    </div>
     </div>
 </main>
 </body>
