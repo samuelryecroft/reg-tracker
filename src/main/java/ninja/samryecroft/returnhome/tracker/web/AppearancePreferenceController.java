@@ -36,9 +36,19 @@ public class AppearancePreferenceController {
      * anyone can set directly, and a value like {@code //evil.example} or {@code
      * https://evil.example} would send a just-authenticated POST's redirect off this app entirely
      * (an open redirect). Only ever redirect somewhere that starts with a single {@code /}.
+     *
+     * <p>Also refuses a backslash right after that leading slash (Kevin's review, PR #29): {@code
+     * /\evil.example} passes a naive "starts with one '/', not '//'" check, but browsers following
+     * the WHATWG URL spec treat {@code \} as equivalent to {@code /} for http/https - so Chrome,
+     * Firefox and Edge all resolve that path to {@code https://evil.example} regardless, the exact
+     * protocol-relative redirect this guard exists to stop. {@code \} is legal in a query string
+     * (and {@code %5C} decodes to it), so this is reachable, not theoretical.
      */
     static String safeReturnTo(String returnTo) {
-        if (returnTo == null || returnTo.isBlank() || !returnTo.startsWith("/") || returnTo.startsWith("//")) {
+        if (returnTo == null || returnTo.isBlank() || !returnTo.startsWith("/")) {
+            return "/";
+        }
+        if (returnTo.length() > 1 && (returnTo.charAt(1) == '/' || returnTo.charAt(1) == '\\')) {
             return "/";
         }
         return returnTo;

@@ -70,6 +70,26 @@ class AppearancePreferenceUiTest extends AbstractUiTest {
         assertAppearance("light", "Light");
     }
 
+    /**
+     * Creed's review (PR #29): the visible label alone ("Auto") names the STATE a screen-reader user
+     * hears, not the ACTION a click performs - that only lived in {@code title}, which isn't
+     * reliably announced, isn't shown on touch, and needs a mouse to hover. Checks the button's full
+     * text content (visible label + the {@code .visually-hidden} completion, which stays in the
+     * accessibility tree since {@code .visually-hidden} clips rather than {@code display: none}s)
+     * reads as one sentence naming both the current state and the destination, not just the
+     * markup's shape.
+     */
+    @Test
+    void theToggleButtonsAccessibleNameDescribesTheActionNotJustTheState() {
+        login(ADMIN_USERNAME, ADMIN_PASSWORD);
+        page.navigate(url("/admin/users"));
+        page.waitForSelector(".shell-appearance-form button");
+
+        String accessibleText = page.locator(".shell-appearance-form button").textContent()
+                .replaceAll("\\s+", " ").trim();
+        assertThat(accessibleText).isEqualTo("Auto appearance - switch to light");
+    }
+
     private void clickToggle() {
         page.click(".shell-appearance-form button");
         page.waitForLoadState();

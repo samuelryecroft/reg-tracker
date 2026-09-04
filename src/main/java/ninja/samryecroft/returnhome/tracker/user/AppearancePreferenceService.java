@@ -42,6 +42,31 @@ public class AppearancePreferenceService {
      * one to a new {@link AppUserPrincipal} that outlives the transaction is the lazy-initialization
      * trap this codebase has hit before - {@code roles}/{@code organisation}/{@code homes} need to
      * already be real, loaded objects before the persistence context that could load them closes.
+     *
+     * <p>The new token's authorities come from {@code refreshed}, the freshly-loaded principal, NOT
+     * from the old token being replaced (Kevin's review, PR #29) - {@link
+     * ninja.samryecroft.returnhome.tracker.config.SecurityConfig}'s {@code hasAnyRole(...)} rules and
+     * every template's {@code #authorization.expression(...)} read {@code Authentication
+     * .getAuthorities()}, while {@code principal.hasRole(...)} (RoleMatrix, OrganisationAccessService,
+     * every service-layer check) reads {@code user.getRoles()} directly. Copying the old token's
+     * authorities here would leave those two answering from two different snapshots of the same
+     * user's roles for the rest of the session if an admin changed them in between - exactly the
+     * split T117's RoleMatrix exists to prevent, and a needless one, since {@link
+     * AppUserPrincipal#getAuthorities()} already derives from the same fresh {@code user.getRoles()}
+     * this method just loaded.
+     *
+     * <p><strong>Relies on {@code SecurityContext} aliasing, not an explicit save.</strong> Spring
+     * Security 6 defaults to {@code requireExplicitSave}, so mutating {@code
+     * SecurityContextHolder.getContext()} does not by itself write through the {@code
+     * SecurityContextRepository}. This works today only because {@code
+     * HttpSessionSecurityContextRepository} keeps a live reference to this same {@code
+     * SecurityContext} instance in the {@code HttpSession}, so the in-place mutation is visible on
+     * the next request by aliasing. That aliasing disappears the moment sessions are serialised
+     * (Spring Session/Redis, or replication across more than one app instance without sticky
+     * sessions) - at that point the refresh would silently stop persisting and the preference would
+     * appear to revert until the next login. Cosmetic, not a security concern, and not worth
+     * refactoring pre-emptively - but the first person deploying behind a shared/serialised session
+     * store should read this paragraph before wondering why appearance stopped sticking.
      */
     @Transactional
     public void updateOwnPreference(AppUserPrincipal principal, AppearancePreference preference) {
@@ -56,6 +81,6 @@ public class AppearancePreferenceService {
         AppUserPrincipal refreshed = new AppUserPrincipal(user, locked);
         Authentication current = SecurityContextHolder.getContext().getAuthentication();
         SecurityContextHolder.getContext().setAuthentication(
-                new UsernamePasswordAuthenticationToken(refreshed, current.getCredentials(), current.getAuthorities()));
+                new UsernamePasswordAuthenticationToken(refreshed, current.getCredentials(), refreshed.getAuthorities()));
     }
 }

@@ -18,7 +18,12 @@ class AppearancePreferenceControllerTest {
 
     @ParameterizedTest
     @ValueSource(strings = { "//evil.example", "//evil.example/path", "https://evil.example",
-            "http://evil.example", "evil.example", "admin/users" })
+            "http://evil.example", "evil.example", "admin/users",
+            // Kevin's review, PR #29: a backslash right after the leading slash passes a naive
+            // "starts with one '/', not '//'" check, but WHATWG URL-spec browsers (Chrome, Firefox,
+            // Edge) treat '\' as equivalent to '/' for http/https, so /\evil.example still resolves
+            // off this app - reachable, since '\' is legal in a query string ('%5C' decodes to it).
+            "/\\evil.example", "/\\/evil.example" })
     void refusesAnythingThatIsNotASingleLeadingSlashPath(String unsafeReturnTo) {
         assertThat(AppearancePreferenceController.safeReturnTo(unsafeReturnTo)).isEqualTo("/");
     }
