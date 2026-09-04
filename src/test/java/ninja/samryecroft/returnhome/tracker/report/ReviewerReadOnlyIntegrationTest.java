@@ -214,6 +214,48 @@ class ReviewerReadOnlyIntegrationTest extends AbstractIntegrationTest {
         assertThat(tagWithId(visitorHtml, "previouslyMissing")).doesNotContain("disabled");
     }
 
+    @Test
+    void reviewFormNumbersSectionsAndSurfacesRequestContextInPlace() throws Exception {
+        // D-1b-4: the number goes in the heading text, matching the generated document - a
+        // reviewer cites it when sending a report back with comments.
+        Long requestId = submittedReport();
+        String html = mockMvc.perform(get("/reviewer/reports/{id}/review", requestId)
+                        .with(asUser("ro-reviewer" + suffix)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(html).contains("1. Details");
+        assertThat(html).contains("2. Return Home Interview");
+        assertThat(html).contains("3. Future Incidents");
+        assertThat(html).contains("4. Interviewer's Comments");
+        assertThat(html).contains("5. Recommendations");
+        assertThat(html).contains("6. Declaration");
+
+        // D-1b-1: the request's own context (known risks etc.) renders in place - no more link to
+        // /interview-requests/{id} taking a reviewer holding an irreversible decision away from it.
+        assertThat(html).doesNotContain("View full request details</a>");
+        assertThat(html).contains("View full request details");
+        assertThat(html).contains("<details class=\"card disclosure\">");
+    }
+
+    @Test
+    void sendingBackWithNoCommentReopensTheDialogWithTheError() throws Exception {
+        // D-1b-5: the comment's requirement and its error must be co-located with the control - a
+        // reviewer who never opened the dialog client-side (JS disabled, or a direct POST) must
+        // still see the error attached to a dialog that is actually open, not one rendered closed
+        // with the error invisible inside it - the exact failure shape the dialog was built to fix.
+        Long requestId = submittedReport();
+
+        String html = mockMvc.perform(post("/reviewer/reports/{id}/review", requestId)
+                        .with(asUser("ro-reviewer" + suffix)).with(csrf())
+                        .param("action", "reject"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(html).contains("Comments are required when sending a report back");
+        assertThat(tagWithId(html, "sendBackDialog")).contains("open");
+    }
+
     /**
      * The single element tag bearing this id. Asserting against the whole document would be
      * meaningless here - the shared layout's stylesheet contains a {@code .disabled} rule, so a

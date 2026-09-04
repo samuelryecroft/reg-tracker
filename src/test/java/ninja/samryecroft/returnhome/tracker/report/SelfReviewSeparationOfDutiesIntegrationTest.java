@@ -139,6 +139,35 @@ class SelfReviewSeparationOfDutiesIntegrationTest extends AbstractIntegrationTes
     }
 
     @Test
+    void theReviewFormHidesTheActionBarFromASelfReviewerButShowsItToAnIndependentOne() throws Exception {
+        // D-1b-7 (T173/spec §6a): getReviewable's own conflict-of-interest check is server-side and
+        // already covered above - this is the screen's OWN job, to SAY so before a self-reviewer
+        // ever presses a button that would 403. Never a disabled button (not focusable, so a
+        // keyboard user hits an unexplained dead end) - no action bar at all instead, replaced by a
+        // banner naming the rule and the way forward. getAuthorized's own visibility is broader than
+        // "can decide" (HOME_STAFF/VIEWER/ORG_ADMIN/COORDINATOR can all reach this GET route too),
+        // so this is a real, reachable case, not a hypothetical one.
+        String selfReviewerHtml = mockMvc.perform(get("/reviewer/reports/{id}/review", requestId)
+                        .with(asUser("t143-visitor-reviewer" + suffix)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        assertThat(selfReviewerHtml).doesNotContain("Approve and generate document");
+        assertThat(selfReviewerHtml).doesNotContain("Send back with comments");
+        assertThat(selfReviewerHtml).contains("You can't decide this report");
+
+        // The paired positive: an independent reviewer sees the real action bar plus the
+        // attestation naming the separation-of-duties rule the system just confirmed for them.
+        String independentReviewerHtml = mockMvc.perform(get("/reviewer/reports/{id}/review", requestId)
+                        .with(asUser("t143-other-reviewer" + suffix)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        assertThat(independentReviewerHtml).contains("Approve and generate document");
+        assertThat(independentReviewerHtml).contains("Send back with comments");
+        assertThat(independentReviewerHtml).contains("You did not submit this report.");
+        assertThat(independentReviewerHtml).doesNotContain("You can't decide this report");
+    }
+
+    @Test
     void anIndependentReviewerIsOfferedItAndMayApproveIt() throws Exception {
         // The paired positive, and it matters in both directions: a control that also blocked
         // legitimate review would stop reports being approved at all, which on a statutory record is

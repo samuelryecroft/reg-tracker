@@ -7,13 +7,101 @@
 </head>
 <body>
 <div th:replace="~{fragments/layout :: nav}"></div>
-<main id="main">
+<!--
+  T173(1b) / spec §6a: "the canvas presents 1a and 1b as two treatments of one record, which reads
+  like a choice. It is not one. 1a shipped as the record view for every role. 1b is the reviewer's
+  decision surface" - the only place in the app an irreversible action is taken on someone else's
+  work. Every decision below follows from that sentence.
+-->
+<main id="main" class="review" th:with="ico=@{/icons/phosphor.svg}">
     <h1 th:text="${'Review: ' + childIdentity.label()}">Review report</h1>
+    <span class="status" th:classappend="${request.status}" th:text="${request.status.displayName}">STATUS</span>
     <p class="muted" th:text="${'Home: ' + request.home.name}">Home</p>
-    <p><a th:href="@{/interview-requests/{id}(id=${request.id})}">View full request details</a> (known risks, professionals, missing episode context)</p>
 
+    <!--
+      D-1b-8: kept for orientation, same component as 1a. But a report sent back once and
+      resubmitted is back at REPORT_SUBMITTED - the rail shows CURRENT and the earlier send-back
+      is invisible, exactly the context a reviewer needs. See priorSendBack below, near the
+      actions, for the piece the rail can't tell them.
+    -->
+    <ol class="rail" aria-label="Interview status">
+        <li th:each="step, stat : ${statusRail}" th:classappend="'rail-' + ${step.state()}"
+            th:attr="aria-current=${step.state().name() == 'CURRENT'} ? 'step'">
+            <span class="rail-connector" aria-hidden="true" th:unless="${stat.first}"></span>
+            <span class="rail-marker" aria-hidden="true" th:switch="${step.state().name()}">
+                <svg class="icon" th:case="'COMPLETE'"><use th:href="${ico} + '#ph-fill-check-circle'"></use></svg>
+                <svg class="icon" th:case="'CURRENT'"><use th:href="${ico} + '#ph-fill-dot-outline'"></use></svg>
+                <svg class="icon" th:case="'SENT_BACK'"><use th:href="${ico} + '#ph-arrow-u-up-left'"></use></svg>
+                <svg class="icon" th:case="'CANCELLED'"><use th:href="${ico} + '#ph-x-circle'"></use></svg>
+                <svg class="icon" th:case="'NOT_APPLICABLE'"><use th:href="${ico} + '#ph-prohibit'"></use></svg>
+                <svg class="icon" th:case="*"><use th:href="${ico} + '#ph-circle-dashed'"></use></svg>
+            </span>
+            <span class="rail-label" th:text="${step.label()}">Label</span>
+            <span class="visually-hidden" th:if="${step.state().name() != 'CANCELLED'}"
+                  th:switch="${step.state().name()}">
+                <th:block th:case="'COMPLETE'">completed</th:block>
+                <th:block th:case="'CURRENT'">current step</th:block>
+                <th:block th:case="'SENT_BACK'">sent back</th:block>
+                <th:block th:case="'NOT_APPLICABLE'">not applicable</th:block>
+                <th:block th:case="*">not yet started</th:block>
+            </span>
+            <span class="rail-when" th:if="${step.note() != null}" th:text="${step.note()}">note</span>
+            <span class="rail-when" th:if="${step.note() == null and step.occurredAt() != null}"
+                  th:text="${#temporals.format(step.occurredAt(), 'dd MMM yyyy')}">date</span>
+        </li>
+    </ol>
+
+    <!--
+      D-1b-1: replaces a link to /interview-requests/{id} that took a reviewer holding an
+      irreversible decision away from it to check the intake, with no way back but the browser's
+      own back button. Same component D-1a-5 shipped (#68), always closed (a report exists by
+      definition on this screen, unlike 1a where open/closed is status-derived). Not in the
+      section index below - it sits at the top of the page, already in view on load, unlike 1a's
+      own disclosure which sits deep in a long scroll and needs a jump target to be reachable.
+    -->
+    <details class="card disclosure">
+        <summary>
+            <svg class="icon caret-closed" aria-hidden="true"><use th:href="${ico} + '#ph-caret-right'"></use></svg>
+            <svg class="icon caret-open" aria-hidden="true"><use th:href="${ico} + '#ph-caret-down'"></use></svg>
+            View full request details
+        </summary>
+        <p class="hint">Known risks, professionals, and missing episode context - as recorded on the original request.</p>
+        <dl class="detail">
+            <dt>Date of missing episode</dt>
+            <dd th:classappend="${request.missingSince == null} ? 'unanswered'"
+                th:text="${request.missingSince} != null ? ${#temporals.format(request.missingSince, 'dd MMM yyyy HH:mm')} : 'Not answered'">Missing since</dd>
+
+            <dt>Missing episode details</dt>
+            <dd th:classappend="${#strings.isEmpty(request.missingEpisodeDetails)} ? 'unanswered'"
+                th:text="${#strings.isEmpty(request.missingEpisodeDetails)} ? 'Not answered' : ${request.missingEpisodeDetails}">Details</dd>
+
+            <dt>Known risks</dt>
+            <dd th:classappend="${#strings.isEmpty(request.knownRisks)} ? 'unanswered'"
+                th:text="${#strings.isEmpty(request.knownRisks)} ? 'Not answered' : ${request.knownRisks}">Risks</dd>
+
+            <dt>Important people</dt>
+            <dd th:classappend="${#strings.isEmpty(request.importantPeople)} ? 'unanswered'"
+                th:text="${#strings.isEmpty(request.importantPeople)} ? 'Not answered' : ${request.importantPeople}">People</dd>
+
+            <dt>Social worker</dt>
+            <dd th:classappend="${#strings.isEmpty(request.socialWorkerDetails)} ? 'unanswered'"
+                th:text="${#strings.isEmpty(request.socialWorkerDetails)} ? 'Not answered' : ${request.socialWorkerDetails}">Social worker</dd>
+
+            <dt>Placing local authority</dt>
+            <dd th:classappend="${#strings.isEmpty(request.placingLocalAuthority)} ? 'unanswered'"
+                th:text="${#strings.isEmpty(request.placingLocalAuthority)} ? 'Not answered' : ${request.placingLocalAuthority}">Authority</dd>
+
+            <dt>Other professionals</dt>
+            <dd th:classappend="${#strings.isEmpty(request.otherProfessionals)} ? 'unanswered'"
+                th:text="${#strings.isEmpty(request.otherProfessionals)} ? 'Not answered' : ${request.otherProfessionals}">Other</dd>
+        </dl>
+    </details>
+
+    <!-- D-1b-9: both already vendored and aria-hidden; neither needs a hidden state word - each
+         sits in a banner whose visible text already carries the state (D-1a-2b's converse: a
+         hidden word there would be duplication, not access). -->
     <div class="banner info">
-        <span class="ic" aria-hidden="true">🔒</span>
+        <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-lock-simple'"></use></svg>
         <div>
             <strong>This report is the visitor's own record and can't be edited here</strong>
             <p>It is signed in their name. To get something changed, send it back with comments and
@@ -21,36 +109,101 @@
         </div>
     </div>
 
-    <div class="card" th:object="${form}">
-        <div th:replace="~{fragments/report-fields :: fields(true)}"></div>
-    </div>
+    <!--
+      D-1b-3: a section, not a tab, as 1a already ruled for a stronger reason here - this is the
+      screen where a reviewer scans and prints before generating the document. D-1b-1's disclosure
+      is deliberately not listed (see its own comment above).
+    -->
+    <nav class="section-index" aria-label="Report sections">
+        <a href="#report-details">1. Details</a>
+        <a href="#rhi">2. Return Home Interview</a>
+        <a href="#future-incidents">3. Future Incidents</a>
+        <a href="#interviewer-comments">4. Interviewer's Comments</a>
+        <a href="#recommendations">5. Recommendations</a>
+        <a href="#declaration">6. Declaration</a>
+        <a href="#history">History</a>
+    </nav>
 
-    <div class="card">
-        <form method="post" th:action="@{/reviewer/reports/{id}/review(id=${request.id})}" th:object="${form}">
-            <div class="banner err" role="alert" th:if="${#fields.hasErrors('reviewComments')}">
-                <span class="ic" aria-hidden="true">▲</span>
-                <div>
-                    <strong>The report hasn't been sent back yet</strong>
-                    <ul><li><a href="#reviewComments" th:text="${#fields.errors('reviewComments')[0]}">Error</a></li></ul>
-                </div>
+    <!--
+      #fields.hasErrors requires an active th:object scope, so this banner must be the FIRST
+      CHILD inside the form below, never before it - a standing gotcha in this codebase, not new
+      to 1b (see fragments/layout's own error-summary convention elsewhere).
+    -->
+    <form method="post" th:action="@{/reviewer/reports/{id}/review(id=${request.id})}" th:object="${form}">
+        <div class="banner err" role="alert" th:if="${#fields.hasErrors('reviewComments')}">
+            <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-warning-circle'"></use></svg>
+            <div>
+                <strong>The report hasn't been sent back yet</strong>
+                <ul><li><a href="#reviewComments" th:text="${#fields.errors('reviewComments')[0]}">Error</a></li></ul>
             </div>
+        </div>
 
-            <h3>Your decision</h3>
+        <div th:replace="~{fragments/report-fields :: reviewerFields()}"></div>
 
-            <label for="reviewComments">Comments <span class="hint" style="display:inline;font-weight:400">— required if sending back, optional if approving</span></label>
-            <textarea id="reviewComments" th:field="*{reviewComments}" th:errorclass="is-invalid"
-                      th:aria-invalid="${#fields.hasErrors('reviewComments')}" aria-describedby="reviewComments-error"
-                      placeholder="What needs to change, and where?"></textarea>
-            <div th:replace="~{fragments/layout :: fieldError('reviewComments')}"></div>
+        <div class="card" id="history" tabindex="-1">
+            <h2 style="margin-top:0">History</h2>
+            <div th:replace="~{fragments/audit-history :: provenance}"></div>
+            <div th:replace="~{fragments/audit-history :: timeline(${auditHistory})}"></div>
+        </div>
 
-            <div class="btn-row">
-                <button type="submit" name="action" value="approve" class="btn">Approve and publish</button>
-                <button type="submit" name="action" value="reject" class="btn danger">Send back with comments</button>
+        <!--
+          D-1b-7: canReview already enforces this server-side (getReviewable's own conflict-of-
+          interest check) - the screen's only job is to SAY so. Satisfied gets a small muted
+          attestation; not satisfied gets NO ACTION BAR AT ALL, replaced by a banner stating the
+          rule and the way forward. Never a disabled button: a disabled control isn't focusable,
+          so a keyboard user meets a dead end that can't explain itself, and this rule is
+          permanent - there is nothing that could later enable it.
+        -->
+        <div th:if="${canDecide}">
+            <p class="muted" th:if="${priorSendBack}">
+                This report has already been sent back once before.
+            </p>
+            <div class="consequence">
+                <p>Approving generates the final Word document, releases it to the child's home, and can't be undone.</p>
+            </div>
+            <p class="muted">You did not submit this report.</p>
+            <div class="sticky-actions">
+                <button type="submit" name="action" value="approve" class="btn">Approve and generate document</button>
+                <button type="button" class="btn sent-back" id="openSendBackDialog">Send back with comments</button>
                 <a class="btn ghost" href="/reviewer/reports">Cancel</a>
             </div>
-            <p class="hint" style="margin-top:12px">Approving generates the final Word document and releases it to the child's home. This can't be undone.</p>
-        </form>
-    </div>
+
+            <!--
+              D-1b-5: send back opens this dialog rather than submitting the page directly. The
+              comment is required only here, and .dialog co-locates the control, its requirement
+              and its error - today (pre-fix) that textarea sat in a card while the button was
+              sticky, so a validation failure targeted a field that could be scrolled far off
+              screen: you press a button you can see and get an error you cannot. `open` is set
+              statically when the server round-trip re-renders with this exact error, so the
+              no-JS/JS-failed case still shows it without depending on send-back-dialog.js.
+            -->
+            <dialog class="dialog" id="sendBackDialog" th:attr="open=${#fields.hasErrors('reviewComments')} ? 'open' : null">
+                <h2 class="dialog-title">Send this report back?</h2>
+                <div class="dialog-body">
+                    <label for="reviewComments">What needs to change, and where?</label>
+                    <p class="hint">Reference the numbered section, e.g. "3. Future Incidents needs...".</p>
+                    <textarea id="reviewComments" th:field="*{reviewComments}" required
+                              th:errorclass="is-invalid" th:aria-invalid="${#fields.hasErrors('reviewComments')}"
+                              aria-describedby="reviewComments-error"></textarea>
+                    <div th:replace="~{fragments/layout :: fieldError('reviewComments')}"></div>
+                </div>
+                <div class="dialog-actions">
+                    <button type="button" class="btn ghost" id="cancelSendBack">Cancel</button>
+                    <button type="submit" name="action" value="reject" class="btn sent-back">Send back</button>
+                </div>
+            </dialog>
+        </div>
+        <div class="banner warn" th:unless="${canDecide}">
+            <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-warning-circle'"></use></svg>
+            <div>
+                <strong>You can't decide this report</strong>
+                <p>A reviewer cannot approve or send back a report they submitted themselves - this
+                    is a separation-of-duties rule and it can't be overridden here. Another reviewer
+                    needs to take this one.</p>
+            </div>
+        </div>
+    </form>
 </main>
+<script th:src="@{/js/send-back-dialog.js}"></script>
 </body>
 </html>

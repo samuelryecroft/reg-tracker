@@ -539,6 +539,20 @@ textarea.input { min-height: 90px; resize: vertical; }
     padding: var(--space-4);
     background: color-mix(in srgb, var(--color-neutral-900) 50%, transparent);
 }
+/*
+  T173(1b): this shipped in T119's phase-1 foundation but had never been used until now - the
+  bug it carried was invisible until the first real <dialog> element. A native <dialog> is
+  display: none by default until it gains the `open` attribute (that IS how showModal() shows
+  it); `display: flex` here, unconditional, is an AUTHOR rule that always beats the UA
+  stylesheet's own display: none regardless of the attribute - the exact same bug shape as
+  .btn[hidden] a few sections up (an author display: X rule beating [hidden]'s UA default), just
+  with a native element's own default state this time instead of a JS-driven attribute. Explicit
+  :not([open]) rather than relying on the .dialog-backdrop wrapper this was written for: this CSS
+  now styles native <dialog> elements directly (see the app-wide note near .review's own CSS on
+  why - native gives focus-trap/Escape/inert-background for free), and a native element's own
+  hidden-by-default state deserves the same explicit guard [hidden] got, not an assumption.
+*/
+.dialog:not([open]) { display: none; }
 .dialog {
     width: min(440px, 100%); display: flex; flex-direction: column; gap: var(--space-3);
     padding: var(--space-4); border-radius: var(--radius-lg);
@@ -763,9 +777,17 @@ input.is-invalid, select.is-invalid, textarea.is-invalid {
 }
 .field-error .icon { font-size: 11px; margin-top: 3px; }
 
+/* T173(1b): was `background: #F6F7F9` - a light-page literal paired with the THEMED --ink colour
+   it already correctly used, so in dark mode this rendered pale text (--ink resolves to #e9e9ed
+   there) on that same pale literal background: 1.13:1, essentially invisible, on the reviewer's
+   OWN readonly report view (this is review-form's only consumer of hardcoded-literal + themed-ink
+   for this exact class; export/case-file-ready.html shares the class and the same live bug).
+   Fixed to match real <input> exactly (same background/border/ink tokens two rules above) - a
+   readonly value reads as "a normal field, just not editable" via its own lack of an interactive
+   affordance, not via a different background shade from the fields around it. */
 .readonly-val {
-    background: #F6F7F9;
-    border: 1px solid var(--border);
+    background: var(--surface);
+    border: 1px solid var(--control-border);
     border-radius: 8px;
     padding: 0.6rem 0.75rem;
     font-size: var(--t-md);
@@ -774,6 +796,14 @@ input.is-invalid, select.is-invalid, textarea.is-invalid {
     white-space: pre-wrap;
 }
 .readonly-val.empty { color: var(--muted); font-style: italic; }
+/* D-1b-2: 920px is a container width, not a measure - a free-text answer at 920px runs to
+   ~123ch, roughly double comfortable reading. Caps the value slot only; dates, names and yes/no
+   answers are already shorter than the cap, so this one rule covers the whole report without
+   classifying individual fields. Spec names dl.detail dd for this - review-form's actual readonly
+   markup (report-fields.html) uses .readonly-val instead (a pre-existing class, not one this
+   ticket introduced), so applying the cap here achieves the identical stated outcome. Flagged to
+   Creed as a factual note on the actual markup, not a design deviation. */
+.readonly-val { max-width: min(100%, 66ch); }
 
 fieldset { border: none; margin: 0; padding: 0; min-width: 0; }
 fieldset.checkbox-fieldset { margin-top: var(--s4); }
@@ -852,6 +882,16 @@ fieldset.checkbox-fieldset > legend {
 .btn.ghost:hover { border-color: var(--accent-dark); color: var(--accent-dark); }
 .btn.danger { background: var(--surface); color: var(--error); border-color: var(--error); box-shadow: none; }
 .btn.danger:hover { background: var(--error-bg); }
+/* D-1b-6: send-back is one of two legitimate review outcomes, not a destructive action - it
+   creates work rather than destroying any (the report reopens to the visitor, nothing is lost),
+   and red tells a reviewer choosing between two valid paths that one of them is dangerous. Not a
+   new component, a modifier: same structure as .btn.secondary (outlined, not filled), --sent-back
+   swapped in for the ink/border instead of --accent-dark - the token already means precisely this
+   event (the status tag, the rail marker and the visitor's own banner all already carry it).
+   Measured on the page background: 11.34:1 dark / 6.41:1 light, past 1.4.3 for the label and
+   1.4.11 for the border. */
+.btn.sent-back { background: var(--surface); color: var(--sent-back); border-color: var(--sent-back); box-shadow: none; }
+.btn.sent-back:hover { background: var(--sent-back-bg); }
 .btn.block { width: 100%; }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn-row { display: flex; gap: var(--s3); flex-wrap: wrap; align-items: center; }
@@ -1234,6 +1274,44 @@ body:has(#history:target) .section-index a[href="#history"] {
     .detail-layout { display: block; }
     .section-index a[href="#history"] { display: inline-flex; }
 }
+
+/* ============================== 1b: the reviewer's decision surface (spec §6a) ============================== */
+/* D-1b-2: single column, no .detail-layout grid - 1b has no second column. 920px is a container
+   width, not a measure (see .readonly-val's own max-width above for the actual reading-width cap
+   on free-text answers); this just keeps the report from stretching edge-to-edge on a wide
+   reviewer monitor, matching main.narrow's own pattern immediately above for a different width. */
+main.review { max-width: 920px; }
+/* D-1b-4: numbered sections, matching the generated document - the number lives in the heading
+   TEXT (see reviewerFields() in fragments/report-fields.html), never a CSS counter, because a
+   counter isn't selectable and the send-back dialog asks the reviewer to CITE this exact number.
+   Scoped to .review rather than added to the shared `h3, legend.section-title` rule above: this
+   is 1b's own heading level (h2, per spec - review-form.html has no h3 sections), and scoping
+   avoids touching every other h2 in the app (1a's own "History" card heading included). */
+.review h2 {
+    margin: var(--s5) 0 var(--s2);
+    padding: 0 0 var(--s1);
+    border-bottom: 2px solid var(--tint);
+    color: var(--accent-dark);
+    font-size: var(--t-xs);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+.review .card h2:first-child { margin-top: 0; }
+/* D-1b-5(a): position: sticky; bottom: 0 pins .sticky-actions OVER content scrolling beneath it -
+   without this the page's last section could never fully clear the bar to be read. Approximate
+   (bar padding + a 44px .btn, no exact measurement taken) but deliberately generous: over-padding
+   costs a little blank space, under-padding hides real content, so the safe side to round on. */
+.review { padding-bottom: 88px; }
+/* D-1b-5(b)/D-1b-9: the native <dialog> element gives focus-trap, Escape-to-close and an inert
+   background for free - the same "don't build a widget the platform already gives you" reasoning
+   as D-1a-3's rejection of invented tablist markup, in the direction where a native element
+   genuinely IS the widget this time. .dialog itself (padding/radius/surface/shadow) is unchanged
+   from the shipped, previously-unused Nocturne definition above; only the backdrop tint needs a
+   line of its own, since a native <dialog>'s ::backdrop is a different pseudo-element from the
+   .dialog-backdrop wrapper div that CSS originally assumed - same tint value, new selector. */
+dialog.dialog::backdrop { background: color-mix(in srgb, var(--color-neutral-900) 50%, transparent); }
+dialog.dialog { border: none; }
 
 /* ============================== dashboard (roadmap 2.3) ============================== */
 .zone {
