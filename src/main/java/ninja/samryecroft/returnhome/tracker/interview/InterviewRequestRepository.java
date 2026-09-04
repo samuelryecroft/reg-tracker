@@ -37,43 +37,42 @@ public interface InterviewRequestRepository extends JpaRepository<InterviewReque
     /**
      * The platform ADMIN's pending-review queue.
      *
-     * <p>The {@code not exists} clause is the queue's half of the self-review separation-of-duties
-     * control that {@code ReportService.getReviewable} enforces at the endpoint. That control tests
-     * the report's <em>author</em> ({@code InterviewReport.visitor} - who produced the artefact);
-     * the queue used to test only the request's <em>allocated visitor</em> (who was assigned it).
-     * Those are usually the same person, but not always - a platform admin submitting on a visitor's
-     * behalf becomes the author while the allocation stays with the visitor - and where they differ
-     * the queue was offering an action the endpoint then refused (T145/T143).
+     * <p>These return EVERY request in scope at the given status, including the ones this reviewer
+     * must not act on. The self-review separation-of-duties control lives at the endpoint
+     * ({@code ReportService.getReviewable}, which refuses a report whose {@code visitor} is the
+     * principal); {@code InterviewRequestService.pendingReviewFor} applies the queue's half in
+     * Java, on top of one scope query.
      *
-     * <p>Query-level rather than a Java filter deliberately: the request-to-report direction is not
-     * mapped ({@code InterviewReport} owns the one-to-one), so filtering in Java would need a report
-     * lookup per row - an N+1 across the whole queue to answer one question per request.
+     * <p>It used to be a {@code not exists} clause in here, which discarded those rows entirely -
+     * and a discarded row is a row the screen cannot talk about. A reviewer whose own two reports
+     * were the only ones waiting saw "Nothing awaiting review", which is the same words a genuinely
+     * empty queue shows: the two states were indistinguishable, in a tool where an empty list is
+     * already ambiguous between "nothing to do" and "the system is not showing me everything".
+     * Partitioning in Java lets the screen say which one it is (R-Q13, D-2d-1) while keeping the
+     * reviewable set exactly as it was.
+     *
+     * <p>The N+1 that the query-level test was avoiding is avoided a different way: the
+     * request-to-report direction is still unmapped, but {@code findByInterviewRequestIdIn}
+     * resolves the whole page's authors in ONE query, which did not exist when this was written.
      */
     @EntityGraph(attributePaths = {"child", "home", "requestedBy", "allocatedVisitor"})
     @Query("""
             select r from InterviewRequest r
             where r.status = :status
-              and not exists (select 1 from InterviewReport rep
-                              where rep.interviewRequest = r and rep.visitor.id = :authorToExcludeId)
             order by r.createdAt desc
             """)
-    List<InterviewRequest> findByStatusExcludingReportsAuthoredBy(
-            @Param("status") InterviewStatus status, @Param("authorToExcludeId") Long authorToExcludeId);
+    List<InterviewRequest> findByStatusWithCaseDetails(@Param("status") InterviewStatus status);
 
-    /** A Reviewer's pending-review queue, scoped to their Supplier org. Excludes their own authored
-     * reports for the reason recorded on {@link #findByStatusExcludingReportsAuthoredBy}. */
+    /** The Supplier-scoped form of {@link #findByStatusWithCaseDetails}. */
     @EntityGraph(attributePaths = {"child", "home", "requestedBy", "allocatedVisitor"})
     @Query("""
             select r from InterviewRequest r
             where r.status = :status
               and r.home.organisation.supplierOrganisation.id = :supplierOrgId
-              and not exists (select 1 from InterviewReport rep
-                              where rep.interviewRequest = r and rep.visitor.id = :authorToExcludeId)
             order by r.createdAt desc
             """)
-    List<InterviewRequest> findByStatusAndHomeOrganisationSupplierOrganisationIdExcludingReportsAuthoredBy(
-            @Param("status") InterviewStatus status, @Param("supplierOrgId") Long supplierOrgId,
-            @Param("authorToExcludeId") Long authorToExcludeId);
+    List<InterviewRequest> findByStatusAndSupplierOrganisationIdWithCaseDetails(
+            @Param("status") InterviewStatus status, @Param("supplierOrgId") Long supplierOrgId);
 
     @EntityGraph(attributePaths = {"child", "home", "requestedBy", "allocatedVisitor"})
     @Query("select r from InterviewRequest r where r.child.id = :childId order by r.createdAt desc")

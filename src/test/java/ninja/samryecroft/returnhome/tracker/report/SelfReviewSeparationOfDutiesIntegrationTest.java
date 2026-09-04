@@ -138,6 +138,31 @@ class SelfReviewSeparationOfDutiesIntegrationTest extends AbstractIntegrationTes
         assertThat(html).doesNotContain("/reviewer/reports/" + requestId + "/review");
     }
 
+    /**
+     * D-2d-1 / R-Q13. Withholding the ACTION is the control's mirror; withholding the ROW as well
+     * was a second thing, and it cost more than it bought - a reviewer whose own report was the
+     * only one waiting saw "nothing waiting", the same words a genuinely empty queue shows. So the
+     * row is now rendered without an action and with the reason there is none.
+     *
+     * <p>Safe because the control is at the endpoint, which the three tests above assert directly;
+     * and this is a request the principal authored, so the card discloses nothing they could not
+     * already reach. The assertion above ({@code andTheirReviewQueueDoesNotOfferIt}) is what pins
+     * that the ACTION is still withheld, and it is unchanged.
+     */
+    @Test
+    void butTheirQueueSaysTheReportIsWaitingAndWhyTheyCannotTakeIt() throws Exception {
+        String html = mockMvc.perform(get("/reviewer/reports")
+                        .with(asUser("t143-visitor-reviewer" + suffix)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(html).contains("You submitted this report");
+        assertThat(html)
+                .as("the whole point is that this must NOT read as a queue with nothing in it")
+                .doesNotContain("Nothing is waiting for review");
+        assertThat(html).contains("The reports waiting were all submitted by you");
+    }
+
     @Test
     void theReviewFormHidesTheActionBarFromASelfReviewerButShowsItToAnIndependentOne() throws Exception {
         // D-1b-7 (T173/spec §6a): getReviewable's own conflict-of-interest check is server-side and
