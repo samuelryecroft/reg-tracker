@@ -119,8 +119,20 @@
     <div class="shell-header-actions">
         <button type="button" class="shell-toggle" disabled title="Reveal names on this page - coming soon">
             <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-eye-slash'"></use></svg>Reveal</button>
-        <button type="button" class="shell-toggle" disabled title="Switch appearance - coming soon">
-            <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-moon'"></use></svg>Dark</button>
+        <!-- T138 batch 1b: a real POST + full-page redirect, not a client-side class toggle - spec
+             §2.3 requires the appearance to be server-rendered with no flash, which a JS-driven
+             instant swap can't give (the whole page, including this button's own icon/label below,
+             has to come back freshly rendered from the new state). returnTo carries the shell's own
+             currentPath so switching appearance from any page returns to that same page. -->
+        <form method="post" th:action="@{/account/appearance}" class="shell-appearance-form">
+            <input type="hidden" name="returnTo" th:value="${currentPath}">
+            <input type="hidden" name="preference" th:value="${appearanceToggle.next()}">
+            <button type="submit" class="shell-toggle"
+                    th:title="'Currently ' + ${appearanceToggle.label()} + ' appearance - switch to ' + ${#strings.toLowerCase(appearanceToggle.next())}">
+                <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-' + ${appearanceToggle.icon()}"></use></svg>
+                <span th:text="${appearanceToggle.label()}">Dark</span>
+            </button>
+        </form>
         <svg class="icon shell-bell" aria-hidden="true"><use th:href="${ico} + '#ph-bell'"></use></svg>
     </div>
 </header>

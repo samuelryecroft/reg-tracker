@@ -12,6 +12,7 @@ import ninja.samryecroft.returnhome.tracker.organisation.Organisation;
 import ninja.samryecroft.returnhome.tracker.organisation.OrganisationAccessService;
 import ninja.samryecroft.returnhome.tracker.organisation.OrgType;
 import ninja.samryecroft.returnhome.tracker.theme.ThemeService;
+import ninja.samryecroft.returnhome.tracker.user.AppearancePreference;
 import ninja.samryecroft.returnhome.tracker.user.AppUserPrincipal;
 import ninja.samryecroft.returnhome.tracker.user.RoleMatrix;
 import org.slf4j.Logger;
@@ -98,6 +99,41 @@ public class GlobalControllerAdvice {
     @ModelAttribute("currentPath")
     public String currentPath(HttpServletRequest request) {
         return request.getRequestURI();
+    }
+
+    /**
+     * T138 (phase 2, batch 1b): every page's {@code <html>} tag reads this to set {@code
+     * data-appearance} server-side with no flash (spec §2.3) - there is no shared page wrapper in
+     * this codebase (each of the 30 real page templates declares its own {@code <html>}), so this is
+     * read identically in all of them rather than from one place. {@code AUTO} for an anonymous
+     * request (login, error): R-Q9's accessible-default reasoning applies before sign-in too.
+     */
+    @ModelAttribute("appearancePreference")
+    public AppearancePreference appearancePreference(@AuthenticationPrincipal AppUserPrincipal principal) {
+        return principal == null ? AppearancePreference.AUTO : principal.getUser().getAppearancePreference();
+    }
+
+    /**
+     * The shell header's appearance button is a 3-state cycle (auto -&gt; light -&gt; dark -&gt;
+     * auto), computed here rather than in the template so the template only ever prints values, the
+     * same "template makes no decisions" principle Kevin's masking design applies (T138 batch 1c
+     * discussion) - the icon, the visible label, and which state a click submits are a controller
+     * decision, not something to derive with template-side ternaries repeated per page.
+     */
+    @ModelAttribute("appearanceToggle")
+    public AppearanceToggle appearanceToggle(@AuthenticationPrincipal AppUserPrincipal principal) {
+        AppearancePreference current = appearancePreference(principal);
+        return switch (current) {
+            case AUTO -> new AppearanceToggle("compass", "Auto", AppearancePreference.LIGHT);
+            case LIGHT -> new AppearanceToggle("sun", "Light", AppearancePreference.DARK);
+            case DARK -> new AppearanceToggle("moon", "Dark", AppearancePreference.AUTO);
+        };
+    }
+
+    /** @param icon a Phosphor icon name (no {@code ph-} prefix) matching the current state.
+     * @param label the current state's visible name, shown on the button itself.
+     * @param next the state a click on the button switches to. */
+    public record AppearanceToggle(String icon, String label, AppearancePreference next) {
     }
 
     /**
