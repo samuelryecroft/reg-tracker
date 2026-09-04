@@ -94,6 +94,10 @@
       S-5's floor rule requires of a state-bearing mark - the state is in the entry text, so the dot
       is aria-hidden rather than carrying a second, hidden copy of it.
     -->
+    <!-- Named container so a test can scope an assertion to the RESULTS: the home chips above
+         legitimately name every home in scope, so "this page does not mention the other home" is
+         not a check that can be made against the whole page. -->
+    <div class="feed">
     <th:block th:each="day : ${days}">
         <p class="daysep" th:text="${day.label()}">Today — 14 March 2026</p>
         <ol class="tl">
@@ -113,6 +117,7 @@
             </li>
         </ol>
     </th:block>
+    </div>
 
     <div class="empty" th:if="${#lists.isEmpty(rows)}">
         No recorded activity matches these filters. Try widening the date range.
