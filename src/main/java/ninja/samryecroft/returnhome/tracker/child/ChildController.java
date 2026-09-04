@@ -143,7 +143,9 @@ public class ChildController {
                 bindingResult.addError(new FieldError("form", "homeId", "Please select a home"));
                 home = null;
             } else {
-                home = homeRepository.findById(form.getHomeId())
+                // With the organisation loaded: the T168(b) guard below reads it, and
+                // Home.organisation is LAZY under open-in-view=false.
+                home = homeRepository.findByIdWithOrganisation(form.getHomeId())
                         .orElseThrow(() -> new IllegalArgumentException("No such home: " + form.getHomeId()));
                 if (!organisationAccessService.canViewHome(principal, home)) {
                     throw new AccessDeniedException("Home does not belong to your organisation");
@@ -152,7 +154,28 @@ public class ChildController {
         } else {
             // Not reachable: homePickerOptionsFor returns a picker for anyone who could land here
             // with more than one home, so the only remaining case is a single implicit home.
-            home = homeRepository.findById(organisationAccessService.homeIdsFor(principal).get(0)).orElseThrow();
+            home = homeRepository.findByIdWithOrganisation(
+                    organisationAccessService.homeIdsFor(principal).get(0)).orElseThrow();
+        }
+
+        // T168(b): the organisation must be ACTIVE before it can hold a child's record.
+        //
+        // WHY HERE AND NOT DEEPER. Three entities carry encrypted fields - Child, InterviewRequest
+        // and InterviewReport - so one gate looks partial. It is not: a request requires a child and
+        // a report hangs off a request, so for an organisation with no confirmed KEK the child
+        // record is the only door into the encrypted class, by structure rather than by luck.
+        // EncryptedEntityChokepointTest fails the day that stops being true, which is what makes
+        // relying on it safe.
+        //
+        // WHY NOT AT THE FIELDCRYPTO LAYER, which someone will reasonably propose as defence in
+        // depth: fail-closed ALREADY refuses there, and it refuses mid-flush with an error the
+        // person cannot act on. That late, opaque refusal is the failure this ticket exists to move
+        // earlier. The guard's job is to refuse EARLY with something actionable, not to refuse
+        // twice.
+        if (home != null && !home.getOrganisation().isActive()) {
+            bindingResult.addError(new FieldError("form", "homeId",
+                    "This organisation is not yet active, so records cannot be added for it. "
+                            + "An administrator needs to activate it first."));
         }
 
         if (bindingResult.hasErrors()) {

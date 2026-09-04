@@ -70,5 +70,17 @@ public enum AuditEventType {
     // the click that caused it rather than the count of names it happened to affect.
     NAMES_REVEALED,
 
+    // Organisation lifecycle (T168(b)). ORGANISATION_ACTIVATED is the moment an organisation becomes
+    // able to hold children's records, and it is recorded because the KEK check that permits it is
+    // a point-in-time fact: the trail has to be able to say WHEN it was verified and by whom.
+    ORGANISATION_ACTIVATED,
+
+    // The archived/removed distinction lives HERE rather than in OrgStatus, which has one state for
+    // both. The state answers "what may happen now"; the event answers "what did a human mean". A
+    // second state would have been two values behaving identically, and every future query would
+    // have had to remember to check them together.
+    ORGANISATION_ARCHIVED,
+    ORGANISATION_RESTORED,
+
     ACCESS_DENIED
 }

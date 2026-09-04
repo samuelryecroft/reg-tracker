@@ -16,6 +16,7 @@ import ninja.samryecroft.returnhome.tracker.interview.InterviewRequestService;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewStatus;
 import ninja.samryecroft.returnhome.tracker.organisation.Organisation;
 import ninja.samryecroft.returnhome.tracker.organisation.OrgType;
+import ninja.samryecroft.returnhome.tracker.organisation.OrganisationLifecycleService;
 import ninja.samryecroft.returnhome.tracker.organisation.OrganisationRepository;
 import ninja.samryecroft.returnhome.tracker.report.InterviewReport;
 import ninja.samryecroft.returnhome.tracker.report.InterviewReportRepository;
@@ -82,6 +83,7 @@ public class DemoDataSeeder implements ApplicationRunner {
     static final String MARKER_ORGANISATION = "Beacon Return Home Services";
 
     private final OrganisationRepository organisationRepository;
+    private final OrganisationLifecycleService lifecycleService;
     private final ThemeSettingsRepository themeSettingsRepository;
     private final HomeRepository homeRepository;
     private final ChildRepository childRepository;
@@ -95,6 +97,7 @@ public class DemoDataSeeder implements ApplicationRunner {
     private final DemoProperties demoProperties;
 
     public DemoDataSeeder(OrganisationRepository organisationRepository,
+            OrganisationLifecycleService lifecycleService,
             ThemeSettingsRepository themeSettingsRepository, HomeRepository homeRepository,
             ChildRepository childRepository, UserRepository userRepository,
             InterviewRequestRepository interviewRequestRepository,
@@ -103,6 +106,7 @@ public class DemoDataSeeder implements ApplicationRunner {
             AuditEventPublisher audit, PasswordEncoder passwordEncoder,
             DemoProperties demoProperties) {
         this.organisationRepository = organisationRepository;
+        this.lifecycleService = lifecycleService;
         this.themeSettingsRepository = themeSettingsRepository;
         this.homeRepository = homeRepository;
         this.childRepository = childRepository;
@@ -172,12 +176,28 @@ public class DemoDataSeeder implements ApplicationRunner {
         seed.organisations = 5;
     }
 
+    /**
+     * Created and then ACTIVATED, because the demo tenancy models a real onboarding and a real
+     * onboarding ends with the organisation usable (T168(b)).
+     *
+     * <p>Two things follow from doing it properly rather than writing the status directly. The
+     * activation goes through {@link OrganisationLifecycleService}, so the demo data exercises the
+     * same KEK verification a real onboarding does - and it activates with a NULL principal, because
+     * the seeder is the system rather than a person, which is the same shape T166 §5's
+     * auto-provisioning will need.
+     *
+     * <p>It also removes a dependency Kevin spotted between two tickets: without this, demo
+     * organisations would be left PENDING and the seeder's children would only be creatable because
+     * {@code autoCreateKeys} defaults to true and mints their KEK on demand. The demo profile would
+     * then break the day that fail-open default is flipped - a failure with no visible connection to
+     * the change that caused it.
+     */
     private Organisation organisation(String name, OrgType type, Organisation supplier) {
         Organisation org = new Organisation();
         org.setName(name);
         org.setType(type);
         org.setSupplierOrganisation(supplier);
-        return organisationRepository.save(org);
+        return lifecycleService.activate(organisationRepository.save(org), null);
     }
 
     private void theme(Organisation org, String primary, String secondary) {
