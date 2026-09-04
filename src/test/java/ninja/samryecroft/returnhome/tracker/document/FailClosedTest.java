@@ -36,6 +36,12 @@ class FailClosedTest {
             throw new KeyUnavailableException("Key Vault is unreachable");
         }
 
+        /** Unreachable is not "absent" - it is "could not determine", which fails closed too. */
+        @Override
+        public boolean keyExists(long organisationId) {
+            throw new KeyUnavailableException("Key Vault is unreachable");
+        }
+
         @Override
         public WrappedKey wrap(KeyHandle handle, byte[] dataKey) {
             throw new KeyUnavailableException("Key Vault is unreachable");

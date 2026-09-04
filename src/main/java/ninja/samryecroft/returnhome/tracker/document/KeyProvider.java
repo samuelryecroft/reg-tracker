@@ -48,6 +48,31 @@ public interface KeyProvider {
      */
     byte[] unwrap(long organisationId, WrappedKey wrappedKey);
 
+    /**
+     * Whether this organisation's KEK already exists - <strong>a read, and only a read</strong>
+     * (T168(b)).
+     *
+     * <p>{@link #currentKeyFor} cannot answer this question. Where key auto-creation is enabled it
+     * CREATES the key on a miss, so using it as a probe mints the very thing it was asked about and
+     * then truthfully reports success. This method has no create path in any implementation, which
+     * is what makes it safe to call in either configuration - and it needs no privilege the
+     * application does not already hold, since Key Vault Crypto User includes
+     * {@code vaults/keys/read}.
+     *
+     * <p>It exists so that an organisation reaching ACTIVE is a VERIFIED FACT rather than a human's
+     * assertion. A lifecycle status that says everything is fine when it isn't is worse than no
+     * status at all: it is the original incident with a reassurance attached.
+     *
+     * <p><strong>Absent is not the same as unreachable, and implementations must not conflate
+     * them.</strong> Only a definite "no such key" answers {@code false}; a vault outage, a denied
+     * role or any other failure raises {@link KeyUnavailableException}. Collapsing the two would let
+     * a transient outage read as "this organisation has no key", which on the activation path means
+     * refusing an organisation that is in fact perfectly provisioned.
+     *
+     * @throws KeyUnavailableException if existence could not be determined
+     */
+    boolean keyExists(long organisationId);
+
     /** The Key Vault key-name convention, shared by every implementation so envelopes are portable. */
     static String keyNameFor(long organisationId) {
         return "org-" + organisationId + "-kek";

@@ -9,6 +9,22 @@
 <div th:replace="~{fragments/layout :: nav}"></div>
 <main id="main">
     <h1>Organisations</h1>
+
+    <!-- T168(b): the activation outcome. The failure names the key because this is the privileged
+         admin screen and the admin is the person who can have it provisioned - the opposite of the
+         end-user 503 on the write path, which withholds it. -->
+    <div class="banner ok" th:if="${activationMessage != null}" th:with="ico=@{/icons/phosphor.svg}">
+        <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-check-circle'"></use></svg>
+        <p th:text="${activationMessage}">Activated.</p>
+    </div>
+    <div class="banner warn" th:if="${activationError != null}" th:with="ico=@{/icons/phosphor.svg}">
+        <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-warning-circle'"></use></svg>
+        <div>
+            <strong>Encryption key not provisioned</strong>
+            <p th:text="${activationError}">The key does not exist yet.</p>
+        </div>
+    </div>
+
     <a class="btn" href="/admin/organisations/new" th:if="${can.addOrganisation}">Add organisation</a>
 
     <div class="table-wrap responsive">
@@ -19,6 +35,8 @@
             <th scope="col">Name</th>
             <th scope="col">Type</th>
             <th scope="col">Supplier</th>
+            <th scope="col">Status</th>
+            <th scope="col">Action</th>
         </tr>
         </thead>
         <tbody>
@@ -26,6 +44,13 @@
             <td th:text="${o.name}">Name</td>
             <td th:text="${o.type}">Type</td>
             <td th:text="${o.supplierOrganisation} ? ${o.supplierOrganisation.name} : '—'">Supplier</td>
+            <td><span class="status" th:classappend="${o.status}" th:text="${o.status}">STATUS</span></td>
+            <td>
+                <form th:if="${o.status.name() == 'PENDING'}" method="post"
+                      th:action="@{/admin/organisations/{id}/activate(id=${o.id})}">
+                    <button type="submit" class="btn">Activate</button>
+                </form>
+            </td>
         </tr>
         </tbody>
     </table>
@@ -37,7 +62,13 @@
             <dl>
                 <dt>Type</dt><dd th:text="${o.type}">Type</dd>
                 <dt>Supplier</dt><dd th:text="${o.supplierOrganisation} ? ${o.supplierOrganisation.name} : '—'">Supplier</dd>
+                <dt>Status</dt><dd th:text="${o.status}">STATUS</dd>
             </dl>
+            <div class="act" th:if="${o.status.name() == 'PENDING'}">
+                <form method="post" th:action="@{/admin/organisations/{id}/activate(id=${o.id})}">
+                    <button type="submit" class="btn">Activate</button>
+                </form>
+            </div>
         </div>
     </div>
 
