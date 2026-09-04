@@ -888,10 +888,21 @@ fieldset.checkbox-fieldset > legend {
 .banner .ic { font-size: var(--t-lg); line-height: 1.1; }
 .banner ul { margin: var(--s2) 0 0; padding-left: 18px; }
 .banner a { color: inherit; font-weight: 700; }
-.banner.err { background: var(--error-bg); color: var(--error); border: 1px solid #F3C0C0; }
-.banner.warn { background: var(--warn-bg); color: var(--warn); border: 1px solid #EBCF8A; }
-.banner.ok { background: var(--ok-bg); color: var(--ok); border: 1px solid #A7D8B6; }
-.banner.info { background: var(--info-bg); color: var(--info); border: 1px solid #A9C3EE; }
+/* The borders derive from each variant's own token, so they follow the appearance the way the
+   ink already does (#48). As light-mode literals they inverted in dark, turning a subtle
+   1.31-1.47:1 boundary into a 7.70-8.99:1 ring around every banner - over-contrast rather than
+   an AA failure, but four banners outlined like alerts. At 25% of their own token they measure
+   1.47-1.50:1 light, visually unchanged, and 1.75-1.87:1 dark (spec cc3574c §5h). Per §5d each
+   color-mix() is preceded by a flat value, and that value is `transparent` rather than the old
+   literal: the literal is the light-page colour being removed, so falling back to it would hand
+   a pre-2023 browser in dark mode the 8.99:1 ring this change exists to remove - the defect
+   wearing a fallback's clothes. No border is honest degradation; the fill and the ink still
+   identify the banner. Keeping `1px solid` holds the border box, so nothing reflows, and the
+   banner's own background paints under it (background-clip is border-box by default). */
+.banner.err { background: var(--error-bg); color: var(--error); border: 1px solid transparent; border-color: color-mix(in srgb, var(--error) 25%, transparent); }
+.banner.warn { background: var(--warn-bg); color: var(--warn); border: 1px solid transparent; border-color: color-mix(in srgb, var(--warn) 25%, transparent); }
+.banner.ok { background: var(--ok-bg); color: var(--ok); border: 1px solid transparent; border-color: color-mix(in srgb, var(--ok) 25%, transparent); }
+.banner.info { background: var(--info-bg); color: var(--info); border: 1px solid transparent; border-color: color-mix(in srgb, var(--info) 25%, transparent); }
 /* .banner-warning kept as an alias so nothing already using it silently loses its styling. */
 .banner-warning { background: var(--warn-bg); color: var(--warn); border: 1px solid #EBCF8A; border-radius: var(--radius); padding: var(--s4); margin-bottom: var(--s4); }
 .banner-warning p { margin: 0.35rem 0 0; white-space: pre-wrap; }
