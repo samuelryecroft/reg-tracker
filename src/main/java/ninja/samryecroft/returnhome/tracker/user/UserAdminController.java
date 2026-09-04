@@ -12,6 +12,7 @@ import ninja.samryecroft.returnhome.tracker.user.dto.EditUserForm;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
@@ -60,7 +61,17 @@ public class UserAdminController {
             addPickerAttributes(principal, model);
             return "admin/user-form";
         }
-        userService.create(form, principal);
+        try {
+            userService.create(form, principal);
+        } catch (DuplicateObjectIdException | DataIntegrityViolationException clash) {
+            // Both arms are the same defect seen at different moments: the service's pre-check
+            // catches the ordinary case, and uq_users_idp_subject catches two admins saving the same
+            // id at once, which no pre-check can. Translating it here keeps the administrator's
+            // other input on the screen instead of losing it to a 500.
+            rejectDuplicateObjectId(bindingResult);
+            addPickerAttributes(principal, model);
+            return "admin/user-form";
+        }
         return "redirect:/admin/users";
     }
 
@@ -77,6 +88,7 @@ public class UserAdminController {
         // One Homes field for both roles now - queried rather than read off the detached user,
         // whose homes are lazy.
         form.setHomeIds(new HashSet<>(userRepository.findHomeIds(id)));
+        form.setIdpSubject(user.getIdpSubject());
         form.setEnabled(user.isEnabled());
 
         model.addAttribute("user", user);
@@ -95,8 +107,20 @@ public class UserAdminController {
             addPickerAttributes(principal, model);
             return "admin/user-form-edit";
         }
-        userService.update(id, form, principal);
+        try {
+            userService.update(id, form, principal);
+        } catch (DuplicateObjectIdException | DataIntegrityViolationException clash) {
+            rejectDuplicateObjectId(bindingResult);
+            model.addAttribute("user", userService.getAuthorized(id, principal));
+            addPickerAttributes(principal, model);
+            return "admin/user-form-edit";
+        }
         return "redirect:/admin/users";
+    }
+
+    private void rejectDuplicateObjectId(BindingResult bindingResult) {
+        bindingResult.rejectValue("idpSubject", "duplicate",
+                "That Directory object ID is already recorded against another account.");
     }
 
     private void addPickerAttributes(AppUserPrincipal principal, Model model) {

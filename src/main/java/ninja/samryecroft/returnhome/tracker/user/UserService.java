@@ -4,6 +4,7 @@ import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import ninja.samryecroft.returnhome.tracker.audit.AuditEventPublisher;
 import ninja.samryecroft.returnhome.tracker.home.Home;
@@ -129,6 +130,36 @@ public class UserService {
         return user;
     }
 
+
+    /**
+     * The directory object id, normalised and checked for a clash - kept out of
+     * {@code applyProfile} deliberately: a first name is profile data, an identity key is not, and
+     * the two want different handling when they are wrong.
+     *
+     * <p><b>Lowercased on the way in.</b> Entra emits {@code oid} in lower case and the sign-in
+     * lookup is an exact string match, so an administrator who pastes the portal's value with any
+     * upper-case characters would create an account that silently never matches. That failure would
+     * surface as one person unable to sign in, with a refusal message that deliberately explains
+     * nothing.
+     *
+     * <p>The pre-check is not the guarantee - {@code uq_users_idp_subject} is, and two admins saving
+     * at once would still race past this. It exists so the ordinary case is a field error on the
+     * form rather than a constraint violation surfacing as a 500 with the rest of their input lost.
+     */
+    private void applyObjectId(User user, String objectId) {
+        String normalised = trimToNull(objectId);
+        if (normalised == null) {
+            user.setIdpSubject(null);
+            return;
+        }
+        normalised = normalised.toLowerCase(Locale.ROOT);
+        Long ownerId = userRepository.findByIdpSubject(normalised).map(User::getId).orElse(null);
+        if (ownerId != null && !ownerId.equals(user.getId())) {
+            throw new DuplicateObjectIdException();
+        }
+        user.setIdpSubject(normalised);
+    }
+
     @Transactional
     public User create(CreateUserForm form, AppUserPrincipal principal) {
         validateRoles(form.getRoles(), principal);
@@ -140,6 +171,7 @@ public class UserService {
         // submitting a blank password would authenticate as this account.
         user.setPassword(form.getPassword() == null ? null : passwordEncoder.encode(form.getPassword()));
         applyProfile(user, form.getFirstName(), form.getLastName(), form.getEmail(), form.getContactPhone());
+        applyObjectId(user, form.getIdpSubject());
         user.setRoles(form.getRoles());
         user.setOrganisation(needsOrganisation(form.getRoles()) ? resolveOrganisation(form.getOrganisationId(), principal) : null);
         user.setHomes(resolveHomes(form.getRoles(), form.getHomeIds(), principal));
@@ -160,6 +192,7 @@ public class UserService {
         boolean enabledBefore = user.isEnabled();
 
         applyProfile(user, form.getFirstName(), form.getLastName(), form.getEmail(), form.getContactPhone());
+        applyObjectId(user, form.getIdpSubject());
         user.setRoles(form.getRoles());
         user.setOrganisation(needsOrganisation(form.getRoles()) ? resolveOrganisation(form.getOrganisationId(), principal) : null);
         user.setHomes(resolveHomes(form.getRoles(), form.getHomeIds(), principal));

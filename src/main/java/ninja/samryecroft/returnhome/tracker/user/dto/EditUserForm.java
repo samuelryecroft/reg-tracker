@@ -2,6 +2,7 @@ package ninja.samryecroft.returnhome.tracker.user.dto;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.Size;
 import java.util.HashSet;
@@ -36,6 +37,16 @@ public class EditUserForm {
      */
     @Size(max = 30, message = "Contact phone must be 30 characters or fewer")
     private String contactPhone;
+
+
+    /**
+     * The person's Entra <b>Directory object ID</b> - optional, because an account can be created
+     * before anyone has looked it up, and because the break-glass admin (D5) has no directory
+     * identity at all. Sign-in matches on this and nothing else.
+     */
+    @Pattern(regexp = UserFormPatterns.OBJECT_ID, message = UserFormPatterns.OBJECT_ID_MESSAGE)
+    @Size(max = 255)
+    private String idpSubject;
 
     @NotEmpty(message = "Select at least one role")
     private Set<Role> roles = new HashSet<>();
@@ -121,4 +132,12 @@ public class EditUserForm {
     public void setNewPassword(String newPassword) {
         this.newPassword = newPassword;
     }
+    public String getIdpSubject() {
+        return idpSubject;
+    }
+
+    public void setIdpSubject(String idpSubject) {
+        this.idpSubject = idpSubject;
+    }
+
 }
