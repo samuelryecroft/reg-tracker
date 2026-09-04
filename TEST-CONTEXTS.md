@@ -204,9 +204,16 @@ than a description of the state:
 
 | Pools | What to do |
 |---|---|
-| 5 (today) | nothing |
-| **7** | open a ticket — a third of the margin is gone and two more slips reproduce T148 |
+| 7 (today) | nothing |
+| **8** | open a ticket — a third of the margin is gone and two more slips reproduce T148 |
 | **9** | stop: the next context to appear will fail, in whichever class happens to run last |
+
+This table said 5/7/9 while the prose above said the line had deliberately moved
+to 8, so the document contradicted itself — and the half that was wrong was the
+half shaped to be read in a hurry by someone who would not read the prose. A
+budget that disagrees with itself becomes a number nobody believes by a shorter
+road than one that is merely moved without saying so. If the line moves again,
+it moves in both places.
 
 **Reach for the ceiling before reaching for the test design.** The 100 is
 Postgres' default, not a law, and the container can be told otherwise in one

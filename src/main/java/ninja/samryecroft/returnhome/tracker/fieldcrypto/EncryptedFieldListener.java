@@ -7,13 +7,20 @@ import org.springframework.stereotype.Component;
 /**
  * Decrypts an entity's marked fields as soon as it is loaded.
  *
- * <p>Reads are automatic and writes are not, which looks asymmetric until you try to make writes
- * automatic too. {@code @PreUpdate} cannot do it: Hibernate computes the row's new state
- * <em>before</em> calling the callback, so a value set there is simply not flushed - the column
- * would keep whatever it had. Decryption has no such problem because it only ever touches transient
- * fields, which Hibernate does not persist and does not dirty-check. So loading is safe to
- * automate, saving must be explicit, and {@code EncryptedFields.encrypt} is called by the services
- * that save these entities.
+ * <p><b>This class handles reads only.</b> Encryption happens elsewhere, in
+ * {@link FieldEncryptionHibernateListener}, and the reason is that a JPA {@code @PreUpdate} callback
+ * cannot do it: Hibernate computes the row's new state <em>before</em> calling the callback, so a
+ * value set there is simply not flushed and the column keeps whatever it had. Writing has to happen
+ * against the flush state array itself, which is a Hibernate {@code PreInsertEventListener} /
+ * {@code PreUpdateEventListener} rather than a JPA one. Decryption has no such problem, because it
+ * only ever touches transient fields that Hibernate does not persist and does not dirty-check - so
+ * loading is safe to automate here.
+ *
+ * <p>This paragraph previously said that saving "must be explicit" and that
+ * {@code EncryptedFields.encrypt} is called by the services that save these entities. No service
+ * calls it; the flush listener does. The mechanism moved and the sentence stayed - which matters
+ * more than an ordinary stale comment, because a reader who believed it would add a new encrypted
+ * entity and go looking for the service call that was supposed to protect it.
  */
 @Component
 public class EncryptedFieldListener {
