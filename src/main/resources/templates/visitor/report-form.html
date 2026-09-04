@@ -7,10 +7,56 @@
 </head>
 <body>
 <div th:replace="~{fragments/layout :: nav}"></div>
-<main id="main">
+<main id="main" th:with="ico=@{/icons/phosphor.svg}">
     <h1 th:text="${'Report: ' + childIdentity.label()}">Report</h1>
     <p class="muted" th:text="${'Home: ' + request.home.name}">Home</p>
-    <p><a th:href="@{/interview-requests/{id}(id=${request.id})}">View full request details</a> (known risks, professionals, missing episode context)</p>
+
+    <!--
+      T173: this used to be a plain link to /interview-requests/{id} - it navigated the visitor
+      away from an in-progress, unsaved report (T174 covers persistence separately; this fix only
+      stops the navigation). VISITOR access to these exact fields is already established: a
+      visitor who reaches THIS page is, by InterviewRequestService#getAuthorized, the request's
+      own allocatedVisitor, and that same check is what lets them open /interview-requests/{id}
+      today - so showing the same fields in place grants no new access, it just stops throwing
+      away their place in the form to see them.
+    -->
+    <details class="card disclosure">
+        <summary>
+            <svg class="icon caret-closed" aria-hidden="true"><use th:href="${ico} + '#ph-caret-right'"></use></svg>
+            <svg class="icon caret-open" aria-hidden="true"><use th:href="${ico} + '#ph-caret-down'"></use></svg>
+            View full request details
+        </summary>
+        <p class="hint">Known risks, professionals, and missing episode context - as recorded on the original request.</p>
+        <dl class="detail">
+            <dt>Date of missing episode</dt>
+            <dd th:classappend="${request.missingSince == null} ? 'unanswered'"
+                th:text="${request.missingSince} != null ? ${#temporals.format(request.missingSince, 'dd MMM yyyy HH:mm')} : 'Not answered'">Missing since</dd>
+
+            <dt>Missing episode details</dt>
+            <dd th:classappend="${#strings.isEmpty(request.missingEpisodeDetails)} ? 'unanswered'"
+                th:text="${#strings.isEmpty(request.missingEpisodeDetails)} ? 'Not answered' : ${request.missingEpisodeDetails}">Details</dd>
+
+            <dt>Known risks</dt>
+            <dd th:classappend="${#strings.isEmpty(request.knownRisks)} ? 'unanswered'"
+                th:text="${#strings.isEmpty(request.knownRisks)} ? 'Not answered' : ${request.knownRisks}">Risks</dd>
+
+            <dt>Important people</dt>
+            <dd th:classappend="${#strings.isEmpty(request.importantPeople)} ? 'unanswered'"
+                th:text="${#strings.isEmpty(request.importantPeople)} ? 'Not answered' : ${request.importantPeople}">People</dd>
+
+            <dt>Social worker</dt>
+            <dd th:classappend="${#strings.isEmpty(request.socialWorkerDetails)} ? 'unanswered'"
+                th:text="${#strings.isEmpty(request.socialWorkerDetails)} ? 'Not answered' : ${request.socialWorkerDetails}">Social worker</dd>
+
+            <dt>Placing local authority</dt>
+            <dd th:classappend="${#strings.isEmpty(request.placingLocalAuthority)} ? 'unanswered'"
+                th:text="${#strings.isEmpty(request.placingLocalAuthority)} ? 'Not answered' : ${request.placingLocalAuthority}">Authority</dd>
+
+            <dt>Other professionals</dt>
+            <dd th:classappend="${#strings.isEmpty(request.otherProfessionals)} ? 'unanswered'"
+                th:text="${#strings.isEmpty(request.otherProfessionals)} ? 'Not answered' : ${request.otherProfessionals}">Other</dd>
+        </dl>
+    </details>
 
     <div class="banner warn" th:if="${request.status.name() == 'REPORT_REJECTED'}" role="alert">
         <span class="ic" aria-hidden="true">↩</span>
