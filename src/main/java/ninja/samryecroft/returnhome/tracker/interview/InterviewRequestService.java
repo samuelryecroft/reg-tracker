@@ -84,7 +84,13 @@ public class InterviewRequestService {
             return interviewRequestRepository.findByHomeOrganisationId(principal.getOrganisationId());
         }
         // Supplier-side: ORG_ADMIN (supplier) or COORDINATOR - every client Care Provider's requests.
-        return interviewRequestRepository.findByHomeOrganisationSupplierOrganisationId(principal.getOrganisationId());
+        // Was a fall-through with no positive test, and reachable: /coordinator/requests admits
+        // COORDINATOR, so a coordinator inside a care provider landed here and got a list scoped to
+        // every care provider recorded as having their own organisation as its supplier - the same
+        // account and the same exposure as the audit feed, on the interview-request list.
+        return organisationAccessService.supplierScopeFor(principal)
+                .map(interviewRequestRepository::findByHomeOrganisationSupplierOrganisationId)
+                .orElseGet(List::of);
     }
 
     /** Any role the principal holds that qualifies is enough - a multi-role user only needs one to match. */
@@ -215,10 +221,16 @@ public class InterviewRequestService {
      * can't approve/reject their own submission.
      */
     public List<InterviewRequest> listPendingReview(AppUserPrincipal principal) {
+        // The non-ADMIN branch was a bare ternary with no role test at all - everyone who was not a
+        // platform admin got a supplier-scoped query keyed on their own organisation id. /reviewer/**
+        // admits REVIEWER, which is supplier-side by convention only.
         List<InterviewRequest> pending = principal.hasRole(Role.ADMIN)
                 ? interviewRequestRepository.findByStatusOrderByCreatedAtDesc(InterviewStatus.REPORT_SUBMITTED)
-                : interviewRequestRepository.findByStatusAndHomeOrganisationSupplierOrganisationId(
-                        InterviewStatus.REPORT_SUBMITTED, principal.getOrganisationId());
+                : organisationAccessService.supplierScopeFor(principal)
+                        .map(supplierOrgId -> interviewRequestRepository
+                                .findByStatusAndHomeOrganisationSupplierOrganisationId(
+                                        InterviewStatus.REPORT_SUBMITTED, supplierOrgId))
+                        .orElseGet(List::of);
         return pending.stream().filter(r -> !isAllocatedVisitor(r, principal)).toList();
     }
 }

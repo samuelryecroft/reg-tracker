@@ -60,11 +60,23 @@ public class OrganisationAccessService {
      * The supplier organisation whose clients' data this principal may see, or empty if they are
      * not supplier-side.
      *
-     * <p><b>This is the only place that decides it.</b> {@code supplier_organisation_id} was read in
-     * seven places and each one re-derived the trust from {@code principal.getOrganisationId()},
-     * which is why the same defect was found and fixed three times (T117, T130, T136) before this.
-     * A query filtering on {@code supplier_organisation_id} <em>is</em> an access decision, so it
-     * belongs here rather than at the call site.
+     * <p><b>This is the only place that decides it.</b> Every data-scoping read of
+     * {@code supplier_organisation_id} now comes through here; each one used to re-derive the trust
+     * from {@code principal.getOrganisationId()}, which is why the same defect was found and fixed
+     * three times (T117, T130, T136) before anyone counted the call sites. A query filtering on
+     * {@code supplier_organisation_id} <em>is</em> an access decision, so it belongs here rather
+     * than at the call site.
+     *
+     * <p>The eight converted sites: {@code AuditFeedController.requestsInScope} and
+     * {@code homesInScope}, {@code DashboardService.supplierDashboard} (four queries),
+     * {@code HomeAdminController.list}, and {@code InterviewRequestService.listVisible} and
+     * {@code listPendingReview}. {@link #canViewCareProviderOrg} delegates here too, so the check
+     * and the list scope cannot drift apart - which was the actual root cause, two definitions that
+     * happened to agree.
+     *
+     * <p>{@code ThemeService} also reads the supplier link, and is deliberately not routed through
+     * this: it resolves branding, not data scope. A wrong answer there gives someone the wrong
+     * logo, not another organisation's records.
      *
      * <p>The type test is the substance. COORDINATOR and REVIEWER are supplier-side only by
      * convention - {@link ninja.samryecroft.returnhome.tracker.user.RoleMatrix} lets only a supplier

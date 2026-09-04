@@ -72,6 +72,7 @@ class SupplierScopeAuditFeedIntegrationTest extends AbstractIntegrationTest {
     private String suffix;
     private String clientHomeName;
     private String clientChildSurname;
+    private String legitimateChildSurname;
 
     @BeforeEach
     void seedTheCrossProviderState() {
@@ -88,7 +89,10 @@ class SupplierScopeAuditFeedIntegrationTest extends AbstractIntegrationTest {
 
         clientChildSurname = "BravoSurname" + suffix;
         Long childId = saveChild("Casey", clientChildSurname, providerBHome);
-        saveChild("Alex", "AlphaSurname" + suffix, providerAHome);
+        // Provider A is the supplier's genuine client, so this child is what a supplier-side
+        // coordinator is supposed to see - the control for the deny assertions below.
+        legitimateChildSurname = "AlphaSurname" + suffix;
+        Long legitimateChildId = saveChild("Alex", legitimateChildSurname, providerAHome);
 
         // Coordinator sitting in a CARE PROVIDER: supplier-side by role, care-provider-side by
         // organisation. /audit/** admits COORDINATOR, so this account reaches the feed.
@@ -97,8 +101,10 @@ class SupplierScopeAuditFeedIntegrationTest extends AbstractIntegrationTest {
         userRepository.save(user("t139-supplier-coordinator" + suffix, Role.COORDINATOR, supplier, null));
         // Home staff to raise a request, so the feed has real case activity to leak.
         userRepository.save(user("t139-staff" + suffix, Role.HOME_STAFF, null, providerBHome));
+        userRepository.save(user("t139-staff-a" + suffix, Role.HOME_STAFF, null, providerAHome));
 
         raiseRequest("t139-staff" + suffix, childId);
+        raiseRequest("t139-staff-a" + suffix, legitimateChildId);
     }
 
     @Test
@@ -120,6 +126,32 @@ class SupplierScopeAuditFeedIntegrationTest extends AbstractIntegrationTest {
         String html = feedAs("t139-supplier-coordinator" + suffix);
 
         assertThat(html).contains("T139 Provider A House" + suffix);
+    }
+
+    @Test
+    void norOnTheInterviewRequestList() throws Exception {
+        // The same account and the same exposure on a second surface. /coordinator/requests admits
+        // COORDINATOR, and InterviewRequestService.listVisible had the identical fall-through - so
+        // this is the audit-feed leak again on the request list. Kevin found it after the first pass
+        // because the original site list had been truncated by a `head`.
+        String html = mockMvc.perform(get("/coordinator/requests").with(asUser("t139-coordinator" + suffix)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(html).doesNotContain(clientChildSurname);
+        assertThat(html).doesNotContain(clientHomeName);
+    }
+
+    @Test
+    void andTheSupplierCoordinatorStillSeesTheirClientsRequests() throws Exception {
+        String html = mockMvc.perform(get("/coordinator/requests")
+                        .with(asUser("t139-supplier-coordinator" + suffix)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(html).contains(legitimateChildSurname);
+        // And still not the provider they have no relationship with.
+        assertThat(html).doesNotContain(clientChildSurname);
     }
 
     private String feedAs(String username) throws Exception {
