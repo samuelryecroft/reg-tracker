@@ -949,3 +949,48 @@ whatever it lands on, so it cannot be reasoned about locally.**
 The five-step status rail, the section tab row, the 316px history column's behaviour below the shell's
 900px breakpoint, and the collapsed `<details>` for the home's original request. None of these are blocked;
 they are simply next.
+
+### D-1a-2 · The status rail — five steps for a seven-state model
+
+The README specifies a five-step rail: Requested → Allocated → Scheduled → Report submitted → Approved.
+**`InterviewStatus` has seven states.** The two the rail cannot show are both live paths, not edge cases:
+
+| state | displayName | in the rail? |
+| --- | --- | --- |
+| `REQUESTED` / `ALLOCATED` / `SCHEDULED` | Requested / Allocated / Scheduled | yes |
+| `REPORT_SUBMITTED` | **"Pending review"** | yes, but under a different name |
+| `REPORT_APPROVED` | **"Report approved"** | yes, but under a different name |
+| `REPORT_REJECTED` | "Report rejected" | **no** |
+| `CANCELLED` | "Cancelled" | **no** |
+
+Both missing states are handled throughout — `InterviewStatusTransitions`, the detail controller, the
+dashboard counts, the audit publisher, the demo seeder. And **the design system already ships a
+`--sent-back` semantic colour pair for a state the rail has no step for**, which is the tell that the rail
+was drawn from the happy path and never reconciled with the model.
+
+**Three rulings.**
+
+**1. Rail labels come from `InterviewStatus.displayName`, never from separate copy.** Today they diverge:
+the rail would say "Report submitted" while the status tag on the *same screen* says "Pending review", and
+"Approved" against "Report approved". 1a shows both the tag and the rail, so the divergence is visible in a
+single glance. One source, or they will drift again the first time either is edited.
+
+**2. `REPORT_REJECTED` renders at step 4 in the sent-back treatment — not as a sixth step.** That is where
+the process actually is: the report exists, and it has gone back to the visitor. A linear rail cannot show
+a backwards transition as a forward step without lying about progress. So the rail's *current step* carries
+an exception state, using `--sent-back` **plus a glyph and the label** — never colour alone, which is this
+design's own standing rule and matters more here because the exception is the whole message.
+
+**3. `CANCELLED` stops the rail at the step it reached and marks it.** The remaining steps must not render
+as "still to come", because they never will be. A pending-looking step on a cancelled request is a false
+statement about future work.
+
+The status **tag** stays authoritative for the exact state; the rail shows progress. They must never
+contradict each other, which is what ruling 1 enforces mechanically.
+
+**Copy finding, and it matters more than it looks.** `REPORT_REJECTED`'s display name is **"Report
+rejected"**, while the action that produces it is **"Send back with comments"** and the visitor's own card
+in 2f is a *sent-back* card. "Rejected" reads as a verdict; the action is a request for more detail. In a
+safeguarding context the difference is not cosmetic — it is what a visitor sees when their work comes back.
+**Recommend changing the display name to "Sent back".** It is a display string only, not the enum constant,
+so nothing else moves, and it brings the tag, the rail, the button and the card into one vocabulary.
