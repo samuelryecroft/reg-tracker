@@ -10,6 +10,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.util.HashSet;
 import java.util.Set;
 import ninja.samryecroft.returnhome.tracker.AbstractIntegrationTest;
+import ninja.samryecroft.returnhome.tracker.audit.AuditEventRepository;
+import ninja.samryecroft.returnhome.tracker.audit.AuditEventType;
 import ninja.samryecroft.returnhome.tracker.organisation.Organisation;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -38,6 +40,7 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 class DirectoryObjectIdFormIntegrationTest extends AbstractIntegrationTest {
 
     private static final String OBJECT_ID = "6f0a1c9e-3c2b-4c1a-9f77-0c0a1b2c3d4e";
+    private static final String OTHER_OBJECT_ID = "1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d";
 
     @Autowired
     private MockMvc mockMvc;
@@ -45,6 +48,8 @@ class DirectoryObjectIdFormIntegrationTest extends AbstractIntegrationTest {
     private UserRepository userRepository;
     @Autowired
     private AppUserDetailsService appUserDetailsService;
+    @Autowired
+    private AuditEventRepository auditEventRepository;
 
     private String suffix;
     private Organisation supplier;
@@ -117,12 +122,12 @@ class DirectoryObjectIdFormIntegrationTest extends AbstractIntegrationTest {
      * administrator typed. It also means something specific - two application accounts pointing at
      * one directory identity, so whichever signed in would be arbitrary.
      *
-     * <p><b>What this test does not pin, measured rather than assumed:</b> removing the service's
-     * pre-check leaves it passing. {@code uq_users_idp_subject} still refuses the insert and the
-     * controller still translates it, so from the form the two layers are indistinguishable. The
-     * pre-check earns its place for the reason a constraint violation cannot be relied on as the
-     * ordinary path - it surfaces at flush, once other writes in the same transaction have already
-     * happened - but this test is evidence for the outcome, not for which layer produced it.
+     * <p><b>What this test does not pin:</b> removing the service's pre-check leaves it passing,
+     * because {@code uq_users_idp_subject} refuses the insert and the controller translates it
+     * either way. From the form the two layers are indistinguishable, so this is evidence for the
+     * outcome, not for which layer produced it. The property the pre-check actually adds - that
+     * nothing is saved at all, rather than a constraint firing at flush after other writes in the
+     * same transaction - is asserted one level down, in {@link ObjectIdPreCheckTest}.
      */
     @Test
     void aDuplicateObjectIdIsAFieldErrorRatherThanAFiveHundred() throws Exception {
@@ -160,6 +165,57 @@ class DirectoryObjectIdFormIntegrationTest extends AbstractIntegrationTest {
         User saved = userRepository.findById(id).orElseThrow();
         assertThat(saved.getFirstName()).isEqualTo("Renamed");
         assertThat(saved.getIdpSubject()).isEqualTo(OBJECT_ID);
+    }
+
+    /**
+     * Rebinding an account's directory link must be legible in the audit trail as what it is.
+     *
+     * <p>This field decides <em>which human being can sign in as this account</em>, so changing it
+     * hands an existing account - with its roles, organisation and home scope already in place - to
+     * a different person. That is precisely the move someone would make to acquire an existing scope
+     * quietly, and until this landed it produced a USER_UPDATED row indistinguishable from
+     * correcting a typo in a contact number.
+     *
+     * <p>Before <em>and</em> after, not a boolean: {@code passwordChanged} is a bare flag because
+     * the value is a secret, and an object id is not one. During an incident the question is "was
+     * this account rebound, and to what" - half of which a boolean cannot answer.
+     */
+    @Test
+    void rebindingAnAccountToADifferentIdentityIsAuditedWithBothEnds() throws Exception {
+        create("rebound" + suffix, OBJECT_ID).andExpect(status().is3xxRedirection());
+        Long id = userRepository.findByUsername("rebound" + suffix).orElseThrow().getId();
+
+        mockMvc.perform(post("/admin/users/{id}/edit", id).with(admin()).with(csrf())
+                        .param("firstName", "Nadia")
+                        .param("lastName", "Khan")
+                        .param("email", "nadia@example.test")
+                        .param("idpSubject", OTHER_OBJECT_ID)
+                        .param("roles", Role.COORDINATOR.name())
+                        .param("organisationId", supplier.getId().toString())
+                        .param("enabled", "true"))
+                .andExpect(status().is3xxRedirection());
+
+        String metadata = auditEventRepository
+                .findByEventTypeOrderByOccurredAtDesc(AuditEventType.USER_UPDATED).stream()
+                .filter(e -> id.equals(e.getTargetId()))
+                .findFirst().orElseThrow().getMetadata();
+
+        assertThat(metadata).contains("identityLinkBefore=" + OBJECT_ID);
+        assertThat(metadata).contains("identityLinkAfter=" + OTHER_OBJECT_ID);
+    }
+
+    /** Creation is the primary place a link is established, so it is recorded there too. */
+    @Test
+    void theIdentityLinkIsRecordedWhenTheAccountIsCreated() throws Exception {
+        create("created-linked" + suffix, OBJECT_ID).andExpect(status().is3xxRedirection());
+        Long id = userRepository.findByUsername("created-linked" + suffix).orElseThrow().getId();
+
+        String metadata = auditEventRepository
+                .findByEventTypeOrderByOccurredAtDesc(AuditEventType.USER_CREATED).stream()
+                .filter(e -> id.equals(e.getTargetId()))
+                .findFirst().orElseThrow().getMetadata();
+
+        assertThat(metadata).contains("identityLink=" + OBJECT_ID);
     }
 
     private org.springframework.test.web.servlet.ResultActions create(String username, String objectId)

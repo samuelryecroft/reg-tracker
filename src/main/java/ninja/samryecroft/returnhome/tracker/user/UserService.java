@@ -190,6 +190,10 @@ public class UserService {
         // record the actual role/enabled transition rather than just the end state.
         Set<Role> rolesBefore = Set.copyOf(user.getRoles());
         boolean enabledBefore = user.isEnabled();
+        // Snapshotted with the other two privilege fields, and for the same reason: applyObjectId
+        // below mutates the managed entity, so the trail could otherwise only report where the
+        // account ended up, not that it was rebound from somewhere else.
+        String identityLinkBefore = user.getIdpSubject();
 
         applyProfile(user, form.getFirstName(), form.getLastName(), form.getEmail(), form.getContactPhone());
         applyObjectId(user, form.getIdpSubject());
@@ -202,7 +206,8 @@ public class UserService {
             user.setPassword(passwordEncoder.encode(form.getNewPassword()));
         }
         User saved = userRepository.save(user);
-        auditEventPublisher.userUpdated(saved, rolesBefore, enabledBefore, passwordChanged, principal);
+        auditEventPublisher.userUpdated(saved, rolesBefore, enabledBefore, identityLinkBefore,
+                passwordChanged, principal);
         return saved;
     }
 

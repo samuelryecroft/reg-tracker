@@ -45,7 +45,6 @@ public class EditUserForm {
      * identity at all. Sign-in matches on this and nothing else.
      */
     @Pattern(regexp = UserFormPatterns.OBJECT_ID, message = UserFormPatterns.OBJECT_ID_MESSAGE)
-    @Size(max = 255)
     private String idpSubject;
 
     @NotEmpty(message = "Select at least one role")
