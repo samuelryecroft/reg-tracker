@@ -13,6 +13,7 @@ import ninja.samryecroft.returnhome.tracker.config.AppProperties;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewRequest;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewRequestService;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewStatus;
+import ninja.samryecroft.returnhome.tracker.interview.InterviewStatusTransitions;
 import ninja.samryecroft.returnhome.tracker.report.docx.DocxReportGenerator;
 import ninja.samryecroft.returnhome.tracker.report.dto.SubmitReportForm;
 import ninja.samryecroft.returnhome.tracker.theme.ThemeService;
@@ -79,6 +80,12 @@ public class ReportService {
     @Transactional
     public InterviewReport submitForReview(Long requestId, SubmitReportForm form, AppUserPrincipal principal) {
         InterviewReport report = existingOrNewReport(requestId, principal);
+        // Checked before anything is mutated. submitForReview is @Transactional and writes the
+        // status last, so a throw further down would roll the field writes back today - but that is
+        // a property of where the transaction boundary happens to sit, not of the guard, and it
+        // stops holding the moment this method is split or a propagation changes. T145(B).
+        InterviewStatusTransitions.require(report.getInterviewRequest().getStatus(),
+                InterviewStatus.REPORT_SUBMITTED);
         ReportStatus statusBefore = report.getStatus();
         // Guarded on the REPORT's own status, which is the thing this sentence is actually about:
         // you cannot resubmit a report that has already been approved. Answering it through the

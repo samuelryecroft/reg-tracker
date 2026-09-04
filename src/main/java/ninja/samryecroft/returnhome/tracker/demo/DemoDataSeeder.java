@@ -12,6 +12,7 @@ import ninja.samryecroft.returnhome.tracker.home.Home;
 import ninja.samryecroft.returnhome.tracker.home.HomeRepository;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewRequest;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewRequestRepository;
+import ninja.samryecroft.returnhome.tracker.interview.InterviewRequestService;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewStatus;
 import ninja.samryecroft.returnhome.tracker.organisation.Organisation;
 import ninja.samryecroft.returnhome.tracker.organisation.OrgType;
@@ -87,6 +88,7 @@ public class DemoDataSeeder implements ApplicationRunner {
     private final UserRepository userRepository;
     private final InterviewRequestRepository interviewRequestRepository;
     private final InterviewReportRepository interviewReportRepository;
+    private final InterviewRequestService interviewRequestService;
     private final ReportService reportService;
     private final AuditEventPublisher audit;
     private final PasswordEncoder passwordEncoder;
@@ -96,7 +98,8 @@ public class DemoDataSeeder implements ApplicationRunner {
             ThemeSettingsRepository themeSettingsRepository, HomeRepository homeRepository,
             ChildRepository childRepository, UserRepository userRepository,
             InterviewRequestRepository interviewRequestRepository,
-            InterviewReportRepository interviewReportRepository, ReportService reportService,
+            InterviewReportRepository interviewReportRepository, InterviewRequestService interviewRequestService,
+            ReportService reportService,
             AuditEventPublisher audit, PasswordEncoder passwordEncoder,
             DemoProperties demoProperties) {
         this.organisationRepository = organisationRepository;
@@ -106,6 +109,7 @@ public class DemoDataSeeder implements ApplicationRunner {
         this.userRepository = userRepository;
         this.interviewRequestRepository = interviewRequestRepository;
         this.interviewReportRepository = interviewReportRepository;
+        this.interviewRequestService = interviewRequestService;
         this.reportService = reportService;
         this.audit = audit;
         this.passwordEncoder = passwordEncoder;
@@ -298,8 +302,7 @@ public class DemoDataSeeder implements ApplicationRunner {
         InterviewRequest allocated = request(seed, seed.priya, seed.oakwood, seed.homeStaff,
                 now.minusDays(1), "Second episode this month; escalation discussed.");
         allocated.setAllocatedVisitor(seed.visitor);
-        allocated.setStatus(InterviewStatus.ALLOCATED);
-        interviewRequestRepository.save(allocated);
+        interviewRequestService.markStatus(allocated, InterviewStatus.ALLOCATED);
         audit.interviewRequestAllocated(allocated, seed.visitor.getId(), InterviewStatus.REQUESTED,
                 new AppUserPrincipal(seed.coordinator));
 
@@ -327,7 +330,7 @@ public class DemoDataSeeder implements ApplicationRunner {
                 now.minusDays(4).withHour(14).withMinute(0));
         awaitingReview.setSubmittedAt(now.minusDays(4).withHour(17).withMinute(20));
         interviewReportRepository.save(awaitingReview);
-        seed.markStatus(interviewRequestRepository, submitted, InterviewStatus.REPORT_SUBMITTED);
+        interviewRequestService.markStatus(submitted, InterviewStatus.REPORT_SUBMITTED);
         // null statusBefore: the demo rows are constructed at SUBMITTED rather than transitioned
         // into it, so there is no prior verdict - the same thing a genuine first submission records.
         audit.reportSubmitted(awaitingReview, null, new AppUserPrincipal(seed.visitor));
@@ -340,7 +343,7 @@ public class DemoDataSeeder implements ApplicationRunner {
                 now.minusDays(11).withHour(14).withMinute(0));
         toApprove.setSubmittedAt(now.minusDays(11).withHour(16).withMinute(45));
         interviewReportRepository.save(toApprove);
-        seed.markStatus(interviewRequestRepository, approved, InterviewStatus.REPORT_SUBMITTED);
+        interviewRequestService.markStatus(approved, InterviewStatus.REPORT_SUBMITTED);
         audit.reportSubmitted(toApprove, null, new AppUserPrincipal(seed.visitor2));
         reportService.approve(approved.getId(), reviewForm("Thorough and timely. Approved for sharing "
                 + "with the placing authority."), new AppUserPrincipal(seed.reviewer));
@@ -353,7 +356,7 @@ public class DemoDataSeeder implements ApplicationRunner {
                 now.minusDays(8).withHour(14).withMinute(0));
         toReject.setSubmittedAt(now.minusDays(8).withHour(13).withMinute(5));
         interviewReportRepository.save(toReject);
-        seed.markStatus(interviewRequestRepository, rejected, InterviewStatus.REPORT_SUBMITTED);
+        interviewRequestService.markStatus(rejected, InterviewStatus.REPORT_SUBMITTED);
         audit.reportSubmitted(toReject, null, new AppUserPrincipal(seed.visitor));
         reportService.reject(rejected.getId(), reviewForm("Please expand the risk section and confirm "
                 + "whether the police MFH coordinator was consulted."), new AppUserPrincipal(seed.reviewer));
@@ -361,8 +364,10 @@ public class DemoDataSeeder implements ApplicationRunner {
         // 8. CANCELLED - the escape hatch state, so the demo shows it exists.
         InterviewRequest cancelled = request(seed, seed.tomas, seed.stanmoreHouse, seed.homeStaff,
                 now.minusDays(15), "Young person moved placement before the visit could take place.");
-        cancelled.setStatus(InterviewStatus.CANCELLED);
-        interviewRequestRepository.save(cancelled);
+        // Marked before it is persisted: CANCELLED has no in-edges in the transition table because
+        // no production path reaches it (T146), and a fixture built in that state is a construction
+        // rather than a transition out of REQUESTED.
+        interviewRequestService.markStatus(cancelled, InterviewStatus.CANCELLED);
 
         seed.requests = 8;
     }
@@ -379,7 +384,6 @@ public class DemoDataSeeder implements ApplicationRunner {
         request.setChild(child);
         request.setHome(home);
         request.setRequestedBy(raisedBy);
-        request.setStatus(InterviewStatus.REQUESTED);
         request.setNotes(notes);
         request.setMissingSince(raisedAt.minusHours(18));
         request.setReturnedAt(raisedAt.minusHours(2));
@@ -419,8 +423,7 @@ public class DemoDataSeeder implements ApplicationRunner {
         InterviewStatus before = request.getStatus();
         request.setAllocatedVisitor(visitor);
         request.setScheduledAt(at);
-        request.setStatus(InterviewStatus.SCHEDULED);
-        interviewRequestRepository.save(request);
+        interviewRequestService.markStatus(request, InterviewStatus.SCHEDULED);
         audit.interviewRequestAllocated(request, visitor.getId(), before,
                 new AppUserPrincipal(seed.coordinator));
         audit.interviewRequestScheduled(request, before, new AppUserPrincipal(seed.coordinator));
@@ -507,10 +510,5 @@ public class DemoDataSeeder implements ApplicationRunner {
         int requests;
         String usernames;
 
-        void markStatus(InterviewRequestRepository repository, InterviewRequest request,
-                InterviewStatus status) {
-            request.setStatus(status);
-            repository.save(request);
-        }
     }
 }
