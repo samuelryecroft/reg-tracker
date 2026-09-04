@@ -340,7 +340,10 @@ public class DemoDataSeeder implements ApplicationRunner {
         draft.setInterviewerComments("Notes captured at the visit; to be written up before submission.");
         draft.setRecommendations(null);
         interviewReportRepository.save(draft);
-        audit.reportDraftSaved(draft, new AppUserPrincipal(seed.visitor));
+        // null statusBefore: the seeder builds this report already in DRAFT rather than saving over
+        // an earlier state, so there is no prior status for the event to record - the same shape a
+        // visitor's very first save has.
+        audit.reportDraftSaved(draft, null, new AppUserPrincipal(seed.visitor));
 
         // 5. REPORT_SUBMITTED - waiting on the reviewer; this is the reviewer's demo screen.
         InterviewRequest submitted = schedule(seed, request(seed, seed.alex, seed.oakwood,
