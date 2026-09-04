@@ -46,16 +46,42 @@ public class UserService {
         this.roleMatrix = roleMatrix;
     }
 
-    /** Platform ADMIN sees everyone; an org-admin sees only users belonging to their own organisation. */
+    /**
+     * Platform ADMIN sees everyone; an org-admin sees only users belonging to their own
+     * organisation; anyone else sees nothing.
+     *
+     * <p>The last branch is a <em>positive</em> test for a supplier org-admin (T130). It used to
+     * fall through - whoever was neither a platform admin nor a care-provider org-admin was handed
+     * {@code findByOrganisationId(principal.getOrganisationId())}, which is the same default-allow
+     * shape T117 removed from {@link RoleMatrix#assignableRoles}, ten lines below.
+     *
+     * <p>It did fail closed, but <b>only by accident</b>: the one state that reaches here and is
+     * neither side is an ORG_ADMIN with no organisation, whose id is therefore null, and the JPQL
+     * {@code u.organisation.id = :organisationId} matches no rows because SQL equality against NULL
+     * is never true. Nothing positively decided that account should see nothing - a database quirk
+     * did. That is not a property to rest a tenancy boundary on: it changes if the query gains an
+     * {@code OR :organisationId IS NULL}, if a third {@link OrgType} is added, or if any future path
+     * reaches this method with a role that is neither. So the deny is now stated, and the
+     * repository is not asked at all.
+     *
+     * <p>The account is not hypothetical. An ORG_ADMIN with no organisation is what a half-applied
+     * data repair leaves behind, and what a link-on-first-login Entra account (P4) looks like
+     * between the identity landing and the organisation being assigned.
+     */
     public List<User> listVisible(AppUserPrincipal principal) {
+        if (principal == null) {
+            return List.of();
+        }
         if (principal.hasRole(Role.ADMIN)) {
             return userRepository.findAllWithHome();
         }
         if (roleMatrix.isCareProviderOrgAdmin(principal)) {
             return userRepository.findHomeStaffByHomeOrganisationId(principal.getOrganisationId());
         }
-        // Supplier ORG_ADMIN
-        return userRepository.findByOrganisationId(principal.getOrganisationId());
+        if (roleMatrix.isSupplierOrgAdmin(principal)) {
+            return userRepository.findByOrganisationId(principal.getOrganisationId());
+        }
+        return List.of();
     }
 
     /**
@@ -75,14 +101,18 @@ public class UserService {
         if (principal.hasRole(Role.ADMIN)) {
             return user;
         }
+        // Same shape as listVisible above, and deliberately so: the list and the detail page must
+        // agree about who is visible, or an account denied the list could still fetch a row by id.
         boolean visible;
         if (roleMatrix.isCareProviderOrgAdmin(principal)) {
             HomeScope scope = organisationAccessService.homeScopeFor(principal);
             visible = user.hasRole(Role.HOME_STAFF) && !user.getHomes().isEmpty()
                     && user.getHomes().stream().allMatch(scope::canView);
-        } else {
+        } else if (roleMatrix.isSupplierOrgAdmin(principal)) {
             visible = user.getOrganisation() != null
                     && user.getOrganisation().getId().equals(principal.getOrganisationId());
+        } else {
+            visible = false;
         }
         if (!visible) {
             throw new AccessDeniedException("Not authorized to view user " + id);

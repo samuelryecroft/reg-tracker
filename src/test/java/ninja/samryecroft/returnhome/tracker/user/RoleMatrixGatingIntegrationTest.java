@@ -66,6 +66,9 @@ class RoleMatrixGatingIntegrationTest extends AbstractIntegrationTest {
         saveUser("mx-home-staff" + suffix, Set.of(Role.HOME_STAFF), null, Set.of(home));
         saveUser("mx-viewer" + suffix, Set.of(Role.VIEWER), careProvider, Set.of(home));
         saveUser("mx-platform-admin" + suffix, Set.of(Role.ADMIN), null, Set.of());
+        // Neither side: ORG_ADMIN with no organisation. Gets past SecurityConfig's /admin/** rule
+        // on the role alone, then resolves to neither a care provider nor a supplier.
+        saveUser("mx-orphan-admin" + suffix, Set.of(Role.ORG_ADMIN), null, Set.of());
     }
 
     @Test
@@ -167,6 +170,31 @@ class RoleMatrixGatingIntegrationTest extends AbstractIntegrationTest {
                     .andReturn().getResponse().getContentAsString();
             assertThat(html).as("%s is offered Add user", username).contains("/admin/users/new");
         }
+    }
+
+    @Test
+    void anOrgAdminWithNoOrganisationSeesNoUsersAtAll() throws Exception {
+        // T130, end to end. UserServiceVisibilityTest is what proves the deny is stated rather than
+        // accidental - the old fall-through returned an empty list here too. This one exists to show
+        // the state is genuinely reachable over HTTP by an account the filter chain lets through,
+        // rather than being a unit-test fiction.
+        String html = mockMvc.perform(get("/admin/users").with(asUser("mx-orphan-admin" + suffix)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(html).doesNotContain("mx-supplier-admin" + suffix);
+        assertThat(html).doesNotContain("mx-provider-admin" + suffix);
+        assertThat(html).doesNotContain("mx-home-staff" + suffix);
+    }
+
+    @Test
+    void aSupplierOrgAdminStillSeesTheirOwnOrganisationsUsers() throws Exception {
+        // The regression guard on the fix: making the last branch positive must not narrow it.
+        String html = mockMvc.perform(get("/admin/users").with(asUser("mx-supplier-admin" + suffix)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(html).contains("mx-supplier-admin" + suffix);
     }
 
     private RequestPostProcessor asUser(String username) {
