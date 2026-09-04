@@ -79,6 +79,13 @@ public class InterviewRequestDetailController {
         // that same narrower failure: report content silently doesn't render, same as pre-approval.
         InterviewReport report = canDownload ? reportService.findByRequestId(id).orElse(null) : null;
 
+        // The rail only ever shows a timestamp and the status label - both already visible via the
+        // status tag on this same page regardless of approval - so it reads the report row whenever
+        // one exists (SUBMITTED/REJECTED too), never gated by canDownload the way `report` above is.
+        // Do not reuse `report` here: doing so would silently blank the rail's own timestamp for a
+        // submitted-but-unapproved request, which is not a content leak, just a bug.
+        InterviewReport reportForRail = reportService.findByRequestId(id).orElse(null);
+        model.addAttribute("statusRail", StatusRail.forRequest(request, reportForRail));
         model.addAttribute("request", request);
         model.addAttribute("childIdentity", ChildIdentity.of(request.getChild(), nameRevealService.isRevealed()));
         model.addAttribute("canAllocate", canAllocate);

@@ -103,7 +103,7 @@ class StatusRailTest {
 
         assertThat(steps).hasSize(5); // never a sixth position
         assertThat(steps.get(3).label()).isEqualTo("Sent back");
-        assertThat(steps.get(3).state()).isEqualTo(StepState.EXCEPTION);
+        assertThat(steps.get(3).state()).isEqualTo(StepState.SENT_BACK);
         assertThat(steps.get(3).occurredAt()).isEqualTo(LocalDateTime.of(2026, 3, 15, 8, 0));
         // Approved still shows as reachable, not ruled out - a rejected report can be resubmitted
         // and approved, so the process is not necessarily terminal here.
@@ -120,7 +120,7 @@ class StatusRailTest {
         List<Step> steps = StatusRail.forRequest(cancelled, null);
 
         assertThat(steps.get(0).label()).isEqualTo("Cancelled");
-        assertThat(steps.get(0).state()).isEqualTo(StepState.EXCEPTION);
+        assertThat(steps.get(0).state()).isEqualTo(StepState.CANCELLED);
         assertThat(steps.subList(1, 5)).extracting(Step::state).containsOnly(StepState.NOT_APPLICABLE);
         // Never "still to come" - a pending-looking step on a cancelled request would be a false
         // statement about future work that will never happen.
@@ -138,7 +138,7 @@ class StatusRailTest {
         assertThat(steps.get(0).state()).isEqualTo(StepState.COMPLETE);
         assertThat(steps.get(1).state()).isEqualTo(StepState.COMPLETE);
         assertThat(steps.get(2).label()).isEqualTo("Cancelled");
-        assertThat(steps.get(2).state()).isEqualTo(StepState.EXCEPTION);
+        assertThat(steps.get(2).state()).isEqualTo(StepState.CANCELLED);
         assertThat(steps.subList(3, 5)).extracting(Step::state).containsOnly(StepState.NOT_APPLICABLE);
     }
 
@@ -152,7 +152,7 @@ class StatusRailTest {
         List<Step> steps = StatusRail.forRequest(cancelled, report);
 
         assertThat(steps.get(3).label()).isEqualTo("Cancelled");
-        assertThat(steps.get(3).state()).isEqualTo(StepState.EXCEPTION);
+        assertThat(steps.get(3).state()).isEqualTo(StepState.CANCELLED);
         assertThat(steps.get(4).state()).isEqualTo(StepState.NOT_APPLICABLE);
     }
 }
