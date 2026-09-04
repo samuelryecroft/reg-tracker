@@ -266,11 +266,18 @@ class FrontendSourceGuardTest {
     private static final Pattern THEMED_INK = Pattern.compile("(?<![-\\w])color:\\s*([^;]+);");
 
     /** Keyword values that never fix a specific colour, so pairing one with a themed background is
-     * never this bug - {@code inherit}/{@code currentColor} read whatever the parent/element's own
-     * (already theme-aware) colour already is. Widening the background match beyond the {@code -bg}
-     * suffix (Creed's #59 review) surfaced {@code .tile { background: var(--surface); color:
-     * inherit; }} as a false positive on the first run - this list is what excludes it correctly,
-     * rather than narrowing the background match back down to dodge one case. */
+     * never this bug - {@code inherit}/{@code currentColor}/{@code unset} read whatever the
+     * parent/element's own (already theme-aware) colour already is, and {@code transparent} fixes
+     * no colour at all. Widening the background match beyond the {@code -bg} suffix (Creed's #59
+     * review) surfaced {@code .tile { background: var(--surface); color: inherit; }} as a false
+     * positive on the first run - this list is what excludes it correctly, rather than narrowing
+     * the background match back down to dodge one case.
+     *
+     * <p>{@code initial} is the one entry here that ISN'T self-evidently safe (Creed's follow-up):
+     * it computes to {@code CanvasText}, which is only theme-aware because app.css sets
+     * {@code color-scheme} per appearance (dark at :root, light in both appearance overrides) - a
+     * declared dependency, not a property of the keyword itself. If those {@code color-scheme}
+     * declarations are ever removed, this exclusion silently becomes a hole. */
     private static final Set<String> SAFE_INK_KEYWORDS = Set.of("inherit", "currentcolor", "unset", "initial", "transparent");
 
     /**

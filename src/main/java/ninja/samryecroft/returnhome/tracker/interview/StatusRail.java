@@ -69,18 +69,18 @@ public final class StatusRail {
             InterviewStatus positionStatus = HAPPY_PATH.get(i);
             if (i == currentIndex && rejected) {
                 steps.add(new Step(InterviewStatus.REPORT_REJECTED.getDisplayName(),
-                        occurredAtFor(InterviewStatus.REPORT_REJECTED, request, report), StepState.SENT_BACK));
+                        occurredAtFor(InterviewStatus.REPORT_REJECTED, request, report), StepState.SENT_BACK, null));
             } else if (i < currentIndex || (i == currentIndex && i == HAPPY_PATH.size() - 1)) {
                 // The terminal position, once reached, is finished rather than "in progress with
                 // something still ahead of it" - CURRENT only means something when there is a
                 // later position for it to be current RELATIVE TO.
                 steps.add(new Step(positionStatus.getDisplayName(),
-                        occurredAtFor(positionStatus, request, report), StepState.COMPLETE));
+                        occurredAtFor(positionStatus, request, report), StepState.COMPLETE, null));
             } else if (i == currentIndex) {
                 steps.add(new Step(positionStatus.getDisplayName(),
-                        occurredAtFor(positionStatus, request, report), StepState.CURRENT));
+                        occurredAtFor(positionStatus, request, report), StepState.CURRENT, null));
             } else {
-                steps.add(new Step(positionStatus.getDisplayName(), null, StepState.UPCOMING));
+                steps.add(new Step(positionStatus.getDisplayName(), null, StepState.UPCOMING, null));
             }
         }
         return List.copyOf(steps);
@@ -93,12 +93,23 @@ public final class StatusRail {
             InterviewStatus positionStatus = HAPPY_PATH.get(i);
             if (i < reachedIndex) {
                 steps.add(new Step(positionStatus.getDisplayName(),
-                        occurredAtFor(positionStatus, request, report), StepState.COMPLETE));
+                        occurredAtFor(positionStatus, request, report), StepState.COMPLETE, null));
             } else if (i == reachedIndex) {
-                steps.add(new Step(InterviewStatus.CANCELLED.getDisplayName(), request.getUpdatedAt(),
-                        StepState.CANCELLED));
+                // Creed's review: keep the POSITION's own label here, not CANCELLED's. This is not
+                // the same case as SENT_BACK - being sent back IS what happened at the
+                // REPORT_SUBMITTED position, but cancellation is not what happened at whichever
+                // position this is; it's what happened AFTER it. Overwriting the label with
+                // "Cancelled" destroys the one thing the rail uniquely knows (how far the request
+                // got before it was cancelled) and repeats what the status tag already says - the
+                // note carries "Cancelled" instead, in the slot the date would otherwise use. No
+                // date attached: request.getUpdatedAt() is last-touched-anything, not the
+                // cancellation event, and a wrong-looking date is worse than none (the real
+                // transition timestamp lives in audit history, which this pure function has no
+                // access to - showing nothing here is honest about that gap).
+                steps.add(new Step(positionStatus.getDisplayName(), null, StepState.CANCELLED,
+                        InterviewStatus.CANCELLED.getDisplayName()));
             } else {
-                steps.add(new Step(positionStatus.getDisplayName(), null, StepState.NOT_APPLICABLE));
+                steps.add(new Step(positionStatus.getDisplayName(), null, StepState.NOT_APPLICABLE, null));
             }
         }
         return List.copyOf(steps);
@@ -130,8 +141,13 @@ public final class StatusRail {
         };
     }
 
-    /** One of the rail's five fixed positions. {@code occurredAt} is null for UPCOMING/NOT_APPLICABLE. */
-    public record Step(String label, LocalDateTime occurredAt, StepState state) {}
+    /**
+     * One of the rail's five fixed positions. {@code occurredAt} is null for UPCOMING/NOT_APPLICABLE
+     * (and for the CANCELLED position - see {@code note}). {@code note} is non-null only for the
+     * CANCELLED position, where it carries "Cancelled" in place of a date - see {@link
+     * #cancelledRail} for why the label itself is deliberately NOT replaced the way SENT_BACK's is.
+     */
+    public record Step(String label, LocalDateTime occurredAt, StepState state, String note) {}
 
     public enum StepState {
         /** A position the request has already passed through, on the current path. */

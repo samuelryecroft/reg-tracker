@@ -223,6 +223,26 @@ class TemplateRenderCoverageIntegrationTest extends AbstractIntegrationTest {
     }
 
     /**
+     * Creed's review: {@code th:case} on the rail's {@code <use>} (rather than the {@code <svg>}
+     * wrapping it) left all six {@code <svg class="icon">} wrappers in the DOM per marker - five
+     * empty, one with content - which the marker's fixed-size flex layout then packed into an 18px
+     * circle, landing the one surviving glyph ~40px off-centre. Invisible to every other test: the
+     * page still returns 200, the view name is still correct, and the glyph that DOES render is the
+     * right one, so a content-substring assertion can't see the five leftover wrappers either. Only
+     * a structural count of the marker's own children catches it.
+     */
+    @Test
+    void everyRailMarkerRendersExactlyOneSvgNotSixEmptyOnes() throws Exception {
+        String html = mockMvc.perform(get("/interview-requests/{id}", approvedRequestId).with(asUser("rc-reviewer" + suffix)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String rail = html.substring(html.indexOf("<ol class=\"rail\""), html.indexOf("</ol>"));
+        long svgCount = countOccurrences(rail, "<svg class=\"icon\">");
+        // Five fixed rail positions (D-1a-2), one marker <svg> each - not five times that.
+        assertThat(svgCount).as("one <svg> per rail position, not one per possible state").isEqualTo(5);
+    }
+
+    /**
      * The auth-equivalence check Kevin's review is for: a report row exists here (SUBMITTED, not
      * yet reviewed) but must stay invisible on the merged page exactly as it was invisible via the
      * old /reports/{id}/view route (which 404'd on it) - this is the one behaviour that must not
@@ -272,6 +292,16 @@ class TemplateRenderCoverageIntegrationTest extends AbstractIntegrationTest {
         if (expectedContent != null) {
             assertThat(html).as("%s renders its seeded content", view).contains(expectedContent);
         }
+    }
+
+    private static long countOccurrences(String content, String needle) {
+        long count = 0;
+        int index = 0;
+        while ((index = content.indexOf(needle, index)) != -1) {
+            count++;
+            index += needle.length();
+        }
+        return count;
     }
 
     private Long raiseRequest(String childFirstName) throws Exception {
