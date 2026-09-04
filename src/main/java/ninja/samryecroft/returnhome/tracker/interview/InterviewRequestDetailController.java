@@ -62,8 +62,22 @@ public class InterviewRequestDetailController {
         // while under review; it must stay invisible on this page until REPORT_APPROVED, exactly as
         // it was invisible via the old /reports/{id}/view route until then. This is the one gate
         // Kevin's auth-equivalence review needs to check is preserved.
+        //
+        // Kevin's review (PR #57): the OLD gate asked "is the report APPROVED" (ReportStatus, read
+        // off the report row itself); this one asks "is the REQUEST REPORT_APPROVED" (InterviewStatus,
+        // read off the request). Those are two different columns, and this substitutes one for the
+        // other - safe only because three invariants live elsewhere: ReportService#approve sets both
+        // atomically in one transaction, REPORT_APPROVED is terminal in InterviewStatusTransitions (so
+        // the request can't move back off it once set), and InterviewStatusWriterGuardTest fails the
+        // build on any status write that bypasses markStatus. If a future path ever sets one without
+        // the other, this line silently starts answering the wrong question.
         boolean canDownload = request.getStatus() == InterviewStatus.REPORT_APPROVED;
-        InterviewReport report = canDownload ? reportService.getByRequestId(id) : null;
+        // findByRequestId, not getByRequestId: REPORT_APPROVED with no report row is a can't-happen
+        // today (the same three invariants above), but getByRequestId would throw and take the WHOLE
+        // page down with it - a strictly wider blast radius than the old route, where only the
+        // separate /reports/{id}/view broke and this page still rendered. Optional.orElse(null) keeps
+        // that same narrower failure: report content silently doesn't render, same as pre-approval.
+        InterviewReport report = canDownload ? reportService.findByRequestId(id).orElse(null) : null;
 
         model.addAttribute("request", request);
         model.addAttribute("childIdentity", ChildIdentity.of(request.getChild(), nameRevealService.isRevealed()));
