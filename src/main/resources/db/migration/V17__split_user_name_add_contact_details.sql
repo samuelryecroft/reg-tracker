@@ -51,12 +51,25 @@ ALTER TABLE users DROP COLUMN full_name;
 CREATE INDEX idx_users_email ON users (lower(email));
 
 -- NOT ENCRYPTED, and the reason is structural rather than a judgement that these are not sensitive.
--- Field encryption here is per-organisation: EncryptedEntity.owningOrganisationId() picks the key,
--- and a null return must be treated as a failure, never as a default key. users.organisation_id is
--- legitimately null - a platform ADMIN belongs to no organisation, and HOME_STAFF are scoped by
--- homes which since V16 may span several organisations - so there is no key to encrypt those rows
--- under. Encrypting only the rows that happen to have an organisation would be worse than not
--- encrypting: it looks like a protected column and is not one.
+--
+-- Field encryption here is per-organisation. EncryptedEntity.owningOrganisationId() picks the key
+-- and EncryptedFields throws FieldCryptoException when it returns null - there is no fallback to a
+-- default key - so a row class whose organisation cannot be resolved does not merely encrypt
+-- awkwardly, it throws on every write.
+--
+-- Most users can be keyed. An org-admin, coordinator, visitor or reviewer has organisation_id
+-- directly. HOME_STAFF have none, but theirs is still derivable from their homes and is
+-- unambiguous, because UserService.requireOneCareProviderOrganisation enforces that all of a
+-- user's homes belong to ONE care provider - the invariant T116 added for exactly this class of
+-- ambiguity. The genuinely un-keyable case is a single role: the PLATFORM ADMIN, who belongs to no
+-- organisation and holds no homes. AdminUserSeeder guarantees at least one such row exists in
+-- every deployment, so this is not a corner case that might not arise.
+--
+-- One un-keyable row class is enough to settle it. Encrypting only the rows that happen to be
+-- keyable would look like a protected column without being one - but the deeper cost is that a
+-- half-encrypted table destroys the only property that makes an encryption claim auditable. You
+-- can no longer answer "is the users table encrypted?" with yes or no. Facing a DPIA, "partly,
+-- depending on the row" is a worse answer than a clean no with a tracked plan.
 --
 -- The users table also has no encrypted columns at all today (V13 covered children and
 -- interview_requests), and COLUMN-ENCRYPTION-OPTIONS.md section 2 Tier 3 deliberately leaves
@@ -65,4 +78,10 @@ CREATE INDEX idx_users_email ON users (lower(email));
 --
 -- Encrypting this table is worth doing as ONE unit - first_name, last_name, email, contact_phone
 -- and the full_name that Tier 2 had already pencilled in - once a platform-scoped key exists.
--- Column-at-a-time is how a table ends up half-encrypted, which is worse than either end state.
+-- Tracked as T133. Column-at-a-time is how a table ends up half-encrypted.
+--
+-- Worth being precise about what actually changed here, rather than "profile fields": names and a
+-- work email address were already in this table in plaintext (full_name, and username, which
+-- COLUMN-ENCRYPTION-OPTIONS.md section 2 Tier 3 describes as "a field that is a work email
+-- address"). The genuinely NEW category of personal data this migration introduces is
+-- contact_phone - a care-home worker's personal mobile number.
