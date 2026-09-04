@@ -92,12 +92,74 @@ class DeadlineTrackerTest {
         assertThat(onTrack.get().cssClass()).isEqualTo("ontrack");
         assertThat(onTrack.get().text()).contains("left");
 
+        // The state is on the badge, so the aria-hidden icon can be chosen from it in markup
+        // rather than being baked into the announced text (T165).
+        assertThat(dueSoon.get().state()).isEqualTo(DueState.DUE_SOON);
+        assertThat(onTrack.get().state()).isEqualTo(DueState.ON_TRACK);
+
         Optional<DueBadge> noClock = DeadlineTracker.badgeFor(requestWith(InterviewStatus.REQUESTED, null), NOW);
         assertThat(noClock).isPresent();
         assertThat(noClock.get().cssClass()).isEqualTo("noclock");
         assertThat(noClock.get().text()).isEqualTo("Return time not recorded");
 
         assertThat(DeadlineTracker.badgeFor(requestWith(InterviewStatus.REPORT_APPROVED, NOW.minusHours(200)), NOW)).isEmpty();
+    }
+
+    /**
+     * T165, and the reason the whole ticket exists. This badge text goes through {@code th:text},
+     * so it is announced verbatim - and "6h 10m left" and "30h 5m left" are the SAME SENTENCE. The
+     * only thing that used to separate "under 24 hours to a statutory deadline" from "fine" was a
+     * prefix glyph (read out as the character's NAME, e.g. "circle with upper right quadrant
+     * black") and a colour. Both fail a non-visual reader.
+     *
+     * <p>So the assertion is deliberately not {@code isNotEqualTo}: two texts differing only in
+     * their numbers, or only in a glyph, would pass that while the defect was fully back. It strips
+     * the durations and every non-letter - which is exactly what a glyph is - and requires the
+     * remaining WORDS to still differ. Restore either the glyph prefix or the bare "N left" pair
+     * and this fails.
+     */
+    @Test
+    void dueSoonAndOnTrackAnnouncedTextDifferByAStateWordNotAGlyphOrANumber() {
+        String dueSoon = DeadlineTracker.badgeFor(requestWith(InterviewStatus.ALLOCATED, NOW.minusHours(60)), NOW)
+                .orElseThrow().text();
+        String onTrack = DeadlineTracker.badgeFor(requestWith(InterviewStatus.SCHEDULED, NOW.minusHours(1)), NOW)
+                .orElseThrow().text();
+
+        assertThat(announcedWords(dueSoon))
+                .as("DUE_SOON and ON_TRACK must be distinguishable to a screen reader by words "
+                        + "alone - not by a glyph, not by a colour, not by the number of hours")
+                .isNotEqualTo(announcedWords(onTrack));
+
+        // ...and the words are the states themselves, not incidental copy that happens to differ.
+        assertThat(dueSoon).startsWith(DueStateCopy.stateWord(DueState.DUE_SOON));
+        assertThat(onTrack).startsWith(DueStateCopy.stateWord(DueState.ON_TRACK));
+    }
+
+    /** Durations first (so "6h" leaves no stray "h"), then everything that is not a letter. */
+    private static String announcedWords(String text) {
+        return text.replaceAll("\\d+[a-zA-Z]?", " ")
+                .replaceAll("[^A-Za-z ]", " ")
+                .replaceAll("\\s+", " ")
+                .trim();
+    }
+
+    /**
+     * T165: the badge and the group heading must say the same word for the same state, or one
+     * request reads as two different states on a single screen. They are built by different classes
+     * ({@link DeadlineTracker} and {@link DeadlineTrackingService}), which is how they drifted.
+     */
+    @Test
+    void theGroupHeadingAndTheBadgeUseTheSameWordForTheSameState() {
+        // groupByUrgency takes its own LocalDateTime.now() (one "now" per render, so every row in
+        // one page agrees with itself), so the fixture clock NOW cannot be used here.
+        DeadlineGroup group = new DeadlineTrackingService()
+                .groupByUrgency(java.util.List.of(
+                        requestWith(InterviewStatus.ALLOCATED, LocalDateTime.now().minusHours(60))))
+                .get(0);
+
+        assertThat(group.state()).isEqualTo(DueState.DUE_SOON);
+        assertThat(group.label()).startsWith(DueStateCopy.stateWord(DueState.DUE_SOON));
+        assertThat(group.rows().get(0).badge().text()).startsWith(DueStateCopy.stateWord(DueState.DUE_SOON));
     }
 
     @Test

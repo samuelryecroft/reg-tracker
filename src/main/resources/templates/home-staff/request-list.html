@@ -26,11 +26,17 @@
         </tr>
         </thead>
         <tbody th:each="group : ${dueGroups}">
-        <tr class="group"><th colspan="6" scope="colgroup" th:text="${group.label()}">Group</th></tr>
+        <tr class="group"><th colspan="6" scope="colgroup"><span class="due-group-head">
+            <th:block th:replace="~{fragments/layout :: dueIcon(${group.state()})}"></th:block>
+            <span th:text="${group.label()}">Group</span>
+        </span></th></tr>
         <tr th:each="row : ${group.rows()}" th:with="r=${row.request()}">
             <td><a class="rowlink" th:href="@{/interview-requests/{id}(id=${r.id})}" th:text="${childIdentities[r.child.id].label()}">Child Name</a></td>
             <td>
-                <span th:if="${row.badge()} != null" class="due" th:classappend="${row.badge().cssClass()}" th:text="${row.badge().text()}">Deadline</span>
+                <span th:if="${row.badge()} != null" class="due" th:classappend="${row.badge().cssClass()}">
+                    <th:block th:replace="~{fragments/layout :: dueIcon(${row.badge().state()})}"></th:block>
+                    <span th:text="${row.badge().text()}">Deadline</span>
+                </span>
                 <span th:if="${row.badge()} == null" class="muted">—</span>
             </td>
             <td><span class="status" th:classappend="${r.status}" th:text="${r.status.displayName}">STATUS</span></td>
@@ -45,11 +51,17 @@
 
     <div class="stack">
         <th:block th:each="group : ${dueGroups}">
-        <h2 style="font-size:15px;margin:20px 0 10px" th:text="${group.label()}">Group</h2>
+        <h2 style="font-size:15px;margin:20px 0 10px"><span class="due-group-head">
+            <th:block th:replace="~{fragments/layout :: dueIcon(${group.state()})}"></th:block>
+            <span th:text="${group.label()}">Group</span>
+        </span></h2>
         <div class="srow" th:each="row : ${group.rows()}" th:with="r=${row.request()}">
             <div class="top">
                 <span class="name" th:text="${childIdentities[r.child.id].label()}">Child Name</span>
-                <span th:if="${row.badge()} != null" class="due" th:classappend="${row.badge().cssClass()}" th:text="${row.badge().text()}">Deadline</span>
+                <span th:if="${row.badge()} != null" class="due" th:classappend="${row.badge().cssClass()}">
+                    <th:block th:replace="~{fragments/layout :: dueIcon(${row.badge().state()})}"></th:block>
+                    <span th:text="${row.badge().text()}">Deadline</span>
+                </span>
             </div>
             <span class="status" th:classappend="${r.status}" th:text="${r.status.displayName}">STATUS</span>
             <dl>

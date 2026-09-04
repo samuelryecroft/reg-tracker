@@ -7,6 +7,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashSet;
@@ -175,6 +178,43 @@ class DeadlineTrackingIntegrationTest extends AbstractIntegrationTest {
 
         // Never silently sorted to the bottom: the overdue group still heads the page.
         assertThat(html.indexOf("Overdue")).isLessThan(html.indexOf("On track"));
+    }
+
+    /**
+     * T165: the end of the round trip. {@link DeadlineTrackerTest} proves the badge TEXT carries the
+     * state as a word; this proves the glyph that used to carry it is now real, aria-hidden markup
+     * on the rendered page - a sprite {@code <use>} that resolves, not a character sitting inside
+     * announced text. Both halves are needed: text alone would let the icon quietly vanish, and
+     * markup alone would let the announced text go back to two identical sentences.
+     */
+    @Test
+    void deadlineStateReachesThePageAsAWordPlusAnAriaHiddenIconNotAsACharacter() throws Exception {
+        LocalDateTime now = LocalDateTime.now();
+        saveRequest("Soon Sasha" + suffix, home, InterviewStatus.SCHEDULED, now.minusHours(60)); // 12h left
+        saveRequest("Ontrack Odis" + suffix, home, InterviewStatus.REQUESTED, now.minusHours(1)); // 71h left
+
+        String html = mockMvc.perform(get("/coordinator/requests").with(asUser("dl-coordinator" + suffix)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        // The state, as a word, in the text a screen reader reads.
+        assertThat(html).contains(DueStateCopy.stateWord(DueState.DUE_SOON));
+        assertThat(html).contains(DueStateCopy.stateWord(DueState.ON_TRACK));
+
+        // The glyphs that used to be that word are gone from the page entirely - badges AND the
+        // group headings, both of which are announced.
+        assertThat(html).doesNotContain("\u25b2").doesNotContain("\u25f7").doesNotContain("\u2713");
+
+        // ...and the icon really is there, hidden, and pointing at a symbol that exists in the
+        // vendored sprite (a typo'd id renders a silently blank <use>, which no other test sees).
+        assertThat(html).contains("#ph-clock-countdown");
+        assertThat(html).contains("#ph-check-circle");
+        assertThat(html).contains("<svg class=\"icon\" aria-hidden=\"true\">");
+
+        String sprite = Files.readString(Path.of("src/main/resources/static/icons/phosphor.svg"),
+                StandardCharsets.UTF_8);
+        assertThat(sprite).contains("id=\"ph-clock-countdown\"").contains("id=\"ph-check-circle\"")
+                .contains("id=\"ph-warning-circle\"");
     }
 
     @Test

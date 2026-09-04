@@ -20,37 +20,43 @@ public class DeadlineTrackingService {
         List<InterviewRequest> sorted = requests.stream().sorted(DeadlineTracker.byUrgency(now)).toList();
 
         List<DeadlineGroup> groups = new ArrayList<>();
-        String currentLabel = null;
+        Optional<DueState> currentState = null;
         List<DeadlineRow> currentRows = null;
         for (InterviewRequest request : sorted) {
             Optional<DueState> state = DeadlineTracker.stateOf(request, now);
-            String label = labelFor(state);
-            if (!label.equals(currentLabel)) {
-                flush(groups, currentLabel, currentRows);
-                currentLabel = label;
+            if (!state.equals(currentState)) {
+                flush(groups, currentState, currentRows);
+                currentState = state;
                 currentRows = new ArrayList<>();
             }
             currentRows.add(new DeadlineRow(request, DeadlineTracker.badgeFor(request, now).orElse(null)));
         }
-        flush(groups, currentLabel, currentRows);
+        flush(groups, currentState, currentRows);
         return groups;
     }
 
-    private void flush(List<DeadlineGroup> groups, String label, List<DeadlineRow> rows) {
+    /** {@code state} is null only on the priming call, which {@code rows} short-circuits first. */
+    private void flush(List<DeadlineGroup> groups, Optional<DueState> state, List<DeadlineRow> rows) {
         if (rows != null && !rows.isEmpty()) {
-            groups.add(new DeadlineGroup(label + " (" + rows.size() + ")", rows));
+            groups.add(new DeadlineGroup(state.orElse(null), labelFor(state) + " (" + rows.size() + ")", rows));
         }
     }
 
+    /**
+     * T165: the state word comes from {@link DueStateCopy} so the heading and the badges inside it
+     * cannot drift apart, and the glyph that used to prefix these strings is gone - headings are
+     * announced, so it was being read as the character's name. The icon is now aria-hidden markup
+     * chosen from {@link DeadlineGroup#state()}.
+     */
     private String labelFor(Optional<DueState> state) {
         if (state.isEmpty()) {
             return "No active deadline";
         }
         return switch (state.get()) {
-            case OVERDUE -> "▲ Overdue — statutory 72 hours passed";
-            case DUE_SOON -> "◷ Due soon — under 24 hours remaining";
-            case NO_CLOCK -> "Return time not recorded";
-            case ON_TRACK -> "✓ On track";
+            case OVERDUE -> DueStateCopy.stateWord(DueState.OVERDUE) + " — statutory 72 hours passed";
+            case DUE_SOON -> DueStateCopy.stateWord(DueState.DUE_SOON) + " — under 24 hours remaining";
+            case NO_CLOCK -> DueStateCopy.stateWord(DueState.NO_CLOCK);
+            case ON_TRACK -> DueStateCopy.stateWord(DueState.ON_TRACK);
         };
     }
 }

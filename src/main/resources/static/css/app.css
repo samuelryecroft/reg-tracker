@@ -748,7 +748,7 @@ input.is-invalid, select.is-invalid, textarea.is-invalid {
     font-weight: 650;
     margin: var(--s2) 0 0;
 }
-.field-error::before { content: "▲"; font-size: 11px; line-height: 1.6; }
+.field-error .icon { font-size: 11px; margin-top: 3px; }
 
 .readonly-val {
     background: #F6F7F9;
@@ -938,6 +938,9 @@ table caption { text-align: left; font-size: var(--t-xs); color: var(--muted); p
 .rowlink { color: var(--accent-dark); font-weight: 650; text-decoration: none; display: inline-flex; align-items: center; min-height: 44px; margin-right: var(--s3); }
 .rowlink:hover, .rowlink:focus-visible { text-decoration: underline; }
 tr.group th { background: #F3F4F6; color: var(--ink); text-transform: none; font-size: var(--t-sm); letter-spacing: 0; }
+/* T165: the urgency-tier glyph is an aria-hidden <svg> in markup now, not a character inside the
+   announced heading text - this keeps it on the text baseline in both the table and .stack views. */
+.due-group-head { display: inline-flex; align-items: center; gap: 6px; }
 
 /* stacked-card table - the mobile alternative to <table>, shown/hidden by the breakpoint below */
 .stack { display: none; flex-direction: column; gap: var(--s3); margin-top: var(--s5); }
