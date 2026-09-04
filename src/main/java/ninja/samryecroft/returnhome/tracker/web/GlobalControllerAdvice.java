@@ -7,6 +7,7 @@ import ninja.samryecroft.returnhome.tracker.child.NameRevealService;
 import ninja.samryecroft.returnhome.tracker.document.DocumentNotFoundException;
 import ninja.samryecroft.returnhome.tracker.document.DocumentSecurityException;
 import ninja.samryecroft.returnhome.tracker.document.KeyUnavailableException;
+import ninja.samryecroft.returnhome.tracker.fieldcrypto.FieldCryptoException;
 import ninja.samryecroft.returnhome.tracker.home.Home;
 import ninja.samryecroft.returnhome.tracker.home.HomeRepository;
 import ninja.samryecroft.returnhome.tracker.organisation.Organisation;
@@ -313,6 +314,63 @@ public class GlobalControllerAdvice {
         model.addAttribute("status", status.value());
         model.addAttribute("message", message);
         return "error";
+    }
+
+    /**
+     * The fail-closed boundary for encrypted <em>field</em> data (the fieldcrypto path), sibling of
+     * {@link #handleDocumentSecurity}. This is a <strong>message</strong> fix, not a status fix, and
+     * the distinction matters (T168):
+     *
+     * <p>{@link FieldCryptoException} is a {@link RuntimeException}, not a {@link DocumentSecurityException}
+     * - but its cause on the missing-KEK path is a {@link KeyUnavailableException}, which <em>is</em> a
+     * DocumentSecurityException. Spring's handler resolution walks the cause chain, so <em>before</em>
+     * this handler existed {@link #handleDocumentSecurity} already matched via that cause and already
+     * returned 503 (verified against the live add-child failure: resultCode 503, not 500). What it
+     * returned was the <em>document</em> message - "this report cannot be opened" - to a care worker
+     * adding a <em>child</em>. Registering a handler for {@code FieldCryptoException} makes Spring match
+     * the raw type first, so this method runs instead and gives an add-child-appropriate message. The
+     * status is 503 either way.
+     *
+     * <p>Status semantics are preserved deliberately: a missing/unreachable KEK is transient/operational
+     * (503, and the remedy is provisioning, not blind retry - the log carries the actionable detail for
+     * whoever operates the vault); a genuine integrity failure stays a 500. Either way the field is
+     * never stored in the clear.
+     *
+     * <p>The user-facing message stays generic for the same reason the document handler's does: telling
+     * a caller <em>why</em> a crypto operation failed tells them how to probe it. The actionable key
+     * name goes to the log and the audit trail, not the response.
+     */
+    @ExceptionHandler(FieldCryptoException.class)
+    public String handleFieldCrypto(FieldCryptoException ex, Model model,
+            jakarta.servlet.http.HttpServletResponse response) {
+        boolean keyUnavailable = hasCause(ex, KeyUnavailableException.class);
+        HttpStatus status = keyUnavailable ? HttpStatus.SERVICE_UNAVAILABLE : HttpStatus.INTERNAL_SERVER_ERROR;
+        String message = keyUnavailable
+                ? "The secure key service for this organisation is temporarily unavailable, so this "
+                        + "record could not be saved. Please contact your administrator."
+                : "This record could not be securely saved, and no unencrypted copy is ever kept.";
+        log.error("Refusing to store a field without encryption ({}): {}", status.value(),
+                ex.getClass().getSimpleName(), ex);
+        response.setStatus(status.value());
+        model.addAttribute("status", status.value());
+        model.addAttribute("message", message);
+        return "error";
+    }
+
+    /**
+     * True if {@code t} or anything in its cause chain is an instance of {@code type}. The walk is
+     * depth-capped: a malformed or cyclic cause chain (A-&gt;B-&gt;A, or one pointing back at itself)
+     * would otherwise spin forever here - inside the error handler, the worst place for an infinite
+     * loop. No legitimate exception chain approaches this depth.
+     */
+    private static boolean hasCause(Throwable t, Class<? extends Throwable> type) {
+        Throwable cause = t;
+        for (int depth = 0; cause != null && depth < 100; cause = cause.getCause(), depth++) {
+            if (type.isInstance(cause)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)

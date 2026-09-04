@@ -37,7 +37,7 @@ class OrganisationActivationMessageTest {
     private final OrganisationRepository repository = mock(OrganisationRepository.class);
     private final OrganisationLifecycleService lifecycle = mock(OrganisationLifecycleService.class);
     private final OrganisationAdminController controller =
-            new OrganisationAdminController(repository, mock(ThemeService.class), lifecycle);
+            new OrganisationAdminController(repository, mock(ThemeService.class), mock(KeyProvider.class), lifecycle);
     private final AppUserPrincipal principal = mock(AppUserPrincipal.class);
 
     private Organisation pendingCareProvider() {

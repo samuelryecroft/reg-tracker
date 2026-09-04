@@ -104,10 +104,12 @@ public class KeyVaultKeyProvider implements KeyProvider {
             // only, which cannot create. Say exactly that, because the fix is an onboarding step,
             // not a code change.
             throw new KeyUnavailableException("No key exists for organisation " + organisationId
-                    + " and key creation is disabled; provision " + keyName + " before its first report", notFound);
+                    + " and key creation is disabled; provision " + keyName
+                    + " before its first encrypted record", notFound);
         }
         try {
-            log.info("Creating the Key Vault KEK for organisation {} on its first report", organisationId);
+            log.info("Creating the Key Vault KEK for organisation {} on its first encrypted record",
+                    organisationId);
             return keyClient.createRsaKey(new CreateRsaKeyOptions(keyName)
                     .setKeySize(RSA_KEY_SIZE)
                     .setKeyOperations(KeyOperation.WRAP_KEY, KeyOperation.UNWRAP_KEY));

@@ -1,10 +1,10 @@
 # Test contexts — the baseline
 
-**Measured against:** `main` @ `fe2bb3d` (T148), re-measured on T113 Inc 3.
-**Date:** 2026-09-04.
+**Measured against:** `main` @ `fe2bb3d` (T148), re-measured on T113 Inc 3 and on T168.
+**Date:** 2026-09-05.
 
-The test suite builds **7 Spring application contexts** across **36
-context-using test classes**, and **6 Hikari pools** against the one shared
+The test suite builds **8 Spring application contexts** across **37
+context-using test classes**, and **7 Hikari pools** against the one shared
 Testcontainers Postgres.
 
 **Pools are the number to watch, not contexts.** A context is only expensive
@@ -20,7 +20,7 @@ The budget, all three numbers measured rather than assumed:
 | `superuser_reserved_connections` | **3** | so **97** are usable |
 | HikariCP `DEFAULT_POOL_SIZE` | **10** | and `minIdle` defaults to it, so a pool tends toward 10 held connections |
 
-97 usable at 10 per pool is **9 pools**. Today's 6 is up to 60 of 97.
+97 usable at 10 per pool is **9 pools**. Today's 7 is up to 70 of 97.
 
 T148 was the suite walking into that ceiling: with the tenth pool live, the
 eleventh context failed to start with `FATAL: sorry, too many clients already`
@@ -42,8 +42,9 @@ the answer: what the 6 are, and which of them have to exist.
 | 5 | `@TestPropertySource` enabling login throttling | 1 | yes | necessary |
 | 6 | `webEnvironment = RANDOM_PORT` (Playwright) | 7 | yes | necessary |
 | 7 | `@TestPropertySource` opening the break-glass path | 2 | yes | **chosen** — see below |
+| 8 | unprovisioned-KEK `KeyProvider` + auto-create off | 1 | yes | **chosen** — see below |
 
-Context 4 is why there are 7 contexts but only 6 pools: a `@WebMvcTest` slice
+Context 4 is why there are 8 contexts but only 7 pools: a `@WebMvcTest` slice
 builds no `DataSource`.
 
 ### Context 3 — necessary, and now shared rather than repeated
@@ -82,13 +83,47 @@ mutable only from a test.
 
 The principle, which outlives the decision: **a test-infrastructure budget must
 not shape a security control's runtime semantics.** This document exists to stop
-the suite reaching 7 pools by accident, not to stop it spending one on purpose.
-Measured at 5 before and 6 after; 7 remains the point at which to stop and ask.
+the suite reaching a pool it did not decide to spend, not to stop it spending
+one on purpose. Measured at 5 before and 6 after.
+
+**The stop-and-ask line has moved once, deliberately.** It said 7 when this was
+written, and T168 spent the 7th with god's sign-off (context 8 below). It is
+**8** now. Moving it is allowed; moving it without measuring, or without saying
+who agreed, is not — that is how a budget becomes a number nobody believes.
 
 `AbstractBreakGlassEnabledTest` holds the override so that however many
 enabled-path tests there end up being, they cost one pool between them. The
 closed-path tests need no override and stay in context 2 — the default is
 closed, which is the configuration they describe.
+
+### Context 8 — chosen, and the reason is worth more than the pool
+
+`UnprovisionedKekIntegrationTest` (T168) supplies a `@Primary` `KeyProvider`
+that fails every operation, plus `auto-create-keys=false`, standing in for an
+organisation whose Key Vault KEK was never provisioned. A nested
+`@TestConfiguration` is a context customizer, so this forks — knowingly, and
+signed off before it was spent.
+
+**One class, both halves.** The admin being warned at onboarding and the write
+later failing well are one story and need the same two overrides, so they share
+this context rather than costing a second. That is the `AbstractEntraEnabledTest`
+lesson applied before the fact instead of after it.
+
+It could not be avoided by sharing: every other integration test needs a
+*working* key provider, so this context is the one thing it is for. And it could
+not be replaced by a cheaper test, which is the actual argument. There was
+already a unit test calling the exception handler directly, and it proved the
+mapping. What no unit test could reach is whether a `FieldCryptoException` raised
+inside a Hibernate `PreInsertEventListener` — during flush, not in the controller
+body — survives Hibernate, the transaction interceptor and Spring's handler
+resolution to arrive at that handler at all. **The half that broke in production
+was routing, and routing is the half a direct call cannot exercise.**
+
+Writing it is what disproved the ticket's premise: the pre-fix path did not
+return the assumed 500. Spring's `@ExceptionHandler` resolution walks the *cause*
+chain, so `handleDocumentSecurity` already matched `KeyUnavailableException` and
+already answered 503 — with a message about a *report* that could not be opened,
+to someone adding a *child*. That is the sort of thing a pool buys.
 
 ### Context 6 — necessary
 

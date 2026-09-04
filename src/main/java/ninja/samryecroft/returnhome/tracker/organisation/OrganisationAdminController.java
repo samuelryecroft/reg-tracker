@@ -1,6 +1,7 @@
 package ninja.samryecroft.returnhome.tracker.organisation;
 
 import jakarta.validation.Valid;
+import ninja.samryecroft.returnhome.tracker.document.KeyProvider;
 import ninja.samryecroft.returnhome.tracker.document.KeyUnavailableException;
 import ninja.samryecroft.returnhome.tracker.organisation.dto.CreateOrganisationForm;
 import ninja.samryecroft.returnhome.tracker.user.AppUserPrincipal;
@@ -23,12 +24,14 @@ public class OrganisationAdminController {
 
     private final OrganisationRepository organisationRepository;
     private final ThemeService themeService;
+    private final KeyProvider keyProvider;
     private final OrganisationLifecycleService lifecycleService;
 
     public OrganisationAdminController(OrganisationRepository organisationRepository, ThemeService themeService,
-            OrganisationLifecycleService lifecycleService) {
+            KeyProvider keyProvider, OrganisationLifecycleService lifecycleService) {
         this.organisationRepository = organisationRepository;
         this.themeService = themeService;
+        this.keyProvider = keyProvider;
         this.lifecycleService = lifecycleService;
     }
 
@@ -91,7 +94,7 @@ public class OrganisationAdminController {
 
     @PostMapping
     public String create(@Valid @ModelAttribute("form") CreateOrganisationForm form, BindingResult bindingResult,
-            Model model) {
+            Model model, RedirectAttributes redirectAttributes) {
         Organisation supplier = null;
         if (form.getType() == OrgType.CARE_PROVIDER) {
             if (form.getSupplierOrganisationId() == null) {
@@ -118,6 +121,41 @@ public class OrganisationAdminController {
             themeService.ensureThemeExistsFor(organisation);
         }
 
+        // T168 preflight: a CARE_PROVIDER's field data is encrypted under a per-organisation KEK. If
+        // that key was not provisioned at onboarding, the organisation's first child record fails
+        // closed later - a confusing error in front of a client (the org-2 P0). Surfacing it here, to
+        // the admin who can arrange provisioning, turns that late failure into an actionable notice at
+        // onboarding. Advisory only: never blocks creation, and the encrypt path still fail-closes at
+        // write time if the key is genuinely missing.
+        //
+        // Uses keyExists (T168(b)), a pure read with NO create path, so it is safe in EVERY
+        // configuration - unlike currentKeyFor, which mints the key when auto-create is on and so could
+        // not be used to probe. That is what lets this drop the old !auto-create guard and fire the
+        // notice everywhere rather than only in the least-privilege shape.
+        if (organisation.getType() == OrgType.CARE_PROVIDER && !fieldKekConfirmed(organisation.getId())) {
+            redirectAttributes.addFlashAttribute("kekWarning",
+                    "This care provider’s encryption key (" + KeyProvider.keyNameFor(organisation.getId())
+                            + ") could not be confirmed. It must exist before any child records can be "
+                            + "added for this organisation; if it has not been provisioned, an operator "
+                            + "needs to create it. See DOCUMENT-KEYS.md.");
+        }
+
         return "redirect:/admin/organisations";
+    }
+
+    /**
+     * Whether the organisation's field KEK could be confirmed present right now, via the pure-read
+     * {@link KeyProvider#keyExists}. {@code false} means definitely absent; a
+     * {@link KeyUnavailableException} means the vault could not be reached to tell - and for this
+     * advisory notice both resolve to "not confirmed" (so the notice is worded "could not be
+     * confirmed"). Deliberately swallows the exception rather than propagating it: a vault blip must
+     * not fail an admin's organisation-create, only leave the notice showing.
+     */
+    private boolean fieldKekConfirmed(long organisationId) {
+        try {
+            return keyProvider.keyExists(organisationId);
+        } catch (KeyUnavailableException e) {
+            return false;
+        }
     }
 }
