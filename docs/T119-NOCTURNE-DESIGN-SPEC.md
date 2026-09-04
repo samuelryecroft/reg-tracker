@@ -896,3 +896,56 @@ which is the specific element that says "this opens something".
 
 Worth stating in general, because it recurs through every screen migration: **a placeholder that looks
 operable is a worse defect than a missing feature, because the missing feature is honest.**
+
+---
+
+## 5g · Screen 1a — the first decisions (Creed, 4 Sep)
+
+1a is the first screen that is genuinely redrawn rather than replumbed, so the patterns settled here set the
+pace for every screen after it. Starting with the one that would otherwise be built literally from the
+README.
+
+### D-1a-1 · "Not answered" — never `opacity`. Use `--color-text-muted`, and only on the value.
+
+The README says unanswered questions *"render at 50% opacity as 'Not answered'"*. **Built literally that
+fails WCAG 1.4.3 in both appearances, and it fails worse in light — the opposite of where people look for
+contrast trouble.** Measured against `--color-surface`:
+
+| what is dimmed | dark | light |
+| --- | --- | --- |
+| full text (no dimming) | 12.55:1 | 14.34:1 |
+| `--color-text-muted` (70%) | 6.89:1 | 5.45:1 |
+| **50% opacity on full text** | **4.25:1** | **3.03:1** |
+| **50% opacity on already-muted text** (0.7 × 0.5) | **2.81:1** | **2.07:1** |
+
+The second failing row is the likely build: answer values are already secondary text, so a container at
+`opacity: .5` compounds with the token rather than replacing it. That is the trap — **`opacity` multiplies
+whatever it lands on, so it cannot be reasoned about locally.**
+
+**Three reasons opacity is the wrong instrument here, and the first is the one that matters most:**
+
+1. **It inverts the information hierarchy.** A reviewer's whole job on this screen is judging whether a
+   report is adequate, and a skipped question is exactly what they must notice. Rendering the absences as
+   the faintest thing on the page makes the most decision-relevant content the least readable.
+2. **It dims everything inside it** — including the focus ring of anything focusable within the block, which
+   can drop the focus indicator below the 3:1 that 1.4.11 requires, and any glyph the block carries.
+3. **It compounds**, as the table shows.
+
+**The rule, which applies well beyond this screen:** de-emphasise with a colour token, never with `opacity`.
+
+**The treatment for 1a:**
+
+- The **question keeps normal text colour**. The README dims the whole question-and-answer block, which
+  hides *what* was skipped — a reviewer skimming for gaps then has to focus on each faint block to read the
+  question. The question is the part they are scanning.
+- The **value slot** carries "Not answered" in `--color-text-muted`, italic. 6.89:1 dark / 5.45:1 light,
+  both clear of 4.5:1, using a token that already exists. Italic does the de-emphasis that opacity was
+  reaching for, without touching contrast.
+- **Absences should aggregate.** A per-section count ("3 not answered") lets a reviewer see the shape of a
+  report before reading it. The design already has this metric — 2d's reviewer cards show questions-answered
+  — so this is reusing an established idea rather than inventing one.
+
+### Still open on 1a, and being settled next
+The five-step status rail, the section tab row, the 316px history column's behaviour below the shell's
+900px breakpoint, and the collapsed `<details>` for the home's original request. None of these are blocked;
+they are simply next.
