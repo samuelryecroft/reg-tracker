@@ -9,6 +9,7 @@ public class AppProperties {
     private final Docx docx = new Docx();
     private final Admin admin = new Admin();
     private final Security security = new Security();
+    private final Auth auth = new Auth();
 
     public Docx getDocx() {
         return docx;
@@ -20,6 +21,40 @@ public class AppProperties {
 
     public Security getSecurity() {
         return security;
+    }
+
+    public Auth getAuth() {
+        return auth;
+    }
+
+    public static class Auth {
+        private final BreakGlass breakGlass = new BreakGlass();
+
+        public BreakGlass getBreakGlass() {
+            return breakGlass;
+        }
+    }
+
+    /**
+     * The emergency local sign-in that survives P8's removal of general form login (D2/D5).
+     *
+     * <p><b>Read per request rather than bound into a startup field, and that is deliberate.</b> A
+     * flag latched at startup can only be turned off by a restart, and "turn this off now" is
+     * precisely what you want to be able to do to an emergency credential path - if break-glass is
+     * being abused, waiting for a deployment is the wrong answer. Reading the live bean also lets
+     * the tests exercise the enabled path without a {@code @TestPropertySource}, which would fork a
+     * Spring context and a Hikari pool (TEST-CONTEXTS.md).
+     */
+    public static class BreakGlass {
+        private boolean enabled;
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
     }
 
     public static class Docx {
