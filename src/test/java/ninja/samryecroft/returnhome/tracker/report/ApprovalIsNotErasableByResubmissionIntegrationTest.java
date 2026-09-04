@@ -60,8 +60,13 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
  * resubmitted, and the verdict survives", which is the behaviour that matters. It does <em>not</em>
  * pin <em>which</em> layer refuses, and it cannot distinguish a guard at the top of the operation
  * from a guard at the end plus rollback - the very distinction the top-of-method placement exists
- * for. That placement is a design property held by review and by the class javadoc on
- * {@code InterviewStatusTransitions}, not by this test.
+ * for. Moving both guards to the bottom of {@code submitForReview} leaves every assertion in this
+ * file passing.
+ *
+ * <p>That gap is closed by {@link SubmitForReviewGuardPlacementTest}, which drops the transaction
+ * rather than trying to see through it: mocked collaborators, no rollback to be rescued by, and
+ * branch assertions ({@code never()).save(...)}) instead of end-state ones. The same mutation that
+ * this file cannot feel fails that one.
  *
  * <p>The scoping's remaining direct evidence is
  * {@link #resubmittingAfterARejectionStillClearsThatRejectionsVerdict}, which pins that clearing
