@@ -3,6 +3,7 @@ package ninja.samryecroft.returnhome.tracker.organisation;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import ninja.samryecroft.returnhome.tracker.home.Home;
 import ninja.samryecroft.returnhome.tracker.user.AppUserPrincipal;
@@ -47,27 +48,58 @@ public class OrganisationAccessService {
             return principalOrgId.equals(careProviderOrgId);
         }
         // Supplier-side: visible iff the principal's org is the Supplier assigned to this Care
-        // Provider org. The organisation TYPE is tested here, not just the role (T136).
-        //
-        // It used to check the three roles alone. For ORG_ADMIN that was still sound - the branch
-        // above has already taken the care-provider case, so an org-admin reaching here is a
-        // supplier one. COORDINATOR and REVIEWER were never type-checked at all, and they are
-        // supplier-side only by convention: RoleMatrix lets only a supplier org-admin assign them,
-        // but a platform ADMIN can put either role in a care-provider organisation.
-        //
-        // Such an account then had its own organisation id compared against
-        // supplier_organisation_id, a column with no type constraint of its own (V5) - so the only
-        // thing standing between it and another organisation's data was that no care provider
-        // happens to be recorded as another care provider's supplier. That is data integrity doing
-        // an access check's job. Same principle as T117 and T130: grant on a positive test.
-        if (principal.getOrganisationType() == OrgType.SUPPLIER
-                && (principal.hasRole(Role.ORG_ADMIN) || principal.hasRole(Role.COORDINATOR)
-                        || principal.hasRole(Role.REVIEWER))) {
-            return organisationRepository.findSupplierOrganisationIdByCareProviderId(careProviderOrgId)
-                    .map(principalOrgId::equals)
-                    .orElse(false);
+        // Provider org. Delegated to supplierScopeFor so there is one definition of "supplier-side".
+        return supplierScopeFor(principal)
+                .flatMap(supplierOrgId -> organisationRepository
+                        .findSupplierOrganisationIdByCareProviderId(careProviderOrgId)
+                        .map(supplierOrgId::equals))
+                .orElse(false);
+    }
+
+    /**
+     * The supplier organisation whose clients' data this principal may see, or empty if they are
+     * not supplier-side.
+     *
+     * <p><b>This is the only place that decides it.</b> Every data-scoping read of
+     * {@code supplier_organisation_id} now comes through here; each one used to re-derive the trust
+     * from {@code principal.getOrganisationId()}, which is why the same defect was found and fixed
+     * three times (T117, T130, T136) before anyone counted the call sites. A query filtering on
+     * {@code supplier_organisation_id} <em>is</em> an access decision, so it belongs here rather
+     * than at the call site.
+     *
+     * <p>The eight converted sites: {@code AuditFeedController.requestsInScope} and
+     * {@code homesInScope}, {@code DashboardService.supplierDashboard} (four queries),
+     * {@code HomeAdminController.list}, and {@code InterviewRequestService.listVisible} and
+     * {@code listPendingReview}. {@link #canViewCareProviderOrg} delegates here too, so the check
+     * and the list scope cannot drift apart - which was the actual root cause, two definitions that
+     * happened to agree.
+     *
+     * <p>{@code ThemeService} also reads the supplier link, and is deliberately not routed through
+     * this: it resolves branding, not data scope. A wrong answer there gives someone the wrong
+     * logo, not another organisation's records.
+     *
+     * <p>The type test is the substance. COORDINATOR and REVIEWER are supplier-side only by
+     * convention - {@link ninja.samryecroft.returnhome.tracker.user.RoleMatrix} lets only a supplier
+     * org-admin assign them, but a platform ADMIN can put either role inside a care provider. Such
+     * an account previously had its own organisation id passed to a supplier-scoped query, and the
+     * only thing that returned nothing was that no care provider happens to be recorded as another
+     * care provider's supplier - a column with no type constraint of its own (V5). That is data
+     * integrity doing an access check's job, and it is exactly the accidental close this codebase
+     * keeps rediscovering.
+     *
+     * <p>Empty means "no supplier scope", which callers must render as no rows. It does not mean
+     * "unscoped", and it must never be turned into a query with a null or foreign organisation id.
+     */
+    public Optional<Long> supplierScopeFor(AppUserPrincipal principal) {
+        if (principal == null || principal.getOrganisationId() == null
+                || principal.getOrganisationType() != OrgType.SUPPLIER) {
+            return Optional.empty();
         }
-        return false;
+        if (principal.hasRole(Role.ORG_ADMIN) || principal.hasRole(Role.COORDINATOR)
+                || principal.hasRole(Role.REVIEWER)) {
+            return Optional.of(principal.getOrganisationId());
+        }
+        return Optional.empty();
     }
 
     /** Whether the principal can see the given Home (its Care Provider org, or one of their own). */

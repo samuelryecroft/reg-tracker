@@ -3,6 +3,7 @@ package ninja.samryecroft.returnhome.tracker.home;
 import jakarta.validation.Valid;
 import java.util.List;
 import ninja.samryecroft.returnhome.tracker.home.dto.CreateHomeForm;
+import ninja.samryecroft.returnhome.tracker.organisation.OrganisationAccessService;
 import ninja.samryecroft.returnhome.tracker.organisation.Organisation;
 import ninja.samryecroft.returnhome.tracker.organisation.OrgType;
 import ninja.samryecroft.returnhome.tracker.organisation.OrganisationRepository;
@@ -27,12 +28,15 @@ public class HomeAdminController {
     private final HomeRepository homeRepository;
     private final OrganisationRepository organisationRepository;
     private final RoleMatrix roleMatrix;
+    private final OrganisationAccessService organisationAccessService;
 
     public HomeAdminController(HomeRepository homeRepository, OrganisationRepository organisationRepository,
-            RoleMatrix roleMatrix) {
+            RoleMatrix roleMatrix,
+            OrganisationAccessService organisationAccessService) {
         this.homeRepository = homeRepository;
         this.organisationRepository = organisationRepository;
         this.roleMatrix = roleMatrix;
+        this.organisationAccessService = organisationAccessService;
     }
 
     @GetMapping
@@ -44,7 +48,11 @@ public class HomeAdminController {
             homes = homeRepository.findByOrganisationIdWithOrganisation(principal.getOrganisationId());
         } else {
             // Supplier ORG_ADMIN: read-only view across their client Care Provider orgs' homes.
-            homes = homeRepository.findByOrganisationSupplierOrganisationId(principal.getOrganisationId());
+            // Scoped through the access service rather than from the principal directly, so this is
+            // not a fourth place that decides who counts as supplier-side (T139).
+            homes = organisationAccessService.supplierScopeFor(principal)
+                    .map(homeRepository::findByOrganisationSupplierOrganisationId)
+                    .orElseGet(List::of);
         }
         model.addAttribute("homes", homes);
         return "admin/home-list";

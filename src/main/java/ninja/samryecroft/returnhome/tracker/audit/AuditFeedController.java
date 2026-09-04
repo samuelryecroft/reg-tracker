@@ -14,6 +14,7 @@ import ninja.samryecroft.returnhome.tracker.home.Home;
 import ninja.samryecroft.returnhome.tracker.home.HomeRepository;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewRequest;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewRequestRepository;
+import ninja.samryecroft.returnhome.tracker.organisation.OrganisationAccessService;
 import ninja.samryecroft.returnhome.tracker.organisation.OrgType;
 import ninja.samryecroft.returnhome.tracker.user.AppUserPrincipal;
 import ninja.samryecroft.returnhome.tracker.user.Role;
@@ -48,10 +49,12 @@ public class AuditFeedController {
     private final AuditEventPublisher auditEventPublisher;
     private final AuditQueryCsvWriter auditQueryCsvWriter;
     private final ExportLinkService exportLinkService;
+    private final OrganisationAccessService organisationAccessService;
 
     public AuditFeedController(InterviewRequestRepository interviewRequestRepository, HomeRepository homeRepository,
             UserRepository userRepository, AuditHistoryService auditHistoryService, AuditEventPublisher auditEventPublisher,
-            AuditQueryCsvWriter auditQueryCsvWriter, ExportLinkService exportLinkService) {
+            AuditQueryCsvWriter auditQueryCsvWriter, ExportLinkService exportLinkService,
+            OrganisationAccessService organisationAccessService) {
         this.interviewRequestRepository = interviewRequestRepository;
         this.homeRepository = homeRepository;
         this.userRepository = userRepository;
@@ -59,6 +62,7 @@ public class AuditFeedController {
         this.auditEventPublisher = auditEventPublisher;
         this.auditQueryCsvWriter = auditQueryCsvWriter;
         this.exportLinkService = exportLinkService;
+        this.organisationAccessService = organisationAccessService;
     }
 
     @GetMapping("/audit")
@@ -154,7 +158,15 @@ public class AuditFeedController {
         if (principal.hasRole(Role.ORG_ADMIN) && principal.getOrganisationType() == OrgType.CARE_PROVIDER) {
             return interviewRequestRepository.findByHomeOrganisationId(principal.getOrganisationId());
         }
-        return interviewRequestRepository.findByHomeOrganisationSupplierOrganisationId(principal.getOrganisationId());
+        // Was a fall-through: anyone who was not ADMIN, VIEWER or a care-provider org-admin had
+        // their own organisation id handed to a supplier-scoped query with no positive test.
+        // /audit/** admits COORDINATOR, so a coordinator inside a care provider reached this line
+        // and got a feed scoped to "every care provider recorded as having my org as its supplier" -
+        // empty today only because no such row happens to exist. On the audit feed, which is the
+        // broadest read surface in the app and is a record of who looked at which children's files.
+        return organisationAccessService.supplierScopeFor(principal)
+                .map(interviewRequestRepository::findByHomeOrganisationSupplierOrganisationId)
+                .orElseGet(List::of);
     }
 
     private List<Home> homesInScope(AppUserPrincipal principal) {
@@ -168,6 +180,9 @@ public class AuditFeedController {
         if (principal.hasRole(Role.ORG_ADMIN) && principal.getOrganisationType() == OrgType.CARE_PROVIDER) {
             return homeRepository.findByOrganisationIdWithOrganisation(principal.getOrganisationId());
         }
-        return homeRepository.findByOrganisationSupplierOrganisationId(principal.getOrganisationId());
+        // Same fall-through as requestsInScope above, and closed the same way.
+        return organisationAccessService.supplierScopeFor(principal)
+                .map(homeRepository::findByOrganisationSupplierOrganisationId)
+                .orElseGet(List::of);
     }
 }
