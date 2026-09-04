@@ -105,6 +105,19 @@ integer, and it is why the README can claim contrast holds whatever colour is pi
 not a hex; the admin colour picker maps its chosen colour to a hue and discards L and C.
 `secondaryColor` has no role in this model — see **Q7**.
 
+**Deriving the hue — normative, because two halves implement it.** Pam's phase-2 branding work derives
+`--brand-hue` for CSS and Jim's T137 derives the same hue for the `.docx`. They read the same source and
+must produce the same number, so the derivation is specified here rather than twice in code:
+
+> Take the supplier's stored `primaryColor` (sRGB hex). Convert sRGB → linear → OKLab. The hue is
+> `atan2(b, a)` in degrees, normalised to `[0, 360)`. Round to the nearest integer degree. Discard L and C.
+> If chroma `sqrt(a² + b²)` is below **0.02** the colour is effectively grey and has no reliable hue — fall
+> back to the neutral hue **265** rather than amplifying rounding noise into an arbitrary brand colour.
+
+Round to a whole degree in **one** place and pass the integer around. Two implementations that each round
+their own way will disagree by a degree on some colours, and a document whose accent is one degree off the
+screen's is the kind of defect nobody can describe and everybody can see.
+
 Beacon = hue 289 (`#9184d9`), Northgate = hue 232 (`#6f9ee0`).
 
 ### 2.3 Appearance — per user, server-rendered
@@ -142,6 +155,19 @@ The canvas also defines, in both themes:
 `--doc-paper: oklch(0.99 0.004 265)`, `--doc-ink: oklch(0.30 0.012 265)`,
 `--doc-ink-muted: oklch(0.50 0.014 265)`, `--doc-accent: oklch(0.46 0.09 <hue>)` — i.e. **accent step 700**.
 See **Q5** for how this meets the `.docx` that merged today.
+
+> **The document tokens are NEVER mirrored.** This is the one rule in this section, and getting it wrong is
+> not a subtle regression. §2.3 mirrors the ramp's lightness axis in light mode, so in the light block
+> `--color-accent-700` is L **0.860**. Paper is light, so reading the light block is the natural move — and
+> L 0.860 on `--doc-paper` measures **1.43:1** at its worst hue. A near-invisible heading colour, in the one
+> artefact that leaves the building and goes into a case file.
+>
+> Paper has no appearance. It is always light, in both themes, so the doc tokens take the **unmirrored**
+> values and are byte-identical in dark and light:
+> `--doc-accent` = L **0.460** C 0.090 (**6.50:1** on paper, worst case over all 360 hues) and
+> `--doc-tint` = L **0.975** C 0.020 (ramp 100, replacing `secondaryColor` — see R-Q7).
+> Assert this in a test rather than a comment: pick the worst hue and check the generated hex, so the
+> mirrored value can never be substituted silently.
 
 ### 2.5 Masking
 `A.B. · CH-0041` — initials plus case reference, per-user preference, page-level reveal control. Design
@@ -656,3 +682,94 @@ ph-warning-circle    ph-wifi-high         ph-wifi-slash        ph-x             
 `ph-microphone` (dictate), `ph-cloud-slash` / `ph-wifi-slash` / `ph-cell-signal-medium` /
 `ph-battery-medium` (the offline affordances) belong to the **held** A1 scope — vendor them, but do not wire
 them up until A1 is answered.
+
+---
+
+## 5e · Foundation review, and a correction to my own arithmetic (Creed, 4 Sep)
+
+Design-fidelity pass on `feat/t119-nocturne-foundation @e5747ee`, and what it changed in this spec.
+
+### F1 · "The legacy rules win the cascade" is not the same as "the legacy rules still work"
+The foundation kept the pre-Nocturne rules and deleted the 20 tokens they read, on the reasoning that
+cascade order keeps the legacy rules winning so no unmigrated screen changes. Cascade order does keep them
+winning — but **an undeclared `var()` makes the declaration invalid at computed-value time**, so it resolves
+to `unset`, i.e. `initial` for every non-inherited property. Winning the cascade buys nothing. Measured in
+Chrome, not inferred: legacy `input` rendered `border: 0px none` with a transparent background (silently
+reverting T124's 3:1 control boundary on 33 screens), `.card` at padding 0 with no border, `.btn-row` at
+gap 0.
+
+Fix is a bridge block, and the rule inside it generalises to any staged design-system migration:
+**colour migrates, structure does not.** Colour has to — `body` already paints the new ground, and a light
+card on a dark page is broken with no half-way state. Spacing and type must not — nothing forces them, and
+swapping the 4px scale for the 0.7× one silently re-lays-out every screen nobody has reviewed yet.
+
+Guard it with a test rather than a comment: collect every `var(--x)` in `app.css` and assert `--x` is
+declared. Landed as `FrontendSourceGuardTest.everyCustomPropertyReferenceResolvesToADeclaration`. Known
+limitation, acceptable today: it checks a token is declared *somewhere in the file*, not in a scope that
+reaches the reference, so a token declared only inside `[data-appearance="light"]` would pass and still be
+undefined in dark.
+
+### F2 · `.shell-toggle` reintroduced the §5d defect on the shell's own buttons
+Bounded by `color-mix(in srgb, var(--color-text) 16%, transparent)` — `--color-divider`'s exact value,
+**1.58:1**. The same 1.4.11 failure §5d fixes on `.input` and `.btn-secondary`. Exempt only while the
+buttons ship `disabled`; phase 2 enables them. Takes `--color-control-border` (**3.42:1** dark on surface),
+which also gives it the flat fallback a bare `color-mix()` in a `border` shorthand lacks — that shorthand
+drops entirely on a pre-2023 browser, leaving no border at all.
+
+### F3 · RETRACTED — the checked chip was never failing contrast
+**I reported the checked chip's border at 2.40:1 and called it a 1.4.11 failure. That was wrong. It measures
+4.51:1 and it passes.** The sweep behind it used a broken OKLCH→sRGB conversion.
+
+> **The bug, recorded so nobody repeats it.** The OKLab matrix yields **linear** sRGB. I then passed those
+> values through the sRGB gamma decode *again* inside the luminance function — decoding twice. Every
+> OKLCH-derived pair it produced was wrong; hex-derived pairs were unaffected, which is why the composited
+> border figures in the same review were correct.
+> **Correct:** `Y = 0.2126·r + 0.7152·g + 0.0722·b` computed **directly from the matrix output**. Only apply
+> the gamma decode when the input is a hex/sRGB string.
+> **Validate any colour-conversion function against a known anchor before trusting a sweep.** Three that this
+> spec already contains: dark accent on the dark ground = **5.31:1**; light accent at L 0.48 = **5.06:1**;
+> and hue 289 step 500 = **#9084DA**, against Nocturne's own published `#9184D9` — one unit per channel.
+> The tell that exposed it was a document figure returning 15.62:1, which is not a plausible number for a
+> mid-lightness colour.
+
+The change itself (`border-color: var(--color-accent-300)`) stays, on design grounds rather than
+conformance: 9.19:1 dark / 6.27:1 light against 4.51:1, and a selected chip whose border matches its ink is
+how it should read. **The T124 carry-over — "a pale supplier colour can push a checked chip below 3:1" —
+closes as NOT A DEFECT, not as fixed.**
+
+`.seg-opt` was checked for the same problem and does not have it: its checked ring is the base accent but it
+sits on `--color-surface`, not on the tint (5.31:1 dark / 5.06:1 light).
+
+### R-Q8 amended · the Java ramp is a contingency for CSS, but unconditional for the document
+R-Q8 closes by treating a server-side hue→hex ramp as the fallback if the browser floor ever excludes
+`oklch()`. **For the `.docx` that is not a contingency.** There is no browser anywhere in the document path,
+so the server must compute hex regardless of how the browser question resolves — it is on the document
+critical path now. Jim identified this; it is a real gap in R-Q8 as written. Landing as **T137**, a shared
+utility for both the document path and any future CSS fallback.
+
+**Ramp implementation, signed off.** Nine fixed L/C pairs, hue injected:
+`100 .975/.020 · 200 .925/.045 · 300 .860/.090 · 400 .775/.115 · 500 .660/.125 · 600 .565/.110 ·
+700 .460/.090 · 800 .360/.070 · 900 .280/.055`.
+OKLCH → OKLab → LMS (cube each) → linear sRGB via the standard matrix → **clamp to [0,1] in linear space**
+→ gamma-encode. Clipping is required and safe: **797 of the 3240 hue×step combinations fall outside sRGB**,
+almost all in the pale steps, and a pale step clips toward white, which only raises its contrast with dark
+ink.
+
+Test vectors:
+
+| hue | 100 | 300 | 500 | 700 | 900 |
+| --- | --- | --- | --- | --- | --- |
+| 289 (Beacon) | `#F6F5FF` | `#CEC8FF` | `#9084DA` | `#574F87` | `#282442` |
+| 232 (Northgate) | `#EAFAFF` | `#93DCFF` | `#259ED1` | `#0C6081` | `#022D3F` |
+
+### Banked for phase 2/3, from the same review
+- **T131** — `--control-min` was never declared (44px is hard-coded at 13 sites: right value, wrong shape),
+  and the `--doc-*` tokens are not yet ported. R-Q7 (T126) folds in here rather than re-pointing the tint
+  alone: `ReportService:197` passes all three colours in one call, and taking two from the retiring model
+  and one from the ramp leaves a call site that cannot tell a reader which model it is on.
+- **T132** — `.shell-search` and `.shell-org` are non-interactive `<div>`s dressed as controls (the search
+  box is the header's most prominent affordance, does nothing, and is not focusable); the two disabled
+  toggles announce their state only through `title`, which screen readers do not reliably read;
+  `ph-users-three` marks three different nav items, so a child record and a staff account share a glyph; and
+  because roles stack (only Home Staff and Admin are exclusive) a Home Staff + Viewer account renders two
+  "Records" group headers with "My Children" and "Children" both pointing at `/children`.
