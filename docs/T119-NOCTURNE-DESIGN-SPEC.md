@@ -106,7 +106,7 @@ not a hex; the admin colour picker maps its chosen colour to a hue and discards 
 `secondaryColor` has no role in this model — see **Q7**.
 
 **Deriving the hue — normative, because two halves implement it.** Pam's phase-2 branding work derives
-`--brand-hue` for CSS and Jim's T137 derives the same hue for the `.docx`. They read the same source and
+`--brand-hue` for CSS and Jim's T131 derives the same hue for the `.docx`. They read the same source and
 must produce the same number, so the derivation is specified here rather than twice in code:
 
 > Take the supplier's stored `primaryColor` (sRGB hex). Convert sRGB → linear → OKLab. The hue is
