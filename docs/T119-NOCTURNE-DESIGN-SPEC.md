@@ -128,6 +128,29 @@ example: the canvas declares `hue: 289`, the ramp renders step 500 to `#9184d9`,
 back gives **289.6 → 290**. Both numbers are right about different things — 289 is the ramp's input, 290 is
 what the rendered colour actually is. **Test the ramp hue → hex only; never assert on a round trip.**
 
+This is stronger than it first looks, and my earlier wording under-stated it by implying only a *foreign*
+hex (like Nocturne's `#9184d9`) fails to round-trip. **The ramp's own output does not round-trip either.**
+Measured, hue → step → `hueFrom`, across all 360 hues:
+
+| step | hues that do not return their own input |
+| --- | --- |
+| 100 | **340 / 360** |
+| 300 | 149 / 360 |
+| 500 | 38 / 360 |
+| 700 | 100 / 360 |
+| 900 | 175 / 360 |
+
+Steps 300–900 drift by ±1 degree from 8-bit quantisation. **Step 100 is different and worth understanding:
+its chroma is 0.020, exactly the grey floor, so after quantisation it lands *below* the floor and correctly
+reports 265.** That is the floor working, not a fault — but it means **the tint can never be used to recover
+the brand hue**, which matters because `--doc-tint` is step 100. If you need the hue, read the stored
+`brandHue`; do not try to reverse a swatch.
+
+A round-trip test therefore passes only on the hues it happens to pick. **The guarantee that makes the
+screen and the document agree is not invertibility — it is that the hue is derived once from `primaryColor`
+and the integer is what travels.** Pin that instead: assert `brandHue` is derived once and that the tint and
+doc-accent are computed from that same integer.
+
 Round to a whole degree in **one** place and pass the integer around. Two implementations that each round
 their own way will disagree by a degree on some colours, and a document whose accent is one degree off the
 screen's is the kind of defect nobody can describe and everybody can see.
