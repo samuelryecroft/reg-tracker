@@ -43,7 +43,7 @@ the answer: what the 6 are, and which of them have to exist.
 | 6 | `webEnvironment = RANDOM_PORT` (Playwright) | 7 | yes | necessary |
 | 7 | `@TestPropertySource` opening the break-glass path | 2 | yes | **chosen** — see below |
 
-Context 4 is why there are 6 contexts but only 5 pools: a `@WebMvcTest` slice
+Context 4 is why there are 7 contexts but only 6 pools: a `@WebMvcTest` slice
 builds no `DataSource`.
 
 ### Context 3 — necessary, and now shared rather than repeated
@@ -124,8 +124,8 @@ into context 2 and return one context and one pool (10 connections).
 structurally narrower than it looks.
 
 A context exists as long as *any* class needs it. So moving three of the four
-saves nothing at all: group 1 survives for the fourth, and the count stays at 6
-contexts and 5 pools. The collapse is all-or-nothing, and the "all" necessarily
+saves nothing at all: group 1 survives for the fourth, and the count stays
+where it is. The collapse is all-or-nothing, and the "all" necessarily
 includes `ReturnHomeTrackerApplicationTests`, whose entire value is proving that
 a context *close to the production one* loads.
 

@@ -107,9 +107,9 @@ class BreakGlassClosedIntegrationTest extends AbstractIntegrationTest {
      * cheap to fix. When P8 lands and the general form-login path goes, this becomes a statement
      * about production and the qualification above can go with it.
      *
-     * <p>It lives in the closed-path class because it is true regardless of whether break-glass is
-     * switched on, and asserting it in the default configuration asserts it about the configuration
-     * nearly every deployment runs.
+     * <p>It lives in the closed-path class because the count does not depend on whether break-glass
+     * is switched on, so it needs no property override and costs no context - not because the claim
+     * holds more widely than the paragraph above says it does.
      */
     @Test
     void atMostOneEnabledAccountHoldsALocalCredential() {
