@@ -202,8 +202,12 @@
     /* Not arbitrary picks: the accent ramp MIRRORS between appearances, so step 900 is
        the pale step in light and the deep step in dark - --tint: accent-900 holds the
        same role (a quiet tinted fill) in both, and --accent-dark: accent-300 is the ink
-       that sits legibly on that fill in both. Swept all 360 hues: 7.82:1 dark / 13.81:1
-       light worst case. */
+       that sits legibly on that fill in both. Swept all 360 hues WITHIN each appearance
+       (both tokens read in the SAME theme, which is the only comparison that corresponds
+       to anything actually rendered): 9.19:1 dark / 6.27:1 light worst case. (Corrected
+       during Creed's #59 review - the figure this replaced, 7.82:1 dark / 13.81:1 light,
+       came from comparing accent-900 ACROSS themes rather than accent-300 against
+       accent-900 within one theme; verified independently, twice, before changing it.) */
     --accent-dark: var(--color-accent-300);
     --tint: var(--color-accent-900);
     --radius: 10px;
@@ -826,7 +830,13 @@ fieldset.checkbox-fieldset > legend {
     margin-right: var(--s2);
     box-shadow: 0 1px 2px rgba(20, 20, 20, 0.06);
 }
-.btn:hover { background: var(--accent-dark); color: #fff; }
+/* Creed's #59 review: --accent-dark is accent-300, which MIRRORS between themes (deep in light,
+   PALE in dark) - so `color: #fff` was white text on a pale lilac fill in dark mode, 1.48-1.62:1,
+   failing 1.4.3 at all 360 hues (worse than any of #48's four). Minimal fix, not a redesign: this
+   legacy .btn family is scheduled for replacement by .btn-primary/.btn-secondary during the
+   screen migrations, so the fix keeps the fill and only swaps the ink - var(--color-bg) measures
+   10.85:1 dark / 5.87:1 light, 0/360 failures. */
+.btn:hover { background: var(--accent-dark); color: var(--color-bg); }
 .btn.secondary { background: var(--surface); color: var(--accent-dark); border-color: var(--accent-dark); box-shadow: none; }
 .btn.secondary:hover { background: var(--tint); }
 .btn.ghost { background: transparent; color: var(--muted); border-color: var(--control-border); box-shadow: none; }
@@ -850,10 +860,18 @@ fieldset.checkbox-fieldset > legend {
 }
 .status.REQUESTED { background: var(--warn-bg); color: var(--warn); }
 .status.ALLOCATED, .status.SCHEDULED, .status.REPORT_SUBMITTED { background: var(--info-bg); color: var(--info); }
-.status.REPORT_REJECTED { background: #FDE7D8; color: #9A3412; }
+/* Was a hardcoded #FDE7D8/#9A3412 pair - the same bug shape as #48 (a light-page literal instead
+   of the theme-aware token), just missed by that pass's grep because both sides were hardcoded
+   rather than one hardcoded ink against a themed background. --sent-back/--sent-back-bg is the
+   correct pair regardless: it's the same token .tag-sent-back and .tl .dot.back already use for
+   this exact state (T155 batch 2), and D-1a-2's copy finding renamed this status's displayName to
+   "Sent back" for the same reason - one vocabulary, one token, for one event. */
+.status.REPORT_REJECTED { background: var(--sent-back-bg); color: var(--sent-back); }
 .status.REPORT_APPROVED { background: var(--ok-bg); color: var(--ok); }
 .status.CANCELLED { background: var(--error-bg); color: var(--error); }
-.status.warning { background: #FDE7D8; color: #9A3412; margin-left: 0.4rem; }
+/* Same literal-pair bug as REPORT_REJECTED above, but this one actually is a warning ("Consent not
+   yet confirmed") - --warn/--warn-bg is the semantically correct token, not --sent-back. */
+.status.warning { background: var(--warn-bg); color: var(--warn); margin-left: 0.4rem; }
 
 /* Roadmap 2.1 due-state badges (ninja...interview.DueBadge). Never colour alone - each carries a
    glyph and duration text too. Colours reuse the semantic families above; no new red. */
@@ -910,6 +928,22 @@ fieldset.checkbox-fieldset > legend {
 .muted { color: var(--muted); }
 dl.detail dt { font-weight: 650; margin-top: var(--s3); font-size: var(--t-xs); color: var(--muted); }
 dl.detail dd { margin: 0.15rem 0 0; white-space: pre-wrap; }
+
+/* D-1a-1 (spec 1058511): never opacity for de-emphasis - it compounds with an already-muted
+   token (0.7 x 0.5 = 2.81:1 dark / 2.07:1 light, both failing 1.4.3) and dims the focus ring of
+   anything focusable inside it along with it. --color-text-muted on its own holds 6.89:1 dark /
+   5.45:1 light; italic supplies the de-emphasis opacity was reaching for, without touching
+   contrast. The question itself (dl.detail dt above) is never touched - a reviewer scans
+   questions for gaps, so the thing skipped is exactly what must stay legible. */
+.unanswered { color: var(--muted); font-style: italic; }
+.section-count {
+    font-weight: 400;
+    text-transform: none;
+    letter-spacing: normal;
+    color: var(--muted);
+    font-size: var(--t-sm);
+    margin-left: var(--s2);
+}
 
 /* ============================== tables ============================== */
 .table-wrap { overflow-x: auto; border-radius: var(--radius); border: 1px solid var(--border); margin-top: var(--s5); }
@@ -1032,6 +1066,111 @@ fieldset.step[hidden] { display: none; }
     .daysep { break-after: avoid; page-break-after: avoid; }
     .provenance { border: 1px solid #999; background: #fff; }
     .tl .dot { border-color: #333 !important; background: #fff !important; }
+}
+
+/* ============================== 1a: interview record (T155) ============================== */
+
+/* D-1a-2/D-1a-2a: the status rail, one <ol> of five fixed positions (StatusRail.java is the only
+   place that decides WHICH state a position is in - this only decides how each state looks).
+   Horizontal, connector-first: each <li> draws its own leading connector as a ::before so the
+   line runs continuously through the row rather than between the markers. */
+.rail { list-style: none; display: flex; margin: var(--space-6) 0; padding: 0; }
+.rail li {
+    position: relative; flex: 1; display: flex; flex-direction: column; align-items: center;
+    gap: var(--space-2); text-align: center; padding-top: 18px; font-size: var(--t-xs);
+}
+.rail li::before {
+    content: ""; position: absolute; top: 8px; left: -50%; width: 100%; height: 2px;
+    background: var(--color-divider); z-index: 0;
+}
+.rail li:first-child::before { content: none; }
+.rail-marker {
+    position: relative; z-index: 1; width: 18px; height: 18px; display: flex; align-items: center;
+    justify-content: center; border-radius: 50%; background: var(--surface); font-size: 16px;
+}
+.rail-label { font-weight: 600; color: var(--color-text-muted); }
+.rail-when { color: var(--muted); font-variant-numeric: tabular-nums; }
+
+.rail li.rail-COMPLETE .rail-marker, .rail li.rail-CURRENT .rail-marker { color: var(--accent); }
+.rail li.rail-COMPLETE::before, .rail li.rail-CURRENT::before { background: var(--accent); }
+.rail li.rail-COMPLETE .rail-label, .rail li.rail-CURRENT .rail-label { color: var(--color-text); }
+.rail li.rail-CURRENT .rail-label { font-weight: 700; }
+/* "in an outlined ring" (D-1a-2a) - the one marker that gets an explicit border, so CURRENT reads
+   as distinct from COMPLETE at a glance and not only by which glyph it happens to carry. */
+.rail li.rail-CURRENT .rail-marker { border: 2px solid var(--accent); }
+
+.rail li.rail-UPCOMING .rail-marker { color: var(--control-border); }
+
+/* SENT_BACK (REPORT_REJECTED at the REPORT_SUBMITTED position) - never colour alone, so the glyph
+   (ph-arrow-u-up-left, "went back") plus the label from InterviewStatus.displayName ("Sent back")
+   both carry the meaning; colour is the third signal, not the only one. */
+.rail li.rail-SENT_BACK .rail-marker { color: var(--sent-back); background: var(--sent-back-bg); }
+.rail li.rail-SENT_BACK::before { background: var(--sent-back); }
+.rail li.rail-SENT_BACK .rail-label { color: var(--sent-back); font-weight: 700; }
+
+/* CANCELLED (the position a cancelled request last reached) - a different glyph AND colour pair
+   from SENT_BACK (D-1a-2a's table gives the two rows distinct treatments), so the two can never
+   be confused for each other even at a glance. */
+.rail li.rail-CANCELLED .rail-marker { color: var(--neutral); background: var(--neutral-bg); }
+.rail li.rail-CANCELLED::before { background: var(--neutral); }
+.rail li.rail-CANCELLED .rail-label { color: var(--neutral); font-weight: 700; }
+
+/* NOT_APPLICABLE (after a cancelled request's last-reached position) - the connector itself turns
+   dashed, not just muted colour: a shape change is what stops these reading as "still to come". */
+.rail li.rail-NOT_APPLICABLE .rail-marker { color: var(--muted); }
+.rail li.rail-NOT_APPLICABLE::before { background: none; border-top: 2px dashed var(--color-divider); height: 0; }
+
+/* D-1a-3: a section index, not tabs - pills that behave as jump links. `:has()` gives an active
+   pill with no JS; it is progressive enhancement only (Chrome 105 / Safari 15.4 / Firefox 121,
+   later than the color-mix() floor R-Q8 committed to) - unsupported browsers simply show no
+   active pill, and every link still works, so nothing here may depend on it to be usable. */
+.section-index {
+    display: flex; flex-wrap: wrap; gap: var(--space-2); margin: var(--space-6) 0;
+    padding: var(--space-2) 0; border-block: 1px solid var(--border);
+}
+.section-index a {
+    display: inline-flex; align-items: center; min-height: 44px; padding: 0 var(--space-4);
+    border-radius: 999px; font-size: var(--text-interactive); font-weight: 600;
+    color: var(--muted); text-decoration: none; background: transparent;
+}
+.section-index a:hover { background: var(--surface); color: var(--color-text); }
+.section-index a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+body:has(#request:target) .section-index a[href="#request"],
+body:has(#young-person:target) .section-index a[href="#young-person"],
+body:has(#professionals:target) .section-index a[href="#professionals"],
+body:has(#submitted-by:target) .section-index a[href="#submitted-by"],
+body:has(#report-details:target) .section-index a[href="#report-details"],
+body:has(#rhi:target) .section-index a[href="#rhi"],
+body:has(#future-incidents:target) .section-index a[href="#future-incidents"],
+body:has(#interviewer-comments:target) .section-index a[href="#interviewer-comments"],
+body:has(#recommendations:target) .section-index a[href="#recommendations"],
+body:has(#declaration:target) .section-index a[href="#declaration"],
+body:has(#history:target) .section-index a[href="#history"] {
+    /* Creed's review: white on the dark-mode accent is 2.89-3.31:1, failing 1.4.3 at all 360
+       hues (light passes at 5.77-7.02, which is why this survives a light-mode eyeball).
+       --color-bg is the fix, not an arbitrary swap - it measures 5.31:1 dark / 5.06:1 light,
+       0/360 failures, because it's the spec's already-locked accent-on-background floor and
+       contrast is symmetric: an accent fill with page-background ink is the exact inverse of a
+       pair already swept. It inherits that guarantee for free. */
+    background: var(--accent); color: var(--color-bg);
+}
+/* Every jump target: tabindex="-1" in the markup makes it focusable (a jump link moves scroll
+   position but not the reading cursor otherwise - a screen-reader user activating a section link
+   would see nothing happen); scroll-margin-top clears the sticky header so the heading lands
+   below it rather than underneath it (D-1a-3). */
+.card[id] { scroll-margin-top: calc(var(--space-8) + 12px); }
+.card[id]:focus { outline: none; }
+
+/* D-1a-4: the history column collapses at 1060px, not the shell's 900px - the report column's own
+   width (viewport - 212 sidebar - 22.4 gap - 316 history) drops under a 66ch measure at ~1045px,
+   well before the sidebar breakpoint. Below 1060px, #history becomes the section index's own last
+   entry (D-1a-3's pattern) rather than a silent single-column stack. */
+.detail-layout { display: grid; grid-template-columns: 1fr 316px; gap: var(--space-8); align-items: start; }
+.detail-layout .history-col { min-width: 0; }
+.section-index a[href="#history"] { display: none; }
+@media (max-width: 1060px) {
+    .detail-layout { display: block; }
+    .section-index a[href="#history"] { display: inline-flex; }
 }
 
 /* ============================== dashboard (roadmap 2.3) ============================== */
