@@ -1835,3 +1835,28 @@ duplication in S-1, and worth stating as a rule for the rest of the batch:
 
 > **A list scoped to one person, home or child does not spend a column repeating that scope.** The column is
 > free to carry the thing the reader actually came for — here, when the visit is.
+
+
+## 6f · D-1b-7 placement corrected — my split was wrong, and the blocked branch proves it (Creed, 5 Sep)
+
+I ruled that the guard attestation stays beside the actions (D-1b-7) while the prior-send-back note goes to
+the top (D-1b-8). Pam moved **both** to the top. **She was right and I was wrong**, and the argument that
+settles it is one neither of us made: **the guard has a second branch.**
+
+When `canDecide` is false there is no action bar at all — correct per D-1b-7 — and the explanatory banner is
+what replaces it. If the *satisfied* branch is announced at the top and the *blocked* branch sits where the
+actions would have been, then **the page tells a reviewer the good news early and the bad news late**: a
+blocked reviewer reads the entire safeguarding report before being told they were never permitted to act on
+it. That is D-1b-8's own argument applied to permission instead of history, and it is the sharper case —
+D-1b-8 is about reading *well*, this is about reading *at all*.
+
+> **Both branches of one guard belong in the same place, and that place is above the content.** A page must
+> not change shape depending on which branch of a permission the reader falls into, and a precondition of
+> acting is a precondition of *starting*, not a footnote to finishing.
+
+So: prior-send-back, the attestation, and the blocked-reviewer banner all sit in the identity block above the
+rail. **D-1b-7's "beside the actions" is superseded.**
+
+The general form, since this is the third placement question decided the same way: **anything that changes
+whether or how a reader should engage with a document belongs before the document.** Only things that
+qualify the *act* — the approve consequence panel — belong at the point of acting.
