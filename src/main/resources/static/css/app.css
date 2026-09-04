@@ -560,12 +560,18 @@ textarea.input { min-height: 90px; resize: vertical; }
     background: linear-gradient(140deg, var(--color-accent), var(--color-accent-700));
 }
 .shell-brand-name { font-size: var(--text-interactive); font-weight: 500; letter-spacing: -0.01em; }
+/* Creed's review (spec 12d10e8): the box-shadow ring stays - it's a decorative hairline (10% of
+   text, ~1.3:1) marking a grouping container, not a control-strength boundary (--color-control-border
+   at 3:1+ is what a real control carries here), so it doesn't contradict "unwired chrome must not
+   look like a control". The button-reset properties this used to carry (background/border/width/
+   text-align/font/color, from when this was headed toward being a <button>) are gone - a plain <div>
+   needs none of them: background/border already default to none, text-align/color/font are all
+   naturally-inherited CSS properties regardless, and width stretches to fill .shell-side's column
+   flex track by that container's own default align-items: stretch. */
 .shell-org {
     padding: var(--space-3) var(--space-4); border-radius: var(--radius-md);
     box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-text) 10%, transparent);
     display: flex; align-items: center; gap: var(--space-3);
-    background: transparent; border: none; width: 100%; text-align: left;
-    font: inherit; color: inherit;
 }
 .shell-org-label {
     display: block; font-size: var(--text-chrome); letter-spacing: 0.1em; text-transform: uppercase;

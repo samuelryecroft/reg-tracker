@@ -137,6 +137,18 @@ class NocturneFoundationUiTest extends AbstractUiTest {
         String orgCursor = (String) page.locator(".shell-org")
                 .evaluate("el => getComputedStyle(el).cursor");
         assertThat(orgCursor).isNotEqualTo("pointer");
+
+        // Creed's optional tidy: the button-reset properties (including an explicit width: 100%)
+        // came off .shell-org as dead residue from when it was headed toward being a <button> -
+        // this pins that the box still visually stretches to the sidebar's own width regardless,
+        // via .shell-side's default column-flex stretch, not the removed declaration.
+        Object orgWidth = page.locator(".shell-org").evaluate("el => el.getBoundingClientRect().width");
+        Object sideWidth = page.locator(".shell-side").evaluate(
+                "el => el.getBoundingClientRect().width - 2 * parseFloat(getComputedStyle(el).paddingLeft)");
+        // Sub-pixel layout rounding can differ by a fraction of a pixel between the two elements'
+        // own rect computations - a tolerance, not exact equality, is what "stretches to fill" means.
+        assertThat(((Number) orgWidth).doubleValue())
+                .isCloseTo(((Number) sideWidth).doubleValue(), org.assertj.core.data.Offset.offset(0.5));
     }
 
     /**
