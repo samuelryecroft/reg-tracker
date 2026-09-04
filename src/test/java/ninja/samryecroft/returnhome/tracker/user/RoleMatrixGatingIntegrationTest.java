@@ -207,7 +207,7 @@ class RoleMatrixGatingIntegrationTest extends AbstractIntegrationTest {
     private void saveUser(String username, Set<Role> roles, Organisation organisation, Set<Home> homes) {
         User user = new User();
         user.setUsername(username);
-        user.setFullName(username);
+        user.setLastName(username);
         user.setRoles(new HashSet<>(roles));
         user.setOrganisation(organisation);
         user.setHomes(new HashSet<>(homes));

@@ -44,6 +44,8 @@
             <div class="top"><span class="name" th:text="${u.username}">username</span></div>
             <dl>
                 <dt>Full name</dt><dd th:text="${u.fullName}">Full Name</dd>
+                <dt>Email</dt><dd th:text="${u.email} ?: 'Not recorded'">Email</dd>
+                <dt>Phone</dt><dd th:text="${u.contactPhone} ?: 'Not recorded'">Phone</dd>
                 <dt>Roles</dt><dd th:text="${#strings.setJoin(u.roles, ', ')}">ROLES</dd>
                 <dt th:unless="${#lists.isEmpty(u.homes)}">Homes</dt><dd th:unless="${#lists.isEmpty(u.homes)}" th:text="${#strings.listJoin(u.homes.![name], ', ')}">Homes</dd>
                 <dt th:if="${u.organisation}">Organisation</dt><dd th:if="${u.organisation}" th:text="${u.organisation.name}">Organisation</dd>

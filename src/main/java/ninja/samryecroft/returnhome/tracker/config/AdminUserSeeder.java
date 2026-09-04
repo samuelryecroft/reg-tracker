@@ -57,7 +57,10 @@ public class AdminUserSeeder implements ApplicationRunner {
         User admin = new User();
         admin.setUsername(username);
         admin.setPassword(passwordEncoder.encode(password));
-        admin.setFullName("System Administrator");
+        admin.setFirstName("System");
+        admin.setLastName("Administrator");
+        // No email: this account is seeded from an environment secret, not provisioned by a person,
+        // so there is no address to record. An admin supplies one on the first edit.
         admin.setRoles(Set.of(Role.ADMIN));
         admin.setEnabled(true);
         userRepository.save(admin);

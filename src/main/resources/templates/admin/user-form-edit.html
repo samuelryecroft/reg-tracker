@@ -17,16 +17,36 @@
                 <div>
                     <strong>Before these changes can be saved</strong>
                     <ul>
-                        <li th:if="${#fields.hasErrors('fullName')}"><a href="#fullName" th:text="${#fields.errors('fullName')[0]}">Error</a></li>
+                        <li th:if="${#fields.hasErrors('firstName')}"><a href="#firstName" th:text="${#fields.errors('firstName')[0]}">Error</a></li>
+                        <li th:if="${#fields.hasErrors('lastName')}"><a href="#lastName" th:text="${#fields.errors('lastName')[0]}">Error</a></li>
+                        <li th:if="${#fields.hasErrors('email')}"><a href="#email" th:text="${#fields.errors('email')[0]}">Error</a></li>
+                        <li th:if="${#fields.hasErrors('contactPhone')}"><a href="#contactPhone" th:text="${#fields.errors('contactPhone')[0]}">Error</a></li>
                         <li th:if="${#fields.hasErrors('newPassword')}"><a href="#newPassword" th:text="${#fields.errors('newPassword')[0]}">Error</a></li>
                     </ul>
                 </div>
             </div>
 
-            <label for="fullName">Full name <span class="req" aria-hidden="true">*</span></label>
-            <input type="text" id="fullName" th:field="*{fullName}" required
-                   th:errorclass="is-invalid" th:aria-invalid="${#fields.hasErrors('fullName')}" aria-describedby="fullName-error"/>
-            <div th:replace="~{fragments/layout :: fieldError('fullName')}"></div>
+            <label for="firstName">First name <span class="req" aria-hidden="true">*</span></label>
+            <input type="text" id="firstName" th:field="*{firstName}" required autocomplete="given-name"
+                   th:errorclass="is-invalid" th:aria-invalid="${#fields.hasErrors('firstName')}" aria-describedby="firstName-error"/>
+            <div th:replace="~{fragments/layout :: fieldError('firstName')}"></div>
+
+            <label for="lastName">Last name <span class="req" aria-hidden="true">*</span></label>
+            <input type="text" id="lastName" th:field="*{lastName}" required autocomplete="family-name"
+                   th:errorclass="is-invalid" th:aria-invalid="${#fields.hasErrors('lastName')}" aria-describedby="lastName-error"/>
+            <div th:replace="~{fragments/layout :: fieldError('lastName')}"></div>
+
+            <label for="email">Email address <span class="req" aria-hidden="true">*</span></label>
+            <p class="hint">Used to contact this person, and to match them to their directory account later.</p>
+            <input type="email" id="email" th:field="*{email}" required autocomplete="email"
+                   th:errorclass="is-invalid" th:aria-invalid="${#fields.hasErrors('email')}" aria-describedby="email-error"/>
+            <div th:replace="~{fragments/layout :: fieldError('email')}"></div>
+
+            <label for="contactPhone">Contact phone number</label>
+            <p class="hint">Optional.</p>
+            <input type="tel" id="contactPhone" th:field="*{contactPhone}" autocomplete="tel"
+                   th:errorclass="is-invalid" th:aria-invalid="${#fields.hasErrors('contactPhone')}" aria-describedby="contactPhone-error"/>
+            <div th:replace="~{fragments/layout :: fieldError('contactPhone')}"></div>
 
             <fieldset class="checkbox-fieldset">
                 <legend>Roles</legend>

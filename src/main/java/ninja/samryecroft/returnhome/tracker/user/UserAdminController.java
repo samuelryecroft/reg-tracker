@@ -68,7 +68,10 @@ public class UserAdminController {
     public String editForm(@PathVariable Long id, @AuthenticationPrincipal AppUserPrincipal principal, Model model) {
         User user = userService.getAuthorized(id, principal);
         EditUserForm form = new EditUserForm();
-        form.setFullName(user.getFullName());
+        form.setFirstName(user.getFirstName());
+        form.setLastName(user.getLastName());
+        form.setEmail(user.getEmail());
+        form.setContactPhone(user.getContactPhone());
         form.setRoles(new HashSet<>(user.getRoles()));
         form.setOrganisationId(user.getOrganisation() != null ? user.getOrganisation().getId() : null);
         // One Homes field for both roles now - queried rather than read off the detached user,

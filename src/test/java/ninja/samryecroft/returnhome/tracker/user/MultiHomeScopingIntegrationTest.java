@@ -214,7 +214,9 @@ class MultiHomeScopingIntegrationTest extends AbstractIntegrationTest {
 
         CreateUserForm form = new CreateUserForm();
         form.setUsername("mh-split" + suffix);
-        form.setFullName("Split Across Providers");
+        form.setFirstName("Split");
+        form.setLastName("Across Providers");
+        form.setEmail("split.across.providers@example.test");
         form.setRoles(Set.of(Role.HOME_STAFF));
         form.setHomeIds(Set.of(firstHome.getId(), foreignHome.getId()));
 
@@ -241,7 +243,7 @@ class MultiHomeScopingIntegrationTest extends AbstractIntegrationTest {
     private AppUserPrincipal adminPrincipal() {
         User admin = new User();
         admin.setUsername("mh-admin" + suffix);
-        admin.setFullName("Platform Admin");
+        admin.setLastName("Platform Admin");
         admin.setRoles(Set.of(Role.ADMIN));
         admin.setEnabled(true);
         return new AppUserPrincipal(userRepository.saveAndFlush(admin), false);
@@ -273,7 +275,7 @@ class MultiHomeScopingIntegrationTest extends AbstractIntegrationTest {
     private void saveUser(String username, Role role, Set<Home> homes) {
         User user = new User();
         user.setUsername(username);
-        user.setFullName(username);
+        user.setLastName(username);
         user.setPassword(passwordEncoder.encode("multi-home-password"));
         user.setRoles(Set.of(role));
         user.setHomes(new HashSet<>(homes));

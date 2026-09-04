@@ -50,7 +50,7 @@ class EntraIdentityLinkSchemaTest extends AbstractIntegrationTest {
     private User user(String username) {
         User user = new User();
         user.setUsername(username);
-        user.setFullName(username);
+        user.setLastName(username);
         user.setRoles(Set.of(Role.COORDINATOR));
         user.setEnabled(true);
         return user;
@@ -114,7 +114,9 @@ class EntraIdentityLinkSchemaTest extends AbstractIntegrationTest {
         // bcrypt hash of the empty string - a credential anyone could present.
         CreateUserForm form = new CreateUserForm();
         form.setUsername("created-without-password");
-        form.setFullName("Created Without Password");
+        form.setFirstName("Created");
+        form.setLastName("Without Password");
+        form.setEmail("created.without.password@example.test");
         form.setRoles(Set.of(Role.COORDINATOR));
         form.setOrganisationId(organisationRepository.findByTypeOrderByName(OrgType.SUPPLIER).get(0).getId());
         // Exactly what an untouched HTML password field submits.
@@ -130,7 +132,9 @@ class EntraIdentityLinkSchemaTest extends AbstractIntegrationTest {
     void aSuppliedPasswordIsStillEncodedAndStillUsable() {
         CreateUserForm form = new CreateUserForm();
         form.setUsername("created-with-password");
-        form.setFullName("Created With Password");
+        form.setFirstName("Created");
+        form.setLastName("With Password");
+        form.setEmail("created.with.password@example.test");
         form.setRoles(Set.of(Role.COORDINATOR));
         form.setOrganisationId(organisationRepository.findByTypeOrderByName(OrgType.SUPPLIER).get(0).getId());
         form.setPassword("a-real-password");

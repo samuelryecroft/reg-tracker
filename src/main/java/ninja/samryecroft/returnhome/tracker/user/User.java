@@ -15,6 +15,7 @@ import jakarta.persistence.JoinTable;
 import jakarta.persistence.ManyToMany;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
@@ -53,8 +54,34 @@ public class User {
     @Column(name = "idp_subject", unique = true)
     private String idpSubject;
 
-    @Column(name = "full_name", nullable = false)
-    private String fullName;
+    @Column(name = "first_name")
+    private String firstName;
+
+    /**
+     * Not null, because every user has at least one name token. A person with a single name has it
+     * here with a null {@code firstName} - which is why this is the field the database insists on
+     * rather than the pair.
+     */
+    @Column(name = "last_name", nullable = false)
+    private String lastName;
+
+    /**
+     * The canonical profile address, entered by an admin. Nullable for rows created before T127.
+     *
+     * <p>Deliberately not {@code username}, and deliberately not unique. {@code username} stays the
+     * login key, and shared mailboxes are ordinary in this sector. This is also the field a future
+     * Entra link will sync its {@code email} claim into and look up on for the one-time link, so it
+     * is one field rather than a profile copy beside an identity copy - see {@link #idpSubject}.
+     *
+     * <p>Not encrypted; V17 records why, and it is a property of the per-organisation key model
+     * rather than a view about how sensitive this is.
+     */
+    @Column(name = "email", length = 320)
+    private String email;
+
+    /** Optional throughout: a contact number is useful, not something to block an account on. */
+    @Column(name = "contact_phone", length = 30)
+    private String contactPhone;
 
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "user_roles", joinColumns = @JoinColumn(name = "user_id"))
@@ -133,12 +160,52 @@ public class User {
         this.idpSubject = idpSubject;
     }
 
-    public String getFullName() {
-        return fullName;
+    public String getFirstName() {
+        return firstName;
     }
 
-    public void setFullName(String fullName) {
-        this.fullName = fullName;
+    public void setFirstName(String firstName) {
+        this.firstName = firstName;
+    }
+
+    public String getLastName() {
+        return lastName;
+    }
+
+    public void setLastName(String lastName) {
+        this.lastName = lastName;
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
+    }
+
+    public String getContactPhone() {
+        return contactPhone;
+    }
+
+    public void setContactPhone(String contactPhone) {
+        this.contactPhone = contactPhone;
+    }
+
+    /**
+     * Display name, derived rather than stored - and there is deliberately no setter.
+     *
+     * <p>Roughly twenty templates and several document-generation paths read {@code fullName}, and
+     * keeping it as a read-only derived value means none of them had to change or can drift from
+     * the fields that now hold the truth. A stored copy would be a second place for a name to live,
+     * and the one that silently goes stale.
+     */
+    @Transient
+    public String getFullName() {
+        if (firstName == null || firstName.isBlank()) {
+            return lastName;
+        }
+        return firstName + " " + lastName;
     }
 
     public Set<Role> getRoles() {
