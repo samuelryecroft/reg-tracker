@@ -189,12 +189,18 @@
             // is the one failure mode that actively misleads a visitor about whether their work is
             // safe.
             //
-            // Honest about what this line is worth: response.json() below would also reject on HTML
-            // and land in the same catch with the same message, so a mutation replacing this with
-            // response.ok survives the suite. It stays because rejecting on the parse is an accident
-            // of what the payload happens to contain rather than a property of the response - but
-            // the case that genuinely needed closing, a gateway answering 200 with its own JSON
-            // envelope, is closed by requiring outcome === 'saved' below, not by this line.
+            // Honest about what this line is worth, because the first version of this comment
+            // overclaimed it. It was kept for the gateway-answers-200-with-its-own-JSON case; that
+            // case is actually closed by requiring outcome === 'saved' below, which is pinned by a
+            // test. Replacing this line with response.ok still survives the suite, and after
+            // looking for one I cannot construct an input where the two differ: response.json()
+            // rejects on anything this would have caught, and lands in the same branch.
+            //
+            // So it stays for a reason that is about the code rather than about behaviour: without
+            // it, every non-JSON response - the ordinary expired-session case - reaches the parse
+            // and is handled by an exception, which is a worse thing to read and a worse thing to
+            // debug than a stated condition. It is not load-bearing, no test pins it, and it should
+            // not be described as though it were.
             if (!isJson(response)) {
                 state(TRANSIENT, 'pending');
                 return null;
