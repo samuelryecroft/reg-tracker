@@ -1262,3 +1262,82 @@ sections have them. Landing on a closed disclosure is not a dead end: the next f
 `<summary>`, which is a real control, natively focusable, and one keypress from open. What we must **not** do
 is try to force it open from `:target` — CSS cannot open a `<details>`, and reaching for JS to fake it would
 buy a nicety with the app's third script.
+
+
+## 5j · Three things the 1a build review found that the spec had not said (Creed, 4 Sep)
+
+Reviewing PR #59 (the 1a batch-2 build) turned up one defect I had specified into existence by omission, one
+general colour rule, and one rendering trap. All three generalise past 1a.
+
+### D-1a-2b · The rail's state must reach a non-visual reader — this was my omission
+
+D-1a-2a gave a glyph and a colour for each of the six rail states and **never said how the state reaches
+someone who sees neither.** The build followed it exactly and the result is a rail whose state is invisible
+to assistive technology: the marker is `aria-hidden="true"`, colour conveys nothing, and the label is the
+bare `displayName`. A screen reader hears *"Requested 1 Sep, Allocated 2 Sep, Scheduled, Report submitted,
+Report approved"* and **cannot tell which have happened.** That is 1.3.1 — the state is real information
+carried only by a hidden glyph and a colour.
+
+Every rail `<li>` carries a visually-hidden state word (`.visually-hidden` already exists in `app.css`), and
+the CURRENT step also takes `aria-current="step"`:
+
+| state | hidden text |
+|---|---|
+| COMPLETE | completed |
+| CURRENT | current step |
+| UPCOMING | not yet started |
+| SENT_BACK | sent back |
+| CANCELLED | cancelled |
+| NOT_APPLICABLE | not applicable |
+
+**The general rule, which applies to every status surface we build, not just this rail:** a decorative icon
+is `aria-hidden` and costs nothing; **a state-bearing icon is `aria-hidden` plus a text equivalent, or it is
+a state that only sighted users have.** "Never colour alone" is routinely read as "add an icon" — but an
+`aria-hidden` icon and a colour are *both* invisible to a screen reader, so the pair satisfies 1.4.1 while
+still failing 1.3.1. Specifying a glyph is not specifying an accessible state.
+
+### D-1a-2c · At the cancelled position, keep the position's own label
+
+The build replaced the label at the cancelled position with `CANCELLED.displayName`, so a request cancelled
+after scheduling reads *Requested / Allocated / **Cancelled** / Report submitted / Report approved* — and
+**the fact that it reached Scheduled is destroyed**, recoverable only by counting positions against a
+five-step order held in your head. Meanwhile the H1 status tag already says "Cancelled". The rail therefore
+repeats what is on screen and deletes what is not.
+
+*How far did this get before it was cancelled* is **the only question the rail uniquely answers**, and it is
+operational: did a visitor already travel, does a report exist. So keep the position's own label and put the
+cancellation in the `.rail-when` slot that already exists — `Scheduled` over `Cancelled 4 Sep`.
+
+**This is not the same as SENT_BACK, where substituting the label is correct**, and the difference is worth
+stating because it is the general test: **substitute the label when the exception IS the event at that
+position; keep it when the exception happened AFTER it.** Being sent back is what happened at *Report
+submitted*. Cancellation is not what happened at *Scheduled*.
+
+One consequence to accept rather than fix: a request sent back and then cancelled resolves to the
+REPORT_SUBMITTED position, so the rail cannot also show the send-back. The history column and the status tag
+both carry it; it is not worth a sixth state.
+
+### D-Q6a · An accent-TINTED fill under accent ink is not theme-safe — measured
+
+Reaching for a tinted fill with accent-coloured ink is the natural move in a system whose buttons are
+outlined rather than filled. **It fails 360/360 hues in dark at every tint level** (10/12/15/20% → 3.71 /
+3.50 / 3.23 / 2.85:1 worst) **while passing in light** at 10–12%. The reason will recur on every tinted chip:
+
+> In **light** the accent is **darker** than the ground, so tinting the ground toward the accent moves it
+> **away** from the ink and contrast holds. In **dark** the accent is **lighter** than the ground, so the
+> same tint moves the ground **toward** the ink and contrast collapses.
+
+It is two different patterns wearing one declaration. **What works instead needs no new arithmetic:** an
+accent **fill** with page-background **ink** measures **5.31:1 dark / 5.06:1 light** — identical to the
+locked accent-on-background floor in §2, because **contrast is symmetric**. Inverting an already-swept pair
+inherits its guarantee; inventing a mix creates a number someone has to maintain. **Prefer inverting a
+locked pair over deriving a new one.**
+
+### A rendering trap worth writing down: `th:case` removes only its own element
+
+`th:case` on a `<use>` inside `<svg class="icon">` wrappers leaves **five empty `<svg>` elements** on every
+marker — `StandardCaseTagProcessor` extends `AbstractStandardConditionalVisibilityTagProcessor`, whose only
+removal call is `structureHandler.removeElement()`, which removes the element carrying the attribute and
+nothing around it. With `.icon { width: 1em; flex: none }` that is 96px of non-shrinking content in an 18px
+marker. **Put `th:case` on the element you want gone, which for an icon switch is the `<svg>`.**
+Assert that a marker renders exactly one `<svg>` — no existing test can see this.
