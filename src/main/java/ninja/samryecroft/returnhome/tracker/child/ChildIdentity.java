@@ -29,6 +29,16 @@ package ninja.samryecroft.returnhome.tracker.child;
  * shoulder-surfing and casual disclosure in a shared office, not to withhold data from the viewer.
  * Never pair this with padlock/shield/"protected" iconography; that would be a false claim about
  * what the control does.
+ *
+ * <p><strong>What the mask actually defeats, precisely</strong> (Kevin's review): the masked label
+ * is initials plus the local case reference, and that reference is a stable identifier the
+ * organisation itself already uses - a colleague, or another visiting professional, can resolve
+ * "CH-0041" to a named child immediately. So masking defeats a <em>stranger's</em> glance (someone
+ * in reception, a cleaner, a photograph of a screen); it does not defeat a colleague's. That is the
+ * spec's shape, not a defect - initials alone would be ambiguous, and two children sharing initials
+ * in one home is a safety problem (acting on the wrong child's record), not just a UX one. But say
+ * this precisely rather than letting "names are masked" be read as hiding identity from everyone
+ * who can see the screen.
  */
 public record ChildIdentity(String avatar, String label) {
 

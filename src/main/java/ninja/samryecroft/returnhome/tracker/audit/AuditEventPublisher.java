@@ -299,6 +299,13 @@ public class AuditEventPublisher {
      * one child's record as being. One event per reveal ACTION, not per row the reveal happened to
      * affect: "who was looking at which children, and when" is answered by this event plus the page
      * path, not by a row-per-child trail that would swamp genuine per-record access events.
+     *
+     * <p>Recorded at the moment reveal is ARMED (the POST), not at the moment a name is actually
+     * rendered - so a user who clicks reveal and then navigates away before the redirect's page
+     * ever loads is still recorded as having revealed, even though nothing was shown. That is
+     * deliberate over-recording, not a bug (Kevin's review): on a safeguarding trail, recording an
+     * intent that did not materialise is the safe direction, unlike the reverse (an exposure that
+     * happened with no record of it).
      */
     public void namesRevealed(String path, AppUserPrincipal principal) {
         publish(actor(AuditEventRecord.of(AuditEventType.NAMES_REVEALED), principal)

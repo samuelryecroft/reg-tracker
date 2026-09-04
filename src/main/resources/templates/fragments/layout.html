@@ -117,14 +117,22 @@
         <span>Search</span>
     </div>
     <div class="shell-header-actions">
-        <!-- T138 1c: reveal is a real POST + full-page redirect, not a client-side class toggle -
+        <!-- T138 1c: revealing is a real POST + full-page redirect, not a client-side class toggle -
              a client-side toggle cannot be audited (Kevin's review: no server event, so nothing
              would record that someone unmasked a list of children). Masked is the state on every
              page load except the one immediately following this POST's own redirect - see
-             NameRevealService's javadoc for why the flag is one-shot and resets on navigation, so
-             nobody stays unmasked site-wide from a single click. Only one Phosphor eye glyph is
-             vendored (R-Q11's fixed 55-icon set has no plain "eye"), so both states below reuse
-             ph-eye-slash and differ by label/disabled/aria-pressed instead of icon. -->
+             NameRevealService's javadoc for why the flag is one-shot and resets on navigation.
+
+             Creed's review: this needs an OFF switch too. A user who reveals to check a name has
+             no way to cover the screen again short of leaving the page - on a part-filled form
+             that means losing their place. Hiding is not itself privacy-sensitive (nothing is
+             armed, nothing is audited - it's just a plain reload of the same page, which is
+             already masked the moment reveal's one-shot flag is gone), so it's a plain link, not a
+             second POST endpoint.
+
+             Both states use Phosphor's regular/fill pair for an active state (Nocturne's own idiom,
+             R-Q11) rather than one glyph doing double duty: ph-eye-slash masked, ph-fill-eye-slash
+             revealed. -->
         <form th:if="${!namesRevealed}" method="post" th:action="@{/account/reveal-names}" class="shell-reveal-form">
             <input type="hidden" name="returnTo" th:value="${currentPath}">
             <button type="submit" class="shell-toggle shell-reveal-toggle" aria-pressed="false">
@@ -136,13 +144,11 @@
                 <span class="visually-hidden">names on this page</span>
             </button>
         </form>
-        <!-- Nothing left to click once revealed for this page - re-masking happens by navigating
-             anywhere else, not by pressing this control again - so a disabled control describing
-             its own state, not a dead action, is the correct accessible name here. -->
-        <button th:if="${namesRevealed}" type="button" class="shell-toggle shell-reveal-toggle" disabled aria-pressed="true">
-            <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-eye-slash'"></use></svg>
-            <span>Names revealed</span>
-        </button>
+        <a th:if="${namesRevealed}" th:href="${currentPath}" class="shell-toggle shell-reveal-toggle" aria-pressed="true">
+            <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-fill-eye-slash'"></use></svg>
+            <span>Hide</span>
+            <span class="visually-hidden">names on this page</span>
+        </a>
         <!-- T138 batch 1b: a real POST + full-page redirect, not a client-side class toggle - spec
              §2.3 requires the appearance to be server-rendered with no flash, which a JS-driven
              instant swap can't give (the whole page, including this button's own icon/label below,

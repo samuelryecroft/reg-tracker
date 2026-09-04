@@ -24,6 +24,23 @@ import org.springframework.web.context.request.ServletRequestAttributes;
  * request - so it does not matter whether {@code GlobalControllerAdvice}'s model attribute or a
  * controller's own handler method asks first; both see the same answer, and the flag is still
  * gone by the next request either way.
+ *
+ * <p><strong>What actually bounds the flag's lifetime is consumption on EVERY request, not
+ * consumption on read</strong> (Kevin's review). {@code GlobalControllerAdvice} calls
+ * {@link #isRevealed(HttpServletRequest)} as a {@code @ModelAttribute}, which Spring runs for
+ * every request a {@code @Controller} handles - including one whose page has no {@link
+ * ChildIdentity} on it at all. That is what guarantees the flag cannot survive into a later,
+ * unrelated page: if consumption were left to only the templates that actually print a masked
+ * name, a redirect to a page with none would leave the flag armed and unmask something the user
+ * never asked to reveal, the next time they did land somewhere with a child on it.
+ *
+ * <p>This also means {@link #arm} must always be followed by a redirect, never a same-request
+ * render. The ordering that makes the whole scheme safe is: the advice's {@code @ModelAttribute}
+ * runs BEFORE the handler method, so on the reveal POST itself {@link #isRevealed} already
+ * consumed any stale flag and cached {@code false} for this request - only after that does {@link
+ * #arm} set a fresh one, for the request the redirect triggers. A handler that armed and rendered
+ * in the same request (no redirect) would silently fail to reveal that render (the cache already
+ * says false) and would leak the reveal into whatever page came next instead.
  */
 @Service
 public class NameRevealService {

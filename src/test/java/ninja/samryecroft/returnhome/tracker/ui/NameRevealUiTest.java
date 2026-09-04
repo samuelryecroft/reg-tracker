@@ -80,7 +80,7 @@ class NameRevealUiTest extends AbstractUiTest {
     }
 
     @Test
-    void clickingRevealShowsTheFullNameOnThisPageOnlyThenMasksAgainOnNavigation() {
+    void clickingRevealShowsTheFullNameThenHideCoversItAgainWithoutLeavingThePage() {
         login("ui-reveal-staff", PASSWORD);
         page.navigate(url("/children"));
         page.waitForSelector(".shell-side");
@@ -94,11 +94,24 @@ class NameRevealUiTest extends AbstractUiTest {
         // only checks the NAME column switched to the full name, not that the reference vanished.
         assertThat(page.locator("main").textContent()).contains("Robin Ashworth");
 
-        // Nothing left to click - re-masking happens by navigating, not by pressing this control
-        // again (NameRevealService: the flag is one-shot).
-        assertThat(page.locator(".shell-reveal-toggle[disabled]").textContent().trim())
-                .isEqualTo("Names revealed");
+        // Creed's review: a permanently disabled "revealed" button has no way back short of
+        // leaving the page - on a part-filled form that would cost someone their place. The
+        // control must be a real toggle, so "Hide" is live and clicking it covers the screen
+        // again on the SAME page, no navigation away required.
+        String hideAccessibleText = page.locator(".shell-reveal-toggle").textContent()
+                .replaceAll("\\s+", " ").trim();
+        assertThat(hideAccessibleText).isEqualTo("Hide names on this page");
 
+        page.click(".shell-reveal-toggle");
+        page.waitForLoadState();
+
+        assertThat(page.url()).endsWith("/children");
+        assertThat(page.locator("main").textContent()).contains("R.A. · CH-UIREVEAL");
+        assertThat(page.locator("main").textContent()).doesNotContain("Robin Ashworth");
+
+        // And a fresh page load without touching the control at all is masked too - hiding didn't
+        // need to arm anything, because nothing was armed to begin with by the time this render
+        // happened (NameRevealService: the flag is one-shot and was already gone).
         page.reload();
         page.waitForSelector(".shell-side");
         assertThat(page.locator("main").textContent()).contains("R.A. · CH-UIREVEAL");

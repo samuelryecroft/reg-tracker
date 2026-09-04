@@ -649,6 +649,10 @@ textarea.input { min-height: 90px; resize: vertical; }
     border: 1px solid var(--color-control-border);
     border-radius: var(--radius-md); padding: 0 10px; color: var(--color-text);
     font: inherit; font-size: var(--text-data); cursor: pointer;
+    /* T138 1c: the reveal control's "hide" state is a plain <a> (a safe, unaudited reload - see
+       fragments/layout.html), the first non-<button> user of this class, so a link's own
+       browser-default underline/blue needs resetting to match the button-shaped ones. */
+    text-decoration: none;
 }
 .shell-toggle:disabled { opacity: 0.6; cursor: default; }
 .shell-toggle .icon { color: var(--color-accent); }
