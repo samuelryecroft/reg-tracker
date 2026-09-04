@@ -76,6 +76,15 @@ public class EntraOidcUserService implements OAuth2UserService<OidcUserRequest, 
      * claim arrived was fine. D4 removed the ceremony and made the identifier something a human
      * types in beforehand, which settles it.
      *
+     * <p><b>{@code oid} alone is a sufficient key only because we are single-tenant (D1), and that
+     * is the same fact that makes a {@code tid} allow-list unnecessary.</b> One condition governs
+     * both, so they would have to change in the same moment: if multi-tenant is ever adopted, the
+     * key becomes {@code tid} + {@code oid} <em>and</em> validating {@code tid} against an
+     * allow-list becomes mandatory - {@code oid} is only unique within a tenant, and without the
+     * allow-list any Entra tenant in the world could present a token this application accepts. The
+     * allow-list is the obvious half; this one is the half that would be forgotten, which is why the
+     * two are written down together.
+     *
      * <p>A token with no {@code oid} is refused rather than falling back to {@code sub}: a fallback
      * would look up a value nothing ever stored, and the interesting failure is not "no match" but
      * matching the wrong row later, once someone does store a {@code sub}-shaped value.

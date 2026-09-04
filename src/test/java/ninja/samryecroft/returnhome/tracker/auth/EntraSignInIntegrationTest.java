@@ -137,7 +137,7 @@ class EntraSignInIntegrationTest extends AbstractIntegrationTest {
      * production as a LazyInitializationException on a page, not at sign-in.
      */
     @Test
-    void theePrincipalsLazyAssociationsSurviveOutsideATransaction() {
+    void thePrincipalsLazyAssociationsSurviveOutsideATransaction() {
         User loaded = userRepository.findByIdpSubject(OBJECT_ID).orElseThrow();
         AppUserPrincipal principal = new EntraUserPrincipal(loaded, idToken(), null);
 

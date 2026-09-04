@@ -137,6 +137,16 @@ public class SecurityConfig {
      * reported by whoever could not sign in, which for a front door is the worst possible channel.
      * Mirrors {@code DocumentStorageConfig} refusing to start on a production misconfiguration.
      */
+    static ClientRegistrationRepository requireClientRegistrations(ClientRegistrationRepository registrations) {
+        if (registrations == null) {
+            throw new IllegalStateException(
+                    "app.auth.entra.enabled is true but no OAuth2 client registration is configured. "
+                            + "Activate the 'entra' profile (application-entra.properties), which supplies "
+                            + "spring.security.oauth2.client.registration.entra.*, or set the flag back to false.");
+        }
+        return registrations;
+    }
+
     /**
      * Same fail-fast reasoning as {@link #requireClientRegistrations}: without our user service the
      * OIDC path would silently fall back to a DefaultOidcUser, which is not an AppUserPrincipal -
@@ -152,15 +162,5 @@ public class SecurityConfig {
                             + "behind it, injected as null rather than failing.");
         }
         return service;
-    }
-
-    static ClientRegistrationRepository requireClientRegistrations(ClientRegistrationRepository registrations) {
-        if (registrations == null) {
-            throw new IllegalStateException(
-                    "app.auth.entra.enabled is true but no OAuth2 client registration is configured. "
-                            + "Activate the 'entra' profile (application-entra.properties), which supplies "
-                            + "spring.security.oauth2.client.registration.entra.*, or set the flag back to false.");
-        }
-        return registrations;
     }
 }
