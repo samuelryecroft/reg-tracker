@@ -779,14 +779,16 @@ fieldset.checkbox-fieldset > legend {
     cursor: pointer;
     min-height: 44px;
 }
-/* F3 (Creed's fidelity review, open since T124): border-color used to be var(--accent)
-   (--color-accent post-bridge) - fine in light (12.39:1) but 2.40:1 worst-case in dark
-   at hue 103, the base accent has never been the boundary colour anywhere else in this
-   system. --color-accent-300 is the same token the bridge's --accent-dark already
-   points at, so this costs nothing new: 7.82:1 dark / 13.81:1 light swept across all
-   360 hues, and a border matching the chip's own ink is how a selected chip should
-   read. --tint's 1.15:1 fill is untouched - it's a fill, not a boundary, so 1.4.11
-   doesn't reach it. */
+/* F3: a checked chip's border takes accent-300, the same step as its ink, rather than
+   the base accent. Not a contrast fix - the base accent measures 4.51:1 on the tint,
+   which passes - but border and ink matching is how a selected chip should read, and
+   accent-300 on accent-900 holds 9.19:1 dark / 6.27:1 light. The ramp MIRRORS between
+   appearances, so one step number keeps the same role in both grounds.
+   (Correction, 2026-09-04: Creed's original review called this a 1.4.11 failure at
+   2.40:1 dark - that number came from a sweep with a double gamma-decode bug in its
+   OKLCH-to-sRGB conversion. The corrected function reproduces Nocturne's own published
+   accent hex to within one unit per channel. The CSS change itself was worth keeping
+   regardless - see above - so nothing here reverted, only the false rationale.) */
 .checkbox-option:has(input:checked) { border-color: var(--color-accent-300); background: var(--tint); color: var(--accent-dark); }
 .checkbox-option input { width: auto; min-height: 0; margin: 0; }
 .checkbox-option[aria-disabled="true"] { opacity: 0.55; }
