@@ -970,6 +970,11 @@ fieldset.checkbox-fieldset > legend {
 .banner.warn { background: var(--warn-bg); color: var(--warn); border: 1px solid transparent; border-color: color-mix(in srgb, var(--warn) 25%, transparent); }
 .banner.ok { background: var(--ok-bg); color: var(--ok); border: 1px solid transparent; border-color: color-mix(in srgb, var(--ok) 25%, transparent); }
 .banner.info { background: var(--info-bg); color: var(--info); border: 1px solid transparent; border-color: color-mix(in srgb, var(--info) 25%, transparent); }
+/* D-1b-8 (spec §6c): a prior send-back is a normal event a reviewer sees while choosing between
+   two legitimate outcomes, not a warning - --sent-back is the vocabulary the rail marker, the
+   status tag and the visitor's own banner already share, and reaching for --warn here would fork
+   it. First real use of this pair on .banner; the tokens themselves were already locked (D-1a-2a). */
+.banner.sent-back { background: var(--sent-back-bg); color: var(--sent-back); border: 1px solid transparent; border-color: color-mix(in srgb, var(--sent-back) 25%, transparent); }
 /* .banner-warning kept as an alias so nothing already using it silently loses its styling. */
 .banner-warning { background: var(--warn-bg); color: var(--warn); border: 1px solid #EBCF8A; border-radius: var(--radius); padding: var(--s4); margin-bottom: var(--s4); }
 .banner-warning p { margin: 0.35rem 0 0; white-space: pre-wrap; }

@@ -19,10 +19,37 @@
     <p class="muted" th:text="${'Home: ' + request.home.name}">Home</p>
 
     <!--
-      D-1b-8: kept for orientation, same component as 1a. But a report sent back once and
-      resubmitted is back at REPORT_SUBMITTED - the rail shows CURRENT and the earlier send-back
-      is invisible, exactly the context a reviewer needs. See priorSendBack below, near the
-      actions, for the piece the rail can't tell them.
+      D-1b-8 CLOSED (god's call, via Creed's spec §6c): show it, at the TOP of the page with the
+      guard attestation - not a caveat beside the actions. "This report has already been sent back
+      once" is context for READING the report (it changes what a reviewer looks for in every
+      section), not a caveat on pressing a button - a reviewer who meets it down at the sticky bar
+      has already read the whole report without it, the one outcome this line exists to prevent.
+      Tone is factual, not alarming (--sent-back, never --warn - the same vocabulary the rail
+      marker, the status tag and the visitor's own banner already share), and it links to #history
+      so a reviewer can read what was actually asked for last time before judging whether it was
+      done. Independent of canDecide - anyone viewing this page benefits from the context,
+      self-reviewer or not.
+    -->
+    <div class="banner sent-back" th:if="${priorSendBack != null}">
+        <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-arrow-u-up-left'"></use></svg>
+        <div>
+            <strong>This report has already been sent back once</strong>
+            <p>Sent back on <span th:text="${#temporals.format(priorSendBack.occurredAt(), 'dd MMM yyyy')}">date</span> -
+                <a href="#history">read what was asked for last time</a> before judging whether it was done.</p>
+        </div>
+    </div>
+    <!--
+      D-1b-7: canReview already enforces this server-side (getReviewable's own conflict-of-
+      interest check) - this line's only job is to SAY so, when it's true. Placed here per §6c,
+      beside the prior-send-back note rather than down by the actions - see that comment above.
+    -->
+    <p class="muted" th:if="${canDecide}">You did not submit this report.</p>
+
+    <!--
+      D-1b-8 (rail limitation, unchanged from the original §6a note): kept for orientation, same
+      component as 1a. A report sent back once and resubmitted is back at REPORT_SUBMITTED - the
+      rail shows CURRENT and the earlier send-back is invisible there, which is exactly why the
+      banner above exists.
     -->
     <ol class="rail" aria-label="Interview status">
         <li th:each="step, stat : ${statusRail}" th:classappend="'rail-' + ${step.state()}"
@@ -148,20 +175,17 @@
 
         <!--
           D-1b-7: canReview already enforces this server-side (getReviewable's own conflict-of-
-          interest check) - the screen's only job is to SAY so. Satisfied gets a small muted
-          attestation; not satisfied gets NO ACTION BAR AT ALL, replaced by a banner stating the
-          rule and the way forward. Never a disabled button: a disabled control isn't focusable,
-          so a keyboard user meets a dead end that can't explain itself, and this rule is
-          permanent - there is nothing that could later enable it.
+          interest check) - the screen's only job is to SAY so. The satisfied attestation moved to
+          the top of the page per §6c (beside D-1b-8's prior-send-back note); this is the other
+          half - not satisfied gets NO ACTION BAR AT ALL, replaced by a banner stating the rule and
+          the way forward. Never a disabled button: a disabled control isn't focusable, so a
+          keyboard user meets a dead end that can't explain itself, and this rule is permanent -
+          there is nothing that could later enable it.
         -->
         <div th:if="${canDecide}">
-            <p class="muted" th:if="${priorSendBack}">
-                This report has already been sent back once before.
-            </p>
             <div class="consequence">
                 <p>Approving generates the final Word document, releases it to the child's home, and can't be undone.</p>
             </div>
-            <p class="muted">You did not submit this report.</p>
             <div class="sticky-actions">
                 <button type="submit" name="action" value="approve" class="btn">Approve and generate document</button>
                 <button type="button" class="btn sent-back" id="openSendBackDialog">Send back with comments</button>

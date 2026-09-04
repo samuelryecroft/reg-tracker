@@ -1,6 +1,7 @@
 package ninja.samryecroft.returnhome.tracker.interview;
 
 import java.util.List;
+import ninja.samryecroft.returnhome.tracker.audit.AuditHistoryEntry;
 import ninja.samryecroft.returnhome.tracker.audit.AuditHistoryService;
 import ninja.samryecroft.returnhome.tracker.audit.AuditHistorySection;
 import ninja.samryecroft.returnhome.tracker.child.ChildIdentities;
@@ -108,14 +109,20 @@ public class ReviewerController {
         List<AuditHistorySection> auditHistory = auditHistoryService.historyFor(request);
         model.addAttribute("auditHistory", auditHistory);
 
-        // D-1b-8: the rail alone shows CURRENT for a resubmitted report, making an earlier
-        // send-back invisible at the exact moment it should change the reviewer's judgement. The
-        // curated audit projection's "back" tone is used ONLY for REPORT_REJECTED
-        // (AuditHistoryService), so checking it here never reaches past the GDPR-safe projection
-        // for anything more than the one fact this needs.
-        boolean priorSendBack = auditHistory.stream()
+        // D-1b-8 CLOSED (god, via Creed's spec §6c): SHOW it, at the top with the guard
+        // attestation - not a caveat beside the actions. The rail alone shows CURRENT for a
+        // resubmitted report, making an earlier send-back invisible at exactly the moment it
+        // should change the reviewer's judgement. The curated audit projection's "back" tone is
+        // used ONLY for REPORT_REJECTED (AuditHistoryService), so this never reaches past the
+        // GDPR-safe projection for anything more than the one fact + timestamp the template
+        // needs. Newest first (this list's own established order, same as the History card built
+        // from it) - if a report has been sent back more than once, the most recent one is what's
+        // relevant to a reviewer judging the CURRENT resubmission.
+        AuditHistoryEntry priorSendBack = auditHistory.stream()
                 .flatMap(section -> section.entries().stream())
-                .anyMatch(entry -> "back".equals(entry.tone()));
+                .filter(entry -> "back".equals(entry.tone()))
+                .findFirst()
+                .orElse(null);
         model.addAttribute("priorSendBack", priorSendBack);
     }
 }

@@ -256,6 +256,64 @@ class ReviewerReadOnlyIntegrationTest extends AbstractIntegrationTest {
         assertThat(tagWithId(html, "sendBackDialog")).contains("open");
     }
 
+    @Test
+    void aResubmittedReportShowsThePriorSendBackAtTheTopNotBesideTheActions() throws Exception {
+        // D-1b-8 CLOSED (spec §6c): the rail alone shows CURRENT for a resubmitted report - a
+        // prior send-back is invisible there - so this banner is the only place a reviewer learns
+        // "this has come back once before" before they start reading. Placement matters: it must
+        // appear before the numbered sections (D-1b-4), not down by the sticky actions, since it's
+        // context for READING the report, not a caveat on pressing a button.
+        Long requestId = submittedReport();
+        mockMvc.perform(post("/reviewer/reports/{id}/review", requestId)
+                        .with(asUser("ro-reviewer" + suffix)).with(csrf())
+                        .param("action", "reject")
+                        .param("reviewComments", "Please expand on the risk section"))
+                .andExpect(status().is3xxRedirection());
+        resubmitAfterRejection(requestId);
+
+        String html = mockMvc.perform(get("/reviewer/reports/{id}/review", requestId)
+                        .with(asUser("ro-reviewer" + suffix)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(html).contains("This report has already been sent back once");
+        assertThat(html).contains("read what was asked for last time");
+        assertThat(html).contains("href=\"#history\"");
+        // --sent-back, not --warn (§6c: a normal event between two legitimate outcomes, not a
+        // warning - and calling it one would fork the vocabulary the rail/tag/visitor banner share).
+        assertThat(html).contains("class=\"banner sent-back\"");
+
+        // Placement: the banner must appear before the numbered sections, not after them.
+        int bannerIndex = html.indexOf("already been sent back once");
+        int firstSectionIndex = html.indexOf("1. Details");
+        assertThat(bannerIndex).isGreaterThan(-1);
+        assertThat(firstSectionIndex).isGreaterThan(-1);
+        assertThat(bannerIndex).as("the prior-send-back banner must render before the report sections, not beside the actions at the bottom")
+                .isLessThan(firstSectionIndex);
+    }
+
+    /** Resubmits the same request after a reject round, landing it back at REPORT_SUBMITTED. */
+    private void resubmitAfterRejection(Long requestId) throws Exception {
+        mockMvc.perform(post("/visitor/interviews/{id}/report", requestId)
+                        .with(asUser("ro-visitor" + suffix)).with(csrf())
+                        .param("action", "submit")
+                        .param("heldAt", "2026-07-21T10:00")
+                        .param("interviewLocation", VISITOR_LOCATION)
+                        .param("previouslyMissing", "false")
+                        .param("confidentialityExplained", "true")
+                        .param("interviewAccepted", "true")
+                        .param("consideredSelfMissing", "false")
+                        .param("whereWereYouWhileMissing", "At a friend's house")
+                        .param("interviewerComments", VISITOR_COMMENTS)
+                        .param("recommendations", "No further action")
+                        .param("conductedByStatement", "Conducted by the allocated visitor"))
+                .andExpect(status().is3xxRedirection());
+
+        assertThat(interviewRequestRepository.findDetailedById(requestId).orElseThrow().getStatus())
+                .as("resubmission must land back at REPORT_SUBMITTED for the rail-invisibility case to be real")
+                .isEqualTo(InterviewStatus.REPORT_SUBMITTED);
+    }
+
     /**
      * The single element tag bearing this id. Asserting against the whole document would be
      * meaningless here - the shared layout's stylesheet contains a {@code .disabled} rule, so a
