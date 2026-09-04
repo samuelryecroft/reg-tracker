@@ -13,6 +13,8 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import ninja.samryecroft.returnhome.tracker.AbstractIntegrationTest;
+import ninja.samryecroft.returnhome.tracker.audit.AuditEventRepository;
+import ninja.samryecroft.returnhome.tracker.audit.AuditEventType;
 import ninja.samryecroft.returnhome.tracker.child.Child;
 import ninja.samryecroft.returnhome.tracker.child.ChildRepository;
 import ninja.samryecroft.returnhome.tracker.home.Home;
@@ -70,6 +72,8 @@ class DraftAutosaveEndpointIntegrationTest extends AbstractIntegrationTest {
     private AppUserDetailsService appUserDetailsService;
     @Autowired
     private JdbcTemplate jdbc;
+    @Autowired
+    private AuditEventRepository auditEventRepository;
 
     private String suffix;
     private Long requestId;
@@ -94,6 +98,7 @@ class DraftAutosaveEndpointIntegrationTest extends AbstractIntegrationTest {
         saveUser("t174e-coordinator" + suffix, Set.of(Role.COORDINATOR), supplier, null);
         saveUser("t174e-visitor" + suffix, Set.of(Role.VISITOR), supplier, null);
         saveUser("t174e-reviewer" + suffix, Set.of(Role.REVIEWER), supplier, null);
+        saveUser("t174e-visitor2" + suffix, Set.of(Role.VISITOR), supplier, null);
 
         mockMvc.perform(post("/requests").with(asUser("t174e-staff" + suffix)).with(csrf())
                         .param("childId", childId.toString())
@@ -217,6 +222,47 @@ class DraftAutosaveEndpointIntegrationTest extends AbstractIntegrationTest {
         InterviewReport after = interviewReportRepository.findByInterviewRequestId(requestId).orElseThrow();
         assertThat(after.getStatus()).isEqualTo(ReportStatus.APPROVED);
         assertThat(after.getGeneratedDocumentPath()).isNotNull();
+    }
+
+    /**
+     * Kevin's second terminal case (T174 review): a visitor de-allocated from the interview while
+     * they were typing. Left to {@code GlobalControllerAdvice} this is a 403 whose body is HTML,
+     * which the client reads as transient and retries forever against a door that will never reopen.
+     *
+     * <p>The status stays honest - 403, not the 409 a finished report gets - and the terminal
+     * decision travels in {@code outcome}, because <b>the status could not carry it</b>: the test
+     * below shows an expired session is also a 403, produced by the CSRF filter before the endpoint
+     * runs, and that is the most transient failure there is. A client rule keyed on 403 would stop
+     * autosaving on someone who only needed to sign in again.
+     *
+     * <p>The audit event is asserted, not just the response. The advice used to publish
+     * ACCESS_DENIED for this path; answering it here would have silently dropped the denial out of
+     * the trail, and autosave will produce far more of them than the form ever did.
+     */
+    @Test
+    void aVisitorDeallocatedMidTypingIsRefusedTerminallyAndTheDenialIsStillAudited() throws Exception {
+        // A second VISITOR, not the reviewer: allocation refuses a user who does not hold the role
+        // (InterviewRequestService:182), so allocating the reviewer would fail for its own reason
+        // and this test would prove nothing about de-allocation.
+        Long otherVisitorId = userRepository.findByUsername("t174e-visitor2" + suffix).orElseThrow().getId();
+        mockMvc.perform(post("/coordinator/requests/{id}/allocate", requestId)
+                        .with(asUser("t174e-coordinator" + suffix)).with(csrf())
+                        .param("visitorId", otherVisitorId.toString())
+                        .param("scheduledAt", "2026-07-22T11:00"))
+                .andExpect(status().is3xxRedirection());
+
+        autosave("interviewerComments", "Typed after being taken off the interview")
+                .andExpect(status().isForbidden())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.outcome").value("terminal"))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString(
+                        "no longer the visitor allocated")));
+
+        assertThat(auditEventRepository.findByEventTypeOrderByOccurredAtDesc(AuditEventType.ACCESS_DENIED))
+                .as("a denial that stops appearing in the trail because a handler got more specific "
+                        + "is a silent loss")
+                .anyMatch(e -> "t174e-visitor".concat(suffix).equals(e.getActorUsernameAtTime()));
+        assertThat(interviewReportRepository.findByInterviewRequestId(requestId)).isEmpty();
     }
 
     /**

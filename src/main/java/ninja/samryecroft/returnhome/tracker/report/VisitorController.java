@@ -1,10 +1,12 @@
 package ninja.samryecroft.returnhome.tracker.report;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
+import ninja.samryecroft.returnhome.tracker.audit.AuditEventPublisher;
 import ninja.samryecroft.returnhome.tracker.child.ChildIdentities;
 import ninja.samryecroft.returnhome.tracker.child.ChildIdentity;
 import ninja.samryecroft.returnhome.tracker.child.NameRevealService;
@@ -16,6 +18,7 @@ import ninja.samryecroft.returnhome.tracker.user.AppUserPrincipal;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -35,12 +38,14 @@ public class VisitorController {
     private final InterviewRequestService interviewRequestService;
     private final ReportService reportService;
     private final NameRevealService nameRevealService;
+    private final AuditEventPublisher auditEventPublisher;
 
     public VisitorController(InterviewRequestService interviewRequestService, ReportService reportService,
-            NameRevealService nameRevealService) {
+            NameRevealService nameRevealService, AuditEventPublisher auditEventPublisher) {
         this.interviewRequestService = interviewRequestService;
         this.reportService = reportService;
         this.nameRevealService = nameRevealService;
+        this.auditEventPublisher = auditEventPublisher;
     }
 
     @GetMapping("/interviews")
@@ -117,17 +122,50 @@ public class VisitorController {
     @ResponseBody
     public ResponseEntity<Map<String, String>> autosaveDraft(@PathVariable Long id,
             @AuthenticationPrincipal AppUserPrincipal principal,
-            @ModelAttribute("form") SubmitReportForm form) {
+            @ModelAttribute("form") SubmitReportForm form, HttpServletRequest request) {
         try {
             reportService.saveDraft(id, form, principal);
         } catch (ReportNotEditableException ex) {
-            return ResponseEntity.status(HttpStatus.CONFLICT)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .body(Map.of("outcome", "terminal", "message", ex.getMessage()));
+            return terminal(HttpStatus.CONFLICT, ex.getMessage());
+        } catch (AccessDeniedException ex) {
+            // The second terminal case (Kevin, T174 review): a visitor de-allocated from the
+            // interview while they were typing. Left to the advice this is a 403 whose body is HTML,
+            // which the client reads as transient and retries forever against a door that will never
+            // reopen - the same right-message-wrong-duration failure the 409 case exists to prevent.
+            //
+            // Answered here rather than by a client-side "403 means terminal" rule, and MEASURING
+            // the expired-session case is what settles that: a request with no session is rejected
+            // by the CSRF filter with a 403 BEFORE it reaches this method, so a rule keyed on the
+            // status would classify an expired session - the most transient failure there is - as
+            // terminal and stop autosaving on someone who only needed to sign in again. Only a 403
+            // this method itself produced is terminal, and only the server can tell them apart.
+            //
+            // The audit event is published here because the advice is no longer the one answering.
+            // A denial that stops appearing in the trail because a handler got more specific is a
+            // silent loss, and this path will produce far more denials than the form ever did once
+            // autosave is running.
+            auditEventPublisher.accessDenied(principal, request.getMethod(), request.getRequestURI(),
+                    ex.getMessage());
+            return terminal(HttpStatus.FORBIDDEN, "You are no longer the visitor allocated to this "
+                    + "interview, so this report can no longer be saved. Copy anything you still "
+                    + "need before leaving this page.");
         }
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(Map.of("outcome", "saved", "savedAt", LocalDateTime.now().format(SAVED_AT_FMT)));
+    }
+
+    /**
+     * The status stays honest at the HTTP layer - 409 for a report that has moved on, 403 for a
+     * visitor who no longer has it - but the <em>decision</em> travels in {@code outcome}, and the
+     * client reads only that. It then needs no table of which statuses mean "stop", and could not
+     * maintain a correct one anyway: an expired session is also a 403, produced by the CSRF filter
+     * before this method runs, and it is the most transient failure there is.
+     */
+    private ResponseEntity<Map<String, String>> terminal(HttpStatus status, String message) {
+        return ResponseEntity.status(status)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(Map.of("outcome", "terminal", "message", message));
     }
 
     @GetMapping("/interviews/{id}/report")

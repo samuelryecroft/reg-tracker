@@ -145,11 +145,22 @@
     var autosaveUrl = form.getAttribute('data-autosave-url');
     var autosaveStopped = false;
 
-    // One message for every transient failure, deliberately. The client cannot reliably tell an
-    // expired session from a dropped connection - a redirected login page and a network error can
-    // arrive on different branches of the same fetch - and it does not need to: both leave the work
-    // on the page and both are worth retrying. The distinction that matters is transient vs
-    // TERMINAL, and that one is never guessed: it is read from the server's own JSON.
+    // One message for every transient failure, deliberately - and NOT because the client cannot
+    // tell them apart. It often can. The reason is that what it can tell apart is not what it would
+    // need to know.
+    //
+    // Reaching this branch means "the server did not answer in a way we can read". Measured, an
+    // expired session arrives as a 403 from the CSRF filter (no session, so no token to match) -
+    // not, as is easy to assume, a followed redirect to a 200 login page. But a gateway 502, a
+    // proxy error page and an SSO hop land here identically. So "Sign in again" would be
+    // confidently wrong a fair share of the time, and a confidently wrong instruction is worse than
+    // a vague one when someone is holding an unsaved account of a child's disclosure. The client
+    // asserts only what it can actually read: the server did not accept this, and the work is still
+    // on the page.
+    //
+    // The distinction that does matter - transient vs TERMINAL - is never guessed either. It is
+    // read from the server's own outcome field, because only the server can tell a de-allocation
+    // 403 from a CSRF 403.
     var TRANSIENT = 'Not saved - your work is still on this page. Sign in again if you have been signed out.';
 
     function state(text, className) {
@@ -173,33 +184,39 @@
             headers: { 'Accept': 'application/json' },
             credentials: 'same-origin'
         }).then(function (response) {
-            // Not response.ok - see point 3 in the file header. A redirected login page arrives here
-            // as a 200 whose body is HTML, and treating that as success is the one failure mode that
-            // actively misleads the visitor about whether their work is safe.
+            // Not response.ok - see point 3 in the file header. A response the server did not
+            // answer in JSON is one we cannot read, whatever its status, and reporting it as a save
+            // is the one failure mode that actively misleads a visitor about whether their work is
+            // safe.
             //
-            // Honest about what this line is worth: for the login-page case specifically it is belt
-            // and braces, because response.json() below would reject on HTML and land in the same
-            // catch with the same message - a mutation replacing this with response.ok survives the
-            // suite for exactly that reason. It stays because rejecting on the parse is an accident
-            // of what the payload happens to contain, not a property of the response, and a gateway
-            // or SSO hop that answers 200 with a JSON error envelope would parse cleanly and be
-            // read as a save. The check asks the question this code actually means.
+            // Honest about what this line is worth: response.json() below would also reject on HTML
+            // and land in the same catch with the same message, so a mutation replacing this with
+            // response.ok survives the suite. It stays because rejecting on the parse is an accident
+            // of what the payload happens to contain rather than a property of the response - but
+            // the case that genuinely needed closing, a gateway answering 200 with its own JSON
+            // envelope, is closed by requiring outcome === 'saved' below, not by this line.
             if (!isJson(response)) {
                 state(TRANSIENT, 'pending');
                 return null;
             }
             return response.json().then(function (body) {
-                if (response.status === 409 || (body && body.outcome === 'terminal')) {
-                    // Terminal: no retry can succeed, so stop trying and stop implying it might.
+                // Keyed on the server's own word, never on the status. The status cannot carry this
+                // decision: a 403 is a de-allocated visitor (terminal) OR an expired session
+                // rejected by the CSRF filter (about as transient as a failure gets), and only the
+                // server knows which one it produced.
+                if (body && body.outcome === 'terminal') {
                     autosaveStopped = true;
-                    state((body && body.message) || 'This report can no longer be saved', 'stopped');
+                    state(body.message || 'This report can no longer be saved', 'stopped');
                     return null;
                 }
-                if (!response.ok) {
+                // Success is asserted, not inferred from the absence of failure. A gateway or SSO
+                // hop answering 200 with its own JSON error envelope parses cleanly and has neither
+                // outcome nor savedAt - without this it would have been read as a save.
+                if (!response.ok || !body || body.outcome !== 'saved') {
                     state(TRANSIENT, 'pending');
                     return null;
                 }
-                state('Saved ' + (body && body.savedAt ? body.savedAt : ''), '');
+                state('Saved ' + (body.savedAt || ''), '');
                 return null;
             });
         }).catch(function () {
