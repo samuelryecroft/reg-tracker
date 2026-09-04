@@ -88,7 +88,9 @@
                             status=${r.status},
                             actionLabel=${open ? (r.allocatedVisitor != null ? 'Reallocate' : 'Allocate') : null},
                             actionHref=@{/coordinator/requests/{id}/allocate(id=${r.id})},
-                            noAction=null)}"></div>
+                            noAction=null,
+                            noteLabel=null,
+                            note=null)}"></div>
                 </th:block>
             </div>
         </section>
