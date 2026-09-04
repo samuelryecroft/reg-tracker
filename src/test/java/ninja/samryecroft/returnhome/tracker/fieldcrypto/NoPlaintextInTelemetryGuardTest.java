@@ -135,6 +135,15 @@ class NoPlaintextInTelemetryGuardTest {
                     String variable = m.group(1);
                     String body = blockBodyAt(source, m.end());
                     if (body == null) {
+                        // An offence, not a skip - which is what makes blockBodyAt's javadoc true
+                        // rather than aspirational. Unreachable today, because a tree that compiles
+                        // has balanced braces; it is here because the alternative is a comment
+                        // promising a stricter guarantee than the branch below it delivers, and the
+                        // next person to loosen this matcher will read the promise, not the branch.
+                        // That disagreement between code and stated contract is the entire class of
+                        // defect this file exists to catch, and it has no business being in the file.
+                        offences.add(file.getFileName() + " has a catch (" + type + ") this guard "
+                                + "cannot parse, so it could not be checked");
                         continue;
                     }
                     boolean asCause = Pattern.compile(
@@ -210,13 +219,19 @@ class NoPlaintextInTelemetryGuardTest {
      * parentheses for precisely this reason. Applying the same counting to braces removes the
      * limitation instead of documenting it, so the javadoc no longer has to warn about it.
      *
-     * @return the block's body, or null if the braces do not balance (a file we cannot parse is not
-     *         a file we may quietly pass)
+     * @return the block's body, or null if the braces do not balance - which the caller reports as
+     *         an offence rather than skipping, because a file this guard cannot parse is a file it
+     *         did not check, and the two must not look the same from outside
      */
     private static String blockBodyAt(String source, int afterOpeningBrace) {
         int depth = 1;
         int i = afterOpeningBrace;
         while (i < source.length() && depth > 0) {
+            int skipped = skipNonCode(source, i);
+            if (skipped > i) {
+                i = skipped;
+                continue;
+            }
             char c = source.charAt(i);
             if (c == '{') {
                 depth++;
@@ -226,6 +241,58 @@ class NoPlaintextInTelemetryGuardTest {
             i++;
         }
         return depth == 0 ? source.substring(afterOpeningBrace, i - 1) : null;
+    }
+
+    /**
+     * The index just past a string literal, character literal, text block or comment starting at
+     * {@code i} - or {@code i} itself when code starts there.
+     *
+     * <p>Counting braces without this is not a smaller version of counting them, it is wrong in the
+     * direction that matters. A brace inside a message string ends the body early, and everything
+     * after it - including the {@code , e)} that attaches the cause - falls outside what gets
+     * checked. The guard then passes, green and silent, on a real leak. Measured: a catch throwing
+     * {@code new DocumentIntegrityException("...malformed } brace", e)} is missed entirely by the
+     * naive counter, and it compiles, so nothing else objects either.
+     *
+     * <p>That case is not exotic. This codebase writes deliberately explanatory exception messages,
+     * and a brace in one is a matter of time - so it is the ordinary shape of the mistake rather
+     * than a contrived one.
+     */
+    private static int skipNonCode(String source, int i) {
+        if (source.startsWith("//", i)) {
+            int end = source.indexOf('\n', i);
+            return end < 0 ? source.length() : end;
+        }
+        if (source.startsWith("/*", i)) {
+            int end = source.indexOf("*/", i + 2);
+            return end < 0 ? source.length() : end + 2;
+        }
+        if (source.startsWith("\"\"\"", i)) {
+            int end = source.indexOf("\"\"\"", i + 3);
+            return end < 0 ? source.length() : end + 3;
+        }
+        if (source.charAt(i) == '"' || source.charAt(i) == '\'') {
+            char quote = source.charAt(i);
+            int j = i + 1;
+            while (j < source.length()) {
+                char c = source.charAt(j);
+                if (c == '\\') {
+                    j += 2;
+                    continue;
+                }
+                if (c == quote) {
+                    return j + 1;
+                }
+                if (c == '\n') {
+                    // An unterminated literal: give up rather than run to the end of the file, and
+                    // let the caller's unbalanced-brace branch report it.
+                    return source.length();
+                }
+                j++;
+            }
+            return source.length();
+        }
+        return i;
     }
 
     private static Set<String> encryptedGetterNames() throws IOException {
