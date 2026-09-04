@@ -744,8 +744,15 @@ sits on `--color-surface`, not on the tint (5.31:1 dark / 5.06:1 light).
 R-Q8 closes by treating a server-side hue→hex ramp as the fallback if the browser floor ever excludes
 `oklch()`. **For the `.docx` that is not a contingency.** There is no browser anywhere in the document path,
 so the server must compute hex regardless of how the browser question resolves — it is on the document
-critical path now. Jim identified this; it is a real gap in R-Q8 as written. Landing as **T137**, a shared
-utility for both the document path and any future CSS fallback.
+critical path now. Jim identified this; it is a real gap in R-Q8 as written. The ramp lands inside **T131**
+as a shared utility for both the document path and any future CSS fallback — R-Q7 (T126) and D-Q5 share the
+`ReportService:197` call site, so they migrate together rather than leaving it half-pointed. (A standalone
+ramp ticket T137 was briefly opened and has been retired; the work is the same, tracked under T131.)
+
+**The test vectors below are the contract between the values and the plumbing.** They are the *corrected*
+set: the double-decode bug recorded in F3 lived in the luminance function, not in the encoding path, so the
+hexes were never affected by it — but they have been independently recomputed from a clean implementation
+and all ten reproduce exactly. Assert them.
 
 **Ramp implementation, signed off.** Nine fixed L/C pairs, hue injected:
 `100 .975/.020 · 200 .925/.045 · 300 .860/.090 · 400 .775/.115 · 500 .660/.125 · 600 .565/.110 ·
