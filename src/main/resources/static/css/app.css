@@ -954,6 +954,39 @@ dl.detail dd { margin: 0.15rem 0 0; white-space: pre-wrap; }
     margin-left: var(--s2);
 }
 
+/* T173: a native <details>/<summary> disclosure, first use in the app - real request context
+   (known risks, professionals, missing episode) available IN PLACE inside the report wizard
+   instead of a link that navigated the visitor away and lost their unsaved progress (T174 covers
+   actual autosave separately; this only stops the navigation). Deliberately native rather than a
+   JS-driven expand/collapse: <summary> already carries the correct implicit role and exposes its
+   own expanded/collapsed state to assistive tech, and focus stays on it after toggling with zero
+   script - exactly the "don't build a widget the platform already gives you" reasoning D-1a-3
+   used against inventing tablist markup, applied here in the direction where the native element
+   genuinely IS the widget. summary:focus-visible is already styled globally (see :focus-visible
+   rules above) - this component predates any <details> in the app, so nothing new to add there. */
+.disclosure summary {
+    display: flex; align-items: center; gap: var(--s2); cursor: pointer;
+    list-style: none; font-weight: 650;
+}
+/* Suppresses the browser default triangle so only the custom caret icons show. `list-style:
+   none` above already does this in modern Firefox for a `display: list-item` element like
+   <summary> - no further ::marker override needed (and AnnouncedGlyphSourceGuardTest would flag
+   one that set the CSS generated-content property directly on ::marker: it can't tell a
+   marker-suppressing empty value from real generated text, so its correct default is to disallow
+   that property outright). Safari/older Chromium still need the vendor-prefixed pseudo-element
+   hidden explicitly. */
+.disclosure summary::-webkit-details-marker { display: none; }
+.disclosure[open] summary { margin-bottom: var(--s3); }
+.disclosure .caret-open { display: none; }
+.disclosure[open] .caret-open { display: block; }
+.disclosure[open] .caret-closed { display: none; }
+/* 1.4.11: a caret is a required graphical object (it's the only visual cue an open disclosure
+   has beyond the content itself appearing) so it needs 3:1, not decorative-icon exemption -
+   --muted (this screen's own name for --color-text-muted, see the bridge at :root) holds 6.89:1
+   dark / 5.45:1 light, comfortably clear. */
+.disclosure .icon { color: var(--muted); }
+.disclosure dl.detail { margin: 0; }
+
 /* ============================== tables ============================== */
 .table-wrap { overflow-x: auto; border-radius: var(--radius); border: 1px solid var(--border); margin-top: var(--s5); }
 table {
@@ -1028,6 +1061,14 @@ tr.group th { background: #F3F4F6; color: var(--ink); text-transform: none; font
     padding: var(--s2) var(--s4); display: flex; gap: var(--s2); align-items: center; border-bottom: 1px solid #EBCF8A;
 }
 fieldset.step[hidden] { display: none; }
+/* T173: report-stepper.js sets nextBtn.hidden on the terminal step, but .btn (both the legacy
+   block above and the Nocturne one near the top of this file) unconditionally declares
+   `display: inline-flex` - an author rule always beats the UA stylesheet's own `[hidden] {
+   display: none}` regardless of specificity, so the Next button never actually disappeared; it
+   sat there fully visible, and clicking it silently no-opped (report-stepper.js's own guard
+   already refuses to advance past the last step). Same fix shape as the line above it - this
+   class needed its own [hidden] override and never got one. */
+.btn[hidden] { display: none; }
 
 /* ============================== responsive (FE-03/FE-10/FE-25): 720px breakpoint ============================== */
 @media (max-width: 720px) {
