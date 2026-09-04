@@ -3,14 +3,10 @@ package ninja.samryecroft.returnhome.tracker.auth;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 
-import ninja.samryecroft.returnhome.tracker.AbstractIntegrationTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
 /**
@@ -23,21 +19,7 @@ import org.springframework.test.web.servlet.MockMvc;
  * <p>This does not make form login stop working, and does not test signing in: without P4 there is
  * no link from a token to an application user, which is precisely why the flag ships off.
  */
-@SpringBootTest
-@AutoConfigureMockMvc
-@TestPropertySource(properties = {
-        "app.auth.entra.enabled=true",
-        "spring.security.oauth2.client.registration.entra.client-id=test-client-id",
-        "spring.security.oauth2.client.registration.entra.client-secret=test-client-secret",
-        "spring.security.oauth2.client.registration.entra.authorization-grant-type=authorization_code",
-        "spring.security.oauth2.client.registration.entra.redirect-uri={baseUrl}/login/oauth2/code/{registrationId}",
-        "spring.security.oauth2.client.registration.entra.scope=openid,profile,email",
-        "spring.security.oauth2.client.provider.entra.authorization-uri=https://tenant.example/oauth2/v2.0/authorize",
-        "spring.security.oauth2.client.provider.entra.token-uri=https://tenant.example/oauth2/v2.0/token",
-        "spring.security.oauth2.client.provider.entra.jwk-set-uri=https://tenant.example/discovery/v2.0/keys",
-        "spring.security.oauth2.client.provider.entra.user-name-attribute=sub"
-})
-class EntraLoginEnabledTest extends AbstractIntegrationTest {
+class EntraLoginEnabledTest extends AbstractEntraEnabledTest {
 
     @Autowired
     private ClientRegistrationRepository clientRegistrations;

@@ -10,7 +10,6 @@ import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import ninja.samryecroft.returnhome.tracker.AbstractIntegrationTest;
 import ninja.samryecroft.returnhome.tracker.user.AppUserDetailsService;
 import ninja.samryecroft.returnhome.tracker.user.Role;
 import ninja.samryecroft.returnhome.tracker.user.User;
@@ -18,14 +17,6 @@ import ninja.samryecroft.returnhome.tracker.user.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.security.oauth2.client.registration.InMemoryClientRegistrationRepository;
-import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
-import org.springframework.security.oauth2.client.registration.ClientRegistration;
-import org.springframework.security.oauth2.core.AuthorizationGrantType;
-import org.springframework.context.annotation.Bean;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -33,7 +24,6 @@ import org.springframework.security.core.context.SecurityContextImpl;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.core.oidc.OidcIdToken;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
 /**
@@ -51,40 +41,9 @@ import org.springframework.test.web.servlet.MockMvc;
  * straight back in as the previous user - with their roles, their home scope, and every action
  * attributed to them in the audit trail.
  */
-@SpringBootTest
-@AutoConfigureMockMvc
-@TestPropertySource(properties = "app.auth.entra.enabled=true")class EntraLogoutIntegrationTest extends AbstractIntegrationTest {
+class EntraLogoutIntegrationTest extends AbstractEntraEnabledTest {
 
     private static final String OBJECT_ID = "c3d4e5f6-1a2b-4c3d-9e8f-7a6b5c4d3e2f";
-
-    /**
-     * The registration is built here rather than from properties for one specific reason:
-     * <b>{@code end_session_endpoint} is only ever populated by OIDC discovery.</b> Spring Boot has
-     * no property for it, so a registration assembled from hand-written endpoints has empty provider
-     * metadata - and {@code OidcClientInitiatedLogoutSuccessHandler} then silently falls back to a
-     * local redirect. Production uses {@code issuer-uri}, so discovery fills it in; a test that
-     * hand-wrote endpoints would pass while proving the opposite of what it claims.
-     */
-    @TestConfiguration
-    static class StubTenant {
-
-        @Bean
-        ClientRegistrationRepository clientRegistrationRepository() {
-            return new InMemoryClientRegistrationRepository(ClientRegistration.withRegistrationId("entra")
-                    .clientId("test-client-id")
-                    .clientSecret("test-client-secret")
-                    .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
-                    .redirectUri("{baseUrl}/login/oauth2/code/{registrationId}")
-                    .scope("openid", "profile", "email")
-                    .authorizationUri("https://tenant.example/oauth2/v2.0/authorize")
-                    .tokenUri("https://tenant.example/oauth2/v2.0/token")
-                    .jwkSetUri("https://tenant.example/discovery/v2.0/keys")
-                    .userNameAttributeName("sub")
-                    .providerConfigurationMetadata(java.util.Map.of(
-                            "end_session_endpoint", "https://tenant.example/oauth2/v2.0/logout"))
-                    .build());
-        }
-    }
 
     @Autowired
     private MockMvc mockMvc;
