@@ -46,8 +46,23 @@ public class OrganisationAccessService {
         if (principal.hasRole(Role.ORG_ADMIN) && principal.getOrganisationType() == OrgType.CARE_PROVIDER) {
             return principalOrgId.equals(careProviderOrgId);
         }
-        if (principal.hasRole(Role.ORG_ADMIN) || principal.hasRole(Role.COORDINATOR) || principal.hasRole(Role.REVIEWER)) {
-            // Supplier-side: visible iff principal's org is the Supplier assigned to this Care Provider org.
+        // Supplier-side: visible iff the principal's org is the Supplier assigned to this Care
+        // Provider org. The organisation TYPE is tested here, not just the role (T136).
+        //
+        // It used to check the three roles alone. For ORG_ADMIN that was still sound - the branch
+        // above has already taken the care-provider case, so an org-admin reaching here is a
+        // supplier one. COORDINATOR and REVIEWER were never type-checked at all, and they are
+        // supplier-side only by convention: RoleMatrix lets only a supplier org-admin assign them,
+        // but a platform ADMIN can put either role in a care-provider organisation.
+        //
+        // Such an account then had its own organisation id compared against
+        // supplier_organisation_id, a column with no type constraint of its own (V5) - so the only
+        // thing standing between it and another organisation's data was that no care provider
+        // happens to be recorded as another care provider's supplier. That is data integrity doing
+        // an access check's job. Same principle as T117 and T130: grant on a positive test.
+        if (principal.getOrganisationType() == OrgType.SUPPLIER
+                && (principal.hasRole(Role.ORG_ADMIN) || principal.hasRole(Role.COORDINATOR)
+                        || principal.hasRole(Role.REVIEWER))) {
             return organisationRepository.findSupplierOrganisationIdByCareProviderId(careProviderOrgId)
                     .map(principalOrgId::equals)
                     .orElse(false);
@@ -60,10 +75,20 @@ public class OrganisationAccessService {
         // HOME_STAFF and VIEWER used to be answered by two different mechanisms here - a field
         // comparison against the principal's single home, and a query against the viewer join
         // table. Since V16 they are the same relationship, so this is one check (T116).
+        //
+        // The two null guards keep this in step with ResolvedHomeScope.canView, which answers the
+        // SAME question for a list. Without them this threw where the list path denied - on a null
+        // home, and on a home with no organisation - so the single-record and list answers differed
+        // on identical input, which is the one thing two implementations of one rule must not do.
+        // An access check that throws also gives the caller a 500 where it asked a yes/no question.
+        if (home == null) {
+            return false;
+        }
         if (canAccessHome(principal, home.getId())) {
             return true;
         }
-        return canViewCareProviderOrg(principal, home.getOrganisation().getId());
+        Long organisationId = home.getOrganisation() == null ? null : home.getOrganisation().getId();
+        return canViewCareProviderOrg(principal, organisationId);
     }
 
     /**
