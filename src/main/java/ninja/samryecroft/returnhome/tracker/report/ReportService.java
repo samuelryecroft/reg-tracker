@@ -97,19 +97,19 @@ public class ReportService {
      * <p>REJECTED stays permitted, deliberately - that is precisely the resubmission round, and the
      * whole point of a rejection is that the visitor goes back and reworks the report.
      *
-     * <p>The refusal is an {@link IllegalStateException} rather than an
-     * {@link AccessDeniedException} because it is a statement about the report, not about the
-     * person: the allocated visitor is exactly who is allowed here, and the report has simply moved
-     * past the point where saving means anything.
+     * <p>The refusal is a {@link ReportNotEditableException} - an {@link IllegalStateException}
+     * rather than an {@link AccessDeniedException} because it is a statement about the report, not
+     * about the person: the allocated visitor is exactly who is allowed here, and the report has
+     * simply moved past the point where saving means anything. It carries its own type so the
+     * autosave endpoint can report it as <em>terminal</em>; see that class for why that distinction
+     * is load-bearing rather than tidy.
      */
     @Transactional
     public InterviewReport saveDraft(Long requestId, SubmitReportForm form, AppUserPrincipal principal) {
         InterviewReport report = existingOrNewReport(requestId, principal);
         ReportStatus statusBefore = report.getStatus();
         if (statusBefore == ReportStatus.SUBMITTED || statusBefore == ReportStatus.APPROVED) {
-            throw new IllegalStateException(
-                    "This report has already been " + (statusBefore == ReportStatus.APPROVED ? "approved" : "submitted for review")
-                            + " and can no longer be saved as a draft");
+            throw new ReportNotEditableException(statusBefore);
         }
         applyFormValues(report, form);
         report.setStatus(ReportStatus.DRAFT);

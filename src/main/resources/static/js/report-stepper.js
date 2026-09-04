@@ -6,9 +6,26 @@
 // Validation runs on advance only, never while typing (the visitor may be sitting opposite a child;
 // the screen must stay calm - see design-perspective.md D.3/2.4). "Save draft" and "Submit for
 // review" remain the same two real form submissions as before, just relocated into the sticky footer
-// on the last step - this script does not talk to the server on its own and does not implement
-// autosave; per-step autosave would need a new save-partial-progress endpoint, which is a backend
-// decision to make with the team rather than something to add unilaterally here.
+// on the last step.
+//
+// T174 adds the autosave this file previously said it could not add unilaterally: each "Next" posts
+// the form to /visitor/interviews/{id}/report/draft, the save-partial-progress endpoint that has
+// since been designed with the team. Three things about it are deliberate.
+//
+// 1. THE WHOLE FORM IS POSTED, NOT THE STEP. The server applies form values as a full replacement
+//    and cannot distinguish an absent field from a cleared one, so a per-step payload would blank
+//    the steps behind it. The fieldsets are hidden, not disabled, so FormData(form) already carries
+//    everything - including the CSRF token.
+// 2. ADVANCING NEVER WAITS ON THE NETWORK. The step changes immediately and the save reports itself
+//    afterwards. Blocking the wizard on a request is the opposite of a calm screen, and the whole
+//    point of saving is that the visitor can carry on.
+// 3. SUCCESS IS "200 AND JSON", NOT "200". fetch follows redirects, so an expired session arrives
+//    as 200 carrying the login page's HTML with response.ok true. Trusting the status alone would
+//    print "Saved" at the exact moment the visitor's work was thrown away.
+//
+// The two failures are told apart because their remedies are opposite: a terminal refusal (the
+// report was submitted or approved while they were typing) can never succeed on retry and stops
+// autosave for good, while anything else is transient and worth trying again.
 (function () {
     var form = document.querySelector('form[data-js="stepper"]');
     if (!form) {
@@ -25,7 +42,10 @@
     chrome.innerHTML =
         '<span class="dots"></span>' +
         '<span class="step-label"></span>' +
-        '<span class="saved pending" id="stepper-saved">Not yet saved</span>';
+        // aria-live, because this is the only thing on the screen that says whether a visitor's
+        // work is safe, and it changes without anything moving focus. A save state that reaches
+        // only sighted users is the same defect as a state-bearing icon marked aria-hidden.
+        '<span class="saved pending" id="stepper-saved" aria-live="polite">Not yet saved</span>';
     form.insertBefore(chrome, steps[0]);
     var dotsEl = chrome.querySelector('.dots');
     var labelEl = chrome.querySelector('.step-label');
@@ -106,6 +126,9 @@
         if (current < steps.length - 1) {
             current += 1;
             render();
+            // After render, never before it: the wizard must not wait on the network (file header,
+            // point 2). The visitor is already reading the next step by the time this resolves.
+            autosave();
         }
     });
 
@@ -117,6 +140,95 @@
         savedEl.textContent = (submitter && submitter.value === 'draft') ? 'Saving draft…' : 'Submitting…';
         savedEl.classList.remove('pending');
     });
+
+    // --- T174 autosave ---------------------------------------------------------------------
+    var autosaveUrl = form.getAttribute('data-autosave-url');
+    var autosaveStopped = false;
+
+    // One message for every transient failure, deliberately - and NOT because the client cannot
+    // tell them apart. It often can. The reason is that what it can tell apart is not what it would
+    // need to know.
+    //
+    // Reaching this branch means "the server did not answer in a way we can read". Measured, an
+    // expired session arrives as a 403 from the CSRF filter (no session, so no token to match) -
+    // not, as is easy to assume, a followed redirect to a 200 login page. But a gateway 502, a
+    // proxy error page and an SSO hop land here identically. So "Sign in again" would be
+    // confidently wrong a fair share of the time, and a confidently wrong instruction is worse than
+    // a vague one when someone is holding an unsaved account of a child's disclosure. The client
+    // asserts only what it can actually read: the server did not accept this, and the work is still
+    // on the page.
+    //
+    // The distinction that does matter - transient vs TERMINAL - is never guessed either. It is
+    // read from the server's own outcome field, because only the server can tell a de-allocation
+    // 403 from a CSRF 403.
+    var TRANSIENT = 'Not saved - your work is still on this page. Sign in again if you have been signed out.';
+
+    function state(text, className) {
+        savedEl.textContent = text;
+        savedEl.className = 'saved' + (className ? ' ' + className : '');
+    }
+
+    function isJson(response) {
+        var type = response.headers.get('content-type') || '';
+        return type.indexOf('application/json') === 0 || type.indexOf('application/json') > 0;
+    }
+
+    function autosave() {
+        if (!autosaveUrl || autosaveStopped) {
+            return;
+        }
+        state('Saving…', 'pending');
+        fetch(autosaveUrl, {
+            method: 'POST',
+            body: new FormData(form),
+            headers: { 'Accept': 'application/json' },
+            credentials: 'same-origin'
+        }).then(function (response) {
+            // Not response.ok - see point 3 in the file header. A response the server did not
+            // answer in JSON is one we cannot read, whatever its status, and reporting it as a save
+            // is the one failure mode that actively misleads a visitor about whether their work is
+            // safe.
+            //
+            // Honest about what this line is worth, because the first version of this comment
+            // overclaimed it. It was kept for the gateway-answers-200-with-its-own-JSON case; that
+            // case is actually closed by requiring outcome === 'saved' below, which is pinned by a
+            // test. Replacing this line with response.ok still survives the suite, and after
+            // looking for one I cannot construct an input where the two differ: response.json()
+            // rejects on anything this would have caught, and lands in the same branch.
+            //
+            // So it stays for a reason that is about the code rather than about behaviour: without
+            // it, every non-JSON response - the ordinary expired-session case - reaches the parse
+            // and is handled by an exception, which is a worse thing to read and a worse thing to
+            // debug than a stated condition. It is not load-bearing, no test pins it, and it should
+            // not be described as though it were.
+            if (!isJson(response)) {
+                state(TRANSIENT, 'pending');
+                return null;
+            }
+            return response.json().then(function (body) {
+                // Keyed on the server's own word, never on the status. The status cannot carry this
+                // decision: a 403 is a de-allocated visitor (terminal) OR an expired session
+                // rejected by the CSRF filter (about as transient as a failure gets), and only the
+                // server knows which one it produced.
+                if (body && body.outcome === 'terminal') {
+                    autosaveStopped = true;
+                    state(body.message || 'This report can no longer be saved', 'stopped');
+                    return null;
+                }
+                // Success is asserted, not inferred from the absence of failure. A gateway or SSO
+                // hop answering 200 with its own JSON error envelope parses cleanly and has neither
+                // outcome nor savedAt - without this it would have been read as a save.
+                if (!response.ok || !body || body.outcome !== 'saved') {
+                    state(TRANSIENT, 'pending');
+                    return null;
+                }
+                state('Saved ' + (body.savedAt || ''), '');
+                return null;
+            });
+        }).catch(function () {
+            state(TRANSIENT, 'pending');
+        });
+    }
 
     render();
 })();

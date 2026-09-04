@@ -6,6 +6,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
+import com.microsoft.playwright.Route;
 import ninja.samryecroft.returnhome.tracker.child.Child;
 import ninja.samryecroft.returnhome.tracker.child.ChildRepository;
 import ninja.samryecroft.returnhome.tracker.home.Home;
@@ -13,6 +14,9 @@ import ninja.samryecroft.returnhome.tracker.home.HomeRepository;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewRequest;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewRequestRepository;
 import ninja.samryecroft.returnhome.tracker.organisation.Organisation;
+import ninja.samryecroft.returnhome.tracker.report.InterviewReport;
+import ninja.samryecroft.returnhome.tracker.report.InterviewReportRepository;
+import ninja.samryecroft.returnhome.tracker.report.ReportStatus;
 import ninja.samryecroft.returnhome.tracker.user.Role;
 import ninja.samryecroft.returnhome.tracker.user.User;
 import ninja.samryecroft.returnhome.tracker.user.UserRepository;
@@ -22,12 +26,16 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 /**
- * T173: two visitor-report-wizard UX fixes from live human testing of 1a's deployed batch.
+ * Visitor-report-wizard behaviour that only a real browser can see. T173's two UX fixes from live
+ * human testing of 1a's deployed batch, and T174's per-step autosave.
  *
  * <p>Both regressions here render fine in a plain Thymeleaf dump (a static HTML render never
  * exercises the CSS cascade or the client-side stepper) - only a real browser catches them, which
  * is why this is a Playwright test rather than a {@code TemplateRenderCoverageIntegrationTest}
- * case.
+ * case. The same is true of the autosave: the endpoint has its own integration test, but nothing
+ * short of a browser proves the two are actually joined - a typo'd URL, a CSRF token that never
+ * left the form, or a response the client cannot read all fail silently, and the visitor is told
+ * nothing was lost while nothing was saved.
  */
 class ReportWizardUiTest extends AbstractUiTest {
 
@@ -43,6 +51,8 @@ class ReportWizardUiTest extends AbstractUiTest {
     private InterviewRequestRepository interviewRequestRepository;
     @Autowired
     private PasswordEncoder passwordEncoder;
+    @Autowired
+    private InterviewReportRepository interviewReportRepository;
 
     private Long requestId;
 
@@ -124,6 +134,118 @@ class ReportWizardUiTest extends AbstractUiTest {
         assertThat(page.locator("button:has-text('Submit for review')").isVisible()).isTrue();
         assertThat(page.locator("button:has-text('Save draft')").isVisible()).isTrue();
         assertThat(page.locator("a:has-text('Cancel')").isVisible()).isTrue();
+    }
+
+    /**
+     * T174: "Next" actually saves, end to end.
+     *
+     * <p>Asserted against <b>the database</b> and not only against the on-screen indicator. The
+     * indicator is what the visitor believes; the row is whether they are right, and the entire
+     * point of this feature is that those two agree. A test that checked only the chrome would pass
+     * on a client that printed "Saved" without a server ever hearing from it - which is precisely
+     * the failure this design is built to avoid.
+     *
+     * <p>The wizard is driven with typing in step one and a single Next, because the claim is about
+     * one advance causing one save, not about the stepper's traversal (covered above).
+     */
+    @Test
+    void pressingNextSavesTheWorkSoFarAndSaysSo() {
+        login("wizard-ui-visitor", PASSWORD);
+        page.navigate(url("/visitor/interviews/" + requestId + "/report"));
+        page.waitForLoadState();
+
+        assertThat(interviewReportRepository.findByInterviewRequestId(requestId))
+                .as("nothing is saved before the first Next")
+                .isEmpty();
+        assertThat(page.locator("#stepper-saved").textContent().trim()).isEqualTo("Not yet saved");
+
+        page.fill("#interviewLocation", "The home's quiet room");
+        page.click("button:has-text('Next')");
+
+        // Waits on the indicator rather than sleeping: the save is deliberately asynchronous to the
+        // step advance, so there is a real window in which the step has changed and the row has not.
+        //
+        // Waits on the CLASS, not on the text. Playwright's :has-text() is a case-insensitive
+        // substring match, so :has-text('Saved') matches the starting "Not yet saved" and every
+        // failure message too - it returned instantly and waited for nothing. The class is the
+        // unambiguous signal: "pending" covers both the starting state and every failure, and only
+        // a successful save clears it.
+        page.waitForSelector("#stepper-saved:not(.pending):not(.stopped)");
+        assertThat(page.locator("#stepper-saved").textContent()).startsWith("Saved ");
+
+        InterviewReport saved = interviewReportRepository.findByInterviewRequestId(requestId).orElseThrow();
+        assertThat(saved.getStatus()).isEqualTo(ReportStatus.DRAFT);
+        assertThat(saved.getInterviewLocation()).isEqualTo("The home's quiet room");
+    }
+
+    /**
+     * T174, and the failure mode the whole response contract exists for: an expired session must
+     * never be reported as a save.
+     *
+     * <p>This is the case that a reasonable implementation gets wrong. Spring's form login
+     * intercepts the unauthenticated POST and redirects, {@code fetch} follows redirects by default,
+     * and so the client receives <b>200 carrying the login page's HTML with {@code response.ok}
+     * true</b>. A client that tests the status - the obvious thing to write - prints "Saved" at the
+     * exact moment the visitor's work was thrown away, which is worse than not autosaving at all.
+     * The only property that separates this response from a real save is its content type.
+     *
+     * <p>Driven by clearing the browser's cookies rather than by stubbing anything, because the
+     * whole point is that the redirect is followed for real by a real fetch. Nothing below the
+     * browser can show this: the endpoint's own test sees the 302, never the 200 the client sees.
+     */
+    @Test
+    void anExpiredSessionIsNeverReportedAsASave() {
+        login("wizard-ui-visitor", PASSWORD);
+        page.navigate(url("/visitor/interviews/" + requestId + "/report"));
+        page.waitForLoadState();
+
+        page.fill("#interviewLocation", "Typed just before the session expired");
+        page.context().clearCookies();
+        page.click("button:has-text('Next')");
+
+        // "Not saved" and not "Saved": :has-text() is a case-insensitive substring match, so the
+        // starting "Not yet saved" does not match this and every failure message does. The class is
+        // asserted too, because text alone would not catch a failure styled as a success.
+        page.waitForSelector("#stepper-saved:has-text('Not saved')");
+        assertThat(page.locator("#stepper-saved").textContent()).doesNotContain("Saved ");
+        assertThat(page.locator("#stepper-saved").getAttribute("class")).contains("pending");
+        assertThat(interviewReportRepository.findByInterviewRequestId(requestId))
+                .as("nothing reached the database, which is exactly why the screen must not claim it did")
+                .isEmpty();
+    }
+
+    /**
+     * T174: a 200 with JSON that is not our envelope must not read as a save.
+     *
+     * <p>This is the case the content-type check exists for and the one nothing pinned. A gateway,
+     * an SSO hop or a proxy answering 200 with its own JSON error body parses cleanly, so every
+     * cheap success test - {@code response.ok}, "it is JSON", "it parsed" - passes it. The client
+     * therefore has to <b>assert</b> success rather than infer it from the absence of failure, and
+     * that is what {@code outcome === 'saved'} is doing; dropping it survives every other test in
+     * this file.
+     *
+     * <p>Modelled at the NETWORK layer with a route interception rather than by pointing the form
+     * at another endpoint of this application, because that is the layer the real failure occupies:
+     * the envelope is injected by something between the browser and us. Pointing it at
+     * {@code /actuator/health} was the first attempt and would have passed for the wrong reason - a
+     * POST there is a 405, so the test would have proved only that a 405 is not a save.
+     */
+    @Test
+    void aTwoHundredCarryingSomeoneElsesJsonIsNotReadAsASave() {
+        login("wizard-ui-visitor", PASSWORD);
+        page.navigate(url("/visitor/interviews/" + requestId + "/report"));
+        page.waitForLoadState();
+
+        page.route("**/report/draft", route -> route.fulfill(new Route.FulfillOptions()
+                .setStatus(200)
+                .setContentType("application/json")
+                .setBody("{\"error\":\"upstream request timeout\"}")));
+
+        page.click("button:has-text('Next')");
+
+        page.waitForSelector("#stepper-saved:has-text('Not saved')");
+        assertThat(page.locator("#stepper-saved").textContent()).doesNotContain("Saved ");
+        assertThat(interviewReportRepository.findByInterviewRequestId(requestId)).isEmpty();
     }
 
     @Test

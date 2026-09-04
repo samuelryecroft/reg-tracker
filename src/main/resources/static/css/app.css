@@ -1050,6 +1050,9 @@ tr.group th { background: #F3F4F6; color: var(--ink); text-transform: none; font
 .dot.now { background: var(--accent); box-shadow: 0 0 0 3px var(--tint); }
 .saved { margin-left: auto; display: inline-flex; align-items: center; gap: 5px; color: var(--ok); font-weight: 700; }
 .saved.pending { color: var(--muted); }
+/* T174: a terminal autosave refusal is not a quieter version of "not yet saved" - the report can
+   never accept this work again, and a muted grey reads as "still in progress". */
+.saved.stopped { color: var(--error); }
 .sticky-actions {
     position: sticky; bottom: 0; background: var(--surface); border-top: 1px solid var(--border);
     padding: var(--s3) var(--s4); display: flex; gap: var(--s2); align-items: center; margin-top: var(--s5);
