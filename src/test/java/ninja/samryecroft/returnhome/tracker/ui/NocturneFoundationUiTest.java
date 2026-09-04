@@ -2,8 +2,9 @@ package ninja.samryecroft.returnhome.tracker.ui;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.microsoft.playwright.Page;
+import com.microsoft.playwright.options.ColorScheme;
 import ninja.samryecroft.returnhome.tracker.theme.AccentRamp;
-import ninja.samryecroft.returnhome.tracker.theme.ThemeService;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -17,6 +18,12 @@ class NocturneFoundationUiTest extends AbstractUiTest {
 
     @Test
     void theShellRendersAsAStyledDarkSidebarWithWorkingIcons() {
+        // T138 batch 1b: a fresh account's appearance preference is AUTO (R-Q9), which now
+        // genuinely follows the OS's prefers-color-scheme (wired for real in this batch, where
+        // phase 1 only built the CSS mechanism) - Playwright's own default OS colour-scheme
+        // emulation is light, so this test (which is specifically about DARK styling) has to force
+        // dark explicitly, or it would - correctly - render light and fail for the right reason.
+        page.emulateMedia(new Page.EmulateMediaOptions().setColorScheme(ColorScheme.DARK));
         login(ADMIN_USERNAME, ADMIN_PASSWORD);
         page.waitForSelector(".shell-side");
 
@@ -92,7 +99,7 @@ class NocturneFoundationUiTest extends AbstractUiTest {
     /**
      * T138 (phase 2, batch 1a): {@code --brand-hue} must come from the signed-in user's actual
      * effective theme, not app.css's hardcoded default (289) - checked against
-     * {@link ThemeService#brandHueOf} called on the platform default's own known colour (the shared
+     * {@link AccentRamp#hueFrom} called on the platform default's own known colour (the shared
      * decision point this override is built on, not a hardcoded expected number that could drift from
      * it independently) rather than the literal default hue, so this fails if the wiring silently
      * falls back to the CSS default instead of actually reading the theme.

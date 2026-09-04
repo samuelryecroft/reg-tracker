@@ -115,6 +115,12 @@ public class User {
             inverseJoinColumns = @JoinColumn(name = "home_id"))
     private Set<Home> homes = new HashSet<>();
 
+    /** T138 batch 1b: spec 2.3's per-user appearance setting. NOT NULL - V18 backfills every
+     * existing row to AUTO, and there is no "unset" state a template would need to handle. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "appearance_preference", nullable = false)
+    private AppearancePreference appearancePreference = AppearancePreference.AUTO;
+
     @Column(nullable = false)
     private boolean enabled = true;
 
@@ -235,6 +241,14 @@ public class User {
 
     public void setHomes(Set<Home> homes) {
         this.homes = homes;
+    }
+
+    public AppearancePreference getAppearancePreference() {
+        return appearancePreference;
+    }
+
+    public void setAppearancePreference(AppearancePreference appearancePreference) {
+        this.appearancePreference = appearancePreference;
     }
 
     public boolean isCanExport() {
