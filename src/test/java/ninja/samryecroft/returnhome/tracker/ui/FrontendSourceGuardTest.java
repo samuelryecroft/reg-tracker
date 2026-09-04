@@ -291,6 +291,74 @@ class FrontendSourceGuardTest {
      * "themed" - any {@code var(--...)} background is theme-aware by construction (that is the
      * entire point of a custom-property token), so the match is not narrowed to a suffix.
      */
+    /**
+     * The CONVERSE of the check above, and the reason it is a separate one: that check finds a
+     * themed background under a hard-coded ink, and this finds a hard-coded background under an
+     * ink that is free to move. Both produce the same failure - a pair where one half follows the
+     * appearance and the other does not - but only this one catches a rule that sets NO colour at
+     * all, which is exactly how the live 2c defect survived two clean sweeps.
+     *
+     * <p>{@code .tile.urgent} and {@code .tile.warn} fixed a light fill ({@code #FFFAFA},
+     * {@code #FFFDF6}) and left the ink inherited. On dark that put near-white text on near-white:
+     * the 30px count on the "needs attention" tiles measured 1.17:1, so the overdue number was the
+     * one that had gone invisible. The other check could not see it, because there was no
+     * {@code color} declaration in the rule for it to read - the bug is the ABSENCE of one.
+     *
+     * <p>Searching the shape rather than those two found four more live instances, including
+     * {@code input.is-invalid}, which is every invalid field on every form in the app.
+     *
+     * <p>So the rule this pins is the general one: <b>a background is half of a contrast pair
+     * whose other half follows the appearance, so it must come from a token.</b> Print is the one
+     * exemption and it is a real one rather than a carve-out for awkward cases - paper is white in
+     * both appearances, so a fixed white there is a statement of fact.
+     */
+    @Test
+    void noBackgroundIsAHardcodedColourExceptWherePrintMakesItAFact() throws IOException {
+        List<String> violations = new ArrayList<>();
+        for (Path file : sourceFilesUnder(CSS_DIR)) {
+            violations.addAll(hardcodedBackgroundsOutsidePrint(
+                    Files.readString(file, StandardCharsets.UTF_8), file.toString()));
+        }
+
+        assertThat(violations)
+                .as("a hard-coded background is half of a contrast pair whose other half follows "
+                        + "the appearance - take the fill from a token, and where the ink is "
+                        + "inherited, let it stay inherited")
+                .isEmpty();
+    }
+
+    /**
+     * Backgrounds set to a colour literal, ignoring anything inside a {@code @media print} block.
+     *
+     * <p>The print block is found by brace depth rather than by a line range, so it keeps working
+     * when rules are added to it - a range would silently stop covering the block's tail.
+     */
+    private static List<String> hardcodedBackgroundsOutsidePrint(String css, String name) {
+        String stripped = css.replaceAll("(?s)/\\*.*?\\*/", "");
+        Pattern literalBackground =
+                Pattern.compile("background(-color)?:\\s*(#[0-9A-Fa-f]{3,8}|rgba?\\(|hsla?\\()");
+        List<String> violations = new ArrayList<>();
+        int depth = 0;
+        int printBlockDepth = -1;
+        for (String line : stripped.split("\n")) {
+            if (line.contains("@media") && line.contains("print")) {
+                printBlockDepth = depth;
+            }
+            if (printBlockDepth < 0 && literalBackground.matcher(line).find()) {
+                violations.add(name + ": " + line.trim());
+            }
+            depth += count(line, '{') - count(line, '}');
+            if (printBlockDepth >= 0 && depth <= printBlockDepth) {
+                printBlockDepth = -1;
+            }
+        }
+        return violations;
+    }
+
+    private static int count(String line, char c) {
+        return (int) line.chars().filter(ch -> ch == c).count();
+    }
+
     private static List<String> themedBackgroundsWithHardcodedInk(String css) {
         String stripped = css.replaceAll("(?s)/\\*.*?\\*/", "");
         List<String> offendingRules = new ArrayList<>();
