@@ -45,10 +45,19 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
  * {@code reviewComments} while leaving the generated approved document attached to a row that now
  * read "awaiting review", with no reviewer on it and no coordinator involved.
  *
- * <p><b>This is the capability, not the reachability.</b> T145's transition guard will separately
- * stop an approved request being walked backwards at all; this file is about what the code is able
- * to do to an approval once something reaches it. A guard alone would leave the erasure sitting in
- * the method for the next path that gets there - which is why Kevin asked for the two split apart.
+ * <p><b>Two defences, and one shadows the other - which is worth stating rather than implying.</b>
+ * The submission is refused when the report is already APPROVED, checked on the report's own status
+ * because the interview request's status is a different state machine that merely happens to be in
+ * step. Behind that, the clearing is scoped to a REJECTED round, so a path that did reach this
+ * method still could not erase a verdict.
+ *
+ * <p>The measurement, since a claim of "two layers" is easy to make and easy to be wrong about:
+ * removing the refusal fails {@link #resubmittingOverAnApprovedReportIsRefusedAndLeavesTheVerdictIntact},
+ * but making the clearing unconditional again fails <em>nothing</em> - the refusal gets there first,
+ * so no test can reach the erasure any more. The scoping's only remaining direct evidence is
+ * {@link #resubmittingAfterARejectionStillClearsThatRejectionsVerdict}, which pins that clearing
+ * still happens on the round it exists for. It is deliberate defence in depth for the day someone
+ * relaxes the refusal, and it is honestly untested for the case it was written for.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -135,16 +144,23 @@ class ApprovalIsNotErasableByResubmissionIntegrationTest extends AbstractIntegra
     /**
      * The visitor resubmits over their own approved report. Reached through the real HTTP path rather
      * than by calling the service, because the whole question is what an ordinary account can do.
+     *
+     * <p>Two independent reasons this now holds, asserted together on one request: the submission is
+     * refused outright, and the verdict survives even if it weren't. The refusal is checked against
+     * the <em>report's</em> own status rather than the interview request's - the two are separate
+     * state machines that happen to be in step, and resting this on their agreement would make it a
+     * coincidence rather than a rule.
      */
     @Test
-    void resubmittingOverAnApprovedReportDoesNotWipeWhoApprovedItOrWhen() throws Exception {
+    void resubmittingOverAnApprovedReportIsRefusedAndLeavesTheVerdictIntact() throws Exception {
         approve();
         InterviewReport before = interviewReportRepository.findByInterviewRequestId(requestId).orElseThrow();
         Long approverId = before.getReviewedBy().getId();
 
-        submitReport();
+        submitReportExpecting(status().isConflict());
 
         InterviewReport after = interviewReportRepository.findByInterviewRequestId(requestId).orElseThrow();
+        assertThat(after.getStatus()).isEqualTo(ReportStatus.APPROVED);
         assertThat(after.getReviewedBy()).isNotNull();
         assertThat(after.getReviewedBy().getId()).isEqualTo(approverId);
         assertThat(after.getReviewedAt()).isNotNull();
@@ -184,7 +200,13 @@ class ApprovalIsNotErasableByResubmissionIntegrationTest extends AbstractIntegra
      */
     @Test
     void theSubmissionEventRecordsTheStatusItOverwrote() throws Exception {
-        approve();
+        // Asserted on the reject-then-resubmit round: that is now the only round a submission can
+        // legally overwrite a verdict on, since an approved report is refused before it publishes.
+        mockMvc.perform(post("/reviewer/reports/{id}/review", requestId)
+                        .with(asUser("t145-reviewer" + suffix)).with(csrf())
+                        .param("action", "reject")
+                        .param("reviewComments", "Please expand the risk section"))
+                .andExpect(status().is3xxRedirection());
         submitReport();
 
         AuditEvent latest = auditEventRepository
@@ -193,10 +215,15 @@ class ApprovalIsNotErasableByResubmissionIntegrationTest extends AbstractIntegra
                         && e.getActorUsernameAtTime().equals("t145-visitor" + suffix))
                 .findFirst().orElseThrow();
 
-        assertThat(latest.getMetadata()).contains("statusBefore=APPROVED");
+        assertThat(latest.getMetadata()).contains("statusBefore=REJECTED");
     }
 
     private void submitReport() throws Exception {
+        submitReportExpecting(status().is3xxRedirection());
+    }
+
+    private void submitReportExpecting(org.springframework.test.web.servlet.ResultMatcher expected)
+            throws Exception {
         mockMvc.perform(post("/visitor/interviews/{id}/report", requestId)
                         .with(asUser("t145-visitor" + suffix)).with(csrf())
                         .param("action", "submit")
@@ -210,7 +237,7 @@ class ApprovalIsNotErasableByResubmissionIntegrationTest extends AbstractIntegra
                         .param("interviewerComments", "Settled on return")
                         .param("recommendations", "No further action")
                         .param("conductedByStatement", "Conducted by the allocated visitor"))
-                .andExpect(status().is3xxRedirection());
+                .andExpect(expected);
     }
 
     private void saveUser(String username, Set<Role> roles, Organisation organisation, Home home) {

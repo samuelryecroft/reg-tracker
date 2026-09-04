@@ -80,6 +80,15 @@ public class ReportService {
     public InterviewReport submitForReview(Long requestId, SubmitReportForm form, AppUserPrincipal principal) {
         InterviewReport report = existingOrNewReport(requestId, principal);
         ReportStatus statusBefore = report.getStatus();
+        // Guarded on the REPORT's own status, which is the thing this sentence is actually about:
+        // you cannot resubmit a report that has already been approved. Answering it through the
+        // interview request's status instead would work today only because the two state machines
+        // happen to be in step - they are separate machines, and this one has no other check on
+        // entry (getReviewable guards it on the review side only). Checked before anything is
+        // mutated, so the refusal doesn't rest on the transaction rolling the field writes back.
+        if (statusBefore == ReportStatus.APPROVED) {
+            throw new IllegalStateException("This report has already been approved and cannot be resubmitted");
+        }
         applyFormValues(report, form);
         report.setStatus(ReportStatus.SUBMITTED);
         report.setSubmittedAt(LocalDateTime.now());
