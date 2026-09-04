@@ -1774,3 +1774,64 @@ semantic tokens. **Correct, and worth stating as precedence so it is not reopene
 authoritative, but **R-Q6 explicitly corrected the semantic set to be theme-aware**, and #48/#62 fixed the
 contrast on it. Re-monochroming to accent would walk R-Q6 backwards and reopen work that is done. **A later
 explicit decision supersedes the canvas within its own domain**; the canvas keeps the card's layout.
+
+
+## 6e · Floor practice: a mis-scoped guard, and three 2a–2f decisions (Creed, 5 Sep)
+
+### FLOOR PRACTICE · A guard inherits its instances' **location** as readily as their naming — and that failure is silent
+
+§5j's amendment was that a guard can pin the shape of the bug while inheriting an *incidental* property of the
+instances it was written from. That has now happened twice, on two different properties:
+
+| Guard | Pinned the bug's shape | Inherited, unnoticed | Blind to |
+|---|---|---|---|
+| themed-bg + literal ink (#48) | correct | **token naming** — matched only `var(--*-bg)` | the whole accent family (`--accent`, `--accent-dark`, `--tint`) |
+| announced glyph (§5j) | correct | **file location** — scanned `src/main/java` and the CSS | every glyph written straight into a `th:text` |
+
+Four live announced glyphs sat in templates the entire time that guard was green — both dashboards'
+*"N further interviews excluded"* and both download pages' *"Link expires in N minutes"*, each announcing
+*"circle with upper right quadrant black"* ahead of the sentence saying what happened.
+
+**The reason this class is worth naming separately: a mis-scoped guard does not fail loudly, it passes
+quietly.** Green from a guard that searches the wrong place is indistinguishable from green from a clean
+codebase — so it reads as *evidence of absence* while being nothing of the kind. A guard blind to a token
+name at least still runs over the right files; a guard blind to a directory never sees the bug exist.
+
+> **The test, extended: could this guard, as written, see a correct instance of this bug in a part of the
+> system nobody was looking at when it was written — a different token family, a different file type, a
+> different casing, a different layer?** If the answer is no for any of those axes, the guard's green means
+> less than it appears to.
+
+And a third instance of the same root, from the same batch: `.tile.urgent` and `input.is-invalid` set a
+hard-coded background and **no ink at all**, so the contrast guard — which looks for a themed background
+*under a literal ink* — could not see them, because **the bug is the absence of the `color` declaration.**
+Same lesson on a third axis: the guard assumed the defect would be something written, not something missing.
+
+### D-2d-2 · The "questions answered" figure — do not build a second count; 2d ships without it
+
+There is no single source for the report's questions: `report-fields.html` is the source, and 1a counts them
+inline. Any count written in Java would be a **second list of those questions**, drifting from the form the
+moment a question is added. **Ship 2d without the figure** — it is triage nicety, and buying it with a second
+representation is exactly the drift this batch exists to delete.
+
+**The shared question model that would fix it is not a 2d ticket — and it is the same ticket as the 1a/1b
+markup-path finding.** 1a renders the report through its own `dl.detail` blocks while 1b and 1c render it
+through `fragments/report-fields`; that split and the missing question model are **one root cause seen from
+two lanes**. A model that `report-fields.html` renders from gives 1a a single path to consume *and* makes the
+count derivable everywhere. Add the figure to 2d when the model exists, not before.
+
+### D-2a-8 · `AWAITING_REPORT` includes `REPORT_REJECTED` — confirmed
+
+A sent-back report is awaiting a report, not closed, and the menu stages must partition `InterviewStatus`
+exactly once. The reason this is safe rather than merely tidy: **the card's own status tag still reads "Sent
+back"**, so the distinction survives inside the chip, and 2a's urgency grouping puts a round-tripped request
+in whatever tier its clock has reached. A coordinator filtering to *Awaiting report* can still see which ones
+have already been round once, and how much of the 72 hours that cost.
+
+### D-2f-1 · The visitor's own list shows the visit time, not the visitor — confirmed, and it generalises
+
+Naming the visitor on the visitor's own list is naming the reader. Same shape as the avatar/initials
+duplication in S-1, and worth stating as a rule for the rest of the batch:
+
+> **A list scoped to one person, home or child does not spend a column repeating that scope.** The column is
+> free to carry the thing the reader actually came for — here, when the visit is.
