@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<!--
+  The case card (spec §6b S-1): ONE component for every list of interview requests - 2a's
+  coordinator queue, 2d's reviewer queue, 2f's visitor list, and home staff's requests.
+
+  It exists because there was nearly the opposite. Every one of those four screens rendered its
+  rows TWICE - a .table-wrap.responsive table AND a duplicated .stack/.srow card list of
+  the same data - and the two copies had already drifted (request-list's card showed a "Scheduled"
+  date its own table omitted). R-Q12 rules cards for cases and tables for aggregates, so the tables
+  go and this is the one remaining rendering. Seven screens with one builder is seven chances to
+  write a slightly different card, which is the same failure a size larger: if a second card
+  appears in this app, one of the two is wrong and nobody can tell which.
+
+  WHAT IT DELIBERATELY IS NOT:
+  - Not a clickable card. The child's name is the link and the action is a button beside it. A
+    whole-card target needs an overlay pseudo-element kept off the button, and leaves a second
+    interactive region with no accessible name - and it is why there is no trailing caret either
+    (D-2a-7): the caret is that pattern's visual signature, and keeping it would promise a click
+    the card does not honour.
+  - Not two tags from one class family. Interview status is .status.* (bound to InterviewStatus);
+    deadline is .due.* (bound to DueState). One family per axis, so the vocabulary cannot fork.
+
+  A11y, the floor rule (a state must reach a non-visual reader AS THE STATE):
+  - The disc is real text, not a decorative graphic, so the initials still reach a screen reader;
+    it sits inside the same link as the reference, so the accessible name is "A.B CH-0041" - the
+    same information ChildIdentity#label() carries, with nothing lost by moving where it is drawn.
+  - Each tag carries a VISUALLY-HIDDEN AXIS LABEL ("Status:", "Deadline:") (D-2a-2). That is access
+    rather than duplication precisely because the axis name appears in no visible text - which is
+    the distinction D-1a-2b's converse turns on.
+  - The due tag's own word is NOT stripped inside a tier group (D-2a-1 REVISED): the copy is
+    DueStateCopy's, human-signed-off and test-pinned, and a card is scanned and deep-linked on its
+    own, where nothing else supplies the tier.
+-->
+<body>
+
+<!--
+  identity    - ChildIdentity for this row (the disc takes avatar(), the label besideAvatar(), S-1)
+  href        - where the child's name links
+  meta        - the line under the name: home and return time on 2a, submitted-ago on 2d
+  asideLabel  - the uppercase kicker over the screen's second fact ("Visitor", "Answered")
+  aside       - that fact
+  badge       - DueBadge, or null. Null renders no deadline tag at all rather than an empty one: a
+                request with no live clock has no deadline STATE, and a "—" would be claiming one.
+  status      - InterviewStatus
+  actionLabel - the ONE state-specific control, or null for none
+  actionHref  - where it goes
+  noAction    - when there is no action, the reason there isn't (D-2d-1), or null to say nothing
+
+  Every parameter is a plain value rather than a markup fragment. A card whose columns are filled
+  by ~{::selector} looks more flexible and is harder to be sure of: the selector resolves against
+  the calling template as a whole, which inside a th:each is exactly where a subtle wrong answer
+  would be invisible. What actually varies between these four screens is the words, not the shape.
+-->
+<div th:fragment="caseCard(identity, href, meta, asideLabel, aside, badge, status, actionLabel, actionHref, noAction)"
+     class="case">
+    <a class="case-link rowlink" th:href="${href}">
+        <span class="case-avatar" th:text="${identity.avatar()}">A.B</span>
+        <span class="case-ident">
+            <span class="case-name" th:text="${identity.besideAvatar()}">CH-0041</span>
+            <span class="case-meta" th:text="${meta}">Oakwood House · returned 9 Mar 2026, 22:10</span>
+        </span>
+    </a>
+
+    <span class="case-aside" th:if="${aside != null}">
+        <span class="lbl" th:text="${asideLabel}">Visitor</span>
+        <span th:text="${aside}">Ade Balogun</span>
+    </span>
+
+    <span class="case-tags">
+        <span th:if="${badge != null}" class="due" th:classappend="${badge.cssClass()}">
+            <span class="visually-hidden">Deadline: </span>
+            <th:block th:replace="~{fragments/layout :: dueIcon(${badge.state()})}"></th:block>
+            <span th:text="${badge.text()}">Overdue — 3h 20m overdue</span>
+        </span>
+        <span class="status" th:classappend="${status}">
+            <span class="visually-hidden">Status: </span>
+            <span th:text="${status.displayName}">Pending review</span>
+        </span>
+    </span>
+
+    <span class="case-action">
+        <a th:if="${actionLabel != null}" class="btn secondary" th:href="${actionHref}" th:text="${actionLabel}">Allocate</a>
+        <span th:if="${actionLabel == null and noAction != null}" class="case-no-action" th:text="${noAction}">You submitted this report</span>
+    </span>
+</div>
+
+</body>
+</html>

@@ -53,77 +53,46 @@
         </div>
     </div>
 
-    <div class="table-wrap responsive">
-    <table>
-        <caption>All open and closed interview requests, most urgent first.</caption>
-        <thead>
-        <tr>
-            <th scope="col">Child</th>
-            <th scope="col">Home</th>
-            <th scope="col">Deadline</th>
-            <th scope="col">Status</th>
-            <th scope="col">Visitor</th>
-            <th scope="col">Raised</th>
-            <th scope="col">Action</th>
-        </tr>
-        </thead>
-        <tbody th:each="group : ${dueGroups}">
-        <tr class="group"><th colspan="7" scope="colgroup"><span class="due-group-head">
-            <th:block th:replace="~{fragments/layout :: dueIcon(${group.state()})}"></th:block>
-            <span th:text="${group.label()}">Group</span>
-        </span></th></tr>
-        <tr th:each="row : ${group.rows()}" th:with="r=${row.request()}">
-            <td th:text="${childIdentities[r.child.id].label()}">Child Name</td>
-            <td th:text="${r.home.name}">Home</td>
-            <td>
-                <span th:if="${row.badge()} != null" class="due" th:classappend="${row.badge().cssClass()}">
-                    <th:block th:replace="~{fragments/layout :: dueIcon(${row.badge().state()})}"></th:block>
-                    <span th:text="${row.badge().text()}">Deadline</span>
-                </span>
-                <span th:if="${row.badge()} == null" class="muted">—</span>
-            </td>
-            <td><span class="status" th:classappend="${r.status}" th:text="${r.status.displayName}">STATUS</span></td>
-            <td th:text="${r.allocatedVisitor} ? ${r.allocatedVisitor.fullName} : '—'">Visitor</td>
-            <td th:text="${#temporals.format(r.createdAt, 'dd MMM yyyy HH:mm')}">Created</td>
-            <td>
-                <a class="rowlink" th:href="@{/interview-requests/{id}(id=${r.id})}">View details</a>
-                <a class="rowlink" th:if="${r.status.name() == 'REQUESTED' or r.status.name() == 'ALLOCATED' or r.status.name() == 'SCHEDULED'}"
-                   th:href="@{/coordinator/requests/{id}/allocate(id=${r.id})}">Allocate / reschedule</a>
-            </td>
-        </tr>
-        </tbody>
-    </table>
-    </div>
+    <!--
+      The queue, as cards grouped by urgency tier (S-1/S-2, R-Q12). This replaces a <table> AND a
+      duplicated .stack/.srow rendering of the same rows - two copies of one dataset, which is the
+      class of bug that had already produced a "Scheduled" date on one screen's card and not in its
+      own table. One list, one truth.
 
-    <div class="stack">
-        <th:block th:each="group : ${dueGroups}">
-        <h2 style="font-size:15px;margin:20px 0 10px"><span class="due-group-head">
-            <th:block th:replace="~{fragments/layout :: dueIcon(${group.state()})}"></th:block>
-            <span th:text="${group.label()}">Group</span>
-        </span></h2>
-        <div class="srow" th:each="row : ${group.rows()}" th:with="r=${row.request()}">
-            <div class="top">
-                <span class="name" th:text="${childIdentities[r.child.id].label()}">Child Name</span>
-                <span th:if="${row.badge()} != null" class="due" th:classappend="${row.badge().cssClass()}">
-                    <th:block th:replace="~{fragments/layout :: dueIcon(${row.badge().state()})}"></th:block>
-                    <span th:text="${row.badge().text()}">Deadline</span>
+      The action is state-specific and there is exactly one: Allocate while the request is still
+      open to allocation, and otherwise none - "View details" is not an action, it is what the
+      child's name link already does.
+    -->
+    <th:block th:each="group : ${dueGroups}">
+        <section class="case-group">
+            <h2 class="case-group-head">
+                <span class="due-group-head">
+                    <th:block th:replace="~{fragments/layout :: dueIcon(${group.state()})}"></th:block>
+                    <span th:text="${group.label()}">Overdue</span>
                 </span>
+                <span class="case-group-count" th:text="${#lists.size(group.rows())}">2</span>
+                <span class="visually-hidden" th:text="${#lists.size(group.rows()) == 1} ? 'request' : 'requests'">requests</span>
+            </h2>
+            <div class="case-list">
+                <th:block th:each="row : ${group.rows()}" th:with="r=${row.request()},
+                        open=${r.status.name() == 'REQUESTED' or r.status.name() == 'ALLOCATED' or r.status.name() == 'SCHEDULED'}">
+                    <div th:replace="~{fragments/case-card :: caseCard(
+                            identity=${childIdentities[r.child.id]},
+                            href=@{/interview-requests/{id}(id=${r.id})},
+                            meta=${r.home.name + (r.returnedAt != null
+                                    ? ' · returned ' + #temporals.format(r.returnedAt, 'dd MMM yyyy, HH:mm')
+                                    : ' · return time not recorded')},
+                            asideLabel='Visitor',
+                            aside=${r.allocatedVisitor != null ? r.allocatedVisitor.fullName : 'Not yet allocated'},
+                            badge=${row.badge()},
+                            status=${r.status},
+                            actionLabel=${open ? (r.allocatedVisitor != null ? 'Reallocate' : 'Allocate') : null},
+                            actionHref=@{/coordinator/requests/{id}/allocate(id=${r.id})},
+                            noAction=null)}"></div>
+                </th:block>
             </div>
-            <span class="status" th:classappend="${r.status}" th:text="${r.status.displayName}">STATUS</span>
-            <dl>
-                <dt>Home</dt><dd th:text="${r.home.name}">Home</dd>
-                <dt>Visitor</dt><dd th:text="${r.allocatedVisitor} ? ${r.allocatedVisitor.fullName} : 'Not yet allocated'">Visitor</dd>
-                <dt>Scheduled</dt><dd th:text="${r.scheduledAt} != null ? ${#temporals.format(r.scheduledAt, 'dd MMM yyyy HH:mm')} : 'Not yet scheduled'">Scheduled</dd>
-                <dt>Raised</dt><dd th:text="${#temporals.format(r.createdAt, 'dd MMM yyyy HH:mm')}">Raised</dd>
-            </dl>
-            <div class="act">
-                <a class="btn secondary" th:if="${r.status.name() == 'REQUESTED' or r.status.name() == 'ALLOCATED' or r.status.name() == 'SCHEDULED'}"
-                   th:href="@{/coordinator/requests/{id}/allocate(id=${r.id})}">Allocate / reschedule</a>
-                <a class="btn ghost" th:href="@{/interview-requests/{id}(id=${r.id})}">View details</a>
-            </div>
-        </div>
-        </th:block>
-    </div>
+        </section>
+    </th:block>
 
     <!--
       R-Q13: an empty list in a safeguarding queue is ambiguous between "nothing to do" and "the

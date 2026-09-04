@@ -1324,3 +1324,58 @@ nav.seg { flex-wrap: wrap; text-decoration: none; }
 nav.seg .seg-opt { color: inherit; text-decoration: none; }
 /* Tabular figures so the counts do not jitter the chip widths between renders. */
 .seg-count { font-variant-numeric: tabular-nums; opacity: 0.75; }
+
+/* ============================== S-1/S-2 · the case card ==============================
+   One component for every list of interview requests (fragments/case-card.html). The
+   columns are shared so a list scans down its own edges: identity, the screen's second
+   fact, the two tags, one action with a MINIMUM width (D-2a-3 - 104px in the canvas is
+   incidental; a fixed width truncates a longer label and breaks under translation, while
+   a minimum still gives the list one aligned button edge, which is what that number was
+   reaching for). Nothing above this block is edited. */
+.case-group + .case-group { margin-top: var(--s5); }
+.case-group-head {
+    display: flex; align-items: center; gap: var(--s3);
+    font-size: var(--t-md); margin: 0 0 var(--s3);
+}
+.case-group-count { color: var(--muted); font-weight: 400; font-variant-numeric: tabular-nums; }
+.case-list { display: flex; flex-direction: column; gap: var(--s2); }
+.case {
+    display: flex; align-items: center; gap: var(--s4);
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: var(--s3) var(--s4);
+}
+/* The link is the identity block, not the row: the whole-card target is deliberately
+   rejected (S-1/D-2a-7), so the name is what carries the affordance. .rowlink already
+   supplies the 44px minimum. */
+.case-link { display: flex; align-items: center; gap: var(--s3); flex: 1.4 1 0; min-width: 0; }
+.case-avatar {
+    width: 38px; height: 38px; border-radius: 50%; flex: none;
+    display: grid; place-items: center;
+    background: var(--tint); color: var(--accent-dark);
+    font-size: var(--t-sm); font-weight: 650;
+}
+.case-ident { min-width: 0; }
+.case-name { display: block; font-size: var(--t-md); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.case-meta { display: block; font-size: var(--t-xs); font-weight: 400; color: var(--muted); }
+.case-aside { flex: 1 1 0; min-width: 0; font-size: var(--t-sm); }
+.case-aside .lbl {
+    display: block; font-size: var(--t-xs); letter-spacing: 0.09em;
+    text-transform: uppercase; color: var(--muted);
+}
+.case-tags { display: flex; align-items: center; gap: var(--s2); flex: none; }
+.case-action { flex: none; display: flex; align-items: center; gap: var(--s2); min-width: 104px; }
+.case-action .btn { margin-top: 0; width: 100%; }
+/* The reason a card has no action (2d's self-review guard, D-2d-1): a sentence, never a
+   disabled button - a disabled control is not focusable, so it cannot explain itself. */
+.case-action .case-no-action { font-size: var(--t-xs); color: var(--muted); }
+
+/* Below the shell's own breakpoint the row cannot hold five columns, so it stacks. The
+   action goes full width rather than shrinking: it is the one thing on the card that is a
+   tap target, and D-Q3's 44px is a floor, not a target to squeeze back towards. */
+@media (max-width: 720px) {
+    .case { flex-wrap: wrap; align-items: flex-start; }
+    .case-link { flex: 1 1 100%; }
+    .case-aside { flex: 1 1 100%; }
+    .case-tags { flex: 1 1 100%; flex-wrap: wrap; }
+    .case-action { flex: 1 1 100%; }
+}
