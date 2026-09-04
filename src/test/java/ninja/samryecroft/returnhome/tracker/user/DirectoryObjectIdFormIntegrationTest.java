@@ -23,7 +23,9 @@ import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextImpl;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
+import org.springframework.validation.BindingResult;
 
 /**
  * T113 Inc 2: an ORG_ADMIN records the person's Entra directory object id when the account is
@@ -114,6 +116,67 @@ class DirectoryObjectIdFormIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(model().attributeHasFieldErrors("form", "idpSubject"));
 
         assertThat(userRepository.findByUsername("typo" + suffix)).isEmpty();
+    }
+
+    /**
+     * T165. This test was written to guard a small refactor and instead found that <b>inline
+     * validation messages had never rendered at all</b>, on any form.
+     *
+     * <p>The shared {@code fieldError} fragment was defined inside {@code <head>}. The parser
+     * auto-closes {@code <head>} at the first non-metadata element, which pushed the fragment's
+     * {@code <p>} outside its own {@code th:fragment} block: the fragment resolved, its bare text
+     * rendered, and its only ELEMENT vanished. Every input therefore carried
+     * {@code aria-describedby="<field>-error"} pointing at an id that was never emitted - a
+     * dangling reference announces nothing - and no message appeared beside any field. Moving the
+     * fragment into {@code <body>} then exposed a second defect the first had been hiding:
+     * {@code th:errors="${field}"} is not a field expression, and threw
+     * {@code "Neither BindingResult nor plain target object for bean name 'field'"} the moment the
+     * element actually rendered. It is {@code *{__${field}__}} now.
+     *
+     * <p>Nothing caught either one. The status is 200, the model carries the errors, the error
+     * summary at the top of each form still renders (a different template, in {@code <body>}), and
+     * no test anywhere asserted a rendered validation message. That is the same shape as the
+     * defect this ticket is about, in its other form: the state reaching the reader as SILENCE.
+     *
+     * <p>So the assertion is against the {@code BindingResult}'s own message rather than a pattern
+     * or a copied string - the rendered text must be the validation message, not merely some words
+     * in some span. It also pins the ticket's own change: that message is the accessible text of
+     * the {@code <p>}, with no character name in front of it, because the marker is aria-hidden
+     * markup now instead of {@code ::before} content (which screen readers announce).
+     *
+     * <p>It lives in this class rather than one of its own because this is an existing test that
+     * already renders a real form with a real field error - a new {@code @SpringBootTest} would
+     * have cost a Spring context and a connection pool to prove the same thing (TEST-CONTEXTS.md).
+     */
+    @Test
+    void anInlineValidationMessageStillRendersAndIsNotPrefixedByACharacterName() throws Exception {
+        MvcResult result = create("typo" + suffix, "6f0a1c9e-3c2b-4c1a-9f77")
+                .andExpect(status().isOk())
+                .andReturn();
+        String html = result.getResponse().getContentAsString();
+
+        int errorAt = html.indexOf("class=\"field-error\"");
+        assertThat(errorAt).as("the shared fieldError fragment must render at all - it did not, for "
+                + "as long as it was defined inside <head>").isPositive();
+        String errorBlock = html.substring(errorAt, Math.min(errorAt + 600, html.length()));
+
+        // Not a pattern match on "some span with some words in it" - the rendered inline message
+        // must be THE validation message the binding produced. That is what th:errors moving to the
+        // inner <span> had to preserve, and it is what a wrong field expression would silently drop
+        // (the original th:errors="${field}" threw the moment the element actually rendered).
+        BindingResult binding = (BindingResult) result.getModelAndView().getModel()
+                .get(BindingResult.MODEL_KEY_PREFIX + "form");
+        String message = binding.getFieldError("idpSubject").getDefaultMessage();
+        assertThat(message).as("the fixture must actually produce a message to look for").isNotBlank();
+        assertThat(errorBlock).contains(message);
+
+        // The marker is an icon, hidden, and the accessible text starts at the message.
+        assertThat(errorBlock).contains("aria-hidden=\"true\"").contains("#ph-warning-circle");
+
+        // Scoped to the error block, not the page: the 21 aria-hidden .ic spans elsewhere in these
+        // templates are a separate, non-urgent item (they are correctly hidden from AT) and are
+        // explicitly out of this ticket - asserting page-wide here would fail for the wrong reason.
+        assertThat(errorBlock).doesNotContain("\u25b2");
     }
 
     /**

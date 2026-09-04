@@ -59,14 +59,28 @@ public final class DeadlineTracker {
         return Optional.of(DueState.ON_TRACK);
     }
 
-    /** The badge shown on the request lists. Empty when the request has no live deadline. */
+    /**
+     * The badge shown on the request lists. Empty when the request has no live deadline.
+     *
+     * <p>T165: the text carries the state AS A WORD ({@link DueStateCopy}) and no presentation
+     * glyph. This string is announced verbatim through {@code th:text}, so a glyph in it reaches a
+     * screen reader as the character's NAME - and, worse, DUE_SOON and ON_TRACK were otherwise the
+     * same sentence ("N left"), leaving a glyph and a colour as the only thing separating "under 24
+     * hours to a statutory deadline" from "fine". The glyph is now aria-hidden markup, chosen from
+     * {@link DueBadge#state()} by the {@code dueIcon} fragment. OVERDUE needs no prefix - its own
+     * duration phrase already ends in the word "overdue".
+     */
     public static Optional<DueBadge> badgeFor(InterviewRequest request, LocalDateTime now) {
         return stateOf(request, now).map(state -> switch (state) {
-            case OVERDUE -> new DueBadge(state, "overdue", "▲ " + describeOverdueBy(request.getReturnedAt(), now));
-            case DUE_SOON -> new DueBadge(state, "soon", "◷ " + describeRemaining(request.getReturnedAt(), now) + " left");
-            case ON_TRACK -> new DueBadge(state, "ontrack", "✓ " + describeRemaining(request.getReturnedAt(), now) + " left");
-            case NO_CLOCK -> new DueBadge(state, "noclock", "Return time not recorded");
+            case OVERDUE -> new DueBadge(state, "overdue", describeOverdueBy(request.getReturnedAt(), now));
+            case DUE_SOON -> new DueBadge(state, "soon", remainingLabel(state, request, now));
+            case ON_TRACK -> new DueBadge(state, "ontrack", remainingLabel(state, request, now));
+            case NO_CLOCK -> new DueBadge(state, "noclock", DueStateCopy.stateWord(state));
         });
+    }
+
+    private static String remainingLabel(DueState state, InterviewRequest request, LocalDateTime now) {
+        return DueStateCopy.stateWord(state) + " — " + describeRemaining(request.getReturnedAt(), now) + " left";
     }
 
     /**

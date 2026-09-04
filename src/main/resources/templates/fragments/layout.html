@@ -12,15 +12,45 @@
      and the docx report's own hue ramp (T137) can never silently disagree for the same supplier. -->
 <style th:if="${theme != null}" th:text="${':root { --brand-hue: ' + theme.brandHue + '; }'}"></style>
 </th:block>
-
-<!-- FE-02: shared field-error rendering. Pairs with th:errorclass="is-invalid" and aria-describedby
-     on the input; the ▲ glyph and colour come from .field-error in app.css, not from this markup,
-     so validation is never signalled by colour alone. -->
-<th:block th:fragment="fieldError(field)">
-    <p class="field-error" th:if="${#fields.hasErrors(field)}" th:id="${field} + '-error'" th:errors="${field}"></p>
-</th:block>
 </head>
 <body>
+<!-- FE-02: shared field-error rendering. Pairs with th:errorclass="is-invalid" and aria-describedby
+     on the input, so validation is never signalled by colour alone.
+
+     T165 - THIS FRAGMENT LIVED IN <head> AND RENDERED NOTHING. The parser auto-closes <head> at the
+     first non-metadata element, which pushed the <p> out of the th:fragment block: the fragment
+     resolved, its bare text rendered, and its only ELEMENT silently vanished. So every inline
+     validation message on every form was missing, and every input's aria-describedby pointed at an
+     id that was never emitted - a dangling reference announces nothing. Nothing caught it: the
+     status is 200, the model still carries the errors, the error summary at the top of each form
+     still renders (a different template, in <body>), and no test asserted the rendered message.
+     Fragments that emit elements belong in <body>. Pinned by
+     DirectoryObjectIdFormIntegrationTest#anInlineValidationMessageStillRendersAndIsNotPrefixedByACharacterName.
+
+     The marker used to be .field-error::before { content: "U+25B2" } in app.css. CSS generated
+     content IS exposed to the accessibility tree by the major screen readers, so once this fragment
+     renders it would have prefixed every message with a character name before the sentence that
+     says what is wrong. It is aria-hidden markup instead. th:errors moves to the inner <span>
+     because it REPLACES the element's content: left on the <p> it would overwrite the icon.
+     aria-describedby still points at the <p>, whose accessible text is now exactly the message. -->
+<th:block th:fragment="fieldError(field)">
+    <p class="field-error" th:if="${#fields.hasErrors(field)}" th:id="${field} + '-error'">
+        <svg class="icon" aria-hidden="true"><use th:href="@{/icons/phosphor.svg} + '#ph-warning-circle'"></use></svg>
+        <span th:errors="*{__${field}__}"></span>
+    </p>
+</th:block>
+
+<!-- T165: a due state's glyph lives HERE, aria-hidden, and not in the Java that builds the
+     announced text - inside th:text it is read out as the character's name ("circle with upper right
+     quadrant black"), which is the exact converse of the rail defect: the state arrives, but as the
+     wrong thing. The state reaches the reader as a word (DueStateCopy); this is decoration.
+     Renders nothing for the two tiers that never had a glyph - NO_CLOCK, and the null state of the
+     "No active deadline" group - which is what the unmatched th:switch does with no th:case="*". -->
+<th:block th:fragment="dueIcon(state)" th:switch="${state?.name()}">
+    <svg th:case="'OVERDUE'" class="icon" aria-hidden="true"><use th:href="@{/icons/phosphor.svg} + '#ph-warning-circle'"></use></svg>
+    <svg th:case="'DUE_SOON'" class="icon" aria-hidden="true"><use th:href="@{/icons/phosphor.svg} + '#ph-clock-countdown'"></use></svg>
+    <svg th:case="'ON_TRACK'" class="icon" aria-hidden="true"><use th:href="@{/icons/phosphor.svg} + '#ph-check-circle'"></use></svg>
+</th:block>
 <!-- T119 shell (phase 1): sidebar + header, inserted as a sibling immediately before each page's
      own <main id="main"> - the same insertion point the old plain <header> used - so no page
      template needs to change shape to adopt it (see app.css's shell section for how the fixed
