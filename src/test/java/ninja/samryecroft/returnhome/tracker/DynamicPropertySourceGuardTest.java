@@ -15,7 +15,9 @@ import org.springframework.test.context.DynamicPropertySource;
 
 /**
  * A fence around T148: declaring {@code @DynamicPropertySource} costs a whole Spring test context,
- * so only the two base classes may do it.
+ * so only the two base classes may do it. Named for the mechanism it fences rather than for the
+ * outcome, because it does not on its own guarantee that the integration tests share one context -
+ * see the scope note below.
  *
  * <p>Spring keys its test-context cache on {@code DynamicPropertiesContextCustomizer}, whose
  * {@code equals} compares the <em>set of registrar methods</em> and never looks at what those
@@ -37,9 +39,23 @@ import org.springframework.test.context.DynamicPropertySource;
  * one, so a grep over {@code src/test/java} reports it and is wrong. Reflection sees what the JVM
  * sees.
  *
+ * <p>The check runs in both directions, because {@code containsExactlyInAnyOrder} does: it fails if
+ * a seventh class gains a registrar, and equally if {@link AbstractIntegrationTest} ever loses its
+ * own - which would silently unshare the document store and put the suite back where T148 started,
+ * with everything still green.
+ *
+ * <p><strong>Scope, so this is not read as more than it is.</strong> It fences one fragmentation
+ * mechanism - registrar methods - and not context fragmentation in general. A {@code @MockBean}, a
+ * different profile, a different {@code @SpringBootTest} webEnvironment or an added
+ * {@code @TestPropertySource} each fork a context too, and none of them trip this test. T148 ended
+ * at six contexts rather than one for exactly those reasons, which at Hikari's default pool size is
+ * fifty connections against a ceiling of a hundred: real headroom, but the same failure returns if
+ * the count creeps back up. What the other five are is a separate question this test does not
+ * answer.
+ *
  * <p>Needs no application context of its own, which is rather the point.
  */
-class SharedSpringContextGuardTest {
+class DynamicPropertySourceGuardTest {
 
     /**
      * The classes allowed to declare a registrar, and why each is worth a context.
@@ -65,7 +81,7 @@ class SharedSpringContextGuardTest {
                 .as("the scan found the compiled test classes")
                 .hasSizeGreaterThan(25);
 
-        assertThat(compiledTestClasses.stream().filter(SharedSpringContextGuardTest::declaresRegistrar).toList())
+        assertThat(compiledTestClasses.stream().filter(DynamicPropertySourceGuardTest::declaresRegistrar).toList())
                 .as("""
                         Every class declaring @DynamicPropertySource gets its own Spring test context \
                         and its own Hikari pool against the shared Postgres container, whatever it \
@@ -97,7 +113,7 @@ class SharedSpringContextGuardTest {
                     .map(path -> root.relativize(path).toString()
                             .replace(java.io.File.separatorChar, '.')
                             .replaceFirst("\\.class$", ""))
-                    .map(SharedSpringContextGuardTest::load)
+                    .map(DynamicPropertySourceGuardTest::load)
                     .toList();
         } catch (IOException e) {
             throw new UncheckedIOException("Could not walk " + root, e);
@@ -106,7 +122,7 @@ class SharedSpringContextGuardTest {
 
     private static Class<?> load(String className) {
         try {
-            return Class.forName(className, false, SharedSpringContextGuardTest.class.getClassLoader());
+            return Class.forName(className, false, DynamicPropertySourceGuardTest.class.getClassLoader());
         } catch (ClassNotFoundException e) {
             throw new IllegalStateException("Compiled test class " + className + " is not loadable", e);
         }
@@ -115,7 +131,7 @@ class SharedSpringContextGuardTest {
     /** Located from this class's own code source, so it does not depend on the working directory. */
     private static Path testClassesDirectory() {
         try {
-            return Path.of(SharedSpringContextGuardTest.class.getProtectionDomain()
+            return Path.of(DynamicPropertySourceGuardTest.class.getProtectionDomain()
                     .getCodeSource().getLocation().toURI());
         } catch (URISyntaxException e) {
             throw new IllegalStateException("Could not locate the compiled test classes", e);
