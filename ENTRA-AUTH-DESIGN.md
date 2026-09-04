@@ -27,6 +27,25 @@
 > - **§8's logout line is a build item, not just a check.** Nothing implements RP-initiated logout
 >   today; `logoutSuccessUrl` ends our session only, so on a shared device the next person is signed
 >   straight back in as the previous user. `OidcClientInitiatedLogoutSuccessHandler` is in scope.
+> - **D6 (new) — we link on `oid`, not `sub`.** Entra's `sub` is **pairwise**: derived per (user,
+>   application registration), different for every app, and **not obtainable from the portal at all**.
+>   D4 made the identifier something an `ORG_ADMIN` types in *before* that person has ever signed in,
+>   so `sub` is not a worse key than `oid` — it is an unavailable one. Matching on it would compile,
+>   pass a stubbed test, and produce "nobody can sign in" on cutover day with the tenant, accounts and
+>   config all correct. `oid` is what the portal shows as **Object ID** and is stable for a user
+>   across every application in the tenant. A token with no `oid` is refused rather than falling back
+>   to `sub`, because the interesting failure of a fallback is not "no match" but matching the *wrong
+>   row* once something stores a `sub`-shaped value.
+>
+>   `oid` alone is sufficient **because we are single-tenant (D1)** — the same fact that makes a `tid`
+>   allow-list unnecessary. The two are governed by one condition and would have to change together:
+>   going multi-tenant makes the key `tid`+`oid` *and* makes the allow-list mandatory, at the same
+>   moment. The allow-list is the obvious half; `oid`-alone is the half that would be forgotten.
+>
+>   **`V14`'s comment still says "`sub` (or `oid`)" and must be left alone.** `spring.flyway.enabled`
+>   is true and validation is on by default, so editing an applied migration — comments included —
+>   changes its checksum and fails startup where V14 has already run. The resolution is recorded on
+>   `User.idpSubject` and in `EntraOidcUserService` instead.
 > - **Still open:** the MFA method (§9a — email OTP recommended, and it is also the £0 option since
 >   SMS MFA is billed per attempt) and the break-glass alert's dependency on R5 phase 3.
 
@@ -188,7 +207,8 @@ write. The blast radius of a mistake would move from a row in our database to th
 | *Which homes you may view* | `User.viewerHomes` | a many-to-many to our rows |
 
 **Claims we rely on — deliberately three:**
-- **`sub` (or `oid`)** — the immutable subject identifier. This is the **only** thing we link on. Stored
+- **`oid`** — the directory object id, and the **only** thing we link on. **Decided, see D6: not
+  `sub`.** Stored
   in a new `users.idp_subject` column, unique, and nullable. Nullable no longer means "during
   coexistence" — D3 removed the coexistence window. It is nullable because the break-glass admin
   (D5) has no Entra identity at all, and because an account can exist between being created and an
