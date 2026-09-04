@@ -161,32 +161,37 @@ public class ThemeService {
     }
 
     /**
-     * T138 (Nocturne phase 2, batch 1a): the Nocturne accent ramp is generated from one integer hue
-     * (0-359) via {@code oklch()} - see {@code app.css}'s {@code --brand-hue} and
-     * {@code docs/T119-NOCTURNE-DESIGN-SPEC.md} §2.2. The stored-hue-column formalisation (an admin
-     * picking a colour and only its hue surviving) is the later "3a Branding" spec step, not this one
-     * - for now the hue is derived on read from the same {@code primaryColor} hex this class has
-     * always stored, so the two halves of the branding work (this CSS-side derivation, and the docx
-     * hue-&gt;hex ramp) can land independently without agreeing on a schema change first.
+     * The Nocturne accent ramp is generated from one integer hue (0-359) via {@code oklch()} - see
+     * {@code app.css}'s {@code --brand-hue} and {@code docs/T119-NOCTURNE-DESIGN-SPEC.md} §2.2. The
+     * stored-hue-column formalisation (an admin picking a colour and only its hue surviving) is the
+     * later "3a Branding" spec step, not this one - for now the hue is derived on read from the same
+     * {@code primaryColor} hex this class has always stored, so the two halves of the branding work
+     * (this CSS-side derivation, and the docx hue ramp) can land independently without agreeing on a
+     * schema change first.
      *
-     * <p><strong>Deliberately NOT {@link #toHsl}.</strong> That method is standard HSL hue, a
-     * different colour space from OKLCH - for every colour checked (including the spec's own two
-     * worked examples), HSL hue and OKLCH hue for the identical hex differ by 24-44 degrees, a real,
-     * visible colour shift, not a rounding difference. Since {@code --brand-hue} feeds straight into
-     * {@code oklch()} throughout the token ramp, an HSL-derived value would render a visibly different
-     * colour than the supplier's stored hex actually is. This does the real sRGB -&gt; linear -&gt;
-     * OKLab -&gt; OKLCH conversion (Björn Ottosson's published matrices - the same ones behind
-     * browsers' own {@code oklch()} implementation) and takes only the hue angle; reproduces the
-     * spec's Beacon example (#9184d9 -&gt; hue 289) to within one degree.
+     * <p>Implements the spec's own normative derivation (§2.2, "Deriving the hue - normative, because
+     * two halves implement it") to the letter, since a document whose accent is one degree off the
+     * screen's own is a defect nobody can describe and everybody can see: sRGB -&gt; linear -&gt;
+     * OKLab (Björn Ottosson's published matrices - the same ones behind browsers' own {@code oklch()}
+     * implementation), hue = {@code atan2(b, a)} normalised to [0, 360), rounded to the nearest whole
+     * degree in this one place, L and C discarded. Below chroma 0.02 the colour is effectively grey
+     * and has no reliable hue, so the spec has this fall back to the neutral hue 265 rather than
+     * amplify rounding noise into an arbitrary brand colour.
+     *
+     * <p><strong>Deliberately NOT {@link #toHsl}</strong>, which an earlier coordination note
+     * suggested reusing. That method is standard HSL hue, a different colour space from OKLCH - for
+     * every colour checked (including the spec's own two worked examples), HSL hue and OKLCH hue for
+     * the identical hex differ by 24-44 degrees, a real, visible colour shift, not a rounding
+     * difference. Reproduces the spec's Beacon example (#9184d9 -&gt; hue 289) to within one degree.
      *
      * <p>Public and static for the same reason {@link #readableForegroundOn} is: one shared decision
      * point for "what hue does this supplier's stored colour resolve to", called from {@link #toView}
-     * here and separately by the docx generator's own hue ramp (T137) - both must derive from this
+     * here and separately by the docx generator's own hue ramp (T131) - both must derive from this
      * exact function, not their own copies of the colour maths, or the on-screen accent and the
      * generated report's accent can silently drift apart for the same supplier.
      *
      * @param hexColor a 6-digit hex colour, with or without a leading {@code #}
-     * @return the hue in degrees, 0-359
+     * @return the hue in degrees, 0-359 (265 for an effectively-grey input)
      */
     public static int brandHueOf(String hexColor) {
         String normalised = hexColor.startsWith("#") ? hexColor : "#" + hexColor;
@@ -208,15 +213,13 @@ public class ThemeService {
         double a = 1.9779984951 * lCube - 2.4285922050 * mCube + 0.4505937099 * sCube;
         double bLab = 0.0259040371 * lCube + 0.7827717662 * mCube - 0.8086757660 * sCube;
 
-        // Hue is genuinely undefined for an achromatic colour (chroma 0) - grey/white/black all put
-        // a and bLab within floating-point noise of the origin, and atan2 on a near-zero vector is
-        // numerically unstable: it can land anywhere in [0, 360) depending on which direction the
-        // rounding noise happens to point, which is a real risk here specifically since the LMS
-        // matrix rows don't sum to EXACTLY 1.0 in floating point. Doesn't matter visually - oklch()'s
-        // hue channel has no effect at zero chroma - but a hue that could differ between runs for the
-        // identical input is still worth pinning down explicitly rather than leaving to noise.
-        if (Math.hypot(a, bLab) < 1e-6) {
-            return 0;
+        // Spec's own chroma floor (§2.2): below 0.02 the colour is effectively grey and atan2 on a
+        // near-zero a/b vector is numerically unstable besides - amplifying floating-point noise into
+        // an arbitrary hue for what is, perceptually, no hue at all. Fall back to the spec's neutral
+        // hue (265, the same hue the neutral ramp and doc tokens already use) rather than that noise.
+        double chroma = Math.hypot(a, bLab);
+        if (chroma < 0.02) {
+            return 265;
         }
 
         double hueDegrees = Math.toDegrees(Math.atan2(bLab, a));
