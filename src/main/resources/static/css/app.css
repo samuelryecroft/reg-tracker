@@ -202,8 +202,12 @@
     /* Not arbitrary picks: the accent ramp MIRRORS between appearances, so step 900 is
        the pale step in light and the deep step in dark - --tint: accent-900 holds the
        same role (a quiet tinted fill) in both, and --accent-dark: accent-300 is the ink
-       that sits legibly on that fill in both. Swept all 360 hues: 7.82:1 dark / 13.81:1
-       light worst case. */
+       that sits legibly on that fill in both. Swept all 360 hues WITHIN each appearance
+       (both tokens read in the SAME theme, which is the only comparison that corresponds
+       to anything actually rendered): 9.19:1 dark / 6.27:1 light worst case. (Corrected
+       during Creed's #59 review - the figure this replaced, 7.82:1 dark / 13.81:1 light,
+       came from comparing accent-900 ACROSS themes rather than accent-300 against
+       accent-900 within one theme; verified independently, twice, before changing it.) */
     --accent-dark: var(--color-accent-300);
     --tint: var(--color-accent-900);
     --radius: 10px;
@@ -826,7 +830,13 @@ fieldset.checkbox-fieldset > legend {
     margin-right: var(--s2);
     box-shadow: 0 1px 2px rgba(20, 20, 20, 0.06);
 }
-.btn:hover { background: var(--accent-dark); color: #fff; }
+/* Creed's #59 review: --accent-dark is accent-300, which MIRRORS between themes (deep in light,
+   PALE in dark) - so `color: #fff` was white text on a pale lilac fill in dark mode, 1.48-1.62:1,
+   failing 1.4.3 at all 360 hues (worse than any of #48's four). Minimal fix, not a redesign: this
+   legacy .btn family is scheduled for replacement by .btn-primary/.btn-secondary during the
+   screen migrations, so the fix keeps the fill and only swaps the ink - var(--color-bg) measures
+   10.85:1 dark / 5.87:1 light, 0/360 failures. */
+.btn:hover { background: var(--accent-dark); color: var(--color-bg); }
 .btn.secondary { background: var(--surface); color: var(--accent-dark); border-color: var(--accent-dark); box-shadow: none; }
 .btn.secondary:hover { background: var(--tint); }
 .btn.ghost { background: transparent; color: var(--muted); border-color: var(--control-border); box-shadow: none; }
@@ -1136,7 +1146,13 @@ body:has(#interviewer-comments:target) .section-index a[href="#interviewer-comme
 body:has(#recommendations:target) .section-index a[href="#recommendations"],
 body:has(#declaration:target) .section-index a[href="#declaration"],
 body:has(#history:target) .section-index a[href="#history"] {
-    background: var(--accent); color: #fff;
+    /* Creed's review: white on the dark-mode accent is 2.89-3.31:1, failing 1.4.3 at all 360
+       hues (light passes at 5.77-7.02, which is why this survives a light-mode eyeball).
+       --color-bg is the fix, not an arbitrary swap - it measures 5.31:1 dark / 5.06:1 light,
+       0/360 failures, because it's the spec's already-locked accent-on-background floor and
+       contrast is symmetric: an accent fill with page-background ink is the exact inverse of a
+       pair already swept. It inherits that guarantee for free. */
+    background: var(--accent); color: var(--color-bg);
 }
 /* Every jump target: tabindex="-1" in the markup makes it focusable (a jump link moves scroll
    position but not the reading cursor otherwise - a screen-reader user activating a section link

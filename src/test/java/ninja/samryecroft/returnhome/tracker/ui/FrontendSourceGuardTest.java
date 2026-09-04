@@ -9,6 +9,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
@@ -264,7 +265,25 @@ class FrontendSourceGuardTest {
      */
     private static final Pattern THEMED_INK = Pattern.compile("(?<![-\\w])color:\\s*([^;]+);");
 
-    /** Rules in {@code css} pairing a themed {@code var(--X-bg)} background with a literal ink. */
+    /** Keyword values that never fix a specific colour, so pairing one with a themed background is
+     * never this bug - {@code inherit}/{@code currentColor} read whatever the parent/element's own
+     * (already theme-aware) colour already is. Widening the background match beyond the {@code -bg}
+     * suffix (Creed's #59 review) surfaced {@code .tile { background: var(--surface); color:
+     * inherit; }} as a false positive on the first run - this list is what excludes it correctly,
+     * rather than narrowing the background match back down to dodge one case. */
+    private static final Set<String> SAFE_INK_KEYWORDS = Set.of("inherit", "currentcolor", "unset", "initial", "transparent");
+
+    /**
+     * Rules in {@code css} pairing a themed {@code var(--X)} background with a literal ink.
+     *
+     * <p>Not anchored to a {@code -bg} suffix: Creed's #59 review found this guard structurally
+     * blind to the accent family's own fills (--accent, --accent-dark, --tint - none end in -bg,
+     * unlike every semantic family's --error-bg/--warn-bg/etc), which is exactly where two
+     * further live 1.4.3 failures were hiding, missed by both this guard and the manual sweep
+     * that produced #48. A naming convention had quietly become this check's definition of
+     * "themed" - any {@code var(--...)} background is theme-aware by construction (that is the
+     * entire point of a custom-property token), so the match is not narrowed to a suffix.
+     */
     private static List<String> themedBackgroundsWithHardcodedInk(String css) {
         String stripped = css.replaceAll("(?s)/\\*.*?\\*/", "");
         List<String> offendingRules = new ArrayList<>();
@@ -272,16 +291,17 @@ class FrontendSourceGuardTest {
         while (rule.find()) {
             String selector = rule.group(1).trim();
             String body = rule.group(2);
-            if (!body.contains("background:") || !body.contains("-bg)")) {
+            if (!body.contains("background:")) {
                 continue;
             }
-            Matcher background = Pattern.compile("background:\\s*var\\(--([a-zA-Z0-9-]+)-bg\\)").matcher(body);
+            Matcher background = Pattern.compile("background:\\s*var\\(--([a-zA-Z0-9-]+)\\)").matcher(body);
             if (!background.find()) {
                 continue;
             }
             Matcher ink = THEMED_INK.matcher(body);
-            if (ink.find() && !ink.group(1).trim().startsWith("var(")) {
-                offendingRules.add(selector + " { background: var(--" + background.group(1) + "-bg); color: "
+            if (ink.find() && !ink.group(1).trim().startsWith("var(")
+                    && !SAFE_INK_KEYWORDS.contains(ink.group(1).trim().toLowerCase(Locale.ROOT))) {
+                offendingRules.add(selector + " { background: var(--" + background.group(1) + "); color: "
                         + ink.group(1).trim() + "; }");
             }
         }
@@ -308,6 +328,30 @@ class FrontendSourceGuardTest {
         assertThat(themedBackgroundsWithHardcodedInk(
                 ".borderOnly { background: var(--error-bg); border-color: #F3C0C0; }"))
                 .as("a literal BORDER colour is not an ink, and this rule declares no ink at all")
+                .isEmpty();
+    }
+
+    /**
+     * Creed's #59 review: widening the background match beyond the {@code -bg} suffix (needed to
+     * catch the accent family's own fills - --accent, --accent-dark, --tint) surfaced a real false
+     * positive on its first run, {@code .tile { background: var(--surface); color: inherit; }} -
+     * {@code inherit} never fixes a colour, so it can never be the bug this guard exists for.
+     */
+    @Test
+    void theWidenedBackgroundMatchCatchesANonBgSuffixedTokenButNotAnInheritedInk() {
+        assertThat(themedBackgroundsWithHardcodedInk(
+                ".genuine { background: var(--accent-dark); color: #fff; }"))
+                .as("a non -bg-suffixed themed background (the accent family's own fills) is still this bug")
+                .hasSize(1);
+
+        assertThat(themedBackgroundsWithHardcodedInk(
+                ".tile { background: var(--surface); color: inherit; }"))
+                .as("inherit is never a hard-coded literal - it reads whatever the parent's own colour is")
+                .isEmpty();
+
+        assertThat(themedBackgroundsWithHardcodedInk(
+                ".icon { background: var(--surface); color: currentColor; }"))
+                .as("currentColor is the same non-literal case, differently cased")
                 .isEmpty();
     }
 
