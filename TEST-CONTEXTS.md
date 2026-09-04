@@ -1,6 +1,7 @@
 # Test contexts — the baseline
 
-**Measured against:** `main` @ `fe2bb3d` (T148). **Date:** 2026-09-04.
+**Measured against:** `main` @ `fe2bb3d` (T148), re-measured on T113 Inc 3.
+**Date:** 2026-09-04.
 
 The test suite builds **6 Spring application contexts** across **33
 context-using test classes**, and **5 Hikari pools** against the one shared
@@ -36,13 +37,26 @@ the answer: what the 6 are, and which of them have to exist.
 |---|---|---|---|---|
 | 1 | `@SpringBootTest`, no `@AutoConfigureMockMvc` | 4 | yes | collapsible, but **don't** — see below |
 | 2 | `@SpringBootTest` + `@AutoConfigureMockMvc` | 19 | yes | necessary (the main one) |
-| 3 | `@TestPropertySource` enabling Entra/OAuth2 login | 1 | yes | necessary |
+| 3 | `@TestPropertySource` enabling Entra/OAuth2 login | 3 | yes | necessary |
 | 4 | `@WebMvcTest` slice (different bootstrapper) | 1 | **no** | necessary, and the cheapest |
 | 5 | `@TestPropertySource` enabling login throttling | 1 | yes | necessary |
 | 6 | `webEnvironment = RANDOM_PORT` (Playwright) | 7 | yes | necessary |
 
 Context 4 is why there are 6 contexts but only 5 pools: a `@WebMvcTest` slice
 builds no `DataSource`.
+
+### Context 3 — necessary, and now shared rather than repeated
+
+Originally one class. T113 added logout and break-glass tests that also need
+the flag on, and each would have forked its own context: the first took the
+suite to **6 pools**, measured by the highest `HikariPool-N` in a full run.
+
+They now share `AbstractEntraEnabledTest`, which carries the property set and
+the stub registration, and the suite is back to **5**. The sharing works for the
+mirror of T148's reason rather than despite it: `@DynamicPropertySource` forks
+per registrar *method* even with identical values, while `@TestPropertySource`
+keys on the merged property *values*, so an identical set genuinely does share
+one context. A subclass that adds its own `@TestPropertySource` forks again.
 
 ### Contexts 3 and 5 — necessary
 

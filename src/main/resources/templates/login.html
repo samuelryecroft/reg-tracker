@@ -26,6 +26,25 @@
             <div class="btn-row"><button type="submit" class="btn block">Log in</button></div>
         </form>
     </div>
+    <!--/*
+      Parser-level comment: it is stripped before rendering, unlike a plain HTML comment. This page
+      is served to unauthenticated visitors, so notes about which endpoints exist behind which flag
+      do not belong in what the browser receives.
+
+      The block below renders only while the Entra path is actually wired (app.auth.entra.enabled).
+      With the flag off that authorization endpoint does not exist, so showing the button would offer
+      a dead control on the one page where the person cannot tell whether the fault is theirs.
+
+      A plain link rather than a form: this is a GET that starts the authorization-code flow against
+      Spring Security's own endpoint. No CSRF token, because there is nothing yet to protect - no
+      session and no authenticated identity.
+    */-->
+    <div class="card" th:if="${entraLoginEnabled}" style="margin-top:16px">
+        <p class="sub" style="margin-top:0">Or use your organisation account.</p>
+        <div class="btn-row">
+            <a class="btn block" th:href="@{/oauth2/authorization/entra}">Sign in with Entra</a>
+        </div>
+    </div>
     <p class="sub" style="margin-top:16px">Trouble signing in? Contact your organisation's administrator.</p>
 </main>
 </body>
