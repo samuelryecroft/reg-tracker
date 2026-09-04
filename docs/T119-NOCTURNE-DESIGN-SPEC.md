@@ -994,3 +994,60 @@ in 2f is a *sent-back* card. "Rejected" reads as a verdict; the action is a requ
 safeguarding context the difference is not cosmetic — it is what a visitor sees when their work comes back.
 **Recommend changing the display name to "Sent back".** It is a display string only, not the enum constant,
 so nothing else moves, and it brings the tag, the rail, the button and the card into one vocabulary.
+
+### D-1a-3 · The section row — a section index, not tabs
+
+**The no-JS call is right, and for a stronger reason than the missing JS.** Real ARIA tabs *hide* the
+inactive panels. This screen is a report a reviewer reads, judges, and generates a `.docx` from — finding a
+phrase anywhere in it is core to the task, and browser find and print both only see what is in the DOM and
+visible. Tabs would put five-sixths of the report out of reach of Ctrl-F. **1b shows the same report full
+width with every section visible**, so tabs in 1a would make one document searchable on the reviewer's
+screen and not on the record screen.
+
+So these were never tabs. **They are a section index**: drawn as pills, behaving as jump links, wrapped in
+`<nav aria-label="Report sections">`. No `tablist`/`tab`/`tabpanel` roles — those promise a widget that
+will not exist, and a role that lies is worse than no role.
+
+**Active state without JS** — `:target` plus `:has()`: `body:has(#details:target) a[href="#details"]`.
+Two constraints on it:
+- **It must not be load-bearing.** `:has()` is Chrome 105 / Safari 15.4 / **Firefox 121 (Dec 2023)** —
+  later than the `color-mix()` floor R-Q8 committed to (Firefox 113). Where it is unsupported there is
+  simply no active pill and every link still works. Never let the highlight carry information the labels
+  do not.
+- `aria-current="location"` would be the right attribute for "where you are in this page", but it cannot
+  be set without JS or a server round-trip. Leave it off rather than fake it.
+
+**Two defects to design out now, because both are invisible until someone hits them:**
+- **`tabindex="-1"` on each section.** A jump link moves the *scroll* position but not the reading cursor
+  unless the target is focusable. Without it a screen-reader user activates a section link and nothing
+  appears to happen.
+- **`scroll-margin-top` on each section**, clearing the sticky header. Without it the jump lands with the
+  section heading underneath the header — the one thing the user was trying to reach.
+
+Pills take `--control-min` (44px, D-Q3), labels at `--text-interactive` 14px (D-Q4), and a visible focus
+ring at 2px accent, offset 2px.
+
+### D-1a-4 · The history column below the fold — 1060px, not the shell's 900px
+
+My instinct was to reuse the sidebar's existing 900px breakpoint and keep one number in the system. **The
+arithmetic says no.** The report column is `viewport − 212 (sidebar) − 22.4 (gap) − 316 (history)`:
+
+| viewport | report column | |
+| --- | --- | --- |
+| 1240 (design width) | 690px | |
+| 1100 | 550px | |
+| 1000 | **450px** | below a 66ch measure |
+| 900 (sidebar breakpoint) | **350px** | badly cramped |
+
+A 66ch measure at 15px is about 495px, so the report drops under its own measure at roughly **1045px** —
+well before the sidebar goes. **History therefore collapses at 1060px**, which leaves the report ≥510px at
+the breakpoint. Two breakpoints, not one; the second number earns its place.
+
+**Below 1060px the history becomes the last section of a single-column document, and takes a seventh entry
+in the section index.** That reuses D-1a-3's pattern rather than inventing a narrow-viewport disclosure, and
+it keeps the history one tap away instead of one long scroll away — which is what stacking it silently
+underneath a full report would actually mean.
+
+This converges 1a on 1b's arrangement at narrow widths, and that is coherent rather than a compromise: 1a's
+whole differentiator is history *permanently adjacent*, and below 1060px there is no second column for it
+to be adjacent to.
