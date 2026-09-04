@@ -3,6 +3,7 @@ package ninja.samryecroft.returnhome.tracker.web;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.securityContext;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
 import java.time.LocalDate;
@@ -18,6 +19,7 @@ import ninja.samryecroft.returnhome.tracker.fieldcrypto.FieldCryptoException;
 import ninja.samryecroft.returnhome.tracker.home.Home;
 import ninja.samryecroft.returnhome.tracker.home.HomeRepository;
 import ninja.samryecroft.returnhome.tracker.organisation.Organisation;
+import ninja.samryecroft.returnhome.tracker.organisation.OrganisationRepository;
 import ninja.samryecroft.returnhome.tracker.user.AppUserDetailsService;
 import ninja.samryecroft.returnhome.tracker.user.Role;
 import ninja.samryecroft.returnhome.tracker.user.User;
@@ -36,11 +38,20 @@ import org.springframework.security.core.context.SecurityContextImpl;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 /**
- * T168: the org-2 failure driven end to end, because the half that broke was ROUTING.
+ * T168, the org-2 condition driven end to end: an organisation whose per-organisation KEK was never
+ * provisioned. Both halves of the response to that live here - the admin being WARNED at onboarding,
+ * and the write later FAILING WELL if nobody acted on the warning.
+ *
+ * <p>They share one class because they need the same two things - a key provider that fails every
+ * operation, and auto-create off - and a class each would have cost a Spring context and a
+ * connection pool to say the same thing twice (TEST-CONTEXTS.md).
+ *
+ * <p>The routing half exists because the part that broke was ROUTING.
  *
  * <p>{@code GlobalControllerAdviceFieldCryptoTest} calls {@link GlobalControllerAdvice#handleFieldCrypto}
  * directly and proves the MAPPING. That leaves the question the incident actually turned on
@@ -63,7 +74,8 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
  */
 @SpringBootTest
 @AutoConfigureMockMvc
-class FieldCryptoFailureRoutingIntegrationTest extends AbstractIntegrationTest {
+@TestPropertySource(properties = "app.documents.key-vault.auto-create-keys=false")
+class UnprovisionedKekIntegrationTest extends AbstractIntegrationTest {
 
     /**
      * Stands in for the org-2 condition: the organisation's KEK was never provisioned, and the
@@ -111,6 +123,8 @@ class FieldCryptoFailureRoutingIntegrationTest extends AbstractIntegrationTest {
     private AppUserDetailsService appUserDetailsService;
     @Autowired
     private PasswordEncoder passwordEncoder;
+    @Autowired
+    private OrganisationRepository organisationRepository;
 
     private Home home;
     private String suffix;
@@ -135,6 +149,16 @@ class FieldCryptoFailureRoutingIntegrationTest extends AbstractIntegrationTest {
         admin.setRoles(new HashSet<>(Set.of(Role.ORG_ADMIN)));
         admin.setHomes(new HashSet<>(Set.of(home)));
         userRepository.save(admin);
+
+        User platformAdmin = new User();
+        platformAdmin.setUsername("kek-platform-admin" + suffix);
+        platformAdmin.setPassword(passwordEncoder.encode("password123"));
+        platformAdmin.setFirstName("Platform");
+        platformAdmin.setLastName("Admin");
+        platformAdmin.setEmail("kek-pa" + suffix + "@example.test");
+        platformAdmin.setRoles(new HashSet<>(Set.of(Role.ADMIN)));
+        platformAdmin.setHomes(new HashSet<>());
+        userRepository.save(platformAdmin);
     }
 
     @Test
@@ -167,6 +191,57 @@ class FieldCryptoFailureRoutingIntegrationTest extends AbstractIntegrationTest {
         // Fail-closed, and it is worth asserting rather than assuming: there is no variant of this
         // that keeps the child without its encrypted fields.
         assertThat(childRepository.count()).isEqualTo(childrenBefore);
+    }
+
+    /**
+     * T168 Part A(a): the onboarding notice actually REACHES THE PAGE.
+     *
+     * <p>The controller test proves the flash attribute is set. It cannot prove an admin ever sees
+     * it, and in this codebase that gap is not theoretical: T165 found the shared {@code fieldError}
+     * fragment sitting in {@code <head>}, where the parser's auto-close pushed its {@code <p>} out of
+     * its own {@code th:fragment} block. It had never rendered - no inline validation message on any
+     * form, every input's {@code aria-describedby} dangling at an id that was never emitted - and the
+     * whole suite stayed green throughout, because every test asserted the model and none asserted
+     * the page. "The markup looks right" is not evidence here.
+     *
+     * <p>MockMvc does not carry a flash attribute across a redirect by itself, so the notice is taken
+     * from the POST's own flash map and replayed on the GET. That still proves the two things that
+     * can independently break: the create path SETS it, and the organisation-list template RENDERS
+     * it. The key name is asserted because it is the whole point of the notice - an admin who cannot
+     * see which key to provision has been told only that something is wrong.
+     */
+    @Test
+    void theOnboardingNoticeNamesTheKeyAndActuallyReachesTheOrganisationsPage() throws Exception {
+        MvcResult created = mockMvc.perform(post("/admin/organisations")
+                        .with(asUser("kek-platform-admin" + suffix)).with(csrf())
+                        .param("name", "Unprovisioned Care" + suffix)
+                        .param("type", "CARE_PROVIDER")
+                        .param("supplierOrganisationId", seededSupplier().getId().toString()))
+                .andReturn();
+
+        Object notice = created.getFlashMap().get("kekWarning");
+        assertThat(notice).as("creating a CARE_PROVIDER whose KEK cannot be confirmed must raise the "
+                + "onboarding notice - auto-create is off for this class, so the probe is not skipped")
+                .isNotNull();
+
+        String html = mockMvc.perform(get("/admin/organisations")
+                        .with(asUser("kek-platform-admin" + suffix))
+                        .flashAttr("kekWarning", notice))
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(html).contains(String.valueOf(notice));
+        assertThat(html).contains("Encryption key could not be confirmed");
+
+        // The actionable half: an admin needs the key's NAME to provision it. Withholding it here
+        // would leave the notice saying only that something is wrong - and this is the privileged
+        // admin screen, which is exactly why it is named here and withheld from the end-user 503.
+        Organisation created0 = organisationRepository.findAll().stream()
+                .filter(o -> ("Unprovisioned Care" + suffix).equals(o.getName()))
+                .findFirst().orElseThrow();
+        assertThat(html).contains(KeyProvider.keyNameFor(created0.getId()));
+
+        // The marker is decoration: the sentence carries the meaning, so the icon must be hidden.
+        assertThat(html).contains("#ph-warning-circle");
     }
 
     private RequestPostProcessor asUser(String username) {

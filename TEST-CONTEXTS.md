@@ -42,7 +42,7 @@ the answer: what the 6 are, and which of them have to exist.
 | 5 | `@TestPropertySource` enabling login throttling | 1 | yes | necessary |
 | 6 | `webEnvironment = RANDOM_PORT` (Playwright) | 7 | yes | necessary |
 | 7 | `@TestPropertySource` opening the break-glass path | 2 | yes | **chosen** — see below |
-| 8 | `@TestConfiguration` supplying an unprovisioned-KEK `KeyProvider` | 1 | yes | **chosen** — see below |
+| 8 | unprovisioned-KEK `KeyProvider` + auto-create off | 1 | yes | **chosen** — see below |
 
 Context 4 is why there are 8 contexts but only 7 pools: a `@WebMvcTest` slice
 builds no `DataSource`.
@@ -98,10 +98,16 @@ closed, which is the configuration they describe.
 
 ### Context 8 — chosen, and the reason is worth more than the pool
 
-`FieldCryptoFailureRoutingIntegrationTest` (T168) supplies a `@Primary`
-`KeyProvider` that fails every operation, standing in for an organisation whose
-Key Vault KEK was never provisioned. A nested `@TestConfiguration` is a context
-customizer, so this forks — knowingly, and signed off before it was spent.
+`UnprovisionedKekIntegrationTest` (T168) supplies a `@Primary` `KeyProvider`
+that fails every operation, plus `auto-create-keys=false`, standing in for an
+organisation whose Key Vault KEK was never provisioned. A nested
+`@TestConfiguration` is a context customizer, so this forks — knowingly, and
+signed off before it was spent.
+
+**One class, both halves.** The admin being warned at onboarding and the write
+later failing well are one story and need the same two overrides, so they share
+this context rather than costing a second. That is the `AbstractEntraEnabledTest`
+lesson applied before the fact instead of after it.
 
 It could not be avoided by sharing: every other integration test needs a
 *working* key provider, so this context is the one thing it is for. And it could
