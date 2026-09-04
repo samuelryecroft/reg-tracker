@@ -193,8 +193,14 @@ public class ReportService {
             Resource template = resourceLoader.getResource(appProperties.getDocx().getTemplatePath());
             ThemeService.ThemeView theme = themeService.getForCareProviderOrg(request.getHome().getOrganisation().getId());
             try (InputStream templateStream = template.getInputStream()) {
+                // D-Q5 and R-Q7, migrated together because they share this one call. The heading
+                // colour and the band tint now come from the accent ramp rather than from the two
+                // ThemeSettings fields that are retiring; primaryColor stays, because it is not
+                // retiring - it is the hue the ramp is derived from. Taking one from the ramp and
+                // leaving the other on the old model would leave a call site that cannot tell a
+                // reader which model is in force.
                 document = docxReportGenerator.generate(templateStream, buildValues(request, report),
-                        theme.primaryColor(), theme.primaryColorDark(), theme.secondaryColor());
+                        theme.primaryColor(), theme.docAccent(), theme.accentTint());
             }
         } catch (IOException e) {
             throw new UncheckedIOException("Failed to generate report document", e);

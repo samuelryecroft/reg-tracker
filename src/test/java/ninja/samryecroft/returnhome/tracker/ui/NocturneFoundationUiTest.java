@@ -2,6 +2,7 @@ package ninja.samryecroft.returnhome.tracker.ui;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import ninja.samryecroft.returnhome.tracker.theme.AccentRamp;
 import ninja.samryecroft.returnhome.tracker.theme.ThemeService;
 import org.junit.jupiter.api.Test;
 
@@ -104,7 +105,7 @@ class NocturneFoundationUiTest extends AbstractUiTest {
         String hueValue = ((String) page.locator(":root")
                 .evaluate("el => getComputedStyle(el).getPropertyValue('--brand-hue')")).trim();
 
-        int expectedHue = ThemeService.brandHueOf("#F36E2A"); // ThemeService's own shipped platform default
+        int expectedHue = AccentRamp.hueFrom("#F36E2A"); // ThemeService's own shipped platform default
         assertThat(hueValue).isEqualTo(String.valueOf(expectedHue));
         assertThat(Integer.parseInt(hueValue)).isNotEqualTo(289); // app.css's hardcoded default - must be overridden
     }
