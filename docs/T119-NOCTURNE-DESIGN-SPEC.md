@@ -1475,3 +1475,129 @@ rather than specifying the copy, because how emphatic it should be is a product 
 `🔒` → `ph-lock-simple`, `▲` → `ph-warning-circle`; both already vendored (§5j sweep), both `aria-hidden`.
 Neither needs a hidden state word: each sits in a banner whose visible text already carries the state, and
 per D-1a-2b's converse a hidden word there would be duplication, not access.
+
+
+## 6b · Screens 2a–2g — the list and dashboard batch (Creed, 6 Sep)
+
+Specced against **main @1593d88**. Seven screens with one builder, so **the risk is seven divergent
+implementations of the same card.** The shared layer is therefore specified once below and every per-screen
+section after it is a *delta only*. Build the shared layer first.
+
+### The finding that shapes the whole batch: every list renders its data twice
+
+All four case lists — `coordinator/requests`, `home-staff/request-list`, `reviewer/queue`,
+`visitor/interview-list` — carry a `<table class="table-wrap responsive">` **and** a duplicated
+`.stack`/`.srow` card list of the same rows. **The two copies have already drifted:** the card in
+`request-list` shows a *Scheduled* date that the table's columns omit. Two renderings of one dataset that
+already disagree about what a row contains.
+
+The canvas is explicit — *"no clunky tables — every list is case cards or a dated feed"* — and **R-Q12
+already ruled cards for cases, tables for aggregates.** So this is applying a decision, not making one:
+
+> **Delete the table from every case list. Keep a table only for 2c's aggregate rows.**
+
+One list, one truth, roughly half the markup, and the drift class disappears rather than being fixed.
+
+### S-1 · The case card — one component, every list screen
+
+`[avatar] child · reference | home + return time | visitor | due tag | status tag | one action`
+
+- **The child's name is the link** (`.rowlink`, already 44px min-height), and **one** state-specific action
+  button sits alongside. The canvas's "one 104px action button" is honoured: the *button* is one; the name
+  link is not a button.
+- **Do not make the whole card clickable.** That pattern needs an overlay pseudo-element kept off the action
+  button, and it leaves a second interactive region with no accessible name. Across seven screens and a new
+  builder that is seven chances to get subtly wrong, for no gain over a named link.
+- **Avatar and masking — a refinement, because the canvas label duplicates itself in the default state.**
+  Masked, the canvas shows `A.B. · CH-0041` beside a disc reading `A.B.` — the initials twice, in the state
+  almost everyone sees almost all the time. Instead: **the avatar carries the initials, and the label carries
+  the case reference.** Same information, no repetition, and it promotes the reference staff actually quote
+  to each other and into the audit. Revealed, the label becomes the full name and the avatar is unchanged.
+- Disc tint is the uniform `--tint`. It is a scanning anchor, not an identifier — **do not derive a per-child
+  hue**: it would fight the one-accent-hue-per-supplier branding model and imply an identity the disc does
+  not actually carry.
+
+### S-2 · Group headings carry the urgency, in text
+
+`.due-group-head` is shipped. The heading states the tier — *Overdue*, *Due within 24 hours*, *On track* —
+so **the group heading is what keeps the due badge's colour from being load-bearing.** Keep every card inside
+its tier heading; never render a flat list with colour as the only urgency signal.
+
+### S-3 · Filter chips
+
+`.filters`, `.seg`, `.seg-opt` are shipped. Server-rendered, so chips are **links with query parameters**,
+not toggle buttons. The active chip takes `aria-current="true"` and must not be distinguished by colour
+alone — `.seg-opt:has(input:checked)` already pairs colour with an inset ring, which satisfies that; keep the
+ring. The existing *"Showing a filtered view"* banner stays: it is what puts the filter state in text.
+
+### S-4 · Status, due and empty treatments — reuse, do not restyle
+
+`.status` and `.due` are shipped and are theme-correct after #48/#49/#62. **Reuse them unchanged.** Any new
+state needs its ink and background from the same family token — never a literal (`FrontendSourceGuardTest`
+now pins this for any `background: var(--...)`, not just `-bg`-suffixed ones).
+Empty-state copy is already final in **R-Q13 (§5d)** — take it from there rather than writing new copy.
+
+### S-5 · The dated feed
+
+`.tl` is shipped and in use by the interview history. **2g reuses it as-is.** Its dots are state-bearing, so
+the D-1a-2b floor applies: a dot is `aria-hidden` plus a text equivalent, or the state is in the entry text.
+
+---
+
+### 2a · Coordinator queue
+Cards grouped by the three urgency tiers, per S-1/S-2. Filter chips per S-3. Delete the table. The one action
+is state-specific: *Allocate* while REQUESTED/ALLOCATED/SCHEDULED, otherwise none.
+
+### 2b · The dated feed of the same queue — **recommend not building it**
+2b is a second rendering of 2a's dataset, grouped by day instead of urgency. **Building it recreates exactly
+the duplication this batch exists to delete**, and a queue's job is *what must I do next*, which is urgency,
+not chronology. The chronological view already exists where it belongs — the audit feed (2g) and the record's
+history. If a chronological queue is wanted later it is a **sort toggle on 2a, not a screen.** Flagged to god
+as a scope reduction rather than taken unilaterally.
+
+### 2c · Supplier dashboard — and a live dark-mode defect that must be fixed here
+Tiles (`.tile`, `.tiles`, `.zone`) are shipped. The compliance-by-provider bars and the home recurrence counts
+are **aggregates, so they stay a table** — the one exception to the delete-the-table rule, per R-Q12.
+
+**T158 is live on this screen and I had its severity wrong.** I filed it as a non-urgent "light island" that
+could ride the migrations. Measured:
+
+```
+.tile.urgent { background: #FFFAFA }   .tile.warn { background: #FFFDF6 }
+```
+Both override the background and **neither overrides the text**, which inherits `--color-text`. In dark mode:
+
+| element | urgent | warn |
+|---|---|---|
+| `.num` — the count itself, 30px | **1.17:1** | **1.19:1** |
+| `.lab` / `.den` (`--muted`) | 2.23:1 | 2.27:1 |
+| `.go` link (`--accent-dark`) | 1.43–1.57:1 | 1.45–1.59:1 |
+
+**These are the "needs attention" tiles, so the overdue count is the number that is invisible.** That is the
+same class as `.due.overdue` — not cosmetic. Both rules must take their background *and* their border from a
+semantic family token (`--error-bg`/`--warn-bg` with borders derived at 25% per §5h), and set no ink at all,
+so `color: inherit` keeps working in both themes.
+
+### 2d · Reviewer queue
+Cards per S-1, with submitted-ago and a questions-answered count. **A report the reviewer submitted
+themselves renders its card with no action and a short line saying why** — never a disabled button, for the
+reasons in D-1b-7: a disabled control is not focusable, so it cannot explain itself, and the rule is
+permanent.
+
+### 2e · Raise a request — a form, not a list
+The shared card layer does not apply. Four groups (young person, missing episode, professionals, your
+details) with a sticky rail. **Return time is required** (canvas decision 1), which is what guarantees the
+72-hour clock always starts. Validation is the floor pattern: a summary panel naming the fields at fault,
+plus an inline message under each — and `.field-error`'s `▲` moves into markup as `ph-warning-circle`, per
+§5j, since CSS generated content reaches the accessibility tree.
+
+### 2f · Visitor's interviews (phone)
+This is S-1's card at narrow width — *"one card per state, each with only its own action"* is the same
+one-action rule, which is useful corroboration that S-1 is right rather than a desktop convenience. The
+sent-back card carries the reviewer's comment and uses the `--sent-back` family throughout.
+
+### 2g · Audit
+Filter chips (S-3), the dated feed (S-5), and an export panel that states what the CSV does and does not
+contain — **`.consequence` and `.manifest` are already shipped for exactly this.** The audit content rule
+holds and must stay true on screen: roles, identifiers and status transitions; **never names, report answers,
+or before-and-after values.**
