@@ -1093,3 +1093,67 @@ as decorative. They are not: they are graphical objects required to understand t
 Because each state also carries a text label the requirement is satisfied twice over, but the marker colours
 above are chosen to hold 3:1 on their own — a rail that is only legible by reading every label is not doing
 its job, which is to be read at a glance.
+
+---
+
+## 5h · The banner component — a live dark-mode failure, and two defects around it (Creed, 4 Sep)
+
+Found while specifying the sent-back banner for 1c. All three live in `.banner`, and they should be fixed
+together.
+
+### 1. LIVE DEFECT — `.banner.err` hard-codes its ink and fails 1.4.3 in dark
+
+    .banner.err { background: var(--error-bg); color: #991B1B; border: 1px solid #F3C0C0; }
+
+`#991B1B` is a light-page red. Its three siblings correctly use their own token — `var(--warn)`,
+`var(--ok)`, `var(--info)` — so this is an oversight rather than a decision.
+
+| | light `--error-bg` | dark `--error-bg` |
+| --- | --- | --- |
+| `#991B1B` as shipped | 6.80:1 | **1.73:1** |
+| `var(--error)` | 5.30:1 | **7.83:1** |
+
+**This is live on main**, not latent: the appearance preference, its controller and the dark token set all
+shipped in batch 1b. A user in dark mode who triggers a validation error reads it at 1.73:1 — and it is the
+*error* banner, the one variant whose message a user least affords to miss. The other three measure
+8.17–8.42:1 in dark. **Fix is one word: `color: var(--error)`.**
+
+### 2. All four banner borders are light-mode literals
+
+`#F3C0C0`, `#EBCF8A`, `#A7D8B6`, `#A9C3EE` were chosen as subtle boundaries on a light ground, and in dark
+they invert into bright rings — the same shape of error as R-Q6 (shipped inks are light-page inks):
+
+| variant | vs light bg | vs dark bg |
+| --- | --- | --- |
+| err | 1.31:1 | 8.99:1 |
+| warn | 1.36:1 | 8.56:1 |
+| ok | 1.46:1 | 7.80:1 |
+| info | 1.47:1 | 7.70:1 |
+
+Not a contrast *failure* — it is over-contrast, four banners ringed like outlines. **Derive the border from
+the variant's own token instead: `color-mix(in srgb, var(--error) 25%, transparent)`** and the same for the
+others. Measured, that lands at **1.46–1.51:1 in light and 1.76–1.86:1 in dark**: light is visually
+unchanged, dark becomes a proportionate boundary, and the five variants become consistent with each other
+instead of spreading. Per §5d each `color-mix()` takes a flat value declared immediately before it.
+
+Exact parity across appearances is not reachable with a single percentage, because each token sits at a
+different distance from its own background. 1.5 against 1.8 is imperceptible as a style; 1.4 against 8.6 is
+a different design.
+
+### 3. There is no `.banner.sent-back`, and 1c needs one
+
+Four variants exist — `err`, `warn`, `ok`, `info`. The visitor's sent-back banner in
+`visitor/report-form.html` currently borrows **`warn`**, which contradicts D-1a-2a: being sent back is the
+process working, not something going wrong, and it should not look like a problem. The token pair already
+exists and is already used by `.tag-sent-back` and `.tl .dot.back`; only the banner variant is missing.
+
+    .banner.sent-back { background: var(--sent-back-bg); color: var(--sent-back);
+                        border: 1px solid <flat fallback>;
+                        border-color: color-mix(in srgb, var(--sent-back) 25%, transparent); }
+
+Ink measures 6.12:1 light / 8.94:1 dark on its own ground. The banner's `↩` should become
+`ph-arrow-u-up-left` — the same glyph as the status rail's exception state, so the two surfaces read as one
+decision rather than two coincidences.
+
+**This banner is the highest-stakes copy surface in the whole sent-back vocabulary**: the rail is a
+coordinator glancing at progress, this is a visitor reading that their own work has come back.
