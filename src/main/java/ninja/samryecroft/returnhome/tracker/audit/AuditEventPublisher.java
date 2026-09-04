@@ -137,7 +137,13 @@ public class AuditEventPublisher {
      */
     public void organisationActivated(Organisation organisation, String verifiedKeyName,
             AppUserPrincipal principal) {
-        publish(actor(AuditEventRecord.of(AuditEventType.ORGANISATION_ACTIVATED), principal)
+        AuditEventRecord.Builder builder = AuditEventRecord.of(AuditEventType.ORGANISATION_ACTIVATED);
+        // A null principal means the SYSTEM activated it, and the row says so by carrying no actor -
+        // the same shape breakGlassEnabled uses. That is not a hole to be tidied later: the demo
+        // seeder activates without a person today, and T166 §5's auto-provisioning will do exactly
+        // the same in production. Inventing a fake actor would make an automated activation
+        // indistinguishable from a human one in the trail, which is the opposite of what it is for.
+        publish((principal == null ? builder : actor(builder, principal))
                 .target("Organisation", organisation.getId())
                 .scope(organisation.getId(), null)
                 .meta("kekVerified", verifiedKeyName)

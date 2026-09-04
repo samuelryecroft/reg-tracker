@@ -12,6 +12,7 @@ import ninja.samryecroft.returnhome.tracker.interview.InterviewRequestRepository
 import ninja.samryecroft.returnhome.tracker.interview.InterviewRequestService;
 import ninja.samryecroft.returnhome.tracker.organisation.Organisation;
 import ninja.samryecroft.returnhome.tracker.organisation.OrgType;
+import ninja.samryecroft.returnhome.tracker.organisation.OrganisationLifecycleService;
 import ninja.samryecroft.returnhome.tracker.organisation.OrganisationRepository;
 import ninja.samryecroft.returnhome.tracker.report.InterviewReportRepository;
 import ninja.samryecroft.returnhome.tracker.report.ReportService;
@@ -111,6 +112,7 @@ class DemoDataSeederTest {
     @Configuration(proxyBeanMethods = false)
     static class Collaborators {
         @Bean OrganisationRepository organisationRepository() { return mock(OrganisationRepository.class); }
+        @Bean OrganisationLifecycleService organisationLifecycleService() { return mock(OrganisationLifecycleService.class); }
         @Bean ThemeSettingsRepository themeSettingsRepository() { return mock(ThemeSettingsRepository.class); }
         @Bean HomeRepository homeRepository() { return mock(HomeRepository.class); }
         @Bean ChildRepository childRepository() { return mock(ChildRepository.class); }
@@ -126,6 +128,10 @@ class DemoDataSeederTest {
 
     private static final class Mocks {
         final OrganisationRepository organisations = mock(OrganisationRepository.class);
+        // T168(b): the seeder activates each organisation it creates, so the demo tenancy is usable
+        // and does not depend on keys being minted on demand. Mocked here because these tests are
+        // about what the seeder seeds, not about the lifecycle rule - which has its own tests.
+        final OrganisationLifecycleService lifecycle = mock(OrganisationLifecycleService.class);
         final ThemeSettingsRepository themes = mock(ThemeSettingsRepository.class);
         final HomeRepository homes = mock(HomeRepository.class);
         final ChildRepository children = mock(ChildRepository.class);
@@ -143,7 +149,9 @@ class DemoDataSeederTest {
         }
 
         DemoDataSeeder seeder() {
-            return new DemoDataSeeder(organisations, themes, homes, children, users, requests,
+            Mockito.when(lifecycle.activate(Mockito.any(Organisation.class), Mockito.isNull()))
+                    .thenAnswer(invocation -> invocation.getArgument(0));
+            return new DemoDataSeeder(organisations, lifecycle, themes, homes, children, users, requests,
                     reports, interviewRequestService, reportService, audit, passwordEncoder,
                     new DemoProperties());
         }

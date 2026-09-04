@@ -51,15 +51,24 @@ public class OrganisationLifecycleService {
         if (organisation.getStatus() == OrgStatus.ACTIVE) {
             return organisation;
         }
-        String keyName = KeyProvider.keyNameFor(organisation.getId());
-
-        // Deliberately NOT caught: if the vault cannot be reached, we do not know whether the key
-        // exists, and answering "absent" would refuse an organisation that may be perfectly
-        // provisioned. KeyUnavailableException travels up as the transient fault it is.
-        if (!keyProvider.keyExists(organisation.getId())) {
-            throw new OrganisationNotActivatableException(keyName);
+        // Only a CARE_PROVIDER needs a KEK, and this condition is load-bearing rather than an
+        // optimisation. Every encrypted entity resolves its owning organisation through
+        // home.getOrganisation() - and homes belong to care providers - so a SUPPLIER never owns an
+        // encrypted record and never has a key. Checking one unconditionally would make suppliers
+        // permanently un-activatable under Key Vault, where their key genuinely does not exist and
+        // never should. Same scope as the T168 onboarding notice, for the same reason.
+        if (organisation.getType() == OrgType.CARE_PROVIDER) {
+            // Deliberately NOT caught: if the vault cannot be reached, we do not know whether the
+            // key exists, and answering "absent" would refuse an organisation that may be perfectly
+            // provisioned. KeyUnavailableException travels up as the transient fault it is.
+            if (!keyProvider.keyExists(organisation.getId())) {
+                throw new OrganisationNotActivatableException(KeyProvider.keyNameFor(organisation.getId()));
+            }
         }
 
+        String keyName = organisation.getType() == OrgType.CARE_PROVIDER
+                ? KeyProvider.keyNameFor(organisation.getId())
+                : null;
         organisation.setStatus(OrgStatus.ACTIVE);
         Organisation saved = organisationRepository.save(organisation);
         auditEvents.organisationActivated(saved, keyName, principal);

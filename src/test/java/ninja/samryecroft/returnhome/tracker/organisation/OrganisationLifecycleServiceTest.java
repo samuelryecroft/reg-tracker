@@ -58,6 +58,28 @@ class OrganisationLifecycleServiceTest {
     }
 
     /**
+     * A SUPPLIER has no KEK and never needs one, so requiring a key to activate it would make every
+     * supplier permanently un-activatable under Key Vault - where the key genuinely does not exist
+     * and never should.
+     *
+     * <p>Found by reasoning about the demo seeder rather than by a failing test: every
+     * {@code EncryptedEntity} resolves its owning organisation through {@code home.getOrganisation()},
+     * and homes belong to care providers, so no encrypted record is ever keyed on a supplier. The
+     * first version of activate() checked unconditionally and would have bricked supplier
+     * onboarding in production while passing every test that existed.
+     */
+    @Test
+    void aSupplierActivatesWithoutAKeyBecauseItNeverOwnsEncryptedRecords() {
+        Organisation supplier = pendingOrganisation();
+        supplier.setType(OrgType.SUPPLIER);
+
+        Organisation activated = service.activate(supplier, principal);
+
+        assertThat(activated.getStatus()).isEqualTo(OrgStatus.ACTIVE);
+        verify(keyProvider, never()).keyExists(anyLong());
+    }
+
+    /**
      * The load-bearing one. Without this, ACTIVE means "an admin clicked a button" and the
      * organisation is free to accept a child record it cannot encrypt.
      */
