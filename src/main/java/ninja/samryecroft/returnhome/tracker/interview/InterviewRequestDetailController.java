@@ -8,6 +8,8 @@ import ninja.samryecroft.returnhome.tracker.report.InterviewReport;
 import ninja.samryecroft.returnhome.tracker.report.ReportService;
 import ninja.samryecroft.returnhome.tracker.user.AppUserPrincipal;
 import ninja.samryecroft.returnhome.tracker.user.Role;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -18,6 +20,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 @Controller
 @RequestMapping("/interview-requests")
 public class InterviewRequestDetailController {
+
+    private static final Logger log = LoggerFactory.getLogger(InterviewRequestDetailController.class);
 
     private final InterviewRequestService interviewRequestService;
     private final AuditHistoryService auditHistoryService;
@@ -77,7 +81,17 @@ public class InterviewRequestDetailController {
         // page down with it - a strictly wider blast radius than the old route, where only the
         // separate /reports/{id}/view broke and this page still rendered. Optional.orElse(null) keeps
         // that same narrower failure: report content silently doesn't render, same as pre-approval.
-        InterviewReport report = canDownload ? reportService.findByRequestId(id).orElse(null) : null;
+        //
+        // Kevin's review (PR #57): without the WARN below, "not approved yet" and "approved but the
+        // row is missing" render identically, so the second (a real data anomaly) has no observer at
+        // all. A can't-happen that goes unrecorded is only can't-happen until it isn't.
+        InterviewReport report = null;
+        if (canDownload) {
+            report = reportService.findByRequestId(id).orElse(null);
+            if (report == null) {
+                log.warn("Interview request {} is REPORT_APPROVED but has no report row", id);
+            }
+        }
 
         model.addAttribute("request", request);
         model.addAttribute("childIdentity", ChildIdentity.of(request.getChild(), nameRevealService.isRevealed()));
