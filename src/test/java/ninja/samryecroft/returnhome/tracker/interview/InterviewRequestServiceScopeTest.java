@@ -37,7 +37,7 @@ import org.springframework.test.util.ReflectionTestUtils;
  * unscoped when the answer is empty. Only the second can regress here.
  *
  * <p>The regression it guards is specific rather than hypothetical. {@code .orElseGet(List::of)} is
- * right; {@code .orElseGet(() -> repository.findByStatusOrderByCreatedAtDesc(...))} would compile,
+ * right; {@code .orElseGet(() -> repository.findByStatusExcludingReportsAuthoredBy(...))} would compile,
  * read perfectly reasonably, and silently restore the old exposure. An empty-list assertion alone
  * would not catch it either - the unfixed code returned an empty list too, for the wrong reason. So
  * these assert that the repository is never asked, which is the same shape as
@@ -78,18 +78,18 @@ class InterviewRequestServiceScopeTest {
         assertThat(service().listPendingReview(reviewer)).isEmpty();
 
         verify(interviewRequestRepository, never())
-                .findByStatusAndHomeOrganisationSupplierOrganisationId(any(), any());
+                .findByStatusAndHomeOrganisationSupplierOrganisationIdExcludingReportsAuthoredBy(any(), any(), any());
         // And specifically not the unscoped query the ADMIN branch uses - the fallback a wrong
         // orElseGet would reach for.
-        verify(interviewRequestRepository, never()).findByStatusOrderByCreatedAtDesc(any());
+        verify(interviewRequestRepository, never()).findByStatusExcludingReportsAuthoredBy(any(), any());
     }
 
     @Test
     void listPendingReviewStillScopesToASupplierSideReviewersOwnOrganisation() {
         AppUserPrincipal reviewer = principal(Set.of(Role.REVIEWER), organisation(7L, OrgType.SUPPLIER));
         InterviewRequest pending = new InterviewRequest();
-        when(interviewRequestRepository.findByStatusAndHomeOrganisationSupplierOrganisationId(
-                InterviewStatus.REPORT_SUBMITTED, 7L)).thenReturn(List.of(pending));
+        when(interviewRequestRepository.findByStatusAndHomeOrganisationSupplierOrganisationIdExcludingReportsAuthoredBy(
+                InterviewStatus.REPORT_SUBMITTED, 7L, reviewer.getUserId())).thenReturn(List.of(pending));
 
         assertThat(service().listPendingReview(reviewer)).containsExactly(pending);
     }
