@@ -222,6 +222,54 @@ class FrontendSourceGuardTest {
                 .isEmpty();
     }
 
+    /**
+     * Creed's review, spec cc3574c: {@code .banner.err} hard-coded {@code color: #991B1B} - a
+     * light-page red - while its own siblings ({@code .warn}/{@code .ok}/{@code .info}) correctly
+     * read {@code var(--warn)}/{@code var(--ok)}/{@code var(--info)}. Measured: 1.73:1 against dark
+     * mode's {@code --error-bg}, against WCAG 1.4.3's 4.5:1 - and it was LIVE, not latent, the
+     * moment T138 1b shipped per-user appearance and someone could actually reach dark mode. Found
+     * by inspection two more instances of the identical pattern next to the one Creed flagged
+     * ({@code .due.overdue}, {@code .pill.flag-high}) - same hard-coded literal, same live failure,
+     * both on genuinely safety-relevant content (an overdue-interview badge, a "missing 5+ times in
+     * 30 days" risk flag).
+     *
+     * <p>Pins the RULE rather than re-testing those three instances: any rule pairing a themed
+     * {@code var(--X-bg)} background with a literal hex {@code color} is exactly this bug shape,
+     * whether or not anyone has measured that specific pair's contrast yet - a themed background
+     * with a fixed ink is the tell, because the ink was clearly meant to track the same semantic
+     * token family and doesn't.
+     */
+    @Test
+    void everyThemedBackgroundPairsWithAThemedInkNeverAHardcodedColour() throws IOException {
+        String rawCss = Files.readString(CSS_DIR.resolve("app.css"), StandardCharsets.UTF_8);
+        String css = rawCss.replaceAll("(?s)/\\*.*?\\*/", "");
+
+        List<String> offendingRules = new ArrayList<>();
+        Matcher rule = Pattern.compile("([^{}]+)\\{([^{}]*)\\}").matcher(css);
+        while (rule.find()) {
+            String selector = rule.group(1).trim();
+            String body = rule.group(2);
+            if (!body.contains("background:") || !body.contains("-bg)")) {
+                continue;
+            }
+            Matcher background = Pattern.compile("background:\\s*var\\(--([a-zA-Z0-9-]+)-bg\\)").matcher(body);
+            if (!background.find()) {
+                continue;
+            }
+            Matcher color = Pattern.compile("color:\\s*([^;]+);").matcher(body);
+            if (color.find() && !color.group(1).trim().startsWith("var(")) {
+                offendingRules.add(selector + " { background: var(--" + background.group(1) + "-bg); color: "
+                        + color.group(1).trim() + "; }");
+            }
+        }
+
+        assertThat(offendingRules)
+                .as("a themed background paired with a hard-coded ink instead of that same family's "
+                        + "var(--x) token - correct in one theme by coincidence, wrong the moment "
+                        + "anyone reaches the other one")
+                .isEmpty();
+    }
+
     private static List<Path> sourceFilesUnder(Path dir) throws IOException {
         try (Stream<Path> walk = Files.walk(dir)) {
             return walk.filter(Files::isRegularFile)
