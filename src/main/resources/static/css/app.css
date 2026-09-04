@@ -36,10 +36,18 @@
    reuses Nocturne's own class names (.btn/.card/...), which the EXISTING
    app also happens to use for unrelated, not-yet-migrated styling further
    down this file. That collision is deliberate and temporary: cascade order
-   keeps the legacy rules winning (they appear later in the file) so no
-   screen changes appearance until its own T119 phase migrates it and
-   removes its legacy rule - only the shell (this phase's actual screen)
-   renders with the classes below today.
+   keeps the legacy rules winning (they appear later in the file), so an
+   unmigrated screen keeps its EXISTING STRUCTURE - its own layout, spacing,
+   type sizes, all untouched - but adopts the new PALETTE, because the
+   legacy rules' own colour tokens (--accent/--border/--surface/--ink/...)
+   are bridged onto the new --color-* system below rather than left
+   undeclared (Creed's fidelity review, F1 - an undeclared var() is invalid
+   at computed-value time, not "keeps the old value"). A screen does not
+   change appearance until its own T119 phase migrates it and removes its
+   legacy rule ONLY in the sense that its structure and non-colour values
+   hold; its colours already do change today, on purpose, because a light
+   card floating on this file's new dark --color-bg would be broken
+   regardless of whether anyone had "migrated" it yet.
    ══════════════════════════════════════════════════════════════════════ */
 :root {
     color-scheme: dark;
@@ -168,6 +176,39 @@
     --info: #9ecbff; --info-bg: #1b2c50;
     --neutral: #c3c7d4; --neutral-bg: #292b31;
     --sent-back: #fdc498; --sent-back-bg: #3f2716;
+
+    /* F1 (Creed's fidelity review): this commit deleted the ~20 tokens the 33
+       not-yet-migrated screens still read. Cascade order keeps their rules winning
+       (see the file-level banner above), but a winning declaration whose var() names
+       an UNDECLARED custom property is invalid at computed-value time - not "keeps the
+       old value", it resolves to unset (initial, for anything non-inherited). Rendered
+       proof: unmigrated input/select/textarea came out border:0 none, background
+       transparent (T124's 3:1 boundary silently gone), .card lost its padding/border/
+       background entirely, .btn-row's gap collapsed to 0.
+       Colour aliases onto the new system, because body already paints --color-bg/
+       --color-text and an unmigrated light card floating on a dark page is broken
+       regardless. Spacing/radius/type do NOT migrate - they keep their exact old
+       literal values, because swapping in the 0.7x space scale or the new type ramp
+       would re-lay-out 33 screens nobody has reviewed for it. Retire a line here only
+       when the last legacy rule reading it has migrated to the --color-*/--space-*
+       equivalent and been deleted. */
+    --ink: var(--color-text);
+    --surface: var(--color-surface);
+    --border: var(--color-divider);
+    --control-border: var(--color-control-border);
+    --muted: var(--color-text-muted);
+    --accent: var(--color-accent);
+    --accent-ink: var(--color-text);
+    /* Not arbitrary picks: the accent ramp MIRRORS between appearances, so step 900 is
+       the pale step in light and the deep step in dark - --tint: accent-900 holds the
+       same role (a quiet tinted fill) in both, and --accent-dark: accent-300 is the ink
+       that sits legibly on that fill in both. Swept all 360 hues: 7.82:1 dark / 13.81:1
+       light worst case. */
+    --accent-dark: var(--color-accent-300);
+    --tint: var(--color-accent-900);
+    --radius: 10px;
+    --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s7: 48px;
+    --t-xs: 12px; --t-sm: 14px; --t-md: 16px; --t-lg: 20px;
 }
 
 /* Self-hosted per R-Q10 (spec §5c) - see static/fonts/README.md for provenance and how
@@ -590,7 +631,15 @@ textarea.input { min-height: 90px; resize: vertical; }
 .shell-header-actions { margin-left: auto; display: flex; align-items: center; gap: var(--space-4); }
 .shell-toggle {
     display: inline-flex; align-items: center; gap: 6px; min-height: 44px;
-    background: transparent; border: 1px solid color-mix(in srgb, var(--color-text) 16%, transparent);
+    background: transparent;
+    /* F2 (Creed's fidelity review): this used to be color-mix(...16% divider) inlined -
+       --color-divider's own value, 1.55:1, the same 1.4.11 defect §5c fixes on
+       .input/.btn-secondary, just not yet fixed here because these two buttons were
+       disabled ("coming soon"). Phase 2 enables them, so fixing it now rather than
+       carrying the defect forward. --color-control-border already has its own flat
+       fallback (§5d), which the old inline color-mix() didn't - a pre-2023 browser
+       dropped the whole border shorthand rather than falling back to anything. */
+    border: 1px solid var(--color-control-border);
     border-radius: var(--radius-md); padding: 0 10px; color: var(--color-text);
     font: inherit; font-size: var(--text-data); cursor: pointer;
 }
@@ -730,7 +779,15 @@ fieldset.checkbox-fieldset > legend {
     cursor: pointer;
     min-height: 44px;
 }
-.checkbox-option:has(input:checked) { border-color: var(--accent); background: var(--tint); color: var(--accent-dark); }
+/* F3 (Creed's fidelity review, open since T124): border-color used to be var(--accent)
+   (--color-accent post-bridge) - fine in light (12.39:1) but 2.40:1 worst-case in dark
+   at hue 103, the base accent has never been the boundary colour anywhere else in this
+   system. --color-accent-300 is the same token the bridge's --accent-dark already
+   points at, so this costs nothing new: 7.82:1 dark / 13.81:1 light swept across all
+   360 hues, and a border matching the chip's own ink is how a selected chip should
+   read. --tint's 1.15:1 fill is untouched - it's a fill, not a boundary, so 1.4.11
+   doesn't reach it. */
+.checkbox-option:has(input:checked) { border-color: var(--color-accent-300); background: var(--tint); color: var(--accent-dark); }
 .checkbox-option input { width: auto; min-height: 0; margin: 0; }
 .checkbox-option[aria-disabled="true"] { opacity: 0.55; }
 .checkbox-option[aria-disabled="true"] input { cursor: not-allowed; }

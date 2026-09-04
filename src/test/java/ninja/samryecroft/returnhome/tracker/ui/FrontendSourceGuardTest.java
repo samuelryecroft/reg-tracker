@@ -7,7 +7,11 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
@@ -103,6 +107,42 @@ class FrontendSourceGuardTest {
                         + "exact same custom properties in the exact same order - an explicit "
                         + "choice and auto-on-a-light-OS have to resolve to the same thing")
                 .containsExactlyElementsOf(light);
+    }
+
+    /**
+     * T119 F1 (Creed's fidelity review): a {@code var(--x)} referencing a custom property that is
+     * declared NOWHERE in the file is invalid at computed-value time - not "keeps the old value",
+     * it resolves to {@code unset}/{@code initial}. That is exactly how the legacy bridge bug
+     * happened: the wholesale {@code :root} replacement deleted ~20 tokens that 33 not-yet-migrated
+     * screens' rules still referenced, and every one of those rules silently lost its border,
+     * padding, or background with nothing to throw and nothing else in the suite able to notice -
+     * only a rendered-in-Chrome check (or this) catches a deleted custom property. Comments are
+     * stripped first so a {@code var(--x)} mentioned only in prose (as several are, in the banner
+     * above {@code :root}) is never mistaken for a real reference.
+     */
+    @Test
+    void everyCustomPropertyReferenceResolvesToADeclaration() throws IOException {
+        String rawCss = Files.readString(CSS_DIR.resolve("app.css"), StandardCharsets.UTF_8);
+        String css = rawCss.replaceAll("(?s)/\\*.*?\\*/", "");
+
+        Set<String> declared = new HashSet<>();
+        Matcher declaration = Pattern.compile("(--[a-zA-Z0-9-]+)\\s*:").matcher(css);
+        while (declaration.find()) {
+            declared.add(declaration.group(1));
+        }
+
+        Set<String> referenced = new TreeSet<>();
+        Matcher reference = Pattern.compile("var\\((--[a-zA-Z0-9-]+)[,)]").matcher(css);
+        while (reference.find()) {
+            referenced.add(reference.group(1));
+        }
+
+        List<String> undeclared = referenced.stream().filter(name -> !declared.contains(name)).toList();
+
+        assertThat(undeclared)
+                .as("var(--x) referencing a custom property declared nowhere in app.css - it resolves "
+                        + "to unset/initial wherever it's used, not to whatever the property used to be")
+                .isEmpty();
     }
 
     /** Every actual {@code --token: value;} declaration between the matched selector's {@code {}
