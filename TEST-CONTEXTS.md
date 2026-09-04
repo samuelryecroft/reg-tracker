@@ -3,8 +3,8 @@
 **Measured against:** `main` @ `fe2bb3d` (T148), re-measured on T113 Inc 3.
 **Date:** 2026-09-04.
 
-The test suite builds **6 Spring application contexts** across **33
-context-using test classes**, and **5 Hikari pools** against the one shared
+The test suite builds **7 Spring application contexts** across **36
+context-using test classes**, and **6 Hikari pools** against the one shared
 Testcontainers Postgres.
 
 **Pools are the number to watch, not contexts.** A context is only expensive
@@ -20,7 +20,7 @@ The budget, all three numbers measured rather than assumed:
 | `superuser_reserved_connections` | **3** | so **97** are usable |
 | HikariCP `DEFAULT_POOL_SIZE` | **10** | and `minIdle` defaults to it, so a pool tends toward 10 held connections |
 
-97 usable at 10 per pool is **9 pools**. Today's 5 is up to 50 of 97.
+97 usable at 10 per pool is **9 pools**. Today's 6 is up to 60 of 97.
 
 T148 was the suite walking into that ceiling: with the tenth pool live, the
 eleventh context failed to start with `FATAL: sorry, too many clients already`
@@ -41,6 +41,7 @@ the answer: what the 6 are, and which of them have to exist.
 | 4 | `@WebMvcTest` slice (different bootstrapper) | 1 | **no** | necessary, and the cheapest |
 | 5 | `@TestPropertySource` enabling login throttling | 1 | yes | necessary |
 | 6 | `webEnvironment = RANDOM_PORT` (Playwright) | 7 | yes | necessary |
+| 7 | `@TestPropertySource` opening the break-glass path | 2 | yes | **chosen** — see below |
 
 Context 4 is why there are 6 contexts but only 5 pools: a `@WebMvcTest` slice
 builds no `DataSource`.
@@ -65,6 +66,29 @@ turns throttling on with a 3-attempt limit. Both use `@TestPropertySource`, and
 both are testing a configuration that **must not leak into the other 30
 classes** — a global 3-attempt lockout would break unrelated login tests. The
 separate context is the isolation, not an accident. Leave them.
+
+### Context 7 — chosen, not arrived at
+
+T113 Inc 4's break-glass gate is startup-bound, so a test that needs the
+emergency path open must override the property, and that forks a context.
+
+**A per-request read would have avoided this pool, and was rejected.** It would
+have bought "close the path without a restart" — real, but not in this
+deployment: no `@RefreshScope`, no Spring Cloud, actuator exposing only
+`health` and `info`, and the value arriving as an App Service app setting whose
+change restarts the app anyway. So the flag is startup-bound in production
+however the read is written, and the per-request version would have been
+mutable only from a test.
+
+The principle, which outlives the decision: **a test-infrastructure budget must
+not shape a security control's runtime semantics.** This document exists to stop
+the suite reaching 7 pools by accident, not to stop it spending one on purpose.
+Measured at 5 before and 6 after; 7 remains the point at which to stop and ask.
+
+`AbstractBreakGlassEnabledTest` holds the override so that however many
+enabled-path tests there end up being, they cost one pool between them. The
+closed-path tests need no override and stay in context 2 — the default is
+closed, which is the configuration they describe.
 
 ### Context 6 — necessary
 

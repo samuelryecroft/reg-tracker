@@ -2,10 +2,10 @@ package ninja.samryecroft.returnhome.tracker.auth;
 
 import ninja.samryecroft.returnhome.tracker.audit.AuditEventPublisher;
 import ninja.samryecroft.returnhome.tracker.audit.AuditEventType;
-import ninja.samryecroft.returnhome.tracker.config.AppProperties;
 import ninja.samryecroft.returnhome.tracker.user.AppUserPrincipal;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.security.authentication.event.AuthenticationSuccessEvent;
@@ -44,11 +44,30 @@ public class BreakGlassAuditListener {
      */
     public static final String ALERT_MARKER = AuditEventType.BREAK_GLASS_LOGIN.name();
 
-    private final AppProperties appProperties;
+    /**
+     * Startup-bound, matching {@code SecurityConfig.entraEnabled}.
+     *
+     * <p>A per-request read was considered and rejected. It would have bought "close the emergency
+     * path without a restart", which is a real thing to want of an emergency credential - but not
+     * here: there is no {@code @RefreshScope} and no Spring Cloud, actuator exposes only
+     * {@code health} and {@code info} so there is no refresh endpoint, and the value arrives as an
+     * App Service app setting, changing which restarts the application anyway. So the flag is
+     * startup-bound in production however this is written, and the per-request version would have
+     * been mutable only from a test - buying nothing real in exchange for mutable state in a Spring
+     * context shared with the rest of the suite.
+     *
+     * <p>The other reason it was tempting is worth naming so it is not re-argued: a per-request read
+     * would have let the enabled-path tests avoid forking a Spring context, and so a Hikari pool.
+     * That is not a reason. A test-infrastructure budget must not shape a security control's runtime
+     * semantics - the sixth pool is spent deliberately and recorded in {@code TEST-CONTEXTS.md}
+     * instead.
+     */
+    @Value("${app.auth.break-glass.enabled:false}")
+    private boolean breakGlassEnabled;
+
     private final AuditEventPublisher auditEventPublisher;
 
-    public BreakGlassAuditListener(AppProperties appProperties, AuditEventPublisher auditEventPublisher) {
-        this.appProperties = appProperties;
+    public BreakGlassAuditListener(AuditEventPublisher auditEventPublisher) {
         this.auditEventPublisher = auditEventPublisher;
     }
 
@@ -59,7 +78,7 @@ public class BreakGlassAuditListener {
      */
     @EventListener
     public void onReady(ApplicationReadyEvent event) {
-        if (appProperties.getAuth().getBreakGlass().isEnabled()) {
+        if (breakGlassEnabled) {
             log.warn("{} enabled: the emergency local sign-in path is available", ALERT_MARKER);
             auditEventPublisher.breakGlassEnabled();
         }
@@ -91,7 +110,7 @@ public class BreakGlassAuditListener {
      * and a principal that is not ours cannot be attributed to an account.
      */
     private boolean isBreakGlass(Authentication authentication) {
-        return appProperties.getAuth().getBreakGlass().isEnabled()
+        return breakGlassEnabled
                 && !(authentication instanceof OAuth2AuthenticationToken)
                 && authentication.getPrincipal() instanceof AppUserPrincipal;
     }

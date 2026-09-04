@@ -8,6 +8,7 @@ import ch.qos.logback.core.read.ListAppender;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import ninja.samryecroft.returnhome.tracker.AbstractIntegrationTest;
 import ninja.samryecroft.returnhome.tracker.audit.AuditEvent;
 import ninja.samryecroft.returnhome.tracker.audit.AuditEventRepository;
 import ninja.samryecroft.returnhome.tracker.audit.AuditEventType;
@@ -20,28 +21,29 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.authentication.event.AuthenticationSuccessEvent;
 import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.test.web.servlet.MockMvc;
 
 /**
- * T113 Inc 4: the emergency local sign-in cannot be used quietly.
+ * T113 Inc 4: the emergency path CLOSED, which is every ordinary deployment.
  *
- * <p>Runs with the path OPEN (see {@link AbstractBreakGlassEnabledTest}) and with the Entra flag at
- * its default of false - the honest configuration for an emergency path, and a structural proof that
- * neither the WARN line nor the audit event is gated behind {@code if (entraEnabled)}.
+ * <p>The paired negative for {@link BreakGlassIntegrationTest}, and the reason that file means
+ * anything. A log assertion is easy to write so that it passes for the wrong reason - the line
+ * exists somewhere, the level is wrong, the gate never ran - so the marker being absent when the
+ * path is shut is what makes its presence when the path is open evidence about the control rather
+ * than about the logger.
  *
- * <p>The closed-path assertions live in {@link BreakGlassClosedIntegrationTest}, which needs no
- * property override and so costs no context. Splitting them is not tidiness: the pair only means
- * something if the same control is observed open and shut, and each half has to run in the
- * configuration it is describing.
+ * <p>No property override, so this runs in the main context and costs no Hikari pool: the default
+ * IS closed, which is the configuration being described.
  */
-class BreakGlassIntegrationTest extends AbstractBreakGlassEnabledTest {
+@SpringBootTest
+@AutoConfigureMockMvc
+class BreakGlassClosedIntegrationTest extends AbstractIntegrationTest {
 
-    @Autowired
-    private MockMvc mockMvc;
     @Autowired
     private UserRepository userRepository;
     @Autowired
@@ -57,10 +59,10 @@ class BreakGlassIntegrationTest extends AbstractBreakGlassEnabledTest {
 
     @BeforeEach
     void seedAndCapture() {
-        username = "break-glass-" + System.nanoTime();
+        username = "no-break-glass-" + System.nanoTime();
         User user = new User();
         user.setUsername(username);
-        user.setLastName("Emergency");
+        user.setLastName("Ordinary");
         user.setRoles(new HashSet<>(Set.of(Role.ADMIN)));
         user.setEnabled(true);
         userRepository.save(user);
@@ -77,24 +79,36 @@ class BreakGlassIntegrationTest extends AbstractBreakGlassEnabledTest {
     }
 
     @Test
-    void usingTheEmergencyPathLogsTheMarkerTheAlertMatchesOn() {
+    void anOrdinarySignInWithThePathClosedLogsNothingAndRaisesNothing() {
         events.publishEvent(new AuthenticationSuccessEvent(formAuthentication()));
 
-        assertThat(warnMessages())
-                .anySatisfy(message -> assertThat(message)
-                        .contains(BreakGlassAuditListener.ALERT_MARKER)
-                        .contains(username));
+        assertThat(warnMessages()).noneMatch(m -> m.contains(BreakGlassAuditListener.ALERT_MARKER));
+        assertThat(auditEventRepository.findByEventTypeOrderByOccurredAtDesc(AuditEventType.BREAK_GLASS_LOGIN)
+                .stream().map(AuditEvent::getActorUsernameAtTime).filter(username::equals).count())
+                .isZero();
     }
 
+    /**
+     * At most one enabled account may hold a local credential - asserted as a COUNT over every
+     * enabled account, not by checking a known row. "At most one" is a claim about everything; a
+     * test that samples proves it about one thing, and the failure this guards is exactly the one
+     * where a second account quietly kept its password.
+     *
+     * <p>Lives here rather than with the enabled-path tests because it is true of every deployment,
+     * not only one with break-glass switched on - and because asserting it in the default
+     * configuration is asserting it about the configuration almost every deployment runs.
+     */
     @Test
-    void usingTheEmergencyPathRaisesItsOwnAuditEventAsWellAsTheOrdinarySignIn() {
-        events.publishEvent(new AuthenticationSuccessEvent(formAuthentication()));
+    void atMostOneEnabledAccountHoldsALocalCredential() {
+        long withCredentials = userRepository.findAll().stream()
+                .filter(User::isEnabled)
+                .filter(user -> user.getPassword() != null && !user.getPassword().isBlank())
+                .count();
 
-        // Both, deliberately: LOGIN_SUCCESS keeps the sign-in trail uniform, and BREAK_GLASS_LOGIN
-        // makes "did anyone use break-glass" a question the feed answers directly rather than by
-        // inference over usernames.
-        assertThat(rowsFor(AuditEventType.BREAK_GLASS_LOGIN)).isEqualTo(1);
-        assertThat(rowsFor(AuditEventType.LOGIN_SUCCESS)).isEqualTo(1);
+        assertThat(withCredentials)
+                .as("break-glass is one account, not a habit - every additional enabled account with "
+                        + "a password is a way in that survives the identity provider")
+                .isLessThanOrEqualTo(1);
     }
 
     private List<String> warnMessages() {
@@ -102,17 +116,6 @@ class BreakGlassIntegrationTest extends AbstractBreakGlassEnabledTest {
                 .filter(event -> event.getLevel() == Level.WARN)
                 .map(ILoggingEvent::getFormattedMessage)
                 .toList();
-    }
-
-    private long breakGlassRows() {
-        return rowsFor(AuditEventType.BREAK_GLASS_LOGIN);
-    }
-
-    private long rowsFor(AuditEventType type) {
-        return auditEventRepository.findByEventTypeOrderByOccurredAtDesc(type).stream()
-                .map(AuditEvent::getActorUsernameAtTime)
-                .filter(username::equals)
-                .count();
     }
 
     private UsernamePasswordAuthenticationToken formAuthentication() {
