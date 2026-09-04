@@ -2,6 +2,7 @@ package ninja.samryecroft.returnhome.tracker.document;
 
 import com.azure.core.credential.TokenCredential;
 import com.azure.identity.DefaultAzureCredentialBuilder;
+import com.azure.identity.ManagedIdentityCredentialBuilder;
 import com.azure.security.keyvault.keys.KeyClient;
 import com.azure.security.keyvault.keys.KeyClientBuilder;
 import com.azure.security.keyvault.keys.cryptography.models.KeyWrapAlgorithm;
@@ -14,6 +15,9 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import ninja.samryecroft.returnhome.tracker.organisation.OrganisationRepository;
+import org.springframework.boot.ApplicationRunner;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
@@ -36,10 +40,11 @@ public class DocumentStorageConfig {
     private static final List<String> PRODUCTION_MARKERS = List.of("prod", "production");
 
     @Bean
-    StorageProvider storageProvider(DocumentStorageProperties properties, Environment environment) {
+    StorageProvider storageProvider(DocumentStorageProperties properties, Environment environment,
+            TokenCredential credential) {
         boolean production = isProduction(environment);
         if (properties.getStorage() == DocumentStorageProperties.StorageBackend.AZURE_BLOB) {
-            return new AzureBlobStorageProvider(blobContainerClient(properties));
+            return new AzureBlobStorageProvider(blobContainerClient(properties, credential));
         }
         if (production) {
             throw new IllegalStateException("app.documents.storage=local is not permitted in production: "
@@ -54,10 +59,11 @@ public class DocumentStorageConfig {
     }
 
     @Bean
-    KeyProvider keyProvider(DocumentStorageProperties properties, Environment environment) {
+    KeyProvider keyProvider(DocumentStorageProperties properties, Environment environment,
+            TokenCredential credential) {
         boolean production = isProduction(environment);
         if (properties.getKeys() == DocumentStorageProperties.KeyBackend.KEY_VAULT) {
-            return keyVaultKeyProvider(properties);
+            return keyVaultKeyProvider(properties, credential);
         }
         if (production) {
             throw new IllegalStateException("app.documents.keys=local is not permitted in production: "
@@ -68,16 +74,76 @@ public class DocumentStorageConfig {
         return new LocalKeyProvider(properties.getLocalKeys().getMasterSecret());
     }
 
-    private KeyProvider keyVaultKeyProvider(DocumentStorageProperties properties) {
+    private KeyProvider keyVaultKeyProvider(DocumentStorageProperties properties, TokenCredential credential) {
         String uri = require(properties.getKeyVault().getUri(), "app.documents.key-vault.uri");
-        TokenCredential credential = new DefaultAzureCredentialBuilder().build();
         KeyClient keyClient = new KeyClientBuilder().vaultUrl(uri).credential(credential).buildClient();
         return new KeyVaultKeyProvider(keyClient, credential, uri,
                 KeyWrapAlgorithm.fromString(properties.getKeyVault().getWrapAlgorithm()),
-                properties.getKeyVault().isAutoCreateKeys());
+                properties.getKeyVault().isAutoCreateKeys(),
+                properties.getKeyVault().getKeyHandleTtl());
     }
 
-    private BlobContainerClient blobContainerClient(DocumentStorageProperties properties) {
+    /**
+     * One credential for the whole application, and a scoped one in production.
+     *
+     * <p><b>One, because there were two.</b> Key Vault and Blob Storage each built their own
+     * {@code DefaultAzureCredential}, and a credential owns its token cache - so the two never
+     * shared a token and a cold container acquired one twice. App Insights measured each
+     * acquisition at 6-7 seconds (T181). Sharing the bean halves that before anything else is
+     * changed, and it is the kind of duplication that is invisible until someone measures it,
+     * because both call sites are individually correct.
+     *
+     * <p><b>Scoped, because the chain is the cost.</b> {@code DefaultAzureCredential} tries its
+     * sources in order and each one that cannot answer has to time out first; on App Service only
+     * the instance metadata endpoint will ever answer, so the whole walk before it is dead time
+     * paid on every fresh container. {@code ManagedIdentityCredential} goes straight there.
+     *
+     * <p>Not applied outside production, deliberately: a developer running against a real vault
+     * authenticates through the Azure CLI, which only the chain finds. Overridable either way with
+     * {@code app.documents.key-vault.credential}, and the choice is logged, because a credential
+     * that silently picked the wrong source is exactly the failure this is meant to remove.
+     */
+    /**
+     * Only registered when there is something to warm: a local key provider derives its keys in
+     * memory, so there is no token and no vault round trip to pay for, and a runner that did
+     * nothing would still have to be read and explained by everyone who met it.
+     */
+    @Bean
+    @ConditionalOnProperty(prefix = "app.documents.key-vault", name = "warm-keys-on-startup",
+            havingValue = "true", matchIfMissing = true)
+    ApplicationRunner keyWarmupRunner(DocumentStorageProperties properties, KeyProvider keyProvider,
+            OrganisationRepository organisationRepository) {
+        if (properties.getKeys() != DocumentStorageProperties.KeyBackend.KEY_VAULT) {
+            return args -> { };
+        }
+        return new KeyWarmupRunner(keyProvider, organisationRepository,
+                properties.getKeyVault().getWarmupTimeout());
+    }
+
+    @Bean
+    TokenCredential azureCredential(DocumentStorageProperties properties, Environment environment) {
+        DocumentStorageProperties.KeyVault keyVault = properties.getKeyVault();
+        String clientId = keyVault.getManagedIdentityClientId();
+        boolean managedIdentity = switch (keyVault.getCredential()) {
+            case MANAGED_IDENTITY -> true;
+            case DEFAULT_CHAIN -> false;
+            case AUTO -> isProduction(environment);
+        };
+        if (managedIdentity) {
+            ManagedIdentityCredentialBuilder builder = new ManagedIdentityCredentialBuilder();
+            if (clientId != null && !clientId.isBlank()) {
+                builder.clientId(clientId);
+            }
+            log.info("Authenticating to Azure with the {} managed identity, no credential chain walk",
+                    (clientId == null || clientId.isBlank()) ? "system-assigned" : "user-assigned");
+            return builder.build();
+        }
+        log.info("Authenticating to Azure with the DefaultAzureCredential chain (non-production)");
+        return new DefaultAzureCredentialBuilder().build();
+    }
+
+    private BlobContainerClient blobContainerClient(DocumentStorageProperties properties,
+            TokenCredential credential) {
         DocumentStorageProperties.Blob blob = properties.getBlob();
         BlobServiceClientBuilder builder = new BlobServiceClientBuilder();
         if (blob.getConnectionString() != null && !blob.getConnectionString().isBlank()) {
@@ -85,8 +151,10 @@ public class DocumentStorageConfig {
             // as its managed identity, so no storage credential ever exists to be leaked.
             builder.connectionString(blob.getConnectionString());
         } else {
+            // The shared credential (see azureCredential): a second one here would keep its own
+            // token cache and pay the acquisition again.
             builder.endpoint(require(blob.getEndpoint(), "app.documents.blob.endpoint"))
-                    .credential(new DefaultAzureCredentialBuilder().build());
+                    .credential(credential);
         }
         BlobServiceClient serviceClient = builder.buildClient();
         BlobContainerClient container = serviceClient.getBlobContainerClient(blob.getContainer());
