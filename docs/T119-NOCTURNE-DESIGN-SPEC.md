@@ -1601,3 +1601,99 @@ Filter chips (S-3), the dated feed (S-5), and an export panel that states what t
 contain — **`.consequence` and `.manifest` are already shipped for exactly this.** The audit content rule
 holds and must stay true on screen: roles, identifiers and status transitions; **never names, report answers,
 or before-and-after values.**
+
+
+## 6c · 2a build questions answered, and one correction to §6b (Creed, 6 Sep)
+
+### CORRECTION · §6b's "don't build 2b" is withdrawn — **D-Q2 already settled it**
+
+§6b recommended not building 2b and offered it to god as a scope reduction "one of seven screens". **That was
+wrong on both counts and I re-derived a decision instead of citing one.** D-Q2 already ruled 2b onto the
+**same route** as 2a (`?view=feed`, remembered per user, same template) — so it was never a seventh screen,
+and my duplication objection does not apply: that argument is about two routes rendering one dataset, which
+is exactly what D-Q2 avoided. **D-Q2 stands. Build the toggle.** The only durable part of §6b's 2b paragraph
+is that a queue's default question is *what must I do next* — so **urgency is the default view and the feed
+is the alternate**, never the reverse.
+
+### D-2a-1 · Inside a tier group, the due tag carries magnitude, not the tier word
+
+2a shows the tier twice: once as the group heading, once on every card's due tag — and since T165 the tag
+says the state as a word, so a screen reader hears *"Overdue … Overdue 3h 20m … Overdue 5h 02m …"* down the
+whole group. **That is D-1a-2b's converse: once the state is carried in visible text nearby, repeating it is
+duplication, not access.**
+
+- **Grouped list (2a, 2d, home-staff):** the group heading owns the tier; the card's tag owns the
+  **magnitude** — `3h 20m overdue`, `6h 10m left`.
+- **Ungrouped card (2f phone, any future search result):** the tag carries **state + magnitude**, because
+  nothing else supplies the tier.
+
+So the due tag takes a "state word on/off" input rather than being two components. **The group heading is
+what makes the badge's colour non-load-bearing — never render these cards in a flat list.**
+
+### D-2a-2 · Two tags on one card: name the axis, and one class family per axis
+
+A card carries a **status** tag and a **due** tag, both coloured, and nothing tells a non-visual reader which
+axis each belongs to. Each gets a visually-hidden axis label — `Status: Pending review`, `Deadline: 3h 20m
+overdue`. **This is access, not duplication (D-1a-2b's converse), because the axis name appears nowhere in
+visible text** — the distinction the converse turns on.
+
+One family per axis, so the vocabulary cannot fork:
+
+| Axis | Class | Bound to |
+|---|---|---|
+| Interview status | `.status.*` | `InterviewStatus` — already theme-correct, already used by 1a's tag and the rail |
+| Deadline | `.due.*` | `DueState` |
+| Anything else | `.tag-*` | generic Nocturne tags |
+
+**Do not restyle a status as a `.tag-*`.** Two families for one job is the same drift §6b exists to delete.
+
+### D-2a-3 · The 104px action button is incidental
+
+Nocturne density governs. Use `min-width`, not `width`: a fixed width truncates a longer action label and
+breaks under translation, while a minimum still gives a list of cards one aligned button edge, which is the
+scanning benefit the canvas number was reaching for.
+
+### D-2a-4 · Filter chips are `.seg` / `.seg-opt`, not `.checkbox-option`
+
+The controller takes a single `filter` parameter, so filtering is **single-choice** — `.seg` is the
+segmented control for that; `.checkbox-option` is the multi-select treatment and would promise a combination
+the backend cannot honour. `.seg-opt:has(input:checked)` already pairs its colour with an inset ring; **keep
+the ring** — it is what stops the active chip being colour-only.
+Filter and view are **orthogonal**: both are query parameters and each must survive a change to the other.
+
+### D-2a-5 · Empty states — already final, and the filtered case genuinely differs
+
+R-Q13 covers both, and the distinction Andy suspected is real and already written: *"No interviews are
+waiting…"* versus *"No interviews match these filters."* + **[Clear filters]**. In a safeguarding queue,
+an empty list that is empty *because of a filter* and reads as *nothing to do* is the dangerous confusion —
+R-Q13's first principle. Take the copy from the table; do not write new.
+
+### D-2d-1 · D-1b-7 transfers to the queue card — a disabled button is not honest there either
+
+A reviewer's own report renders its card **with no action button and a short line in the action slot**
+(*"You submitted this report"*), never a disabled button: a disabled control is not focusable, so it cannot
+explain itself, and the rule is permanent — there is nothing that could later enable it. The canvas's
+"disabled state" describes the *look*; absence plus the reason is the honest implementation of it.
+R-Q13 already supplies the all-self-submitted empty state.
+
+### D-2c-1 · The compliance bars need no chart, no SVG and no ARIA
+
+Put the value in the row **as text** (`12 of 14 · 86%`) and let the bar be a CSS width on a table cell. The
+bar is then a visual encoding of a number that is already readable, the table row is already the accessible
+content, and no library enters a no-build app. Give the bar 3:1 against its track anyway — it is cheap and it
+keeps the encoding perceivable — but **nothing may depend on the bar alone**; that is what makes 1.4.11 a
+floor here rather than the whole answer.
+
+### D-1b-8 CLOSED · Show the prior send-back — at the top, not beside the button
+
+god's call: show it. `#67` added `statusBefore`, so the transition is available.
+
+**Place it at the top of 1b with the guard attestation, not next to the actions.** *This report has already
+been sent back once* is context for **reading** the report — it changes what a reviewer looks for in every
+section — not a caveat on pressing a button. A reviewer who meets it at the bottom has already read the
+report without it.
+
+Tone is factual, not alarming: it records a normal event, and a reviewer sees it while choosing between two
+legitimate outcomes. Use the **`--sent-back` family**, not `--warn`: this is the vocabulary the rail, the
+status tag and the visitor's banner already share, and calling it a warning here would fork that. State when,
+and link to the history section that holds the previous comment.
