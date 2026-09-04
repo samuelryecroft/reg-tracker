@@ -222,9 +222,12 @@ public class InterviewRequestService {
      * The only writer of {@code InterviewRequest.status}, and the place the transition table is
      * enforced.
      *
-     * <p>{@code InterviewRequest.setStatus} is package-private so this stays true by compilation
-     * rather than by convention - an authority with callers reaching past it is the shape T139 spent
-     * three PRs closing.
+     * <p>{@code InterviewRequest.setStatus} is package-private, which makes that true by compilation
+     * for the rest of the codebase - an authority with callers reaching past it is the shape T139
+     * spent three PRs closing. <b>Inside this package it is still only convention</b>, though: a class
+     * added here could write the field directly and the compiler would say nothing. That half is
+     * asserted by {@code InterviewStatusWriterGuardTest} instead, which scans this package's sources
+     * and fails if any production call to {@code setStatus} appears outside this method.
      *
      * <p>Callers that can refuse an illegal transition before mutating anything else should still
      * call {@link InterviewStatusTransitions#require} at the top of their operation; the check here
