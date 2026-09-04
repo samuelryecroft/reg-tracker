@@ -11,6 +11,35 @@
     <h1>All Return Home Interview Requests</h1>
     <p class="muted">Sorted by statutory deadline: most urgent first. Deadline is 72 hours from the child's recorded return.</p>
 
+    <!--
+      2a's filter row (S-3, D-2a-6). Chips are LINKS with query parameters, not toggles: the page is
+      server-rendered, and each chip's URL is one the 2c dashboard's tiles already deep-link to
+      (QueueFilter#href), so the row is also the landing state for those tiles.
+
+      D-2a-6: the row is the stage MENU plus whatever is actually on - a deep-linked filter that is
+      not a menu stage (overdue, dueSoon, consent) renders as an extra selected chip, so a tile's
+      link visibly matches the list it opens instead of landing on a row with nothing selected.
+
+      a11y: selection is aria-current, and .seg-opt's treatment pairs the accent ink with an inset
+      ring, so the active chip is never distinguished by colour alone. The count is followed by a
+      visually-hidden noun - "Needs allocating 3" alone is a number with no unit attached to it.
+    -->
+    <nav class="seg" aria-label="Filter these requests" th:if="${filterChips != null}">
+        <a th:each="chip : ${filterChips}" class="seg-opt"
+           th:href="${chip.key().isEmpty()} ? @{/coordinator/requests(homeId=${homeId})}
+                                            : @{/coordinator/requests(homeId=${homeId}, filter=${chip.key()})}"
+           th:attr="aria-current=${chip.selected()} ? 'true'">
+            <span th:text="${chip.label()}">All</span>
+            <span class="seg-count" th:text="${chip.count()}">0</span>
+            <span class="visually-hidden" th:text="${chip.count() == 1} ? 'request' : 'requests'">requests</span>
+        </a>
+    </nav>
+
+    <!--
+      S-3: the banner stays. The chip row shows the filter state visually and to assistive tech via
+      aria-current; this is what states it in ordinary running text, and it carries the one control
+      that gets you back out.
+    -->
     <div class="banner info" th:if="${homeId != null or filter != null}">
         <span class="ic" aria-hidden="true">◆</span>
         <div>
@@ -18,8 +47,8 @@
             <p>
                 <span th:if="${homeId != null}" th:text="${'One home only (id ' + homeId + ')'}">One home</span>
                 <span th:if="${homeId != null and filter != null}"> · </span>
-                <span th:if="${filter != null}" th:text="${'Filter: ' + filter}">Filter</span>
-                · <a href="/coordinator/requests">Clear and show everything</a>
+                <span th:if="${filter != null}" th:text="${filter.label()}">Filter</span>
+                · <a href="/coordinator/requests">Clear filters</a>
             </p>
         </div>
     </div>
@@ -96,7 +125,18 @@
         </th:block>
     </div>
 
-    <div class="empty" th:if="${#lists.isEmpty(requests)}">No requests yet.</div>
+    <!--
+      R-Q13: an empty list in a safeguarding queue is ambiguous between "nothing to do" and "the
+      system isn't showing me everything", and the reader needs certainty which - so the filtered
+      case says so and offers the way out, rather than reading as an all-clear.
+    -->
+    <div class="empty" th:if="${#lists.isEmpty(requests)}">
+        <th:block th:if="${homeId == null and filter == null}">No interviews are waiting. New requests appear here as homes raise them, most urgent first.</th:block>
+        <th:block th:unless="${homeId == null and filter == null}">
+            No interviews match these filters.
+            <a class="btn secondary" href="/coordinator/requests">Clear filters</a>
+        </th:block>
+    </div>
 </main>
 </body>
 </html>
