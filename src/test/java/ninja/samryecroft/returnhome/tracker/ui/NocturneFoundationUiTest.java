@@ -2,6 +2,7 @@ package ninja.samryecroft.returnhome.tracker.ui;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import ninja.samryecroft.returnhome.tracker.theme.ThemeService;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -63,5 +64,48 @@ class NocturneFoundationUiTest extends AbstractUiTest {
         String bodyColor = (String) page.locator("body")
                 .evaluate("el => getComputedStyle(el).color");
         assertThat(bodyColor).isEqualTo("oklch(0.28 0.014 265)");
+    }
+
+    /**
+     * T138 (phase 2, batch 1a): {@code aria-current} carried forward as an unfixed defect from the
+     * T86 review ("no page tells you where you are") - real navigation, real page, checking the
+     * actual attribute rather than trusting the template logic parses. The admin account sees both
+     * Users and Organisations in the sidebar (same "Admin" group, different hrefs) - exactly the case
+     * that would catch an aria-current expression matching the wrong link, or every link, or none.
+     */
+    @Test
+    void ariaCurrentMarksOnlyTheActiveNavLink() {
+        login(ADMIN_USERNAME, ADMIN_PASSWORD);
+        page.navigate(url("/admin/users"));
+        page.waitForSelector(".shell-side");
+
+        String usersCurrent = (String) page.locator(".shell-nav a[href='/admin/users']").first()
+                .getAttribute("aria-current");
+        assertThat(usersCurrent).isEqualTo("page");
+
+        String organisationsCurrent = (String) page.locator(".shell-nav a[href='/admin/organisations']").first()
+                .getAttribute("aria-current");
+        assertThat(organisationsCurrent).isNull();
+    }
+
+    /**
+     * T138 (phase 2, batch 1a): {@code --brand-hue} must come from the signed-in user's actual
+     * effective theme, not app.css's hardcoded default (289) - checked against
+     * {@link ThemeService#brandHueOf} called on the platform default's own known colour (the shared
+     * decision point this override is built on, not a hardcoded expected number that could drift from
+     * it independently) rather than the literal default hue, so this fails if the wiring silently
+     * falls back to the CSS default instead of actually reading the theme.
+     */
+    @Test
+    void brandHueIsReadFromTheEffectiveThemeNotTheCssDefault() {
+        login(ADMIN_USERNAME, ADMIN_PASSWORD);
+        page.waitForSelector(".shell-side");
+
+        String hueValue = ((String) page.locator(":root")
+                .evaluate("el => getComputedStyle(el).getPropertyValue('--brand-hue')")).trim();
+
+        int expectedHue = ThemeService.brandHueOf("#F36E2A"); // ThemeService's own shipped platform default
+        assertThat(hueValue).isEqualTo(String.valueOf(expectedHue));
+        assertThat(Integer.parseInt(hueValue)).isNotEqualTo(289); // app.css's hardcoded default - must be overridden
     }
 }

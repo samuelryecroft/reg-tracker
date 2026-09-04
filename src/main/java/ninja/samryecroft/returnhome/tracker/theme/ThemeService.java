@@ -156,7 +156,87 @@ public class ThemeService {
     private ThemeView toView(ThemeSettings settings) {
         String primary = settings.getPrimaryColor();
         String tint = settings.getSecondaryColor();
-        return new ThemeView(primary, darken(primary, tint), tint, readableForegroundOn(primary));
+        return new ThemeView(primary, darken(primary, tint), tint, readableForegroundOn(primary),
+                brandHueOf(primary));
+    }
+
+    /**
+     * The Nocturne accent ramp is generated from one integer hue (0-359) via {@code oklch()} - see
+     * {@code app.css}'s {@code --brand-hue} and {@code docs/T119-NOCTURNE-DESIGN-SPEC.md} §2.2. The
+     * stored-hue-column formalisation (an admin picking a colour and only its hue surviving) is the
+     * later "3a Branding" spec step, not this one - for now the hue is derived on read from the same
+     * {@code primaryColor} hex this class has always stored, so the two halves of the branding work
+     * (this CSS-side derivation, and the docx hue ramp) can land independently without agreeing on a
+     * schema change first.
+     *
+     * <p>Implements the spec's own normative derivation (§2.2, "Deriving the hue - normative, because
+     * two halves implement it") to the letter, since a document whose accent is one degree off the
+     * screen's own is a defect nobody can describe and everybody can see: sRGB -&gt; linear -&gt;
+     * OKLab (Björn Ottosson's published matrices - the same ones behind browsers' own {@code oklch()}
+     * implementation), hue = {@code atan2(b, a)} normalised to [0, 360), rounded to the nearest whole
+     * degree in this one place, L and C discarded. Below chroma 0.02 the colour is effectively grey
+     * and has no reliable hue, so the spec has this fall back to the neutral hue 265 rather than
+     * amplify rounding noise into an arbitrary brand colour.
+     *
+     * <p><strong>Deliberately NOT {@link #toHsl}</strong>, which an earlier coordination note
+     * suggested reusing. That method is standard HSL hue, a different colour space from OKLCH - for
+     * every colour checked (including the spec's own two worked examples), HSL hue and OKLCH hue for
+     * the identical hex differ by 24-44 degrees, a real, visible colour shift, not a rounding
+     * difference. Reproduces the spec's Beacon example (#9184d9 -&gt; hue 289) to within one degree.
+     *
+     * <p>Public and static for the same reason {@link #readableForegroundOn} is: one shared decision
+     * point for "what hue does this supplier's stored colour resolve to", called from {@link #toView}
+     * here and separately by the docx generator's own hue ramp (T131) - both must derive from this
+     * exact function, not their own copies of the colour maths, or the on-screen accent and the
+     * generated report's accent can silently drift apart for the same supplier.
+     *
+     * @param hexColor a 6-digit hex colour, with or without a leading {@code #}
+     * @return the hue in degrees, 0-359 (265 for an effectively-grey input)
+     */
+    public static int brandHueOf(String hexColor) {
+        String normalised = hexColor.startsWith("#") ? hexColor : "#" + hexColor;
+        int[] rgb = hexToRgb(normalised);
+        double r = srgbChannelToLinear(rgb[0]);
+        double g = srgbChannelToLinear(rgb[1]);
+        double b = srgbChannelToLinear(rgb[2]);
+
+        // Linear sRGB -> LMS (Ottosson's OKLab, https://bottosson.github.io/posts/oklab/)
+        double l = 0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b;
+        double m = 0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b;
+        double s = 0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b;
+
+        double lCube = Math.cbrt(l);
+        double mCube = Math.cbrt(m);
+        double sCube = Math.cbrt(s);
+
+        // LMS' -> OKLab a/b (skip L - only the hue angle in the a/b plane is wanted here)
+        double a = 1.9779984951 * lCube - 2.4285922050 * mCube + 0.4505937099 * sCube;
+        double bLab = 0.0259040371 * lCube + 0.7827717662 * mCube - 0.8086757660 * sCube;
+
+        // Spec's own chroma floor (§2.2): below 0.02 the colour is effectively grey and atan2 on a
+        // near-zero a/b vector is numerically unstable besides - amplifying floating-point noise into
+        // an arbitrary hue for what is, perceptually, no hue at all. Fall back to the spec's neutral
+        // hue (265, the same hue the neutral ramp and doc tokens already use) rather than that noise.
+        double chroma = Math.hypot(a, bLab);
+        if (chroma < 0.02) {
+            return 265;
+        }
+
+        double hueDegrees = Math.toDegrees(Math.atan2(bLab, a));
+        if (hueDegrees < 0) {
+            hueDegrees += 360;
+        }
+        return ((int) Math.round(hueDegrees)) % 360;
+    }
+
+    /** The sRGB electro-optical transfer function (gamma decode) - distinct from, and more precise
+     * than, {@link #channelLuminance}'s WCAG variant (which uses a 0.03928 cutoff rather than the
+     * standard's 0.04045): that difference is negligible for WCAG's own contrast formula but this is
+     * a different calculation (OKLab) with its own published constant, so it gets its own method
+     * rather than reusing one named and documented for a different purpose. */
+    private static double srgbChannelToLinear(int channel8Bit) {
+        double normalised = channel8Bit / 255.0;
+        return normalised <= 0.04045 ? normalised / 12.92 : Math.pow((normalised + 0.055) / 1.055, 2.4);
     }
 
     /**
@@ -293,6 +373,6 @@ public class ThemeService {
     }
 
     public record ThemeView(String primaryColor, String primaryColorDark, String secondaryColor,
-            String primaryColorInk) {
+            String primaryColorInk, int brandHue) {
     }
 }

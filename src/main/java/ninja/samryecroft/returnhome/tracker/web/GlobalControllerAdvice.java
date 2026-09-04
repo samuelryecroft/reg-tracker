@@ -85,6 +85,22 @@ public class GlobalControllerAdvice {
     }
 
     /**
+     * T138 (phase 2, batch 1a): the shell's nav uses this to mark the current section with
+     * {@code aria-current="page"} - carried forward as an unfixed defect from the T86 review ("no
+     * page tells you where you are"). Exposed as a model attribute rather than templates reaching for
+     * Thymeleaf's {@code #httpServletRequest} directly: that expression object evaluates to {@code
+     * null} in this app's Thymeleaf/Spring wiring (confirmed - it throws {@code
+     * SpelEvaluationException: Property or field 'requestURI' cannot be found on null} the moment a
+     * template references it), so the request has to come in some other way regardless. Injecting it
+     * here also matches how every other page-context value ({@code theme}, {@code shellOrg}, {@code
+     * can}) already reaches templates in this codebase.
+     */
+    @ModelAttribute("currentPath")
+    public String currentPath(HttpServletRequest request) {
+        return request.getRequestURI();
+    }
+
+    /**
      * T119 shell: the sidebar's org box (kicker + name), source of truth for whichever
      * organisation/home(s) scope the signed-in user. Organisation access uses the same lazy
      * association Hibernate access pattern already proven safe by
