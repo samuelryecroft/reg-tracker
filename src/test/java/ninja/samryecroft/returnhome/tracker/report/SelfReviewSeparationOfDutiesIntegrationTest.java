@@ -93,6 +93,8 @@ class SelfReviewSeparationOfDutiesIntegrationTest extends AbstractIntegrationTes
         saveUser("t143-visitor-reviewer" + suffix, Set.of(Role.VISITOR, Role.REVIEWER), supplier, null);
         // An independent reviewer, to prove the control is about identity and not about the role.
         saveUser("t143-other-reviewer" + suffix, Set.of(Role.REVIEWER), supplier, null);
+        // A platform admin, for the "no superuser bypass" case below.
+        saveUser("t143-platform-admin" + suffix, Set.of(Role.ADMIN), null, null);
 
         requestId = submitReportAsTheVisitorReviewer();
     }
@@ -154,6 +156,78 @@ class SelfReviewSeparationOfDutiesIntegrationTest extends AbstractIntegrationTes
 
         assertThat(interviewRequestRepository.findDetailedById(requestId).orElseThrow().getStatus())
                 .isEqualTo(InterviewStatus.REPORT_APPROVED);
+    }
+
+    @Test
+    void aPlatformAdminWhoAuthoredTheReportIsRefusedToo() throws Exception {
+        // Kevin's addition, and it protects a design decision rather than a line of code:
+        // getReviewable lets ADMIN past the ROLE check and then applies the self-review test
+        // regardless of role. That is correct - a separation-of-duties control with a superuser
+        // bypass is not one - but it is exactly the line someone later exempts admins from as a
+        // convenience. This pins it.
+        //
+        // The admin can author a report without being the allocated visitor: SecurityConfig admits
+        // ADMIN to /visitor/**, and canSubmitReport allows ADMIN outright. So this is also the
+        // real path by which a report's author and its allocated visitor differ.
+        Long secondRequestId = raiseAndAllocateASecondRequest();
+        submitReportAs("t143-platform-admin" + suffix, secondRequestId);
+
+        mockMvc.perform(post("/reviewer/reports/{id}/review", secondRequestId)
+                        .with(asUser("t143-platform-admin" + suffix)).with(csrf())
+                        .param("action", "approve"))
+                .andExpect(status().isForbidden());
+
+        assertThat(interviewRequestRepository.findDetailedById(secondRequestId).orElseThrow().getStatus())
+                .isEqualTo(InterviewStatus.REPORT_SUBMITTED);
+
+        // Deliberately no queue assertion here. This account authored the report but is NOT its
+        // allocated visitor, and listPendingReview filters on the allocated visitor - so the queue
+        // still offers it while the endpoint refuses. That mismatch is the T145 defect, reported
+        // rather than asserted, because pinning current behaviour would make the bug the spec.
+    }
+
+    private Long raiseAndAllocateASecondRequest() throws Exception {
+        Child second = new Child();
+        second.setFirstName("Sam");
+        second.setLastName("T143b" + suffix);
+        second.setDateOfBirth(LocalDate.of(2010, 3, 4));
+        second.setHome(homeRepository.findAll().stream()
+                .filter(h -> h.getName().equals("T143 House" + suffix)).findFirst().orElseThrow());
+        Long secondChildId = childRepository.save(second).getId();
+
+        mockMvc.perform(post("/requests").with(asUser("t143-staff" + suffix)).with(csrf())
+                        .param("childId", secondChildId.toString())
+                        .param("returnedAt", "2026-07-18T19:00"))
+                .andExpect(status().is3xxRedirection());
+
+        Long id = interviewRequestRepository.findAllDetailed().stream()
+                .filter(r -> r.getChild().getId().equals(secondChildId))
+                .findFirst().orElseThrow().getId();
+
+        Long visitorId = userRepository.findByUsername("t143-visitor-reviewer" + suffix).orElseThrow().getId();
+        mockMvc.perform(post("/coordinator/requests/{id}/allocate", id)
+                        .with(asUser("t143-coordinator" + suffix)).with(csrf())
+                        .param("visitorId", visitorId.toString())
+                        .param("scheduledAt", "2026-07-22T11:00"))
+                .andExpect(status().is3xxRedirection());
+        return id;
+    }
+
+    private void submitReportAs(String username, Long id) throws Exception {
+        mockMvc.perform(post("/visitor/interviews/{id}/report", id)
+                        .with(asUser(username)).with(csrf())
+                        .param("action", "submit")
+                        .param("heldAt", "2026-07-22T11:00")
+                        .param("interviewLocation", "The home's quiet room")
+                        .param("previouslyMissing", "false")
+                        .param("confidentialityExplained", "true")
+                        .param("interviewAccepted", "true")
+                        .param("consideredSelfMissing", "false")
+                        .param("whereWereYouWhileMissing", "At a friend's house")
+                        .param("interviewerComments", "Settled on return")
+                        .param("recommendations", "No further action")
+                        .param("conductedByStatement", "Conducted on behalf of the allocated visitor"))
+                .andExpect(status().is3xxRedirection());
     }
 
     private Long submitReportAsTheVisitorReviewer() throws Exception {
