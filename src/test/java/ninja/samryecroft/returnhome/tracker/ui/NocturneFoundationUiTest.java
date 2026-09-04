@@ -97,6 +97,49 @@ class NocturneFoundationUiTest extends AbstractUiTest {
     }
 
     /**
+     * Creed's review (spec 12d10e8, following the T132 nav dedup): the 55-icon set was sampled from
+     * the mockup screens, and the sidebar nav was never one of them - Users and Children shared
+     * {@code ph-users-three} as a result. {@code ph-user-list} closes that gap; this checks it
+     * actually resolves to a real, non-empty glyph (a typo'd symbol id renders a blank {@code <use>}
+     * silently - same failure mode {@code theShellRendersAsAStyledDarkSidebarWithWorkingIcons}
+     * guards against) and that Children keeps the group glyph, not that the two now merely differ.
+     */
+    @Test
+    void usersAndChildrenNoLongerShareOneIconGlyph() {
+        login(ADMIN_USERNAME, ADMIN_PASSWORD);
+        page.waitForSelector(".shell-side");
+
+        String usersHref = (String) page.locator(".shell-nav a[href='/admin/users'] use").getAttribute("href");
+        assertThat(usersHref).endsWith("#ph-user-list");
+        Object usersIconWidth = page.locator(".shell-nav a[href='/admin/users'] .icon")
+                .evaluate("el => el.getBoundingClientRect().width");
+        assertThat(((Number) usersIconWidth).doubleValue()).isGreaterThan(0);
+
+        String childrenHref = (String) page.locator(".shell-nav a[href='/children'] use").getAttribute("href");
+        assertThat(childrenHref).endsWith("#ph-users-three");
+    }
+
+    /**
+     * Creed's review (spec 12d10e8): a control that isn't wired must not look like one. Search was
+     * removed outright (a real feature, tracked as its own ticket) rather than left as a styled box
+     * that does nothing; the organisation name stays (real information), but the caret that promised
+     * supplier-switching, and the pointer cursor, come off until that exists.
+     */
+    @Test
+    void unwiredShellChromeDoesNotLookLikeAControl() {
+        login(ADMIN_USERNAME, ADMIN_PASSWORD);
+        page.waitForSelector(".shell-side");
+
+        assertThat(page.locator(".shell-search").count()).isEqualTo(0);
+
+        assertThat(page.locator(".shell-org").count()).isEqualTo(1);
+        assertThat(page.locator(".shell-org svg").count()).isEqualTo(0);
+        String orgCursor = (String) page.locator(".shell-org")
+                .evaluate("el => getComputedStyle(el).cursor");
+        assertThat(orgCursor).isNotEqualTo("pointer");
+    }
+
+    /**
      * T138 (phase 2, batch 1a): {@code --brand-hue} must come from the signed-in user's actual
      * effective theme, not app.css's hardcoded default (289) - checked against
      * {@link AccentRamp#hueFrom} called on the platform default's own known colour (the shared

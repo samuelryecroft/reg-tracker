@@ -42,12 +42,14 @@
         <span class="shell-brand-name">Return Home</span>
     </div>
 
+    <!-- Creed's review (spec 12d10e8): the name is useful information and stays, but the caret
+         promised switching supplier/organisation, which isn't wired - removed along with the
+         pointer cursor (app.css) until it is, so this reads as information, not a dead control. -->
     <div class="shell-org" th:if="${shellOrg != null}">
         <span style="flex:1;min-width:0">
             <span class="shell-org-label" th:text="${shellOrg.kicker()}">Supplier</span>
             <span class="shell-org-name" th:text="${shellOrg.name()}">Organisation</span>
         </span>
-        <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-caret-up-down'"></use></svg>
     </div>
 
     <nav class="shell-nav" aria-label="Main">
@@ -90,9 +92,13 @@
 
         <span class="shell-nav-group"
               th:if="${#authorization.expression('hasAnyRole(''ADMIN'',''ORG_ADMIN'')') or canEditTheme}">Admin</span>
+        <!-- Creed's review (spec 12d10e8): Users and Children shared ph-users-three - the 55-icon
+             set was sampled from the mockup screens, and the sidebar nav was never one of them, so
+             it was never sized for a nav. ph-user-list (a person beside a list) is what this screen
+             actually is; Children keeps the group glyph as the domain-central entity. -->
         <a th:if="${#authorization.expression('hasAnyRole(''ADMIN'',''ORG_ADMIN'')')}" href="/admin/users"
            th:aria-current="${path == '/admin/users' or #strings.startsWith(path, '/admin/users/')} ? 'page'">
-            <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-users-three'"></use></svg>Users</a>
+            <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-user-list'"></use></svg>Users</a>
         <a th:if="${canEditTheme}" href="/admin/theme"
            th:aria-current="${path == '/admin/theme' or #strings.startsWith(path, '/admin/theme/')} ? 'page'">
             <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-eyedropper'"></use></svg>Branding</a>
@@ -115,10 +121,10 @@
 </aside>
 
 <header class="shell-header">
-    <div class="shell-search">
-        <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-magnifying-glass'"></use></svg>
-        <span>Search</span>
-    </div>
+    <!-- Creed's review (spec 12d10e8): removed rather than left as a dead box. Search is a real,
+         scoped feature ("Search child ref, home or visitor" per the canvas) tracked as its own
+         ticket - a styled control that does nothing is worse than the empty space its absence
+         leaves, since it invites a click that goes nowhere. Comes back when it's wired. -->
     <div class="shell-header-actions">
         <!-- T138 1c: revealing is a real POST + full-page redirect, not a client-side class toggle -
              a client-side toggle cannot be audited (Kevin's review: no server event, so nothing
