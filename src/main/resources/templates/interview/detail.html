@@ -44,12 +44,20 @@
               Creed's review (1.3.1): the marker is aria-hidden and colour alone can't reach
               assistive tech, so without this a screen reader hears every label with no way to tell
               which have happened. aria-current="step" above covers CURRENT; this covers the rest.
+
+              Creed's follow-up: CANCELLED is excluded here on purpose, not an oversight - it's the
+              one state that already carries itself in VISIBLE text (the rail-when "Cancelled" note
+              below), so the hidden word would read as "Scheduled, cancelled, Cancelled" - the same
+              thing said twice, once into an ear that can't see the note is already there. The rule
+              this follows: the hidden word exists BECAUSE a state was otherwise only in an
+              aria-hidden glyph and a colour; the moment a state is carried in visible text instead,
+              the hidden word stops being access and becomes duplication.
             -->
-            <span class="visually-hidden" th:switch="${step.state().name()}">
+            <span class="visually-hidden" th:if="${step.state().name() != 'CANCELLED'}"
+                  th:switch="${step.state().name()}">
                 <th:block th:case="'COMPLETE'">completed</th:block>
                 <th:block th:case="'CURRENT'">current step</th:block>
                 <th:block th:case="'SENT_BACK'">sent back</th:block>
-                <th:block th:case="'CANCELLED'">cancelled</th:block>
                 <th:block th:case="'NOT_APPLICABLE'">not applicable</th:block>
                 <th:block th:case="*">not yet started</th:block>
             </span>
