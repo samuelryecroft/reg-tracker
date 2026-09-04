@@ -5,6 +5,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.securityContext;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
@@ -79,6 +80,7 @@ class TemplateRenderCoverageIntegrationTest extends AbstractIntegrationTest {
     private Long unallocatedRequestId;
     private Long allocatedRequestId;
     private Long approvedRequestId;
+    private Long submittedRequestId;
 
     @BeforeEach
     void seedData() throws Exception {
@@ -98,16 +100,22 @@ class TemplateRenderCoverageIntegrationTest extends AbstractIntegrationTest {
         userRepository.save(newUser("rc-visitor" + suffix, Role.VISITOR, null, supplierOrg));
         userRepository.save(newUser("rc-reviewer" + suffix, Role.REVIEWER, null, supplierOrg));
 
-        // Three requests, because three of these pages only exist in a particular state: the
+        // Four requests, because four of these pages only exist in a particular state: the
         // allocate form before a visitor is chosen, the schedule form after one is chosen but
-        // before a time is agreed, and the report view only once a reviewer has approved.
+        // before a time is agreed, the report content only once a reviewer has approved it, and
+        // (submittedRequestId) a report that exists but is NOT YET approved - the state
+        // T155 batch 2's auth-equivalence gate exists for (see
+        // reportContentStaysHiddenUntilApproved below).
         unallocatedRequestId = raiseRequest("Una" + suffix);
         allocatedRequestId = raiseRequest("Alan" + suffix);
         approvedRequestId = raiseRequest("Approv" + suffix);
+        submittedRequestId = raiseRequest("Subm" + suffix);
 
         allocate(allocatedRequestId, null);
         allocate(approvedRequestId, "2026-07-20T14:00");
+        allocate(submittedRequestId, "2026-07-20T14:00");
         submitReport(approvedRequestId);
+        submitReport(submittedRequestId);
         approveReport(approvedRequestId);
     }
 
@@ -195,10 +203,40 @@ class TemplateRenderCoverageIntegrationTest extends AbstractIntegrationTest {
         assertRenders("/reviewer/reports", "reviewer/queue", "rc-reviewer", null);
     }
 
+    /**
+     * T155 batch 2: report/view.html no longer exists - its content is inline on
+     * interview/detail.html, gated by the same REPORT_APPROVED check the old route enforced
+     * (ReportController#approvedReportFor, now InterviewRequestDetailController#detail). The old
+     * URL survives only as a redirect for existing links/bookmarks.
+     */
     @Test
-    void reportViewRenders() throws Exception {
-        assertRenders("/reports/" + approvedRequestId + "/view", "report/view", "rc-reviewer",
-                "Approv" + suffix);
+    void reportViewUrlRedirectsToTheMergedDetailPage() throws Exception {
+        mockMvc.perform(get("/reports/{id}/view", approvedRequestId).with(asUser("rc-reviewer" + suffix)))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/interview-requests/" + approvedRequestId));
+    }
+
+    @Test
+    void interviewDetailRendersApprovedReportContentInline() throws Exception {
+        assertRenders("/interview-requests/" + approvedRequestId, "interview/detail", "rc-reviewer",
+                "The quiet room");
+    }
+
+    /**
+     * The auth-equivalence check Kevin's review is for: a report row exists here (SUBMITTED, not
+     * yet reviewed) but must stay invisible on the merged page exactly as it was invisible via the
+     * old /reports/{id}/view route (which 404'd on it) - this is the one behaviour that must not
+     * regress across the merge.
+     */
+    @Test
+    void reportContentStaysHiddenUntilApproved() throws Exception {
+        String html = mockMvc.perform(get("/interview-requests/{id}", submittedRequestId)
+                        .with(asUser("rc-reviewer" + suffix)))
+                .andExpect(status().isOk())
+                .andExpect(view().name("interview/detail"))
+                .andReturn().getResponse().getContentAsString();
+        assertThat(html).as("unapproved report content must not render").doesNotContain("The quiet room");
+        assertThat(html).as("no download link before approval").doesNotContain("/reports/" + submittedRequestId + "/download");
     }
 
     // ---------------------------------------------------------------- error page

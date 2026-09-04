@@ -34,7 +34,6 @@
                 <a class="rowlink" th:if="${r.status.name() == 'SCHEDULED'}" th:href="@{/visitor/interviews/{id}/report(id=${r.id})}">Submit report</a>
                 <a class="rowlink" th:if="${r.status.name() == 'REPORT_REJECTED'}" th:href="@{/visitor/interviews/{id}/report(id=${r.id})}">Resubmit report</a>
                 <span th:if="${r.status.name() == 'REPORT_SUBMITTED'}" class="muted">Awaiting review</span>
-                <a class="rowlink" th:if="${r.status.name() == 'REPORT_APPROVED'}" th:href="@{/reports/{id}/view(id=${r.id})}">View report</a>
                 <a class="rowlink" th:if="${r.status.name() == 'REPORT_APPROVED'}" th:href="@{/reports/{id}/download(id=${r.id})}">Download</a>
             </td>
         </tr>
@@ -57,8 +56,7 @@
                 <a class="btn" th:if="${r.status.name() == 'SCHEDULED'}" th:href="@{/visitor/interviews/{id}/report(id=${r.id})}">Submit report</a>
                 <a class="btn" th:if="${r.status.name() == 'REPORT_REJECTED'}" th:href="@{/visitor/interviews/{id}/report(id=${r.id})}">Resubmit report</a>
                 <span th:if="${r.status.name() == 'REPORT_SUBMITTED'}" class="muted">Awaiting review</span>
-                <a class="btn secondary" th:if="${r.status.name() == 'REPORT_APPROVED'}" th:href="@{/reports/{id}/view(id=${r.id})}">View report</a>
-                <a class="btn ghost" th:if="${r.status.name() == 'REPORT_APPROVED'}" th:href="@{/reports/{id}/download(id=${r.id})}">Download</a>
+                <a class="btn secondary" th:if="${r.status.name() == 'REPORT_APPROVED'}" th:href="@{/reports/{id}/download(id=${r.id})}">Download</a>
                 <a class="btn ghost" th:href="@{/interview-requests/{id}(id=${r.id})}">View details</a>
             </div>
         </div>

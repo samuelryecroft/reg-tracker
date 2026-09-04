@@ -195,12 +195,16 @@ class AuditHistoryIntegrationTest extends AbstractIntegrationTest {
 
         // ...but nothing free-text off the underlying rows ever reaches the page through the History
         // section specifically. Scoped to that section's own markup, not the whole page: the page
-        // legitimately shows request.notes in its own "Additional Notes" card and the logged-in
-        // user's username in the nav's logout form - neither is a History leak, so a whole-page
-        // check would false-positive on both. interviewerComments is never shown anywhere on this
-        // page outside History, so it stays a valid whole-page probe too.
-        assertThat(html).doesNotContain("Recorded for the history test");
+        // legitimately shows request.notes in its own "Additional Notes" card, the logged-in user's
+        // username in the nav's logout form, AND (since T155 batch 2 merged report/view.html in
+        // here) interviewerComments in its own "Interviewer's Comments" card once the report is
+        // approved - none of those three is a History leak, so a whole-page check would
+        // false-positive on all of them. The History section is the one place free text off these
+        // rows must never surface, because AuditHistoryService's allow-list is what makes this
+        // fragment GDPR-safe to print/export - a leak there, unlike in the report card above it,
+        // would bypass that curation entirely.
         String historySection = html.substring(html.indexOf("<h2 style=\"margin-top:0\">History</h2>"));
+        assertThat(historySection).doesNotContain("Recorded for the history test");
         assertThat(historySection).doesNotContain("hist-home" + suffix)
                 .doesNotContain("hist-coordinator" + suffix)
                 .doesNotContain("hist-visitor" + suffix)

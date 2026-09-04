@@ -46,10 +46,8 @@
             <td th:text="${r.scheduledAt} != null ? ${#temporals.format(r.scheduledAt, 'dd MMM yyyy HH:mm')} : '—'">Scheduled</td>
             <td>
                 <a class="rowlink" th:href="@{/interview-requests/{id}(id=${r.id})}">View details</a>
-                <th:block th:if="${r.status.name() == 'REPORT_APPROVED'}">
-                    <a class="rowlink" th:href="@{/reports/{id}/view(id=${r.id})}">View report</a>
-                    <a class="rowlink" th:href="@{/reports/{id}/download(id=${r.id})}">Download</a>
-                </th:block>
+                <a class="rowlink" th:if="${r.status.name() == 'REPORT_APPROVED'}"
+                   th:href="@{/reports/{id}/download(id=${r.id})}">Download</a>
             </td>
         </tr>
         </tbody>
@@ -65,10 +63,8 @@
             </dl>
             <div class="act">
                 <a class="btn ghost" th:href="@{/interview-requests/{id}(id=${r.id})}">View details</a>
-                <th:block th:if="${r.status.name() == 'REPORT_APPROVED'}">
-                    <a class="btn secondary" th:href="@{/reports/{id}/view(id=${r.id})}">View report</a>
-                    <a class="btn ghost" th:href="@{/reports/{id}/download(id=${r.id})}">Download</a>
-                </th:block>
+                <a class="btn ghost" th:if="${r.status.name() == 'REPORT_APPROVED'}"
+                   th:href="@{/reports/{id}/download(id=${r.id})}">Download</a>
             </div>
         </div>
     </div>

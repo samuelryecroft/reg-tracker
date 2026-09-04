@@ -1,8 +1,6 @@
 package ninja.samryecroft.returnhome.tracker.report;
 
 import ninja.samryecroft.returnhome.tracker.audit.AuditEventPublisher;
-import ninja.samryecroft.returnhome.tracker.child.ChildIdentity;
-import ninja.samryecroft.returnhome.tracker.child.NameRevealService;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewRequest;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewRequestService;
 import ninja.samryecroft.returnhome.tracker.user.AppUserPrincipal;
@@ -13,7 +11,6 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
-import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.ResponseBody;
@@ -28,16 +25,13 @@ public class ReportController {
     private final ReportService reportService;
     private final ReportDocumentService reportDocumentService;
     private final AuditEventPublisher auditEventPublisher;
-    private final NameRevealService nameRevealService;
 
     public ReportController(InterviewRequestService interviewRequestService, ReportService reportService,
-            ReportDocumentService reportDocumentService, AuditEventPublisher auditEventPublisher,
-            NameRevealService nameRevealService) {
+            ReportDocumentService reportDocumentService, AuditEventPublisher auditEventPublisher) {
         this.interviewRequestService = interviewRequestService;
         this.reportService = reportService;
         this.reportDocumentService = reportDocumentService;
         this.auditEventPublisher = auditEventPublisher;
-        this.nameRevealService = nameRevealService;
     }
 
     @GetMapping("/reports/{requestId}/download")
@@ -69,14 +63,17 @@ public class ReportController {
                 .body(new ByteArrayResource(document));
     }
 
+    /**
+     * T155 batch 2: the report content this used to render now lives inline on the merged
+     * {@code interview/detail} page, gated by the same REPORT_APPROVED check
+     * (InterviewRequestDetailController#detail). This route survives only as a redirect for
+     * existing bookmarks/links to the old URL - it does its own authorization check on neither
+     * the request nor the report, because it decides nothing: the destination page enforces both
+     * gates itself, on every hit, whether reached from here or directly.
+     */
     @GetMapping("/reports/{requestId}/view")
-    public String view(@PathVariable Long requestId, @AuthenticationPrincipal AppUserPrincipal principal, Model model) {
-        InterviewRequest request = interviewRequestService.getAuthorized(requestId, principal);
-        InterviewReport report = approvedReportFor(requestId);
-        model.addAttribute("request", request);
-        model.addAttribute("childIdentity", ChildIdentity.of(request.getChild(), nameRevealService.isRevealed()));
-        model.addAttribute("report", report);
-        return "report/view";
+    public String view(@PathVariable Long requestId) {
+        return "redirect:/interview-requests/" + requestId;
     }
 
     /** A report is only visible to its Home/Viewer audience once it's been through review and approved. */
