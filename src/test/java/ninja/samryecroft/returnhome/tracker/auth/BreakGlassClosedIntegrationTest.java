@@ -89,14 +89,27 @@ class BreakGlassClosedIntegrationTest extends AbstractIntegrationTest {
     }
 
     /**
-     * At most one enabled account may hold a local credential - asserted as a COUNT over every
-     * enabled account, not by checking a known row. "At most one" is a claim about everything; a
-     * test that samples proves it about one thing, and the failure this guards is exactly the one
-     * where a second account quietly kept its password.
+     * At most one enabled account holds a local credential - asserted as a COUNT over every enabled
+     * account, not by checking a known row. "At most one" is a claim about everything, and a test
+     * that samples proves it about one thing.
      *
-     * <p>Lives here rather than with the enabled-path tests because it is true of every deployment,
-     * not only one with break-glass switched on - and because asserting it in the default
-     * configuration is asserting it about the configuration almost every deployment runs.
+     * <p><b>This is the P8-era invariant, and it is not true of production yet. Read that before
+     * acting on it.</b> N2 and §5's rollback reasoning keep existing users' passwords deliberately
+     * until P8, so that rolling back is a configuration change and one restart rather than a data
+     * restore. Between cutover and P8, production will legitimately hold many enabled accounts with
+     * credentials. Anyone who reads this as a live invariant and strips those passwords to bring
+     * reality into line will destroy the rollback path at the one moment it might be needed - which
+     * is a worse outcome than the state they were tidying.
+     *
+     * <p>What it guards <em>now</em> is narrower and still worth having: that no code path mints
+     * credentials beyond the ones fixtures create for themselves. It is asserted here, before P8
+     * makes it live, so that the code which would violate it is caught while violating it is still
+     * cheap to fix. When P8 lands and the general form-login path goes, this becomes a statement
+     * about production and the qualification above can go with it.
+     *
+     * <p>It lives in the closed-path class because it is true regardless of whether break-glass is
+     * switched on, and asserting it in the default configuration asserts it about the configuration
+     * nearly every deployment runs.
      */
     @Test
     void atMostOneEnabledAccountHoldsALocalCredential() {
