@@ -328,7 +328,9 @@ public class DemoDataSeeder implements ApplicationRunner {
         awaitingReview.setSubmittedAt(now.minusDays(4).withHour(17).withMinute(20));
         interviewReportRepository.save(awaitingReview);
         seed.markStatus(interviewRequestRepository, submitted, InterviewStatus.REPORT_SUBMITTED);
-        audit.reportSubmitted(awaitingReview, new AppUserPrincipal(seed.visitor));
+        // null statusBefore: the demo rows are constructed at SUBMITTED rather than transitioned
+        // into it, so there is no prior verdict - the same thing a genuine first submission records.
+        audit.reportSubmitted(awaitingReview, null, new AppUserPrincipal(seed.visitor));
 
         // 6. REPORT_APPROVED - driven through the real service so a real .docx is generated.
         InterviewRequest approved = schedule(seed, request(seed, seed.priya, seed.oakwood,
@@ -339,7 +341,7 @@ public class DemoDataSeeder implements ApplicationRunner {
         toApprove.setSubmittedAt(now.minusDays(11).withHour(16).withMinute(45));
         interviewReportRepository.save(toApprove);
         seed.markStatus(interviewRequestRepository, approved, InterviewStatus.REPORT_SUBMITTED);
-        audit.reportSubmitted(toApprove, new AppUserPrincipal(seed.visitor2));
+        audit.reportSubmitted(toApprove, null, new AppUserPrincipal(seed.visitor2));
         reportService.approve(approved.getId(), reviewForm("Thorough and timely. Approved for sharing "
                 + "with the placing authority."), new AppUserPrincipal(seed.reviewer));
 
@@ -352,7 +354,7 @@ public class DemoDataSeeder implements ApplicationRunner {
         toReject.setSubmittedAt(now.minusDays(8).withHour(13).withMinute(5));
         interviewReportRepository.save(toReject);
         seed.markStatus(interviewRequestRepository, rejected, InterviewStatus.REPORT_SUBMITTED);
-        audit.reportSubmitted(toReject, new AppUserPrincipal(seed.visitor));
+        audit.reportSubmitted(toReject, null, new AppUserPrincipal(seed.visitor));
         reportService.reject(rejected.getId(), reviewForm("Please expand the risk section and confirm "
                 + "whether the police MFH coordinator was consulted."), new AppUserPrincipal(seed.reviewer));
 

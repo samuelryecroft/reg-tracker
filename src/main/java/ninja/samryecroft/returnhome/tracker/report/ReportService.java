@@ -79,6 +79,7 @@ public class ReportService {
     @Transactional
     public InterviewReport submitForReview(Long requestId, SubmitReportForm form, AppUserPrincipal principal) {
         InterviewReport report = existingOrNewReport(requestId, principal);
+        ReportStatus statusBefore = report.getStatus();
         applyFormValues(report, form);
         report.setStatus(ReportStatus.SUBMITTED);
         report.setSubmittedAt(LocalDateTime.now());
@@ -86,12 +87,20 @@ public class ReportService {
         // Clear the previous round's verdict - otherwise a stale rejection comment would still be
         // sitting on the report (and pre-filling the reviewer's form) for this brand new round, and
         // could get silently carried through into an APPROVED report if the reviewer doesn't notice.
-        report.setReviewComments(null);
-        report.setReviewedBy(null);
-        report.setReviewedAt(null);
+        //
+        // Only for a REJECTED round, which is what that reasoning is actually about. Unconditional,
+        // this erased an APPROVED report's verdict: who signed it off and when, wiped by the report's
+        // own author with no reviewer involved, while the approved document stayed attached to a row
+        // that now read "awaiting review". Nothing legitimate needs that - a first submission has no
+        // verdict to clear, and an approved one is finished. T145(B).
+        if (statusBefore == ReportStatus.REJECTED) {
+            report.setReviewComments(null);
+            report.setReviewedBy(null);
+            report.setReviewedAt(null);
+        }
         report = interviewReportRepository.save(report);
         interviewRequestService.markStatus(report.getInterviewRequest(), InterviewStatus.REPORT_SUBMITTED);
-        auditEventPublisher.reportSubmitted(report, principal);
+        auditEventPublisher.reportSubmitted(report, statusBefore, principal);
         return report;
     }
 

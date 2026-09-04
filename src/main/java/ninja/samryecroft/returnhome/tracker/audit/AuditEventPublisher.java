@@ -8,6 +8,7 @@ import ninja.samryecroft.returnhome.tracker.home.Home;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewRequest;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewStatus;
 import ninja.samryecroft.returnhome.tracker.report.InterviewReport;
+import ninja.samryecroft.returnhome.tracker.report.ReportStatus;
 import ninja.samryecroft.returnhome.tracker.user.AppUserPrincipal;
 import ninja.samryecroft.returnhome.tracker.user.UserRepository;
 import java.util.List;
@@ -122,9 +123,20 @@ public class AuditEventPublisher {
         publish(reportEvent(AuditEventType.REPORT_DRAFT_SAVED, report, principal).build());
     }
 
-    public void reportSubmitted(InterviewReport report, AppUserPrincipal principal) {
+    /**
+     * Records the status this submission overwrote, not just that a submission happened.
+     *
+     * <p>An append-only trail whose events don't say what they replaced is only as good as a reader
+     * who thinks to go looking for the previous one. {@code interviewRequestAllocated} above already
+     * records {@code statusBefore}; this one didn't, which is exactly why a resubmission over an
+     * APPROVED report left nothing in the feed saying an approval had been superseded. T145(B).
+     *
+     * @param statusBefore the report's status before this submission, or null for a first submission
+     */
+    public void reportSubmitted(InterviewReport report, ReportStatus statusBefore, AppUserPrincipal principal) {
         publish(reportEvent(AuditEventType.REPORT_SUBMITTED, report, principal)
                 .meta("submittedAt", report.getSubmittedAt())
+                .meta("statusBefore", statusBefore)
                 .build());
     }
 
