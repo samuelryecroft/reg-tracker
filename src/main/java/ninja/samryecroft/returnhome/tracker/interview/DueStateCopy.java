@@ -11,10 +11,13 @@ package ninja.samryecroft.returnhome.tracker.interview;
  * which means the word has to carry the state - and the badge and the heading have to agree on it,
  * or the same request reads as two different states on one screen.
  *
- * <p>These are NOT new strings: they are the words the group headings have always shipped
+ * <p>These are not invented strings: they are the words the group headings have always shipped
  * ("Overdue - statutory 72 hours passed", "Due soon - under 24 hours remaining", "On track"),
- * lifted to where the badge can reuse them. The confirmed wording for the 72-hour statutory surface
- * (T165c, with the human) lands here and nowhere else.
+ * lifted to where the badge can reuse them. That is also the wording the human signed off for the
+ * badges under T165c - "Due soon - 6h 10m left" and "On track - 30h 5m left", em dash, OVERDUE and
+ * NO_CLOCK unchanged because they already read as their state. Pinned character-for-character by
+ * {@code DeadlineTrackerTest#theSignedOffDeadlineWordingIsRenderedExactly}: this is copy on a
+ * statutory surface, so a rewording should have to be a deliberate act, not a passing edit.
  */
 public final class DueStateCopy {
 

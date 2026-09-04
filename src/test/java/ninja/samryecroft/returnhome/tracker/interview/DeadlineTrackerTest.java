@@ -135,6 +135,39 @@ class DeadlineTrackerTest {
         assertThat(onTrack).startsWith(DueStateCopy.stateWord(DueState.ON_TRACK));
     }
 
+    /**
+     * T165c: the wording the human signed off for the 72-hour statutory surface, pinned exactly
+     * rather than by shape. The durations are the ones from the sign-off itself, so the test reads
+     * as the decision it records.
+     *
+     * <p>{@link #dueSoonAndOnTrackAnnouncedTextDifferByAStateWordNotAGlyphOrANumber} is the one
+     * that protects the PROPERTY, and it is the one that must never be relaxed. This is narrower on
+     * purpose: it protects the exact text, so a rewording of a statutory-surface string has to be a
+     * deliberate act rather than something that rides along in an unrelated edit.
+     */
+    @Test
+    void theSignedOffDeadlineWordingIsRenderedExactly() {
+        LocalDateTime now = LocalDateTime.of(2026, 9, 4, 12, 0);
+
+        // 72h window minus 6h 10m remaining, and minus 30h 5m remaining.
+        String dueSoon = DeadlineTracker.badgeFor(
+                requestWith(InterviewStatus.ALLOCATED, now.minusHours(65).minusMinutes(50)), now)
+                .orElseThrow().text();
+        String onTrack = DeadlineTracker.badgeFor(
+                requestWith(InterviewStatus.SCHEDULED, now.minusHours(41).minusMinutes(55)), now)
+                .orElseThrow().text();
+
+        assertThat(dueSoon).isEqualTo("Due soon \u2014 6h 10m left");
+        assertThat(onTrack).isEqualTo("On track \u2014 30h 5m left");
+
+        // Unchanged by T165c - both already read as their state.
+        assertThat(DeadlineTracker.badgeFor(
+                requestWith(InterviewStatus.REQUESTED, now.minusHours(75).minusMinutes(20)), now)
+                .orElseThrow().text()).isEqualTo("3h 20m overdue");
+        assertThat(DeadlineTracker.badgeFor(requestWith(InterviewStatus.REQUESTED, null), now)
+                .orElseThrow().text()).isEqualTo("Return time not recorded");
+    }
+
     /** Durations first (so "6h" leaves no stray "h"), then everything that is not a letter. */
     private static String announcedWords(String text) {
         return text.replaceAll("\\d+[a-zA-Z]?", " ")
