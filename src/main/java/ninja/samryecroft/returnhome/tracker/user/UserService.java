@@ -103,6 +103,15 @@ public class UserService {
         }
         // Same shape as listVisible above, and deliberately so: the list and the detail page must
         // agree about who is visible, or an account denied the list could still fetch a row by id.
+        //
+        // Two states reach the final deny. An ORG_ADMIN with no organisation is neither side, as in
+        // listVisible - that one the old code also refused, because a null organisation id matches
+        // no target. The one it did NOT refuse is a principal that is neither side but DOES have an
+        // organisation: HOME_STAFF, COORDINATOR, VIEWER, VISITOR or REVIEWER, all of which
+        // needsOrganisation() gives one to. The old else read "same organisation as the target?",
+        // which is true for every user in that organisation, so it handed the row over. Only
+        // SecurityConfig keeping those roles off /admin/** stopped it - a routing fact that a new
+        // controller or a widened rule changes without touching this file.
         boolean visible;
         if (roleMatrix.isCareProviderOrgAdmin(principal)) {
             HomeScope scope = organisationAccessService.homeScopeFor(principal);

@@ -1,6 +1,7 @@
 package ninja.samryecroft.returnhome.tracker.user;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -8,6 +9,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import ninja.samryecroft.returnhome.tracker.audit.AuditEventPublisher;
 import ninja.samryecroft.returnhome.tracker.home.HomeRepository;
@@ -19,6 +21,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -109,6 +112,37 @@ class UserServiceVisibilityTest {
         when(userRepository.findAllWithHome()).thenReturn(List.of(everyone));
 
         assertThat(service().listVisible(principal)).containsExactly(everyone);
+    }
+
+    @Test
+    void getAuthorizedDeniesANeitherSidePrincipalWhoDoesHaveAnOrganisation() {
+        // The state I wrongly said could not exist. My reasoning only covered ORG_ADMIN principals,
+        // where "neither side" does imply a null organisation - but ORG_ADMIN is not the whole input
+        // space. HOME_STAFF, COORDINATOR, VIEWER, VISITOR and REVIEWER are all neither side, and
+        // needsOrganisation() gives most of them an organisation, so the id is NOT null.
+        //
+        // Under the old shape the else branch read "same organisation as the target?", which is TRUE
+        // for every user in org 7 - so getAuthorized returned the row. Distinguishing today, with no
+        // schema change and no third OrgType. SecurityConfig keeps these roles off /admin/** for now,
+        // which makes it not urgent; it never made it untestable.
+        AppUserPrincipal principal = principal(Set.of(Role.HOME_STAFF), organisation(7L, OrgType.CARE_PROVIDER));
+        User target = new User();
+        target.setOrganisation(organisation(7L, OrgType.CARE_PROVIDER));
+        when(userRepository.findById(42L)).thenReturn(Optional.of(target));
+
+        assertThatThrownBy(() -> service().getAuthorized(42L, principal))
+                .isInstanceOf(AccessDeniedException.class);
+    }
+
+    @Test
+    void getAuthorizedStillLetsASupplierOrgAdminSeeTheirOwnOrganisationsUser() {
+        // The other side of it: the deny must not have swallowed the branch it replaced.
+        AppUserPrincipal principal = principal(Set.of(Role.ORG_ADMIN), organisation(7L, OrgType.SUPPLIER));
+        User target = new User();
+        target.setOrganisation(organisation(7L, OrgType.SUPPLIER));
+        when(userRepository.findById(42L)).thenReturn(Optional.of(target));
+
+        assertThat(service().getAuthorized(42L, principal)).isSameAs(target);
     }
 
     private Organisation organisation(Long id, OrgType type) {
