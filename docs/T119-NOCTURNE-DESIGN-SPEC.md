@@ -1303,6 +1303,22 @@ a state that only sighted users have.** "Never colour alone" is routinely read a
 `aria-hidden` icon and a colour are *both* invisible to a screen reader, so the pair satisfies 1.4.1 while
 still failing 1.3.1. Specifying a glyph is not specifying an accessible state.
 
+**Sweeping for that shape found its exact converse on the deadline surface, so state the rule to cover both:**
+
+> **A state must reach a non-visual reader AS THE STATE — not as silence, and not as the name of a
+> character.**
+
+`DeadlineTracker` builds badge text in Java with the glyph baked in — `"▲ 3h 20m overdue"`, `"◷ 6h 10m
+left"`, `"✓ 30h 5m left"` — and that text goes through `th:text`, so it **is** announced: *"circle with upper
+right quadrant black, 6h 10m left"*. **Strip the glyph and DUE_SOON and ON_TRACK are textually identical in
+shape** — both "N left", neither carrying its state word — so the only thing separating *under 24 hours to a
+statutory deadline* from *fine* is a glyph and a colour. `.field-error::before { content: "▲" }` is the same
+fault in CSS: generated content is exposed to the accessibility tree, so every inline validation error is
+prefixed with a character name before its message.
+
+The rail failed by silence, the badges fail by mispronunciation, and **both pass a naive "never colour alone"
+check, because both have an icon.** That check is what let them through.
+
 ### D-1a-2c · At the cancelled position, keep the position's own label
 
 The build replaced the label at the cancelled position with `CANCELLED.displayName`, so a request cancelled
