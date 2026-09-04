@@ -173,6 +173,55 @@ class FrontendSourceGuardTest {
         return declarations;
     }
 
+    /**
+     * Creed's review (spec 12d10e8, following T132/T150): regular-versus-fill is Nocturne's own
+     * idiom for an active state (it's how the reveal toggle distinguishes masked from revealed), so
+     * a vendored icon missing one weight isn't just an inconsistency - it's the one glyph that can't
+     * express {@code aria-current} with a filled variant if a future nav item wants to, and it'll
+     * read as a puzzling one-off rather than an obvious gap. {@code ph-user-list} shipped without
+     * {@code ph-fill-user-list} for exactly one PR before this caught it (the icon-resolves test
+     * added alongside it only proved the regular one worked, since that's the one actually used).
+     *
+     * <p>Pins the RULE rather than that one instance, same shape as the achromatic chroma-floor test
+     * cases (a specific failure becomes a general invariant, not a regression test for the exact
+     * bug): R-Q11 vendors both weights for every icon with no exceptions - confirmed by checking the
+     * sprite before writing this, rather than assuming a plausible-sounding exception exists - so
+     * the check is plain symmetry (every {@code ph-X} has a {@code ph-fill-X} and vice versa), not a
+     * hand-maintained allow-list that would silently stop checking whatever it didn't list.
+     */
+    @Test
+    void everyVendoredIconHasBothARegularAndAFillVariant() throws IOException {
+        String svg = Files.readString(
+                Path.of("src/main/resources/static/icons/phosphor.svg"), StandardCharsets.UTF_8);
+
+        Set<String> allIds = new TreeSet<>();
+        Matcher symbol = Pattern.compile("<symbol id=\"(ph-[a-zA-Z0-9-]+)\"").matcher(svg);
+        while (symbol.find()) {
+            allIds.add(symbol.group(1));
+        }
+
+        Set<String> regular = new TreeSet<>();
+        Set<String> fill = new TreeSet<>();
+        for (String id : allIds) {
+            if (id.startsWith("ph-fill-")) {
+                fill.add(id.substring("ph-fill-".length()));
+            } else {
+                regular.add(id.substring("ph-".length()));
+            }
+        }
+
+        List<String> missingFill = regular.stream().filter(name -> !fill.contains(name)).toList();
+        List<String> missingRegular = fill.stream().filter(name -> !regular.contains(name)).toList();
+
+        assertThat(missingFill)
+                .as("ph-%s vendored without its ph-fill-%s counterpart - R-Q11 vendors both weights "
+                        + "for every icon", missingFill, missingFill)
+                .isEmpty();
+        assertThat(missingRegular)
+                .as("ph-fill-%s vendored without its plain ph-%s counterpart", missingRegular, missingRegular)
+                .isEmpty();
+    }
+
     private static List<Path> sourceFilesUnder(Path dir) throws IOException {
         try (Stream<Path> walk = Files.walk(dir)) {
             return walk.filter(Files::isRegularFile)
