@@ -7,7 +7,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import java.nio.file.Path;
 import java.util.List;
 import java.util.HashSet;
 import java.util.Set;
@@ -24,7 +23,6 @@ import ninja.samryecroft.returnhome.tracker.user.User;
 import ninja.samryecroft.returnhome.tracker.user.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -33,8 +31,6 @@ import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextImpl;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
@@ -51,14 +47,6 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 class AuditHistoryIntegrationTest extends AbstractIntegrationTest {
 
     private static final String PASSWORD = "CorrectHorse123!";
-
-    @TempDir
-    static Path documentStoreDir;
-
-    @DynamicPropertySource
-    static void documentStoreDir(DynamicPropertyRegistry registry) {
-        registry.add("app.documents.local.directory", () -> documentStoreDir.toString());
-    }
 
     @Autowired
     private MockMvc mockMvc;
