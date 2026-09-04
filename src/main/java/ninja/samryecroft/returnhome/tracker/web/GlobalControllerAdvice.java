@@ -78,6 +78,26 @@ public class GlobalControllerAdvice {
     public record Capabilities(boolean addOrganisation, boolean addHome, boolean addChild, boolean addUser) {
     }
 
+    /**
+     * T132: the nav's ONE {@code /children} entry, computed here rather than as two separately-gated
+     * {@code th:if} blocks in the template (the bug this replaces). Roles stack - only HOME_STAFF and
+     * ADMIN are mutually exclusive - so an account that is HOME_STAFF <em>and</em> VIEWER (or a
+     * care-provider ORG_ADMIN) used to satisfy both the old "My Children" and "Children" branches at
+     * once, rendering two links to the same URL and, once T138 1a added {@code aria-current}, two
+     * simultaneous "current page" announcements in one nav (Creed's review). {@link
+     * RoleMatrix#isChildrenListPersonalisedToOwnHomes} mirrors {@code ChildController#list}'s own
+     * role precedence, so the label can never describe a different scope than the page actually
+     * shows.
+     */
+    @ModelAttribute("childrenNav")
+    public ChildrenNav childrenNav(@AuthenticationPrincipal AppUserPrincipal principal) {
+        return new ChildrenNav(roleMatrix.canViewChildrenList(principal),
+                roleMatrix.isChildrenListPersonalisedToOwnHomes(principal) ? "My Children" : "Children");
+    }
+
+    public record ChildrenNav(boolean visible, String label) {
+    }
+
     @ModelAttribute("theme")
     public ThemeService.ThemeView theme(@AuthenticationPrincipal AppUserPrincipal principal) {
         return principal == null ? themeService.getPlatformDefault() : themeService.getEffectiveFor(principal);
