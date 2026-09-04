@@ -116,7 +116,7 @@ class AuditFeedIntegrationTest extends AbstractIntegrationTest {
         User user = new User();
         user.setUsername(username);
         user.setPassword(passwordEncoder.encode(PASSWORD));
-        user.setFullName(username);
+        user.setLastName(username);
         user.setRoles(Set.of(role));
         user.setHomes(userHome == null ? new HashSet<>() : new HashSet<>(Set.of(userHome)));
         user.setOrganisation(organisation);

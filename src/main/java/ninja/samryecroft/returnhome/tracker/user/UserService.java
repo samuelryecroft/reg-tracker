@@ -139,7 +139,7 @@ public class UserService {
         // encoding of an empty string - that would be a real, matchable credential, and anyone
         // submitting a blank password would authenticate as this account.
         user.setPassword(form.getPassword() == null ? null : passwordEncoder.encode(form.getPassword()));
-        user.setFullName(form.getFullName());
+        applyProfile(user, form.getFirstName(), form.getLastName(), form.getEmail(), form.getContactPhone());
         user.setRoles(form.getRoles());
         user.setOrganisation(needsOrganisation(form.getRoles()) ? resolveOrganisation(form.getOrganisationId(), principal) : null);
         user.setHomes(resolveHomes(form.getRoles(), form.getHomeIds(), principal));
@@ -159,7 +159,7 @@ public class UserService {
         Set<Role> rolesBefore = Set.copyOf(user.getRoles());
         boolean enabledBefore = user.isEnabled();
 
-        user.setFullName(form.getFullName());
+        applyProfile(user, form.getFirstName(), form.getLastName(), form.getEmail(), form.getContactPhone());
         user.setRoles(form.getRoles());
         user.setOrganisation(needsOrganisation(form.getRoles()) ? resolveOrganisation(form.getOrganisationId(), principal) : null);
         user.setHomes(resolveHomes(form.getRoles(), form.getHomeIds(), principal));
@@ -194,6 +194,27 @@ public class UserService {
     }
 
     /** Any role other than HOME_STAFF/ADMIN is org-scoped (ORG_ADMIN, COORDINATOR, VISITOR). */
+    /**
+     * The profile fields, set the same way on create and edit so the two paths cannot drift.
+     *
+     * <p>Trimmed here rather than in the form, because this is the last point before persistence
+     * and a name with a trailing space sorts and displays wrongly for the life of the row.
+     */
+    private void applyProfile(User user, String firstName, String lastName, String email, String contactPhone) {
+        user.setFirstName(trimToNull(firstName));
+        user.setLastName(trimToNull(lastName));
+        user.setEmail(trimToNull(email));
+        user.setContactPhone(trimToNull(contactPhone));
+    }
+
+    private String trimToNull(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+
     private boolean needsOrganisation(Set<Role> roles) {
         return roles.stream().anyMatch(role -> role != Role.HOME_STAFF && role != Role.ADMIN);
     }

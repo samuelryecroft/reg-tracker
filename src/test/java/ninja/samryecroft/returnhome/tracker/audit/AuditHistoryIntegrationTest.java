@@ -123,7 +123,7 @@ class AuditHistoryIntegrationTest extends AbstractIntegrationTest {
         // shows the requester's full name in its own "Requested by" field (unrelated to History),
         // and a fullName built from the username (even "X for " + username) still contains it as a
         // substring, which defeats a test asserting "the raw username never leaks via History".
-        user.setFullName(role.name() + " Test Person");
+        user.setLastName(role.name() + " Test Person");
         user.setRoles(Set.of(role));
         user.setHomes(userHome == null ? new HashSet<>() : new HashSet<>(Set.of(userHome)));
         user.setOrganisation(organisation);
@@ -259,7 +259,9 @@ class AuditHistoryIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(post("/admin/users").with(asUser("hist-admin" + suffix)).with(csrf())
                         .param("username", "hist-newvisitor" + suffix)
                         .param("password", "CorrectHorse123!")
-                        .param("fullName", "History New Visitor")
+                        .param("firstName", "History")
+                        .param("lastName", "New Visitor")
+                        .param("email", "history.new.visitor@example.test")
                         .param("roles", "VISITOR")
                         .param("organisationId", supplierOrg.getId().toString()))
                 .andExpect(status().is3xxRedirection());

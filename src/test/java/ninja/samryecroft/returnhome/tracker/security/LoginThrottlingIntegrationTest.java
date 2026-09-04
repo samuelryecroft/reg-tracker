@@ -54,7 +54,7 @@ class LoginThrottlingIntegrationTest extends AbstractIntegrationTest {
         User user = new User();
         user.setUsername(username);
         user.setPassword(passwordEncoder.encode(PASSWORD));
-        user.setFullName("Throttle Test User");
+        user.setLastName("Throttle Test User");
         user.setRoles(Set.of(Role.VISITOR));
         user.setEnabled(true);
         userRepository.save(user);

@@ -16,7 +16,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
     boolean existsByRole(@Param("role") Role role);
 
     @EntityGraph(attributePaths = {"roles"})
-    @Query("select u from User u where :role member of u.roles order by u.fullName")
+    @Query("select u from User u where :role member of u.roles order by u.lastName, u.firstName")
     List<User> findByRoleOrderByFullName(@Param("role") Role role);
 
     @EntityGraph(attributePaths = {"homes", "organisation", "roles"})
@@ -24,15 +24,15 @@ public interface UserRepository extends JpaRepository<User, Long> {
     List<User> findAllWithHome();
 
     @EntityGraph(attributePaths = {"homes", "organisation", "roles"})
-    @Query("select u from User u where :role member of u.roles and u.organisation.id = :organisationId order by u.fullName")
+    @Query("select u from User u where :role member of u.roles and u.organisation.id = :organisationId order by u.lastName, u.firstName")
     List<User> findByRoleAndOrganisationId(@Param("role") Role role, @Param("organisationId") Long organisationId);
 
     @EntityGraph(attributePaths = {"homes", "organisation", "roles"})
-    @Query("select u from User u where u.organisation.id = :organisationId order by u.fullName")
+    @Query("select u from User u where u.organisation.id = :organisationId order by u.lastName, u.firstName")
     List<User> findByOrganisationId(@Param("organisationId") Long organisationId);
 
     @EntityGraph(attributePaths = {"homes", "organisation", "roles"})
-    @Query("select distinct u from User u join u.homes h where ninja.samryecroft.returnhome.tracker.user.Role.HOME_STAFF member of u.roles and h.organisation.id = :organisationId order by u.fullName")
+    @Query("select distinct u from User u join u.homes h where ninja.samryecroft.returnhome.tracker.user.Role.HOME_STAFF member of u.roles and h.organisation.id = :organisationId order by u.lastName, u.firstName")
     List<User> findHomeStaffByHomeOrganisationId(@Param("organisationId") Long organisationId);
 
     /** The homes a user is attached to, whichever role attaches them. Not viewer-specific since V16. */

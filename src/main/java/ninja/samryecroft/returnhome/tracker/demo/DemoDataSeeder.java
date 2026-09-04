@@ -266,7 +266,12 @@ public class DemoDataSeeder implements ApplicationRunner {
     private User user(String username, String fullName, Set<Role> roles, Organisation org, Home home) {
         User user = new User();
         user.setUsername(username);
-        user.setFullName(fullName);
+        // The seeder keeps taking a single display name; splitting it here rather than at ~30 call
+        // sites keeps the demo data readable, and exercises the same first-space rule as V17.
+        int space = fullName.indexOf(' ');
+        user.setFirstName(space < 0 ? null : fullName.substring(0, space));
+        user.setLastName(space < 0 ? fullName : fullName.substring(space + 1));
+        user.setEmail(username + "@example.test");
         user.setPassword(passwordEncoder.encode(demoProperties.getPassword()));
         user.setRoles(new LinkedHashSet<>(roles));
         user.setOrganisation(org);

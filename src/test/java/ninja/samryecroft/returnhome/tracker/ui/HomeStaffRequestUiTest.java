@@ -49,7 +49,7 @@ class HomeStaffRequestUiTest extends AbstractUiTest {
         User staff = new User();
         staff.setUsername("ui-home-staff");
         staff.setPassword(passwordEncoder.encode(PASSWORD));
-        staff.setFullName("UI Test Staff");
+        staff.setLastName("UI Test Staff");
         staff.setRoles(Set.of(Role.HOME_STAFF));
         staff.setHomes(home == null ? new HashSet<>() : new HashSet<>(Set.of(home)));
         staff.setEnabled(true);

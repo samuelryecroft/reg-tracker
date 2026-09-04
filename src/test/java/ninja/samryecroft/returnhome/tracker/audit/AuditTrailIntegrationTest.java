@@ -143,7 +143,7 @@ class AuditTrailIntegrationTest extends AbstractIntegrationTest {
         User user = new User();
         user.setUsername(username);
         user.setPassword(passwordEncoder.encode(PASSWORD));
-        user.setFullName(username);
+        user.setLastName(username);
         user.setRoles(Set.of(role));
         user.setHomes(userHome == null ? new HashSet<>() : new HashSet<>(Set.of(userHome)));
         user.setOrganisation(organisation);
@@ -332,7 +332,9 @@ class AuditTrailIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(post("/admin/users").with(asUser("audit-orgadmin" + suffix)).with(csrf())
                         .param("username", newUsername)
                         .param("password", PASSWORD)
-                        .param("fullName", "Created By Audit Test")
+                        .param("firstName", "Created")
+                        .param("lastName", "By Audit Test")
+                        .param("email", "created.by.audit.test@example.test")
                         .param("roles", Role.COORDINATOR.name()))
                 .andExpect(status().is3xxRedirection());
 
@@ -348,7 +350,9 @@ class AuditTrailIntegrationTest extends AbstractIntegrationTest {
         // Now change their roles and disable them - the transition itself is what gets recorded.
         mockMvc.perform(post("/admin/users/{id}/edit", created.getId())
                         .with(asUser("audit-orgadmin" + suffix)).with(csrf())
-                        .param("fullName", "Created By Audit Test")
+                        .param("firstName", "Created")
+                        .param("lastName", "By Audit Test")
+                        .param("email", "created.by.audit.test@example.test")
                         .param("roles", Role.REVIEWER.name())
                         .param("enabled", "false"))
                 .andExpect(status().is3xxRedirection());
