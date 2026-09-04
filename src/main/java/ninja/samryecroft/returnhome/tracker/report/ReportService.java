@@ -168,10 +168,12 @@ public class ReportService {
     }
 
     /** Unlike {@link #getByRequestId}, tolerates a request that has not reached REPORT_SUBMITTED yet
-     * (no report row at all), or the can't-happen case Kevin's PR #57 review flagged: REPORT_APPROVED
-     * with no matching report row. A caller gating report CONTENT on approval status must still apply
-     * that gate itself - this only changes what happens if the row is unexpectedly missing (a graceful
-     * absence rather than a request that fails to render at all). */
+     * (no report row at all), a report that exists but is not yet APPROVED, or the can't-happen case
+     * Kevin's PR #57 review flagged: REPORT_APPROVED with no matching report row. Used by the status
+     * rail (which only needs timing metadata, already visible via the status tag regardless of
+     * approval) and by the merged detail page's own REPORT_APPROVED branch, to degrade a missing row
+     * gracefully rather than fail the whole page. Never use this to decide whether report CONTENT may
+     * be shown - that gate is the caller's own status == REPORT_APPROVED check (T155 batch 2). */
     public Optional<InterviewReport> findByRequestId(Long requestId) {
         return interviewReportRepository.findByInterviewRequestId(requestId);
     }

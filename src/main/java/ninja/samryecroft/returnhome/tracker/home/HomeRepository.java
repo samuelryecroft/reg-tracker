@@ -16,6 +16,17 @@ public interface HomeRepository extends JpaRepository<Home, Long> {
     @Query("select h from Home h order by h.name")
     List<Home> findAllWithOrganisation();
 
+    /**
+     * One home with its organisation already loaded. Load-bearing under {@code open-in-view=false}:
+     * {@code Home.organisation} is LAZY, so a plain {@code findById} hands back a proxy that throws
+     * {@code LazyInitializationException} the moment anything outside the transaction touches it -
+     * which is exactly what the T168(b) activation guard does when it asks whether the organisation
+     * is active. Found by the guard's own integration test failing, not by reading the mapping.
+     */
+    @EntityGraph(attributePaths = "organisation")
+    @Query("select h from Home h where h.id = :homeId")
+    Optional<Home> findByIdWithOrganisation(@Param("homeId") Long homeId);
+
     @EntityGraph(attributePaths = "organisation")
     @Query("select h from Home h where h.organisation.id = :organisationId order by h.name")
     List<Home> findByOrganisationIdWithOrganisation(@Param("organisationId") Long organisationId);

@@ -103,7 +103,7 @@ class StatusRailTest {
 
         assertThat(steps).hasSize(5); // never a sixth position
         assertThat(steps.get(3).label()).isEqualTo("Sent back");
-        assertThat(steps.get(3).state()).isEqualTo(StepState.EXCEPTION);
+        assertThat(steps.get(3).state()).isEqualTo(StepState.SENT_BACK);
         assertThat(steps.get(3).occurredAt()).isEqualTo(LocalDateTime.of(2026, 3, 15, 8, 0));
         // Approved still shows as reachable, not ruled out - a rejected report can be resubmitted
         // and approved, so the process is not necessarily terminal here.
@@ -119,8 +119,14 @@ class StatusRailTest {
 
         List<Step> steps = StatusRail.forRequest(cancelled, null);
 
-        assertThat(steps.get(0).label()).isEqualTo("Cancelled");
-        assertThat(steps.get(0).state()).isEqualTo(StepState.EXCEPTION);
+        // Creed's review: the reached position keeps ITS OWN label ("Requested") - cancellation is
+        // what happened AFTER this position, not what happened AT it (unlike SENT_BACK, where the
+        // substitution IS correct). "Cancelled" moves to `note` instead, with no date attached
+        // (request.getUpdatedAt() is last-touched-anything, not the actual cancellation event).
+        assertThat(steps.get(0).label()).isEqualTo("Requested");
+        assertThat(steps.get(0).note()).isEqualTo("Cancelled");
+        assertThat(steps.get(0).occurredAt()).isNull();
+        assertThat(steps.get(0).state()).isEqualTo(StepState.CANCELLED);
         assertThat(steps.subList(1, 5)).extracting(Step::state).containsOnly(StepState.NOT_APPLICABLE);
         // Never "still to come" - a pending-looking step on a cancelled request would be a false
         // statement about future work that will never happen.
@@ -137,8 +143,9 @@ class StatusRailTest {
 
         assertThat(steps.get(0).state()).isEqualTo(StepState.COMPLETE);
         assertThat(steps.get(1).state()).isEqualTo(StepState.COMPLETE);
-        assertThat(steps.get(2).label()).isEqualTo("Cancelled");
-        assertThat(steps.get(2).state()).isEqualTo(StepState.EXCEPTION);
+        assertThat(steps.get(2).label()).isEqualTo("Scheduled");
+        assertThat(steps.get(2).note()).isEqualTo("Cancelled");
+        assertThat(steps.get(2).state()).isEqualTo(StepState.CANCELLED);
         assertThat(steps.subList(3, 5)).extracting(Step::state).containsOnly(StepState.NOT_APPLICABLE);
     }
 
@@ -151,8 +158,9 @@ class StatusRailTest {
 
         List<Step> steps = StatusRail.forRequest(cancelled, report);
 
-        assertThat(steps.get(3).label()).isEqualTo("Cancelled");
-        assertThat(steps.get(3).state()).isEqualTo(StepState.EXCEPTION);
+        assertThat(steps.get(3).label()).isEqualTo("Pending review");
+        assertThat(steps.get(3).note()).isEqualTo("Cancelled");
+        assertThat(steps.get(3).state()).isEqualTo(StepState.CANCELLED);
         assertThat(steps.get(4).state()).isEqualTo(StepState.NOT_APPLICABLE);
     }
 }

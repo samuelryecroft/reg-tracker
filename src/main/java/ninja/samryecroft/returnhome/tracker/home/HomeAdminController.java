@@ -85,6 +85,22 @@ public class HomeAdminController {
             } else {
                 organisation = organisationRepository.findById(form.getOrganisationId())
                         .orElseThrow(() -> new IllegalArgumentException("No such organisation: " + form.getOrganisationId()));
+                // T168(b): the dropdown above is already filtered to care providers, but A FILTERED
+                // DROPDOWN IS NOT A CONSTRAINT - it shapes the form, not the POST, and a platform
+                // admin can post any organisation id. Nothing else stopped a home being hung off a
+                // SUPPLIER: V6's foreign key does not care about the type either.
+                //
+                // It is enforced here because OTHER CODE NOW RELIES ON IT. Every encrypted entity
+                // resolves its owning organisation through home.getOrganisation(), so
+                // OrganisationLifecycleService only requires a KEK for CARE_PROVIDERs - correct
+                // precisely because homes belong to care providers. A home under a supplier would
+                // make that narrowing wrong, and the write would fail closed against a key that does
+                // not exist and never should. This is the floor under that assumption.
+                if (organisation.getType() != OrgType.CARE_PROVIDER) {
+                    bindingResult.addError(new FieldError("form", "organisationId",
+                            "Homes belong to care provider organisations. Please select a care provider."));
+                    organisation = null;
+                }
             }
         } else {
             // Care Provider ORG_ADMIN: home is always pinned to their own organisation.

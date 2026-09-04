@@ -7,7 +7,7 @@
 </head>
 <body>
 <div th:replace="~{fragments/layout :: nav}"></div>
-<main id="main">
+<main id="main" th:with="ico=@{/icons/phosphor.svg}">
     <h1 th:text="${childIdentity.label()}">Child Name</h1>
     <span class="status" th:classappend="${request.status}" th:text="${request.status.displayName}">STATUS</span>
     <span class="status warning"
@@ -15,7 +15,91 @@
         Consent not yet confirmed
     </span>
 
-    <div class="card">
+    <!--
+      D-1a-2/D-1a-2a (spec 1f04c68, 58494b2): the rail shows PROGRESS; the status tag above stays
+      authoritative for the exact state. Both read InterviewStatus.displayName (StatusRail's ruling
+      1), so they can never disagree about what to call one state - only about how much of the
+      journey it represents.
+    -->
+    <ol class="rail" aria-label="Interview status">
+        <li th:each="step : ${statusRail}" th:classappend="'rail-' + ${step.state()}"
+            th:attr="aria-current=${step.state().name() == 'CURRENT'} ? 'step'">
+            <!--
+              Creed's review: th:case must sit on the <svg>, not the <use> inside it. A non-matching
+              th:case removes only the element it's ON - putting it on <use> left all SIX <svg
+              class="icon"> wrappers in the DOM (five empty), which .icon's fixed 1em size and
+              .rail-marker's flex centring then packed into an 18px circle: the one surviving glyph
+              landed ~40px off-centre, into a neighbouring step's cell. One <svg> per state, here.
+            -->
+            <span class="rail-marker" aria-hidden="true" th:switch="${step.state().name()}">
+                <svg class="icon" th:case="'COMPLETE'"><use th:href="${ico} + '#ph-fill-check-circle'"></use></svg>
+                <svg class="icon" th:case="'CURRENT'"><use th:href="${ico} + '#ph-fill-dot-outline'"></use></svg>
+                <svg class="icon" th:case="'SENT_BACK'"><use th:href="${ico} + '#ph-arrow-u-up-left'"></use></svg>
+                <svg class="icon" th:case="'CANCELLED'"><use th:href="${ico} + '#ph-x-circle'"></use></svg>
+                <svg class="icon" th:case="'NOT_APPLICABLE'"><use th:href="${ico} + '#ph-prohibit'"></use></svg>
+                <svg class="icon" th:case="*"><use th:href="${ico} + '#ph-circle-dashed'"></use></svg>
+            </span>
+            <span class="rail-label" th:text="${step.label()}">Label</span>
+            <!--
+              Creed's review (1.3.1): the marker is aria-hidden and colour alone can't reach
+              assistive tech, so without this a screen reader hears every label with no way to tell
+              which have happened. aria-current="step" above covers CURRENT; this covers the rest.
+
+              Creed's follow-up: CANCELLED is excluded here on purpose, not an oversight - it's the
+              one state that already carries itself in VISIBLE text (the rail-when "Cancelled" note
+              below), so the hidden word would read as "Scheduled, cancelled, Cancelled" - the same
+              thing said twice, once into an ear that can't see the note is already there. The rule
+              this follows: the hidden word exists BECAUSE a state was otherwise only in an
+              aria-hidden glyph and a colour; the moment a state is carried in visible text instead,
+              the hidden word stops being access and becomes duplication.
+            -->
+            <span class="visually-hidden" th:if="${step.state().name() != 'CANCELLED'}"
+                  th:switch="${step.state().name()}">
+                <th:block th:case="'COMPLETE'">completed</th:block>
+                <th:block th:case="'CURRENT'">current step</th:block>
+                <th:block th:case="'SENT_BACK'">sent back</th:block>
+                <th:block th:case="'NOT_APPLICABLE'">not applicable</th:block>
+                <th:block th:case="*">not yet started</th:block>
+            </span>
+            <!--
+              Creed's review: a cancelled request's reached position keeps ITS OWN label above (see
+              StatusRail#cancelledRail) - "Cancelled" renders here, in the slot a date would
+              otherwise use, rather than overwriting the label and destroying how far the request
+              got. `note` is null for every other state, so this falls through to the ordinary date.
+            -->
+            <span class="rail-when" th:if="${step.note() != null}" th:text="${step.note()}">note</span>
+            <span class="rail-when" th:if="${step.note() == null and step.occurredAt() != null}"
+                  th:text="${#temporals.format(step.occurredAt(), 'dd MMM yyyy')}">date</span>
+        </li>
+    </ol>
+
+    <!--
+      D-1a-3 (spec 6bf5119): a section index, not tabs - real ARIA tabs hide inactive panels, and
+      this screen is a document a reviewer must Ctrl-F and print in full (1b already shows the same
+      report full width with every section visible). Plain jump links, wrapped in a nav landmark,
+      no tablist/tab/tabpanel roles (a role that lies is worse than no role) - god's steer on 1a.
+      #history is CSS-hidden here and shown only below 1060px (D-1a-4): above that width history is
+      already visible in its own column, so a jump link to it would be redundant chrome.
+    -->
+    <nav class="section-index" aria-label="Report sections">
+        <a href="#request">Request</a>
+        <a href="#young-person">Young person</a>
+        <a href="#professionals">Professionals</a>
+        <a href="#submitted-by">Submitted by</a>
+        <a href="#notes" th:if="${request.notes}">Notes</a>
+        <a href="#report-details" th:if="${report != null}">Report details</a>
+        <a href="#rhi" th:if="${report != null}">Return home interview</a>
+        <a href="#future-incidents" th:if="${report != null}">Future incidents</a>
+        <a href="#interviewer-comments" th:if="${report != null}">Interviewer's comments</a>
+        <a href="#recommendations" th:if="${report != null}">Recommendations</a>
+        <a href="#declaration" th:if="${report != null}">Declaration</a>
+        <a href="#history">History</a>
+    </nav>
+
+    <div class="detail-layout">
+    <div class="report-col">
+
+    <div class="card" id="request" tabindex="-1">
         <h3>Request</h3>
         <dl class="detail">
             <dt>Home</dt>
@@ -25,98 +109,118 @@
             <dd th:text="${request.requestedBy.fullName}">User</dd>
 
             <dt>Date of missing episode</dt>
-            <dd th:text="${request.missingSince} != null ? ${#temporals.format(request.missingSince, 'dd MMM yyyy HH:mm')} : '—'">Missing since</dd>
+            <dd th:classappend="${request.missingSince == null} ? 'unanswered'"
+                th:text="${request.missingSince} != null ? ${#temporals.format(request.missingSince, 'dd MMM yyyy HH:mm')} : 'Not answered'">Missing since</dd>
 
             <dt>Date of return</dt>
-            <dd th:text="${request.returnedAt} != null ? ${#temporals.format(request.returnedAt, 'dd MMM yyyy HH:mm')} : '—'">Returned at</dd>
+            <dd th:text="${#temporals.format(request.returnedAt, 'dd MMM yyyy HH:mm')}">Returned at</dd>
 
             <dt>Allocated visitor</dt>
-            <dd th:text="${request.allocatedVisitor} ? ${request.allocatedVisitor.fullName} : 'Not yet allocated'">Visitor</dd>
+            <dd th:classappend="${request.allocatedVisitor == null} ? 'unanswered'"
+                th:text="${request.allocatedVisitor} ? ${request.allocatedVisitor.fullName} : 'Not yet allocated'">Visitor</dd>
 
             <dt>Scheduled visit</dt>
-            <dd th:text="${request.scheduledAt} != null ? ${#temporals.format(request.scheduledAt, 'dd MMM yyyy HH:mm')} : 'Not yet scheduled'">Scheduled</dd>
+            <dd th:classappend="${request.scheduledAt == null} ? 'unanswered'"
+                th:text="${request.scheduledAt} != null ? ${#temporals.format(request.scheduledAt, 'dd MMM yyyy HH:mm')} : 'Not yet scheduled'">Scheduled</dd>
         </dl>
     </div>
 
-    <div class="card">
-        <h3>Details of the Young Person</h3>
+    <div class="card" id="young-person" tabindex="-1"
+         th:with="notAnswered=${(request.legalStatus == null ? 1 : 0) + (request.knownRisks == null ? 1 : 0)
+                               + (request.childsComments == null ? 1 : 0) + (request.missingEpisodeDetails == null ? 1 : 0)
+                               + (request.missingInLast6Months == null ? 1 : 0) + (request.missingFiveTimesIn30Days == null ? 1 : 0)
+                               + (request.strategyMeetingRequested == null ? 1 : 0) + (request.importantPeople == null ? 1 : 0)
+                               + (request.aboutYoungPerson == null ? 1 : 0)}">
+        <h3>Details of the Young Person
+            <span class="section-count" th:if="${notAnswered > 0}" th:text="${notAnswered + ' not answered'}"></span>
+        </h3>
         <dl class="detail">
             <dt>Legal status</dt>
-            <dd th:text="${request.legalStatus} ?: '—'">Legal status</dd>
+            <dd th:classappend="${request.legalStatus == null} ? 'unanswered'" th:text="${request.legalStatus} ?: 'Not answered'">Legal status</dd>
 
             <dt>Any known risks</dt>
-            <dd th:text="${request.knownRisks} ?: '—'">Known risks</dd>
+            <dd th:classappend="${request.knownRisks == null} ? 'unanswered'" th:text="${request.knownRisks} ?: 'Not answered'">Known risks</dd>
 
             <dt>Comments made by the young person</dt>
-            <dd th:text="${request.childsComments} ?: '—'">Comments</dd>
+            <dd th:classappend="${request.childsComments == null} ? 'unanswered'" th:text="${request.childsComments} ?: 'Not answered'">Comments</dd>
 
             <dt>Details relating to the missing episode</dt>
-            <dd th:text="${request.missingEpisodeDetails} ?: '—'">Missing episode details</dd>
+            <dd th:classappend="${request.missingEpisodeDetails == null} ? 'unanswered'" th:text="${request.missingEpisodeDetails} ?: 'Not answered'">Missing episode details</dd>
 
             <dt>Missing in the last 6 months?</dt>
-            <dd th:text="${request.missingInLast6Months} == null ? 'Not answered' : (${request.missingInLast6Months} ? 'Yes' : 'No')">—</dd>
+            <dd th:classappend="${request.missingInLast6Months == null} ? 'unanswered'" th:text="${request.missingInLast6Months} == null ? 'Not answered' : (${request.missingInLast6Months} ? 'Yes' : 'No')">—</dd>
 
             <dt>Missing 5+ times in the last 30 days?</dt>
-            <dd th:text="${request.missingFiveTimesIn30Days} == null ? 'Not answered' : (${request.missingFiveTimesIn30Days} ? 'Yes' : 'No')">—</dd>
+            <dd th:classappend="${request.missingFiveTimesIn30Days == null} ? 'unanswered'" th:text="${request.missingFiveTimesIn30Days} == null ? 'Not answered' : (${request.missingFiveTimesIn30Days} ? 'Yes' : 'No')">—</dd>
 
             <dt>Strategy meeting requested?</dt>
-            <dd th:text="${request.strategyMeetingRequested} == null ? 'Not answered' : (${request.strategyMeetingRequested} ? 'Yes' : 'No')">—</dd>
+            <dd th:classappend="${request.strategyMeetingRequested == null} ? 'unanswered'" th:text="${request.strategyMeetingRequested} == null ? 'Not answered' : (${request.strategyMeetingRequested} ? 'Yes' : 'No')">—</dd>
 
             <dt>Important people to the young person</dt>
-            <dd th:text="${request.importantPeople} ?: '—'">Important people</dd>
+            <dd th:classappend="${request.importantPeople == null} ? 'unanswered'" th:text="${request.importantPeople} ?: 'Not answered'">Important people</dd>
 
             <dt>About the young person</dt>
-            <dd th:text="${request.aboutYoungPerson} ?: '—'">About the young person</dd>
+            <dd th:classappend="${request.aboutYoungPerson == null} ? 'unanswered'" th:text="${request.aboutYoungPerson} ?: 'Not answered'">About the young person</dd>
         </dl>
     </div>
 
-    <div class="card">
-        <h3>Details of Professionals</h3>
+    <div class="card" id="professionals" tabindex="-1"
+         th:with="notAnswered=${(request.socialWorkerDetails == null ? 1 : 0) + (request.consentProvided == null ? 1 : 0)
+                               + (request.placingLocalAuthority == null ? 1 : 0) + (request.policeMfhCoordinatorDetails == null ? 1 : 0)
+                               + (request.parentsDetails == null ? 1 : 0) + (request.otherProfessionals == null ? 1 : 0)}">
+        <h3>Details of Professionals
+            <span class="section-count" th:if="${notAnswered > 0}" th:text="${notAnswered + ' not answered'}"></span>
+        </h3>
         <dl class="detail">
             <dt>Social worker details</dt>
-            <dd th:text="${request.socialWorkerDetails} ?: '—'">Social worker</dd>
+            <dd th:classappend="${request.socialWorkerDetails == null} ? 'unanswered'" th:text="${request.socialWorkerDetails} ?: 'Not answered'">Social worker</dd>
 
             <dt>Consent for IRHI provided?</dt>
-            <dd th:text="${request.consentProvided} == null ? 'Not answered' : (${request.consentProvided} ? 'Yes' : 'No')">—</dd>
+            <dd th:classappend="${request.consentProvided == null} ? 'unanswered'" th:text="${request.consentProvided} == null ? 'Not answered' : (${request.consentProvided} ? 'Yes' : 'No')">—</dd>
 
             <dt>Placing local authority</dt>
-            <dd th:text="${request.placingLocalAuthority} ?: '—'">Local authority</dd>
+            <dd th:classappend="${request.placingLocalAuthority == null} ? 'unanswered'" th:text="${request.placingLocalAuthority} ?: 'Not answered'">Local authority</dd>
 
             <dt>Police MFH coordinator details</dt>
-            <dd th:text="${request.policeMfhCoordinatorDetails} ?: '—'">Police coordinator</dd>
+            <dd th:classappend="${request.policeMfhCoordinatorDetails == null} ? 'unanswered'" th:text="${request.policeMfhCoordinatorDetails} ?: 'Not answered'">Police coordinator</dd>
 
             <dt>Parents' details</dt>
-            <dd th:text="${request.parentsDetails} ?: '—'">Parents</dd>
+            <dd th:classappend="${request.parentsDetails == null} ? 'unanswered'" th:text="${request.parentsDetails} ?: 'Not answered'">Parents</dd>
 
             <dt>Any other professionals</dt>
-            <dd th:text="${request.otherProfessionals} ?: '—'">Other professionals</dd>
+            <dd th:classappend="${request.otherProfessionals == null} ? 'unanswered'" th:text="${request.otherProfessionals} ?: 'Not answered'">Other professionals</dd>
         </dl>
     </div>
 
-    <div class="card">
-        <h3>Submitted By</h3>
+    <div class="card" id="submitted-by" tabindex="-1"
+         th:with="notAnswered=${(request.submitterOrganisation == null ? 1 : 0) + (request.submitterNameAndRole == null ? 1 : 0)
+                               + (request.relationshipToYoungPerson == null ? 1 : 0) + (request.submitterAddress == null ? 1 : 0)
+                               + (request.submitterContactDetails == null ? 1 : 0) + (request.bestTimesToVisit == null ? 1 : 0)}">
+        <h3>Submitted By
+            <span class="section-count" th:if="${notAnswered > 0}" th:text="${notAnswered + ' not answered'}"></span>
+        </h3>
         <dl class="detail">
             <dt>Organisation</dt>
-            <dd th:text="${request.submitterOrganisation} ?: '—'">Organisation</dd>
+            <dd th:classappend="${request.submitterOrganisation == null} ? 'unanswered'" th:text="${request.submitterOrganisation} ?: 'Not answered'">Organisation</dd>
 
             <dt>Name and role</dt>
-            <dd th:text="${request.submitterNameAndRole} ?: '—'">Name and role</dd>
+            <dd th:classappend="${request.submitterNameAndRole == null} ? 'unanswered'" th:text="${request.submitterNameAndRole} ?: 'Not answered'">Name and role</dd>
 
             <dt>Relationship to young person</dt>
-            <dd th:text="${request.relationshipToYoungPerson} ?: '—'">Relationship</dd>
+            <dd th:classappend="${request.relationshipToYoungPerson == null} ? 'unanswered'" th:text="${request.relationshipToYoungPerson} ?: 'Not answered'">Relationship</dd>
 
             <dt>Address</dt>
-            <dd th:text="${request.submitterAddress} ?: '—'">Address</dd>
+            <dd th:classappend="${request.submitterAddress == null} ? 'unanswered'" th:text="${request.submitterAddress} ?: 'Not answered'">Address</dd>
 
             <dt>Contact details</dt>
-            <dd th:text="${request.submitterContactDetails} ?: '—'">Contact details</dd>
+            <dd th:classappend="${request.submitterContactDetails == null} ? 'unanswered'" th:text="${request.submitterContactDetails} ?: 'Not answered'">Contact details</dd>
 
             <dt>Best times to visit</dt>
-            <dd th:text="${request.bestTimesToVisit} ?: '—'">Best times to visit</dd>
+            <dd th:classappend="${request.bestTimesToVisit == null} ? 'unanswered'" th:text="${request.bestTimesToVisit} ?: 'Not answered'">Best times to visit</dd>
         </dl>
     </div>
 
-    <div class="card" th:if="${request.notes}">
+    <div class="card" id="notes" tabindex="-1" th:if="${request.notes}">
         <h3>Additional Notes</h3>
         <p th:text="${request.notes}">Notes</p>
     </div>
@@ -140,124 +244,146 @@
       to enforce on the old standalone route). Do not gate this block on anything else: `report`
       being non-null on the model IS the authorization check.
     -->
-    <div class="card" th:if="${report != null}">
-        <h3>Details</h3>
+    <div class="card" id="report-details" tabindex="-1" th:if="${report != null}"
+         th:with="notAnswered=${(report.interviewLocation == null ? 1 : 0) + (report.ifNotWhyLate == null ? 1 : 0)
+                               + (report.consultationWithHomeStaff == null ? 1 : 0) + (report.previouslyMissing == null ? 1 : 0)
+                               + (report.missingOccasionsLast30Days == null ? 1 : 0) + (report.confidentialityExplained == null ? 1 : 0)}">
+        <h3>Details
+            <span class="section-count" th:if="${notAnswered > 0}" th:text="${notAnswered + ' not answered'}"></span>
+        </h3>
         <dl class="detail">
             <dt>Visitor</dt>
             <dd th:text="${report.visitor.fullName}">Visitor</dd>
 
             <dt>Date of interview</dt>
-            <dd th:text="${report.heldAt} != null ? ${#temporals.format(report.heldAt, 'dd MMM yyyy HH:mm')} : '—'">Date</dd>
+            <dd th:classappend="${report.heldAt == null} ? 'unanswered'" th:text="${report.heldAt} != null ? ${#temporals.format(report.heldAt, 'dd MMM yyyy HH:mm')} : 'Not answered'">Date</dd>
 
             <dt>Location of this interview</dt>
-            <dd th:text="${report.interviewLocation} ?: '—'">Location</dd>
+            <dd th:classappend="${report.interviewLocation == null} ? 'unanswered'" th:text="${report.interviewLocation} ?: 'Not answered'">Location</dd>
 
             <dt>Was this interview offered and completed within 72 hours of return?</dt>
-            <dd th:text="${report.within72Hours} == null ? 'Not measurable — interview time not recorded' : (${report.within72Hours} ? 'Yes' : 'No')">—</dd>
+            <dd class="unanswered" th:if="${report.within72Hours == null}">Not measurable — interview time not recorded</dd>
+            <dd th:unless="${report.within72Hours == null}" th:text="${report.within72Hours} ? 'Yes' : 'No'">—</dd>
 
             <dt>If not, why?</dt>
-            <dd th:text="${report.ifNotWhyLate} ?: '—'">—</dd>
+            <dd th:classappend="${report.ifNotWhyLate == null} ? 'unanswered'" th:text="${report.ifNotWhyLate} ?: 'Not answered'">—</dd>
 
             <dt>Consultation with home's staff to establish any new information</dt>
-            <dd th:text="${report.consultationWithHomeStaff} ?: '—'">—</dd>
+            <dd th:classappend="${report.consultationWithHomeStaff == null} ? 'unanswered'" th:text="${report.consultationWithHomeStaff} ?: 'Not answered'">—</dd>
 
             <dt>Has this young person previously been missing?</dt>
-            <dd th:text="${report.previouslyMissing} == null ? 'Not answered' : (${report.previouslyMissing} ? 'Yes' : 'No')">—</dd>
+            <dd th:classappend="${report.previouslyMissing == null} ? 'unanswered'" th:text="${report.previouslyMissing} == null ? 'Not answered' : (${report.previouslyMissing} ? 'Yes' : 'No')">—</dd>
 
             <dt>How many occasions of missing has there been in the last 30 days?</dt>
-            <dd th:text="${report.missingOccasionsLast30Days} ?: '—'">—</dd>
+            <dd th:classappend="${report.missingOccasionsLast30Days == null} ? 'unanswered'" th:text="${report.missingOccasionsLast30Days} ?: 'Not answered'">—</dd>
 
             <dt>Confidentiality explained to the young person regarding safeguarding duty of care?</dt>
-            <dd th:text="${report.confidentialityExplained} == null ? 'Not answered' : (${report.confidentialityExplained} ? 'Yes' : 'No')">—</dd>
+            <dd th:classappend="${report.confidentialityExplained == null} ? 'unanswered'" th:text="${report.confidentialityExplained} == null ? 'Not answered' : (${report.confidentialityExplained} ? 'Yes' : 'No')">—</dd>
         </dl>
     </div>
 
-    <div class="card" th:if="${report != null}">
-        <h3>Return Home Interview</h3>
+    <div class="card" id="rhi" tabindex="-1" th:if="${report != null}"
+         th:with="notAnswered=${(report.interviewAccepted == null ? 1 : 0) + (report.interviewDeclinedReason == null ? 1 : 0)
+                               + (report.whereWereYouWhileMissing == null ? 1 : 0) + (report.whoWereYouWithWhileMissing == null ? 1 : 0)
+                               + (report.whatMadeYouGoMissing == null ? 1 : 0) + (report.whatCanBeDoneToAddressReasons == null ? 1 : 0)
+                               + (report.consideredSelfMissing == null ? 1 : 0) + (report.whatDidYouDoWhileMissing == null ? 1 : 0)
+                               + (report.whatHappenedWhenReturned == null ? 1 : 0) + (report.preventFutureMissingSuggestions == null ? 1 : 0)
+                               + (report.additionalCommentsFromYoungPerson == null ? 1 : 0) + (report.additionalInfoFromParentCarer == null ? 1 : 0)}">
+        <h3>Return Home Interview
+            <span class="section-count" th:if="${notAnswered > 0}" th:text="${notAnswered + ' not answered'}"></span>
+        </h3>
         <dl class="detail">
             <dt>Interview accepted?</dt>
-            <dd th:text="${report.interviewAccepted} == null ? 'Not answered' : (${report.interviewAccepted} ? 'Yes' : 'No')">—</dd>
+            <dd th:classappend="${report.interviewAccepted == null} ? 'unanswered'" th:text="${report.interviewAccepted} == null ? 'Not answered' : (${report.interviewAccepted} ? 'Yes' : 'No')">—</dd>
 
             <dt>If not, why?</dt>
-            <dd th:text="${report.interviewDeclinedReason} ?: '—'">—</dd>
+            <dd th:classappend="${report.interviewDeclinedReason == null} ? 'unanswered'" th:text="${report.interviewDeclinedReason} ?: 'Not answered'">—</dd>
 
             <dt>Where were you while missing?</dt>
-            <dd th:text="${report.whereWereYouWhileMissing} ?: '—'">—</dd>
+            <dd th:classappend="${report.whereWereYouWhileMissing == null} ? 'unanswered'" th:text="${report.whereWereYouWhileMissing} ?: 'Not answered'">—</dd>
 
             <dt>Who were you with while missing?</dt>
-            <dd th:text="${report.whoWereYouWithWhileMissing} ?: '—'">—</dd>
+            <dd th:classappend="${report.whoWereYouWithWhileMissing == null} ? 'unanswered'" th:text="${report.whoWereYouWithWhileMissing} ?: 'Not answered'">—</dd>
 
             <dt>What made you go missing?</dt>
-            <dd th:text="${report.whatMadeYouGoMissing} ?: '—'">—</dd>
+            <dd th:classappend="${report.whatMadeYouGoMissing == null} ? 'unanswered'" th:text="${report.whatMadeYouGoMissing} ?: 'Not answered'">—</dd>
 
             <dt>What can be done to address these reasons?</dt>
-            <dd th:text="${report.whatCanBeDoneToAddressReasons} ?: '—'">—</dd>
+            <dd th:classappend="${report.whatCanBeDoneToAddressReasons == null} ? 'unanswered'" th:text="${report.whatCanBeDoneToAddressReasons} ?: 'Not answered'">—</dd>
 
             <dt>Did you consider yourself to be missing?</dt>
-            <dd th:text="${report.consideredSelfMissing} == null ? 'Not answered' : (${report.consideredSelfMissing} ? 'Yes' : 'No')">—</dd>
+            <dd th:classappend="${report.consideredSelfMissing == null} ? 'unanswered'" th:text="${report.consideredSelfMissing} == null ? 'Not answered' : (${report.consideredSelfMissing} ? 'Yes' : 'No')">—</dd>
 
             <dt>What did you do while you were missing?</dt>
-            <dd th:text="${report.whatDidYouDoWhileMissing} ?: '—'">—</dd>
+            <dd th:classappend="${report.whatDidYouDoWhileMissing == null} ? 'unanswered'" th:text="${report.whatDidYouDoWhileMissing} ?: 'Not answered'">—</dd>
 
             <dt>What happened when you returned home?</dt>
-            <dd th:text="${report.whatHappenedWhenReturned} ?: '—'">—</dd>
+            <dd th:classappend="${report.whatHappenedWhenReturned == null} ? 'unanswered'" th:text="${report.whatHappenedWhenReturned} ?: 'Not answered'">—</dd>
 
             <dt>Is there anything that can be done to stop you going missing again?</dt>
-            <dd th:text="${report.preventFutureMissingSuggestions} ?: '—'">—</dd>
+            <dd th:classappend="${report.preventFutureMissingSuggestions == null} ? 'unanswered'" th:text="${report.preventFutureMissingSuggestions} ?: 'Not answered'">—</dd>
 
             <dt>Any additional comments from the young person?</dt>
-            <dd th:text="${report.additionalCommentsFromYoungPerson} ?: '—'">—</dd>
+            <dd th:classappend="${report.additionalCommentsFromYoungPerson == null} ? 'unanswered'" th:text="${report.additionalCommentsFromYoungPerson} ?: 'Not answered'">—</dd>
 
             <dt>Any additional information provided by the parent/carer?</dt>
-            <dd th:text="${report.additionalInfoFromParentCarer} ?: '—'">—</dd>
+            <dd th:classappend="${report.additionalInfoFromParentCarer == null} ? 'unanswered'" th:text="${report.additionalInfoFromParentCarer} ?: 'Not answered'">—</dd>
         </dl>
     </div>
 
-    <div class="card" th:if="${report != null}">
-        <h3>Future Incidents</h3>
+    <div class="card" id="future-incidents" tabindex="-1" th:if="${report != null}"
+         th:with="notAnswered=${(report.risksIdentifiedDuringEpisode == null ? 1 : 0) + (report.risksIncreaseFutureEpisodes == null ? 1 : 0)
+                               + (report.safeguardingConcernsToExplore == null ? 1 : 0) + (report.infoToHelpLocateFuture == null ? 1 : 0)}">
+        <h3>Future Incidents
+            <span class="section-count" th:if="${notAnswered > 0}" th:text="${notAnswered + ' not answered'}"></span>
+        </h3>
         <dl class="detail">
             <dt>Any identified risks during this missing episode?</dt>
-            <dd th:text="${report.risksIdentifiedDuringEpisode} ?: '—'">—</dd>
+            <dd th:classappend="${report.risksIdentifiedDuringEpisode == null} ? 'unanswered'" th:text="${report.risksIdentifiedDuringEpisode} ?: 'Not answered'">—</dd>
 
             <dt>Is there anything that would increase risks during future missing episodes?</dt>
-            <dd th:text="${report.risksIncreaseFutureEpisodes} ?: '—'">—</dd>
+            <dd th:classappend="${report.risksIncreaseFutureEpisodes == null} ? 'unanswered'" th:text="${report.risksIncreaseFutureEpisodes} ?: 'Not answered'">—</dd>
 
             <dt>Any safeguarding concerns that need to be further explored?</dt>
-            <dd th:text="${report.safeguardingConcernsToExplore} ?: '—'">—</dd>
+            <dd th:classappend="${report.safeguardingConcernsToExplore == null} ? 'unanswered'" th:text="${report.safeguardingConcernsToExplore} ?: 'Not answered'">—</dd>
 
             <dt>Any information that might help locating the young person during future missing episodes?</dt>
-            <dd th:text="${report.infoToHelpLocateFuture} ?: '—'">—</dd>
+            <dd th:classappend="${report.infoToHelpLocateFuture == null} ? 'unanswered'" th:text="${report.infoToHelpLocateFuture} ?: 'Not answered'">—</dd>
         </dl>
     </div>
 
-    <div class="card" th:if="${report != null}">
+    <div class="card" id="interviewer-comments" tabindex="-1" th:if="${report != null}">
         <h3>Interviewer's Comments</h3>
-        <p th:text="${report.interviewerComments} ?: '—'">Comments</p>
+        <p th:classappend="${report.interviewerComments == null} ? 'unanswered'" th:text="${report.interviewerComments} ?: 'Not answered'">Comments</p>
     </div>
 
-    <div class="card" th:if="${report != null}">
+    <div class="card" id="recommendations" tabindex="-1" th:if="${report != null}">
         <h3>Recommendations</h3>
-        <p th:text="${report.recommendations} ?: '—'">Recommendations</p>
+        <p th:classappend="${report.recommendations == null} ? 'unanswered'" th:text="${report.recommendations} ?: 'Not answered'">Recommendations</p>
     </div>
 
-    <div class="card" th:if="${report != null}">
+    <div class="card" id="declaration" tabindex="-1" th:if="${report != null}">
         <h3>Declaration</h3>
         <dl class="detail">
             <dt>Statement</dt>
-            <dd th:text="${report.conductedByStatement} ?: '—'">—</dd>
+            <dd th:classappend="${report.conductedByStatement == null} ? 'unanswered'" th:text="${report.conductedByStatement} ?: 'Not answered'">—</dd>
 
             <dt>Signed</dt>
             <dd th:text="${report.visitor.fullName + ' on ' + #temporals.format(report.submittedAt, 'dd MMM yyyy HH:mm')}">—</dd>
 
             <dt>Date report shared with relevant professionals</dt>
-            <dd th:text="${report.dateReportShared} != null ? ${#temporals.format(report.dateReportShared, 'dd MMM yyyy')} : 'Not yet shared'">—</dd>
+            <dd th:classappend="${report.dateReportShared == null} ? 'unanswered'" th:text="${report.dateReportShared} != null ? ${#temporals.format(report.dateReportShared, 'dd MMM yyyy')} : 'Not yet shared'">—</dd>
         </dl>
     </div>
 
-    <div class="card">
+    </div>
+    <div class="history-col">
+    <div class="card" id="history" tabindex="-1">
         <h2 style="margin-top:0">History</h2>
         <div th:replace="~{fragments/audit-history :: provenance}"></div>
         <div th:replace="~{fragments/audit-history :: timeline(${auditHistory})}"></div>
+    </div>
+    </div>
     </div>
 </main>
 </body>
