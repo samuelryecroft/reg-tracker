@@ -6,6 +6,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
+import com.microsoft.playwright.Route;
 import ninja.samryecroft.returnhome.tracker.child.Child;
 import ninja.samryecroft.returnhome.tracker.child.ChildRepository;
 import ninja.samryecroft.returnhome.tracker.home.Home;
@@ -211,6 +212,40 @@ class ReportWizardUiTest extends AbstractUiTest {
         assertThat(interviewReportRepository.findByInterviewRequestId(requestId))
                 .as("nothing reached the database, which is exactly why the screen must not claim it did")
                 .isEmpty();
+    }
+
+    /**
+     * T174: a 200 with JSON that is not our envelope must not read as a save.
+     *
+     * <p>This is the case the content-type check exists for and the one nothing pinned. A gateway,
+     * an SSO hop or a proxy answering 200 with its own JSON error body parses cleanly, so every
+     * cheap success test - {@code response.ok}, "it is JSON", "it parsed" - passes it. The client
+     * therefore has to <b>assert</b> success rather than infer it from the absence of failure, and
+     * that is what {@code outcome === 'saved'} is doing; dropping it survives every other test in
+     * this file.
+     *
+     * <p>Modelled at the NETWORK layer with a route interception rather than by pointing the form
+     * at another endpoint of this application, because that is the layer the real failure occupies:
+     * the envelope is injected by something between the browser and us. Pointing it at
+     * {@code /actuator/health} was the first attempt and would have passed for the wrong reason - a
+     * POST there is a 405, so the test would have proved only that a 405 is not a save.
+     */
+    @Test
+    void aTwoHundredCarryingSomeoneElsesJsonIsNotReadAsASave() {
+        login("wizard-ui-visitor", PASSWORD);
+        page.navigate(url("/visitor/interviews/" + requestId + "/report"));
+        page.waitForLoadState();
+
+        page.route("**/report/draft", route -> route.fulfill(new Route.FulfillOptions()
+                .setStatus(200)
+                .setContentType("application/json")
+                .setBody("{\"error\":\"upstream request timeout\"}")));
+
+        page.click("button:has-text('Next')");
+
+        page.waitForSelector("#stepper-saved:has-text('Not saved')");
+        assertThat(page.locator("#stepper-saved").textContent()).doesNotContain("Saved ");
+        assertThat(interviewReportRepository.findByInterviewRequestId(requestId)).isEmpty();
     }
 
     @Test
