@@ -750,7 +750,10 @@ textarea:focus-visible, summary:focus-visible, .checkbox-option:focus-within {
 input.is-invalid, select.is-invalid, textarea.is-invalid {
     border-color: var(--error);
     border-width: 2px;
-    background: #FFF7F7;
+    /* Was #FFF7F7: a fixed pale-red fill under an ink that follows the appearance, i.e. the
+       .tile.urgent bug on EVERY invalid field in the app, in the one state a user most needs
+       to be able to read. Creed's sweep found the tiles; this came out of searching the shape. */
+    background: var(--error-bg);
 }
 .field-error {
     display: flex;
@@ -764,7 +767,8 @@ input.is-invalid, select.is-invalid, textarea.is-invalid {
 .field-error .icon { font-size: 11px; margin-top: 3px; }
 
 .readonly-val {
-    background: #F6F7F9;
+    /* Same shape as .tile.urgent - a fixed light fill under themed ink. */
+    background: var(--neutral-bg);
     border: 1px solid var(--border);
     border-radius: 8px;
     padding: 0.6rem 0.75rem;
@@ -864,8 +868,10 @@ fieldset.checkbox-fieldset > legend {
     border-radius: 12px;
     font-size: var(--t-xs);
     font-weight: 700;
-    background: #eef2f6;
-    color: #333;
+    /* Both halves were hard-coded, so this pair was at least self-consistent - but it ignored
+       the appearance entirely, and every .status.* modifier below already takes a themed pair. */
+    background: var(--neutral-bg);
+    color: var(--neutral);
 }
 .status.REQUESTED { background: var(--warn-bg); color: var(--warn); }
 .status.ALLOCATED, .status.SCHEDULED, .status.REPORT_SUBMITTED { background: var(--info-bg); color: var(--info); }
@@ -1013,7 +1019,6 @@ table caption { text-align: left; font-size: var(--t-xs); color: var(--muted); p
 }
 .rowlink { color: var(--accent-dark); font-weight: 650; text-decoration: none; display: inline-flex; align-items: center; min-height: 44px; margin-right: var(--s3); }
 .rowlink:hover, .rowlink:focus-visible { text-decoration: underline; }
-tr.group th { background: #F3F4F6; color: var(--ink); text-transform: none; font-size: var(--t-sm); letter-spacing: 0; }
 /* T165: the urgency-tier glyph is an aria-hidden <svg> in markup now, not a character inside the
    announced heading text - this keeps it on the text baseline in both the table and .stack views. */
 .due-group-head { display: inline-flex; align-items: center; gap: 6px; }
@@ -1266,8 +1271,19 @@ body:has(#history:target) .section-index a[href="#history"] {
 .tile .num { display: block; font-size: 30px; font-weight: 700; line-height: 1.15; margin: 4px 0 2px; font-variant-numeric: tabular-nums; }
 .tile .den { display: block; font-size: var(--t-xs); color: var(--muted); }
 .tile .go { display: block; font-size: var(--t-xs); font-weight: 700; color: var(--accent-dark); margin-top: var(--s2); }
-.tile.urgent { border-color: #F3C0C0; background: #FFFAFA; }
-.tile.warn { border-color: #EBCF8A; background: #FFFDF6; }
+/* LIVE DARK-MODE DEFECT, fixed (Creed's 2c review). Both rules used to set a hard-coded
+   LIGHT background (#FFFAFA / #FFFDF6) and no ink at all, so .num / .lab / .den / .go kept
+   inheriting --color-text - which is near-white in dark. Measured on dark: the .num, the
+   30px COUNT ITSELF, at 1.17:1 and 1.19:1; .lab/.den 2.23-2.27:1; .go 1.43-1.59:1. These
+   are the "needs attention" tiles, so the number that was invisible was the overdue count.
+   Same class as the .due.overdue bug (#48), not cosmetic.
+
+   The fix takes fill AND border from the semantic family and sets NO ink, so color:inherit
+   keeps working in both appearances. The border derives at 25% (§5h) and its fallback for a
+   browser without color-mix() is TRANSPARENT, never the old literal: a fallback degrades to
+   ABSENCE, because #F3C0C0 is precisely the value that produces the bug this removes. */
+.tile.urgent { background: var(--error-bg); border: 1px solid transparent; border-color: color-mix(in srgb, var(--error) 25%, transparent); }
+.tile.warn { background: var(--warn-bg); border: 1px solid transparent; border-color: color-mix(in srgb, var(--warn) 25%, transparent); }
 
 /* small flag chips (recurrence panel) - reuses the same neutral/semantic families as .due and .status */
 .pill {
@@ -1395,3 +1411,15 @@ nav.seg .seg-opt { color: inherit; text-decoration: none; }
     text-transform: uppercase; color: var(--muted);
 }
 .case-note p { margin: var(--s1) 0 0; font-size: var(--t-sm); white-space: pre-wrap; }
+
+/* ============================== 2c · compliance bars ==============================
+   D-2c-1. The bar is decoration over a number the row already states in words, so it
+   carries no ARIA and needs none - it is aria-hidden, and removing it loses nothing but
+   the at-a-glance comparison between rows. It still takes 3:1 against its own track:
+   an invisible encoding is not a safe encoding just because it is redundant. */
+.rate { display: block; font-variant-numeric: tabular-nums; }
+.bar {
+    display: block; height: 6px; margin-top: 5px; min-width: 90px;
+    border-radius: 999px; background: var(--neutral-bg); overflow: hidden;
+}
+.bar-fill { display: block; height: 100%; background: var(--accent-dark); border-radius: inherit; }
