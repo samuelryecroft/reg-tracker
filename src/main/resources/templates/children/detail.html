@@ -2,13 +2,16 @@
 <html xmlns:th="http://www.thymeleaf.org" lang="en" th:attr="data-appearance=${#strings.toLowerCase(appearancePreference)}">
 <head>
     <meta charset="UTF-8"/>
-    <title th:text="${child.fullName + ' — Return Home Tracker'}">Child</title>
+    <!-- T138 1c: the title tag is easy to miss when masking a page - it goes in the browser tab,
+         history and bookmarks, and every screenshot of the window, none of which respect an h1's
+         own masking (Kevin's review). -->
+    <title th:text="${childIdentity.label() + ' — Return Home Tracker'}">Child</title>
     <th:block th:replace="~{fragments/layout :: styles}"></th:block>
 </head>
 <body>
 <div th:replace="~{fragments/layout :: nav}"></div>
 <main id="main">
-    <h1 th:text="${child.fullName}">Child Name</h1>
+    <h1 th:text="${childIdentity.label()}">Child Name</h1>
     <p class="muted" th:text="${'Home: ' + child.home.name}">Home</p>
 
     <div class="card" th:if="${canExport}" style="display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap">

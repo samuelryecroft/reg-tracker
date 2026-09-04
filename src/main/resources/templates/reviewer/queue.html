@@ -24,7 +24,7 @@
         </thead>
         <tbody>
         <tr th:each="r : ${requests}">
-            <td th:text="${r.child.fullName}">Child Name</td>
+            <td th:text="${childIdentities[r.child.id].label()}">Child Name</td>
             <td th:text="${r.home.name}">Home</td>
             <td th:text="${r.allocatedVisitor} ? ${r.allocatedVisitor.fullName} : '—'">Visitor</td>
             <td th:text="${#temporals.format(r.createdAt, 'dd MMM yyyy HH:mm')}">Created</td>
@@ -39,7 +39,7 @@
 
     <div class="stack">
         <div class="srow" th:each="r : ${requests}">
-            <div class="top"><span class="name" th:text="${r.child.fullName}">Child Name</span></div>
+            <div class="top"><span class="name" th:text="${childIdentities[r.child.id].label()}">Child Name</span></div>
             <dl>
                 <dt>Home</dt><dd th:text="${r.home.name}">Home</dd>
                 <dt>Visitor</dt><dd th:text="${r.allocatedVisitor} ? ${r.allocatedVisitor.fullName} : '—'">Visitor</dd>

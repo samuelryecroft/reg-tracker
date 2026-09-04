@@ -3,7 +3,9 @@ package ninja.samryecroft.returnhome.tracker.export;
 import java.time.LocalDate;
 import java.util.Set;
 import ninja.samryecroft.returnhome.tracker.child.Child;
+import ninja.samryecroft.returnhome.tracker.child.ChildIdentity;
 import ninja.samryecroft.returnhome.tracker.child.ChildRepository;
+import ninja.samryecroft.returnhome.tracker.child.NameRevealService;
 import ninja.samryecroft.returnhome.tracker.user.AppUserPrincipal;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -27,10 +29,13 @@ public class CaseFileExportPageController {
 
     private final ChildRepository childRepository;
     private final ExportController exportController;
+    private final NameRevealService nameRevealService;
 
-    public CaseFileExportPageController(ChildRepository childRepository, ExportController exportController) {
+    public CaseFileExportPageController(ChildRepository childRepository, ExportController exportController,
+            NameRevealService nameRevealService) {
         this.childRepository = childRepository;
         this.exportController = exportController;
+        this.nameRevealService = nameRevealService;
     }
 
     @GetMapping("/children/{id}/export")
@@ -40,6 +45,11 @@ public class CaseFileExportPageController {
         ExportManifest manifest = exportController.manifest(id, null, null, principal);
         Child child = childRepository.findDetailedById(id).orElseThrow();
         model.addAttribute("child", child);
+        // These screens are ordinary screens, masked like any other - decision 5 ("exports are
+        // never masked") is about the STATUTORY DOCUMENT, not the HTML pages that request or
+        // confirm one (Kevin's review: worth stating explicitly so nobody reads that decision as
+        // exempting this template).
+        model.addAttribute("childIdentity", ChildIdentity.of(child, nameRevealService.isRevealed()));
         model.addAttribute("manifest", manifest);
         model.addAttribute("purposes", ExportPurpose.values());
         return "export/case-file-form";
@@ -63,13 +73,16 @@ public class CaseFileExportPageController {
         ResponseEntity<?> response = exportController.generate(id, body, principal);
 
         if (response.getStatusCode().is2xxSuccessful()) {
-            model.addAttribute("child", childRepository.findDetailedById(id).orElseThrow());
+            Child child = childRepository.findDetailedById(id).orElseThrow();
+            model.addAttribute("child", child);
+            model.addAttribute("childIdentity", ChildIdentity.of(child, nameRevealService.isRevealed()));
             model.addAttribute("result", (ExportController.GenerateResponse) response.getBody());
             return "export/case-file-ready";
         }
 
         Child child = childRepository.findDetailedById(id).orElseThrow();
         model.addAttribute("child", child);
+        model.addAttribute("childIdentity", ChildIdentity.of(child, nameRevealService.isRevealed()));
         model.addAttribute("manifest", exportController.manifest(id, from, null, principal));
         model.addAttribute("purposes", ExportPurpose.values());
         model.addAttribute("selectedPurpose", purpose);

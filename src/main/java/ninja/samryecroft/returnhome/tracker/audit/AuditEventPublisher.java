@@ -289,6 +289,25 @@ public class AuditEventPublisher {
                 .build());
     }
 
+    // --- Masking (T138 1c) ---
+
+    /**
+     * Someone revealed the masked child names on a page (spec §2.5). Recorded because a client-side
+     * toggle cannot be audited - there would be no server event, so nothing would record that
+     * someone unmasked a list of children, and revealing a whole list is at least as much
+     * professional access to safeguarding data as {@link #auditViewOpened} already treats opening
+     * one child's record as being. One event per reveal ACTION, not per row the reveal happened to
+     * affect: "who was looking at which children, and when" is answered by this event plus the page
+     * path, not by a row-per-child trail that would swamp genuine per-record access events.
+     */
+    public void namesRevealed(String path, AppUserPrincipal principal) {
+        publish(actor(AuditEventRecord.of(AuditEventType.NAMES_REVEALED), principal)
+                .target("Page", null)
+                .scope(principal.getOrganisationId(), actorHomeId(principal))
+                .meta("path", path)
+                .build());
+    }
+
     // --- Access control (A.4) ---
 
     /** {@code principal} is null for an anonymous attempt. */

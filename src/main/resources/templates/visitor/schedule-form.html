@@ -8,7 +8,7 @@
 <body>
 <div th:replace="~{fragments/layout :: nav}"></div>
 <main id="main">
-    <h1 th:text="${'Confirm visit time: ' + request.child.fullName}">Confirm visit time</h1>
+    <h1 th:text="${'Confirm visit time: ' + childIdentity.label()}">Confirm visit time</h1>
     <p class="muted" th:text="${'Home: ' + request.home.name}">Home</p>
 
     <div class="card">

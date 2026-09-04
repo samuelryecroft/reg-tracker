@@ -252,6 +252,10 @@ class TemplateRenderCoverageIntegrationTest extends AbstractIntegrationTest {
         Child child = new Child();
         child.setFirstName(childFirstName);
         child.setLastName("Render");
+        // T138 1c: several of these views mask child names by default (spec §2.5) - the case
+        // reference is the part of a masked identity that IS shown, so assertRenders' seeded-name
+        // check still finds this fixture's marker on a masked page via it.
+        child.setLocalCaseReference(childFirstName);
         child.setDateOfBirth(LocalDate.of(2010, 2, 3));
         child.setHome(home);
         Long childId = childRepository.save(child).getId();

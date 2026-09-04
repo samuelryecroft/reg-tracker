@@ -73,6 +73,11 @@ class SupplierScopeAuditFeedIntegrationTest extends AbstractIntegrationTest {
     private String clientHomeName;
     private String clientChildSurname;
     private String legitimateChildSurname;
+    // T138 1c: coordinator/requests.html now masks child names by default (spec §2.5) - the case
+    // reference is the one part of a masked identity that IS shown ("A.B. · CH-0041"), so it's what
+    // the on-page identity assertions below check for instead of the surname.
+    private String clientChildCaseReference;
+    private String legitimateChildCaseReference;
 
     @BeforeEach
     void seedTheCrossProviderState() {
@@ -88,11 +93,13 @@ class SupplierScopeAuditFeedIntegrationTest extends AbstractIntegrationTest {
         Home providerAHome = saveHome("T139 Provider A House" + suffix, providerA);
 
         clientChildSurname = "BravoSurname" + suffix;
-        Long childId = saveChild("Casey", clientChildSurname, providerBHome);
+        clientChildCaseReference = "CH-BRAVO" + suffix;
+        Long childId = saveChild("Casey", clientChildSurname, clientChildCaseReference, providerBHome);
         // Provider A is the supplier's genuine client, so this child is what a supplier-side
         // coordinator is supposed to see - the control for the deny assertions below.
         legitimateChildSurname = "AlphaSurname" + suffix;
-        Long legitimateChildId = saveChild("Alex", legitimateChildSurname, providerAHome);
+        legitimateChildCaseReference = "CH-ALPHA" + suffix;
+        Long legitimateChildId = saveChild("Alex", legitimateChildSurname, legitimateChildCaseReference, providerAHome);
 
         // Coordinator sitting in a CARE PROVIDER: supplier-side by role, care-provider-side by
         // organisation. /audit/** admits COORDINATOR, so this account reaches the feed.
@@ -138,7 +145,10 @@ class SupplierScopeAuditFeedIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
 
-        assertThat(html).doesNotContain(clientChildSurname);
+        // T138 1c: this page masks child names by default, so the surname was never going to
+        // appear regardless of scoping - the case reference is the part of a masked identity that
+        // IS shown, and is the thing that would actually leak if scoping were broken.
+        assertThat(html).doesNotContain(clientChildCaseReference);
         assertThat(html).doesNotContain(clientHomeName);
     }
 
@@ -149,9 +159,11 @@ class SupplierScopeAuditFeedIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
 
-        assertThat(html).contains(legitimateChildSurname);
+        // T138 1c: masked by default - the surname itself never renders here, so this checks the
+        // part of the masked identity that does (spec §2.5's "A.B. · CH-0041").
+        assertThat(html).contains(legitimateChildCaseReference);
         // And still not the provider they have no relationship with.
-        assertThat(html).doesNotContain(clientChildSurname);
+        assertThat(html).doesNotContain(clientChildCaseReference);
     }
 
     private String feedAs(String username) throws Exception {
@@ -186,10 +198,11 @@ class SupplierScopeAuditFeedIntegrationTest extends AbstractIntegrationTest {
         return homeRepository.save(home);
     }
 
-    private Long saveChild(String firstName, String lastName, Home home) {
+    private Long saveChild(String firstName, String lastName, String localCaseReference, Home home) {
         Child child = new Child();
         child.setFirstName(firstName);
         child.setLastName(lastName);
+        child.setLocalCaseReference(localCaseReference);
         child.setDateOfBirth(LocalDate.of(2012, 2, 2));
         child.setHome(home);
         return childRepository.save(child).getId();

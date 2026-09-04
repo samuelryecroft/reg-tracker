@@ -24,7 +24,7 @@
         </thead>
         <tbody>
         <tr th:each="r : ${requests}">
-            <td th:text="${r.child.fullName}">Child Name</td>
+            <td th:text="${childIdentities[r.child.id].label()}">Child Name</td>
             <td th:text="${r.home.name}">Home</td>
             <td><span class="status" th:classappend="${r.status}" th:text="${r.status.displayName}">STATUS</span></td>
             <td th:text="${r.scheduledAt} != null ? ${#temporals.format(r.scheduledAt, 'dd MMM yyyy HH:mm')} : '—'">Scheduled</td>
@@ -45,7 +45,7 @@
     <div class="stack">
         <div class="srow" th:each="r : ${requests}">
             <div class="top">
-                <span class="name" th:text="${r.child.fullName}">Child Name</span>
+                <span class="name" th:text="${childIdentities[r.child.id].label()}">Child Name</span>
                 <span class="status" th:classappend="${r.status}" th:text="${r.status.displayName}">STATUS</span>
             </div>
             <dl>

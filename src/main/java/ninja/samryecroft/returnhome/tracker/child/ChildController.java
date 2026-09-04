@@ -38,11 +38,12 @@ public class ChildController {
     private final AuditHistoryService auditHistoryService;
     private final AuditEventPublisher auditEventPublisher;
     private final RoleMatrix roleMatrix;
+    private final NameRevealService nameRevealService;
 
     public ChildController(ChildRepository childRepository, HomeRepository homeRepository,
             InterviewRequestRepository interviewRequestRepository, OrganisationAccessService organisationAccessService,
             AuditHistoryService auditHistoryService, AuditEventPublisher auditEventPublisher,
-            RoleMatrix roleMatrix) {
+            RoleMatrix roleMatrix, NameRevealService nameRevealService) {
         this.childRepository = childRepository;
         this.homeRepository = homeRepository;
         this.interviewRequestRepository = interviewRequestRepository;
@@ -50,6 +51,7 @@ public class ChildController {
         this.auditHistoryService = auditHistoryService;
         this.auditEventPublisher = auditEventPublisher;
         this.roleMatrix = roleMatrix;
+        this.nameRevealService = nameRevealService;
     }
 
     @GetMapping
@@ -74,10 +76,13 @@ public class ChildController {
         }
         // Sorted here rather than by the database: the names are encrypted columns now, so an
         // ORDER BY on them would sort ciphertext. Home-grouped lists keep the home order they had.
-        model.addAttribute("children", children.stream()
+        List<Child> sorted = children.stream()
                 .sorted(showHomeColumn ? ChildRepository.BY_HOME_THEN_NAME : ChildRepository.BY_NAME)
-                .toList());
+                .toList();
+        model.addAttribute("children", sorted);
         model.addAttribute("isAdmin", showHomeColumn);
+        model.addAttribute("childIdentities",
+                ChildIdentities.mapOf(sorted, c -> c, nameRevealService.isRevealed()));
         return "children/list";
     }
 
@@ -94,6 +99,7 @@ public class ChildController {
                 .filter(r -> r.getStatus().name().equals("REPORT_APPROVED"))
                 .count();
         model.addAttribute("child", child);
+        model.addAttribute("childIdentity", ChildIdentity.of(child, nameRevealService.isRevealed()));
         model.addAttribute("requests", requests);
         model.addAttribute("caseHistory", auditHistoryService.caseHistoryFor(requests));
         model.addAttribute("canExport", ExportCapability.canExport(principal));

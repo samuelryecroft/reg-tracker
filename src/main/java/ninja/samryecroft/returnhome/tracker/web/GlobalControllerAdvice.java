@@ -3,6 +3,7 @@ package ninja.samryecroft.returnhome.tracker.web;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import ninja.samryecroft.returnhome.tracker.audit.AuditEventPublisher;
+import ninja.samryecroft.returnhome.tracker.child.NameRevealService;
 import ninja.samryecroft.returnhome.tracker.document.DocumentNotFoundException;
 import ninja.samryecroft.returnhome.tracker.document.DocumentSecurityException;
 import ninja.samryecroft.returnhome.tracker.document.KeyUnavailableException;
@@ -39,15 +40,17 @@ public class GlobalControllerAdvice {
     private final RoleMatrix roleMatrix;
     private final OrganisationAccessService organisationAccessService;
     private final HomeRepository homeRepository;
+    private final NameRevealService nameRevealService;
 
     public GlobalControllerAdvice(ThemeService themeService, AuditEventPublisher auditEventPublisher,
             RoleMatrix roleMatrix, OrganisationAccessService organisationAccessService,
-            HomeRepository homeRepository) {
+            HomeRepository homeRepository, NameRevealService nameRevealService) {
         this.themeService = themeService;
         this.auditEventPublisher = auditEventPublisher;
         this.roleMatrix = roleMatrix;
         this.organisationAccessService = organisationAccessService;
         this.homeRepository = homeRepository;
+        this.nameRevealService = nameRevealService;
     }
 
     /**
@@ -134,6 +137,19 @@ public class GlobalControllerAdvice {
      * @param label the current state's visible name, shown on the button itself.
      * @param next the state a click on the button switches to. */
     public record AppearanceToggle(String icon, String label, AppearancePreference next) {
+    }
+
+    /**
+     * T138 1c: whether the child names on the page about to render should show revealed (spec
+     * §2.5). Deliberately not persisted - see {@link NameRevealService}'s javadoc for why the
+     * reveal state itself is a one-shot, per-page flag rather than a sticky per-user setting. Every
+     * template that prints a {@code ChildIdentity} reads this exactly once, at the point it resolves
+     * the projection - the boolean itself carries no name, masked or otherwise, so there is nothing
+     * sensitive in the model even before a controller decides what to do with it.
+     */
+    @ModelAttribute("namesRevealed")
+    public boolean namesRevealed(HttpServletRequest request) {
+        return nameRevealService.isRevealed(request);
     }
 
     /**

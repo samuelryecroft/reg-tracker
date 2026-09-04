@@ -26,7 +26,7 @@
         </thead>
         <tbody>
         <tr th:each="c : ${children}">
-            <td th:text="${c.fullName}">Child Name</td>
+            <td th:text="${childIdentities[c.id].label()}">Child Name</td>
             <td th:text="${#temporals.format(c.dateOfBirth, 'dd MMM yyyy')}">DOB</td>
             <td th:if="${isAdmin}" th:text="${c.home.name}">Home</td>
             <td th:text="${c.localCaseReference} ?: '—'">Case reference</td>
@@ -37,7 +37,7 @@
 
     <div class="stack">
         <div class="srow" th:each="c : ${children}">
-            <div class="top"><span class="name" th:text="${c.fullName}">Child Name</span></div>
+            <div class="top"><span class="name" th:text="${childIdentities[c.id].label()}">Child Name</span></div>
             <dl>
                 <dt>Date of birth</dt><dd th:text="${#temporals.format(c.dateOfBirth, 'dd MMM yyyy')}">DOB</dd>
                 <dt th:if="${isAdmin}">Home</dt><dd th:if="${isAdmin}" th:text="${c.home.name}">Home</dd>

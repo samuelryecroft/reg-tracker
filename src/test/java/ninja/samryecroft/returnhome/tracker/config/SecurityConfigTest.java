@@ -6,6 +6,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import ninja.samryecroft.returnhome.tracker.audit.AuditEventPublisher;
+import ninja.samryecroft.returnhome.tracker.child.NameRevealService;
 import ninja.samryecroft.returnhome.tracker.home.HomeRepository;
 import ninja.samryecroft.returnhome.tracker.organisation.OrganisationAccessService;
 import ninja.samryecroft.returnhome.tracker.theme.ThemeService;
@@ -46,6 +47,10 @@ class SecurityConfigTest {
 
     @MockitoBean
     private HomeRepository homeRepository;
+
+    // T138 1c: GlobalControllerAdvice's namesRevealed() model attribute resolves this.
+    @MockitoBean
+    private NameRevealService nameRevealService;
 
     @Test
     void anonymousRequestToRootRedirectsToLogin() throws Exception {

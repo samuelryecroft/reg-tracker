@@ -267,6 +267,11 @@ class MultiHomeScopingIntegrationTest extends AbstractIntegrationTest {
         Child child = new Child();
         child.setFirstName(firstName);
         child.setLastName("Multihome");
+        // T138 1c: children/list.html and home-staff/request-list.html now mask child names by
+        // default (spec §2.5) - the case reference is the part of a masked identity that IS shown,
+        // so this fixture's own marker (the first name) still appears on those pages via it,
+        // rather than the scoping assertions below needing to know about masking at all.
+        child.setLocalCaseReference(firstName);
         child.setDateOfBirth(LocalDate.of(2011, 3, 4));
         child.setHome(home);
         return childRepository.save(child);

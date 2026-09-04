@@ -3,6 +3,9 @@ package ninja.samryecroft.returnhome.tracker.interview;
 import jakarta.validation.Valid;
 import java.time.LocalDateTime;
 import java.util.List;
+import ninja.samryecroft.returnhome.tracker.child.ChildIdentities;
+import ninja.samryecroft.returnhome.tracker.child.ChildIdentity;
+import ninja.samryecroft.returnhome.tracker.child.NameRevealService;
 import ninja.samryecroft.returnhome.tracker.interview.dto.AllocateAndScheduleForm;
 import ninja.samryecroft.returnhome.tracker.user.AppUserPrincipal;
 import ninja.samryecroft.returnhome.tracker.user.Role;
@@ -26,12 +29,14 @@ public class CoordinatorController {
     private final InterviewRequestService interviewRequestService;
     private final UserRepository userRepository;
     private final DeadlineTrackingService deadlineTrackingService;
+    private final NameRevealService nameRevealService;
 
     public CoordinatorController(InterviewRequestService interviewRequestService, UserRepository userRepository,
-            DeadlineTrackingService deadlineTrackingService) {
+            DeadlineTrackingService deadlineTrackingService, NameRevealService nameRevealService) {
         this.interviewRequestService = interviewRequestService;
         this.userRepository = userRepository;
         this.deadlineTrackingService = deadlineTrackingService;
+        this.nameRevealService = nameRevealService;
     }
 
     /**
@@ -55,6 +60,8 @@ public class CoordinatorController {
         model.addAttribute("dueGroups", deadlineTrackingService.groupByUrgency(requests));
         model.addAttribute("homeId", homeId);
         model.addAttribute("filter", filter);
+        model.addAttribute("childIdentities",
+                ChildIdentities.mapOf(requests, InterviewRequest::getChild, nameRevealService.isRevealed()));
         return "coordinator/requests";
     }
 
@@ -73,7 +80,9 @@ public class CoordinatorController {
 
     @GetMapping("/requests/{id}/allocate")
     public String allocateForm(@PathVariable Long id, @AuthenticationPrincipal AppUserPrincipal principal, Model model) {
-        model.addAttribute("request", interviewRequestService.getAuthorized(id, principal));
+        InterviewRequest request = interviewRequestService.getAuthorized(id, principal);
+        model.addAttribute("request", request);
+        model.addAttribute("childIdentity", ChildIdentity.of(request.getChild(), nameRevealService.isRevealed()));
         model.addAttribute("form", new AllocateAndScheduleForm());
         model.addAttribute("visitors", visitorsFor(principal));
         return "coordinator/allocate-form";
@@ -83,7 +92,9 @@ public class CoordinatorController {
     public String allocate(@PathVariable Long id, @AuthenticationPrincipal AppUserPrincipal principal,
             @Valid @ModelAttribute("form") AllocateAndScheduleForm form, BindingResult bindingResult, Model model) {
         if (bindingResult.hasErrors()) {
-            model.addAttribute("request", interviewRequestService.getAuthorized(id, principal));
+            InterviewRequest request = interviewRequestService.getAuthorized(id, principal);
+            model.addAttribute("request", request);
+            model.addAttribute("childIdentity", ChildIdentity.of(request.getChild(), nameRevealService.isRevealed()));
             model.addAttribute("visitors", visitorsFor(principal));
             return "coordinator/allocate-form";
         }
