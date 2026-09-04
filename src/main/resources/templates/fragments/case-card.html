@@ -46,14 +46,18 @@
   actionLabel - the ONE state-specific control, or null for none
   actionHref  - where it goes
   noAction    - when there is no action, the reason there isn't (D-2d-1), or null to say nothing
+  noteLabel   - who the note is from ("Reviewer's comment"); see note
+  note        - an annotation BELOW the row, or null. 2f's sent-back card carries the reviewer's
+                comment here: it is the thing the visitor has to act on, so it belongs on the card
+                rather than one navigation away, and it is prose - it cannot live in a column.
 
   Every parameter is a plain value rather than a markup fragment. A card whose columns are filled
   by ~{::selector} looks more flexible and is harder to be sure of: the selector resolves against
   the calling template as a whole, which inside a th:each is exactly where a subtle wrong answer
   would be invisible. What actually varies between these four screens is the words, not the shape.
 -->
-<div th:fragment="caseCard(identity, href, meta, asideLabel, aside, badge, status, actionLabel, actionHref, noAction)"
-     class="case">
+<div th:fragment="caseCard(identity, href, meta, asideLabel, aside, badge, status, actionLabel, actionHref, noAction, noteLabel, note)"
+     th:classappend="${note != null} ? 'case-with-note'" class="case">
     <a class="case-link rowlink" th:href="${href}">
         <span class="case-avatar" th:text="${identity.avatar()}">A.B</span>
         <span class="case-ident">
@@ -83,6 +87,16 @@
         <a th:if="${actionLabel != null}" class="btn secondary" th:href="${actionHref}" th:text="${actionLabel}">Allocate</a>
         <span th:if="${actionLabel == null and noAction != null}" class="case-no-action" th:text="${noAction}">You submitted this report</span>
     </span>
+
+    <!--
+      The note is a labelled region rather than loose text: without the label it arrives as an
+      unattributed paragraph after the card's own facts, and "you must change the times" reads very
+      differently depending on who is understood to be saying it.
+    -->
+    <div th:if="${note != null}" class="case-note">
+        <span class="lbl" th:text="${noteLabel}">Reviewer's comment</span>
+        <p th:text="${note}">Please add the times you spoke to the young person.</p>
+    </div>
 </div>
 
 </body>

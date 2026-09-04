@@ -35,7 +35,9 @@
                     status=${r.status},
                     actionLabel='Review',
                     actionHref=@{/reviewer/reports/{id}/review(id=${r.id})},
-                    noAction=null)}"></div>
+                    noAction=null,
+                    noteLabel=null,
+                    note=null)}"></div>
         </th:block>
     </div>
 
@@ -67,7 +69,9 @@
                         status=${r.status},
                         actionLabel=null,
                         actionHref=null,
-                        noAction='You submitted this report')}"></div>
+                        noAction='You submitted this report',
+                        noteLabel=null,
+                        note=null)}"></div>
             </th:block>
         </div>
     </section>

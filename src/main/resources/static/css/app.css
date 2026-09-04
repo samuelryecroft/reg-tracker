@@ -1379,3 +1379,19 @@ nav.seg .seg-opt { color: inherit; text-decoration: none; }
     .case-tags { flex: 1 1 100%; flex-wrap: wrap; }
     .case-action { flex: 1 1 100%; }
 }
+/* 2f's sent-back card: the reviewer's comment is what the visitor has to act on, so it
+   sits on the card rather than one navigation away. A note breaks the row's single line,
+   so the card becomes a two-row block; the label is what attributes the words to their
+   author, without which "you must add the times" arrives unattributed. */
+.case-with-note { flex-wrap: wrap; }
+.case-note {
+    flex: 1 1 100%;
+    border-top: 1px solid var(--border);
+    margin-top: var(--s2);
+    padding-top: var(--s3);
+}
+.case-note .lbl {
+    display: block; font-size: var(--t-xs); letter-spacing: 0.09em;
+    text-transform: uppercase; color: var(--muted);
+}
+.case-note p { margin: var(--s1) 0 0; font-size: var(--t-sm); white-space: pre-wrap; }

@@ -163,6 +163,30 @@ class SelfReviewSeparationOfDutiesIntegrationTest extends AbstractIntegrationTes
         assertThat(html).contains("The reports waiting were all submitted by you");
     }
 
+    /**
+     * Screen 2f: the sent-back card carries the reviewer's comment.
+     *
+     * <p>It is the one thing on that card the visitor has to act on, and reading it used to mean
+     * leaving the list. "Sent back" plus an "Amend and resubmit" button, with the reason one
+     * navigation away, is a card that tells you to do something without telling you what.
+     */
+    @Test
+    void aSentBackReportShowsTheReviewersCommentOnTheVisitorsOwnCard() throws Exception {
+        mockMvc.perform(post("/reviewer/reports/{id}/review", requestId)
+                        .with(asUser("t143-other-reviewer" + suffix)).with(csrf())
+                        .param("action", "reject")
+                        .param("reviewComments", "Please add the times you spoke to the young person."))
+                .andExpect(status().is3xxRedirection());
+
+        String html = mockMvc.perform(get("/visitor/interviews")
+                        .with(asUser("t143-visitor-reviewer" + suffix)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(html).contains("Please add the times you spoke to the young person.");
+        assertThat(html).contains("Reviewer&#39;s comment").contains("Amend and resubmit");
+    }
+
     @Test
     void anIndependentReviewerIsOfferedItAndMayApproveIt() throws Exception {
         // The paired positive, and it matters in both directions: a control that also blocked

@@ -1,11 +1,15 @@
 package ninja.samryecroft.returnhome.tracker.report;
 
 import jakarta.validation.Valid;
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.stream.Collectors;
 import ninja.samryecroft.returnhome.tracker.child.ChildIdentities;
 import ninja.samryecroft.returnhome.tracker.child.ChildIdentity;
 import ninja.samryecroft.returnhome.tracker.child.NameRevealService;
+import ninja.samryecroft.returnhome.tracker.interview.DeadlineTracker;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewRequest;
+import ninja.samryecroft.returnhome.tracker.interview.InterviewStatus;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewRequestService;
 import ninja.samryecroft.returnhome.tracker.interview.dto.ConfirmScheduleForm;
 import ninja.samryecroft.returnhome.tracker.report.dto.SubmitReportForm;
@@ -36,12 +40,29 @@ public class VisitorController {
         this.nameRevealService = nameRevealService;
     }
 
+    /**
+     * Screen 2f. One card per state, each with only its own action.
+     *
+     * <p>{@code nothingOutstanding} is a separate fact from an empty list and gets separate words
+     * (R-Q13): a visitor who has finished everything allocated to them has an empty-of-WORK screen,
+     * not an empty screen, and telling them their coordinator will assign interviews here would
+     * read as a rebuke for work they have in fact done. Outstanding means "waiting on this visitor"
+     * - a submitted report is with the reviewer, so it is not outstanding for them either.
+     */
     @GetMapping("/interviews")
     public String list(@AuthenticationPrincipal AppUserPrincipal principal, Model model) {
         List<InterviewRequest> requests = interviewRequestService.listForVisitor(principal);
+        LocalDateTime now = LocalDateTime.now();
+
         model.addAttribute("requests", requests);
         model.addAttribute("childIdentities",
                 ChildIdentities.mapOf(requests, InterviewRequest::getChild, nameRevealService.isRevealed()));
+        model.addAttribute("reports", reportService.reportsByRequestId(requests));
+        model.addAttribute("dueBadges", requests.stream()
+                .filter(r -> DeadlineTracker.badgeFor(r, now).isPresent())
+                .collect(Collectors.toMap(InterviewRequest::getId, r -> DeadlineTracker.badgeFor(r, now).orElseThrow())));
+        model.addAttribute("nothingOutstanding",
+                !requests.isEmpty() && requests.stream().noneMatch(VisitorController::isOutstandingForVisitor));
         return "visitor/interview-list";
     }
 
@@ -100,5 +121,12 @@ public class VisitorController {
             reportService.saveDraft(id, form, principal);
         }
         return "redirect:/visitor/interviews";
+    }
+
+    /** Waiting on the VISITOR specifically - a submitted report is with the reviewer, not them. */
+    private static boolean isOutstandingForVisitor(InterviewRequest request) {
+        return request.getStatus() == InterviewStatus.ALLOCATED
+                || request.getStatus() == InterviewStatus.SCHEDULED
+                || request.getStatus() == InterviewStatus.REPORT_REJECTED;
     }
 }
