@@ -1091,11 +1091,18 @@ fieldset.step[hidden] { display: none; }
     position: relative; flex: 1; display: flex; flex-direction: column; align-items: center;
     gap: var(--space-2); text-align: center; padding-top: 18px; font-size: var(--t-xs);
 }
-.rail li::before {
-    content: ""; position: absolute; top: 8px; left: -50%; width: 100%; height: 2px;
+/*
+  T165 fast-follow: this was a `.rail li::before` connector using the CSS generated-content
+  property, which is exposed to the accessibility tree by the major screen readers
+  (AnnouncedGlyphSourceGuardTest) - a purely decorative line must be real, aria-hidden markup
+  instead, never CSS-generated. The template now renders `<span class="rail-connector"
+  aria-hidden="true">` as the first child of every <li> but the first (th:unless="${stat.first}"),
+  so no first-child exclusion rule is needed here - the element simply isn't in the DOM for it.
+*/
+.rail-connector {
+    position: absolute; top: 8px; left: -50%; width: 100%; height: 2px;
     background: var(--color-divider); z-index: 0;
 }
-.rail li:first-child::before { content: none; }
 .rail-marker {
     position: relative; z-index: 1; width: 18px; height: 18px; display: flex; align-items: center;
     justify-content: center; border-radius: 50%; background: var(--surface); font-size: 16px;
@@ -1104,7 +1111,7 @@ fieldset.step[hidden] { display: none; }
 .rail-when { color: var(--muted); font-variant-numeric: tabular-nums; }
 
 .rail li.rail-COMPLETE .rail-marker, .rail li.rail-CURRENT .rail-marker { color: var(--accent); }
-.rail li.rail-COMPLETE::before, .rail li.rail-CURRENT::before { background: var(--accent); }
+.rail li.rail-COMPLETE .rail-connector, .rail li.rail-CURRENT .rail-connector { background: var(--accent); }
 .rail li.rail-COMPLETE .rail-label, .rail li.rail-CURRENT .rail-label { color: var(--color-text); }
 .rail li.rail-CURRENT .rail-label { font-weight: 700; }
 /* "in an outlined ring" (D-1a-2a) - the one marker that gets an explicit border, so CURRENT reads
@@ -1117,20 +1124,22 @@ fieldset.step[hidden] { display: none; }
    (ph-arrow-u-up-left, "went back") plus the label from InterviewStatus.displayName ("Sent back")
    both carry the meaning; colour is the third signal, not the only one. */
 .rail li.rail-SENT_BACK .rail-marker { color: var(--sent-back); background: var(--sent-back-bg); }
-.rail li.rail-SENT_BACK::before { background: var(--sent-back); }
+.rail li.rail-SENT_BACK .rail-connector { background: var(--sent-back); }
 .rail li.rail-SENT_BACK .rail-label { color: var(--sent-back); font-weight: 700; }
 
 /* CANCELLED (the position a cancelled request last reached) - a different glyph AND colour pair
    from SENT_BACK (D-1a-2a's table gives the two rows distinct treatments), so the two can never
    be confused for each other even at a glance. */
 .rail li.rail-CANCELLED .rail-marker { color: var(--neutral); background: var(--neutral-bg); }
-.rail li.rail-CANCELLED::before { background: var(--neutral); }
+.rail li.rail-CANCELLED .rail-connector { background: var(--neutral); }
 .rail li.rail-CANCELLED .rail-label { color: var(--neutral); font-weight: 700; }
 
 /* NOT_APPLICABLE (after a cancelled request's last-reached position) - the connector itself turns
    dashed, not just muted colour: a shape change is what stops these reading as "still to come". */
 .rail li.rail-NOT_APPLICABLE .rail-marker { color: var(--muted); }
-.rail li.rail-NOT_APPLICABLE::before { background: none; border-top: 2px dashed var(--color-divider); height: 0; }
+.rail li.rail-NOT_APPLICABLE .rail-connector {
+    background: none; border-top: 2px dashed var(--color-divider); height: 0;
+}
 
 /* D-1a-3: a section index, not tabs - pills that behave as jump links. `:has()` gives an active
    pill with no JS; it is progressive enhancement only (Chrome 105 / Safari 15.4 / Firefox 121,

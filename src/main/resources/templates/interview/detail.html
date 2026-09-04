@@ -22,8 +22,15 @@
       journey it represents.
     -->
     <ol class="rail" aria-label="Interview status">
-        <li th:each="step : ${statusRail}" th:classappend="'rail-' + ${step.state()}"
+        <li th:each="step, stat : ${statusRail}" th:classappend="'rail-' + ${step.state()}"
             th:attr="aria-current=${step.state().name() == 'CURRENT'} ? 'step'">
+            <!--
+              T165 fast-follow: the connector was a CSS ::before with `content: ""` - generated
+              content is exposed to the accessibility tree by the major screen readers
+              (AnnouncedGlyphSourceGuardTest), so a purely decorative line must be real,
+              aria-hidden markup instead, never CSS `content`. Same visual line, no announcement.
+            -->
+            <span class="rail-connector" aria-hidden="true" th:unless="${stat.first}"></span>
             <!--
               Creed's review: th:case must sit on the <svg>, not the <use> inside it. A non-matching
               th:case removes only the element it's ON - putting it on <use> left all SIX <svg
