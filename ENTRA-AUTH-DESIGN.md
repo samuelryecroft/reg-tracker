@@ -189,8 +189,12 @@ write. The blast radius of a mistake would move from a row in our database to th
 
 **Claims we rely on — deliberately three:**
 - **`sub` (or `oid`)** — the immutable subject identifier. This is the **only** thing we link on. Stored
-  in a new `users.idp_subject` column, unique, nullable during coexistence.
-- **`email`** — for display and for the one-time link ceremony (§5). **Never the join key.**
+  in a new `users.idp_subject` column, unique, and nullable. Nullable no longer means "during
+  coexistence" — D3 removed the coexistence window. It is nullable because the break-glass admin
+  (D5) has no Entra identity at all, and because an account can exist between being created and an
+  `ORG_ADMIN` recording its object id.
+- **`email`** — display only. **Never the join key**, and since D4 withdrew the email-match
+  ceremony, never consulted at sign-in either.
 - **`name`** — display only.
 
 > **Do not link on email.** Email is mutable and reassignable. Someone changes their surname and gets
