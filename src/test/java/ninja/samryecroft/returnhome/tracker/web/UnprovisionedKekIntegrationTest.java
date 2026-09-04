@@ -38,7 +38,6 @@ import org.springframework.security.core.context.SecurityContextImpl;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
@@ -47,9 +46,9 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
  * provisioned. Both halves of the response to that live here - the admin being WARNED at onboarding,
  * and the write later FAILING WELL if nobody acted on the warning.
  *
- * <p>They share one class because they need the same two things - a key provider that fails every
- * operation, and auto-create off - and a class each would have cost a Spring context and a
- * connection pool to say the same thing twice (TEST-CONTEXTS.md).
+ * <p>They share one class because they need the same thing - a key provider that fails every
+ * operation - and a class each would have cost a Spring context and a connection pool to say the
+ * same thing twice (TEST-CONTEXTS.md).
  *
  * <p>The routing half exists because the part that broke was ROUTING.
  *
@@ -74,7 +73,6 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
  */
 @SpringBootTest
 @AutoConfigureMockMvc
-@TestPropertySource(properties = "app.documents.key-vault.auto-create-keys=false")
 class UnprovisionedKekIntegrationTest extends AbstractIntegrationTest {
 
     /**
@@ -227,7 +225,7 @@ class UnprovisionedKekIntegrationTest extends AbstractIntegrationTest {
 
         Object notice = created.getFlashMap().get("kekWarning");
         assertThat(notice).as("creating a CARE_PROVIDER whose KEK cannot be confirmed must raise the "
-                + "onboarding notice - auto-create is off for this class, so the probe is not skipped")
+                + "onboarding notice - keyExists is a pure read, so the probe runs in every configuration")
                 .isNotNull();
 
         String html = mockMvc.perform(get("/admin/organisations")
