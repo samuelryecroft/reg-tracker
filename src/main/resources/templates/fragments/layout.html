@@ -68,16 +68,19 @@
            th:aria-current="${path == '/reviewer/reports' or #strings.startsWith(path, '/reviewer/reports/')} ? 'page'">
             <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-seal-check'"></use></svg>Review Queue</a>
 
-        <span class="shell-nav-group" th:if="${#authorization.expression('hasRole(''HOME_STAFF'')')}">Records</span>
-        <a th:if="${#authorization.expression('hasRole(''HOME_STAFF'')')}" href="/children"
-           th:aria-current="${path == '/children' or #strings.startsWith(path, '/children/')} ? 'page'">
-            <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-users-three'"></use></svg>My Children</a>
-
+        <!-- T132: ONE "Records" group and ONE /children link, gated by the union of every role that
+             used to gate either of the two separate blocks this replaced - HOME_STAFF ("My
+             Children") and ADMIN/ORG_ADMIN/VIEWER/COORDINATOR ("Children") never lost or gained
+             visibility, they just can no longer both render at once for a stacked-role account. See
+             GlobalControllerAdvice#childrenNav / RoleMatrix#isChildrenListPersonalisedToOwnHomes for
+             why the label, not the visibility, is the only thing that still varies by role. -->
         <span class="shell-nav-group"
-              th:if="${#authorization.expression('hasAnyRole(''ADMIN'',''ORG_ADMIN'',''VIEWER'',''COORDINATOR'')')}">Records</span>
-        <a th:if="${#authorization.expression('hasAnyRole(''ADMIN'',''ORG_ADMIN'',''VIEWER'')')}" href="/children"
+              th:if="${childrenNav.visible() or #authorization.expression('hasRole(''COORDINATOR'')')}">Records</span>
+        <a th:if="${childrenNav.visible()}" href="/children"
            th:aria-current="${path == '/children' or #strings.startsWith(path, '/children/')} ? 'page'">
-            <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-users-three'"></use></svg>Children</a>
+            <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-users-three'"></use></svg>
+            <span th:text="${childrenNav.label()}">Children</span>
+        </a>
         <a th:if="${#authorization.expression('hasAnyRole(''ADMIN'',''ORG_ADMIN'')')}" href="/admin/homes"
            th:aria-current="${path == '/admin/homes' or #strings.startsWith(path, '/admin/homes/')} ? 'page'">
             <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-house-line'"></use></svg>Homes</a>

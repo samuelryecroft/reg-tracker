@@ -76,6 +76,58 @@ public class RoleMatrix {
     }
 
     /**
+     * T132: whether {@code /children} is reachable at all - the single gate for the nav's ONE
+     * children entry. Widening this widens who sees the link; it does not change what {@code
+     * ChildController#list} lets them see, which is its own, separately-checked, per-branch query.
+     *
+     * <p>This necessarily restates {@code SecurityConfig}'s {@code /children/**} rule rather than
+     * calling it (the roles a nav decides visually and the roles a filter chain enforces are
+     * different kinds of thing to ask). Deliberately left without a test pinning the two together
+     * (Kevin's review): the drift it could suffer fails safe either direction - if {@code
+     * SecurityConfig} ever narrows without this following, the nav offers a link that 403s (bad UX,
+     * no exposure); if it widens without this following, the nav simply doesn't advertise a page the
+     * user could still reach directly (harmless). No drift direction shows anyone a link to
+     * something they can then see and shouldn't.
+     */
+    public boolean canViewChildrenList(AppUserPrincipal principal) {
+        return principal != null
+                && (principal.hasRole(Role.ADMIN) || principal.hasRole(Role.ORG_ADMIN)
+                        || principal.hasRole(Role.VIEWER) || principal.hasRole(Role.HOME_STAFF));
+    }
+
+    /**
+     * Whether {@code /children} shows this account's own home(s) ("My Children") rather than the
+     * broader supplier/organisation view ("Children") - mirrors {@code ChildController#list}'s
+     * BRANCH precedence, not its data (ADMIN, then a care-provider org-admin, then VIEWER, all
+     * outrank the home-staff fallback this labels), for accounts that actually reach that branch.
+     *
+     * <p>Not an exact mirror for every role {@code SecurityConfig} admits to {@code /children}: a
+     * SUPPLIER org-admin (no {@link #isCareProviderOrgAdmin}) is neither ADMIN, a care-provider
+     * org-admin, nor VIEWER, so the controller's home-scoped fallback branch runs for them too - but
+     * this method also requires {@code HOME_STAFF}, so it answers {@code false} and the nav shows
+     * "Children" over what is, for that account, an empty list (Kevin's review: no exposure either
+     * way, and "Children" promises less than "My Children" would over nothing). Branch precedence,
+     * not scope, is deliberate: for a HOME_STAFF+VIEWER account both branches run the identical
+     * query today, so a label derived from actual data scope would look "more accurate" and be
+     * fragile - it would silently stop matching the moment either branch's query changed
+     * independently. A branch-derived label stays correct by construction instead.
+     *
+     * <p>This is the fix for T132 (originally an aria-current double-announcement defect, spotted
+     * by Creed's review of T138 1a): roles stack - only HOME_STAFF and ADMIN are mutually exclusive
+     * - so an account that is HOME_STAFF <em>and</em> VIEWER (or a care-provider ORG_ADMIN) used to
+     * satisfy both nav branches at once and render two separate {@code /children} links, both
+     * carrying {@code aria-current="page"}. There is now exactly one link in the template; this
+     * method decides only which label it carries, never whether it renders.
+     */
+    public boolean isChildrenListPersonalisedToOwnHomes(AppUserPrincipal principal) {
+        return principal != null
+                && principal.hasRole(Role.HOME_STAFF)
+                && !principal.hasRole(Role.ADMIN)
+                && !isCareProviderOrgAdmin(principal)
+                && !principal.hasRole(Role.VIEWER);
+    }
+
+    /**
      * Which roles this principal may assign, and the reason the last branch is a positive test.
      *
      * <p>It used to fall through: anyone who was neither a platform admin nor a care-provider

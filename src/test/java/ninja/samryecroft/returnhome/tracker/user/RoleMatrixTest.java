@@ -108,4 +108,53 @@ class RoleMatrixTest {
         assertThat(matrix.canCreateHome(principal(null, Role.ORG_ADMIN))).isFalse();
         assertThat(matrix.canCreateChild(principal(null, Role.ORG_ADMIN))).isFalse();
     }
+
+    // --- T132: the nav's one /children entry ---
+
+    @Test
+    void everyRoleThatCouldSeeEitherOldChildrenLinkStillSeesTheOneThatReplacedThem() {
+        assertThat(matrix.canViewChildrenList(principal(null, Role.ADMIN))).isTrue();
+        assertThat(matrix.canViewChildrenList(principal(OrgType.CARE_PROVIDER, Role.ORG_ADMIN))).isTrue();
+        assertThat(matrix.canViewChildrenList(principal(OrgType.SUPPLIER, Role.ORG_ADMIN))).isTrue();
+        assertThat(matrix.canViewChildrenList(principal(OrgType.CARE_PROVIDER, Role.VIEWER))).isTrue();
+        assertThat(matrix.canViewChildrenList(principal(null, Role.HOME_STAFF))).isTrue();
+    }
+
+    @Test
+    void rolesThatNeverSawAChildrenLinkStillDont() {
+        assertThat(matrix.canViewChildrenList(principal(OrgType.SUPPLIER, Role.COORDINATOR))).isFalse();
+        assertThat(matrix.canViewChildrenList(principal(OrgType.SUPPLIER, Role.VISITOR))).isFalse();
+        assertThat(matrix.canViewChildrenList(principal(OrgType.SUPPLIER, Role.REVIEWER))).isFalse();
+        assertThat(matrix.canViewChildrenList(null)).isFalse();
+    }
+
+    @Test
+    void pureHomeStaffGetsTheOwnHomesFraming() {
+        // Matches ChildController#list's else-branch: this account has no higher-precedence role,
+        // so the page it links to really is scoped to their own home(s).
+        assertThat(matrix.isChildrenListPersonalisedToOwnHomes(principal(null, Role.HOME_STAFF))).isTrue();
+    }
+
+    @Test
+    void aHigherPrecedenceRoleWinsTheLabelEvenWhenStackedWithHomeStaff() {
+        // T132's actual bug: roles stack (only HOME_STAFF and ADMIN are mutually exclusive), so an
+        // account can be HOME_STAFF and also VIEWER or a care-provider ORG_ADMIN. Content-wise
+        // ChildController#list runs the HIGHER branch for all three of these (ADMIN sees everyone;
+        // a care-provider org-admin sees their whole org; VIEWER sees their assigned homes via the
+        // same homeIdsFor query the home-staff fallback uses) - so "My Children" would describe a
+        // narrower scope than the page actually shows. The label must say so.
+        assertThat(matrix.isChildrenListPersonalisedToOwnHomes(
+                principal(null, Role.HOME_STAFF, Role.VIEWER))).isFalse();
+        assertThat(matrix.isChildrenListPersonalisedToOwnHomes(
+                principal(OrgType.CARE_PROVIDER, Role.HOME_STAFF, Role.ORG_ADMIN))).isFalse();
+    }
+
+    @Test
+    void rolesWithNoChildrenAccessAtAllAreNotPersonalisedEither() {
+        // isChildrenListPersonalisedToOwnHomes only decides the LABEL - canViewChildrenList is what
+        // decides whether the link (and this question) is reachable at all.
+        assertThat(matrix.isChildrenListPersonalisedToOwnHomes(principal(OrgType.SUPPLIER, Role.COORDINATOR)))
+                .isFalse();
+        assertThat(matrix.isChildrenListPersonalisedToOwnHomes(null)).isFalse();
+    }
 }
