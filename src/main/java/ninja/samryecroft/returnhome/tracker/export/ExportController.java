@@ -9,6 +9,7 @@ import ninja.samryecroft.returnhome.tracker.audit.AuditHistoryService;
 import ninja.samryecroft.returnhome.tracker.child.Child;
 import ninja.samryecroft.returnhome.tracker.child.ChildRepository;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewRequestRepository;
+import ninja.samryecroft.returnhome.tracker.organisation.HomeScope;
 import ninja.samryecroft.returnhome.tracker.organisation.OrganisationAccessService;
 import ninja.samryecroft.returnhome.tracker.user.AppUserPrincipal;
 import org.springframework.core.io.ByteArrayResource;
@@ -143,8 +144,9 @@ public class ExportController {
      * than one implied by read access.
      */
     private void requireVisibility(Long childId, AppUserPrincipal principal) {
+        HomeScope scope = organisationAccessService.homeScopeFor(principal);
         boolean visible = interviewRequestRepository.findByChildIdOrderByCreatedAtDesc(childId).stream()
-                .anyMatch(request -> organisationAccessService.canViewHome(principal, request.getHome()));
+                .anyMatch(request -> scope.canView(request.getHome()));
         if (!visible) {
             throw new AccessDeniedException("You do not have access to this child's records");
         }

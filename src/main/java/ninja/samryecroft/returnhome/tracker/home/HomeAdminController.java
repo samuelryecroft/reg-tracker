@@ -7,6 +7,7 @@ import ninja.samryecroft.returnhome.tracker.organisation.Organisation;
 import ninja.samryecroft.returnhome.tracker.organisation.OrgType;
 import ninja.samryecroft.returnhome.tracker.organisation.OrganisationRepository;
 import ninja.samryecroft.returnhome.tracker.user.AppUserPrincipal;
+import ninja.samryecroft.returnhome.tracker.user.RoleMatrix;
 import ninja.samryecroft.returnhome.tracker.user.Role;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -25,10 +26,13 @@ public class HomeAdminController {
 
     private final HomeRepository homeRepository;
     private final OrganisationRepository organisationRepository;
+    private final RoleMatrix roleMatrix;
 
-    public HomeAdminController(HomeRepository homeRepository, OrganisationRepository organisationRepository) {
+    public HomeAdminController(HomeRepository homeRepository, OrganisationRepository organisationRepository,
+            RoleMatrix roleMatrix) {
         this.homeRepository = homeRepository;
         this.organisationRepository = organisationRepository;
+        this.roleMatrix = roleMatrix;
     }
 
     @GetMapping
@@ -36,20 +40,19 @@ public class HomeAdminController {
         List<Home> homes;
         if (principal.hasRole(Role.ADMIN)) {
             homes = homeRepository.findAllWithOrganisation();
-        } else if (isCareProviderOrgAdmin(principal)) {
+        } else if (roleMatrix.isCareProviderOrgAdmin(principal)) {
             homes = homeRepository.findByOrganisationIdWithOrganisation(principal.getOrganisationId());
         } else {
             // Supplier ORG_ADMIN: read-only view across their client Care Provider orgs' homes.
             homes = homeRepository.findByOrganisationSupplierOrganisationId(principal.getOrganisationId());
         }
         model.addAttribute("homes", homes);
-        model.addAttribute("canCreate", canCreateHomes(principal));
         return "admin/home-list";
     }
 
     @GetMapping("/new")
     public String newForm(@AuthenticationPrincipal AppUserPrincipal principal, Model model) {
-        if (!canCreateHomes(principal)) {
+        if (!roleMatrix.canCreateHome(principal)) {
             throw new AccessDeniedException("Only a platform admin or a Care Provider's own admin can add homes");
         }
         model.addAttribute("form", new CreateHomeForm());
@@ -62,7 +65,7 @@ public class HomeAdminController {
     @PostMapping
     public String create(@AuthenticationPrincipal AppUserPrincipal principal,
             @Valid @ModelAttribute("form") CreateHomeForm form, BindingResult bindingResult, Model model) {
-        if (!canCreateHomes(principal)) {
+        if (!roleMatrix.canCreateHome(principal)) {
             throw new AccessDeniedException("Only a platform admin or a Care Provider's own admin can add homes");
         }
 
@@ -100,11 +103,5 @@ public class HomeAdminController {
         return "redirect:/admin/homes";
     }
 
-    private boolean isCareProviderOrgAdmin(AppUserPrincipal principal) {
-        return principal.hasRole(Role.ORG_ADMIN) && principal.getOrganisationType() == OrgType.CARE_PROVIDER;
-    }
 
-    private boolean canCreateHomes(AppUserPrincipal principal) {
-        return principal.hasRole(Role.ADMIN) || isCareProviderOrgAdmin(principal);
-    }
 }

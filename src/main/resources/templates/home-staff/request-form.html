@@ -28,7 +28,7 @@
                 <option th:each="c : ${children}" th:value="${c.id}" th:text="${c.fullName}">Child</option>
             </select>
             <div th:replace="~{fragments/layout :: fieldError('childId')}"></div>
-            <p class="muted"><a href="/children/new">+ Add a child</a> not in this list</p>
+            <p class="muted" th:if="${can.addChild}"><a href="/children/new">+ Add a child</a> not in this list</p>
 
             <label for="legalStatus">Legal status</label>
             <input type="text" id="legalStatus" th:field="*{legalStatus}"/>

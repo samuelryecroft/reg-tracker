@@ -15,6 +15,7 @@ import ninja.samryecroft.returnhome.tracker.document.DocumentSecurityException;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewRequest;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewRequestRepository;
 import ninja.samryecroft.returnhome.tracker.organisation.OrgType;
+import ninja.samryecroft.returnhome.tracker.organisation.HomeScope;
 import ninja.samryecroft.returnhome.tracker.organisation.OrganisationAccessService;
 import ninja.samryecroft.returnhome.tracker.report.InterviewReport;
 import ninja.samryecroft.returnhome.tracker.report.InterviewReportRepository;
@@ -89,8 +90,10 @@ public class CaseFileExportService {
 
         List<InterviewRequest> allForChild =
                 interviewRequestRepository.findByChildIdOrderByCreatedAtDesc(childId);
+        // Resolved once for the whole list rather than per request - see homeScopeFor.
+        HomeScope scope = organisationAccessService.homeScopeFor(principal);
         List<InterviewRequest> visible = allForChild.stream()
-                .filter(request -> organisationAccessService.canViewHome(principal, request.getHome()))
+                .filter(request -> scope.canView(request.getHome()))
                 .toList();
         if (visible.isEmpty()) {
             // Nothing visible is indistinguishable from no such child, and should stay that way -
@@ -170,9 +173,10 @@ public class CaseFileExportService {
         ExportManifest finalManifest = new ExportManifest(manifest.childReference(), manifest.periodLabel(),
                 included, excluded, List.of(), manifest.partialScope(), manifest.partialScopeNote());
 
+        HomeScope historyScope = organisationAccessService.homeScopeFor(principal);
         List<AuditHistorySection> history = auditHistoryService.caseHistoryFor(
                 interviewRequestRepository.findByChildIdOrderByCreatedAtDesc(childId).stream()
-                        .filter(r -> organisationAccessService.canViewHome(principal, r.getHome()))
+                        .filter(r -> historyScope.canView(r.getHome()))
                         .filter(period::covers)
                         .toList());
 

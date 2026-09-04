@@ -9,6 +9,7 @@ import ninja.samryecroft.returnhome.tracker.audit.AuditEventPublisher;
 import ninja.samryecroft.returnhome.tracker.home.Home;
 import ninja.samryecroft.returnhome.tracker.home.HomeRepository;
 import ninja.samryecroft.returnhome.tracker.organisation.Organisation;
+import ninja.samryecroft.returnhome.tracker.organisation.HomeScope;
 import ninja.samryecroft.returnhome.tracker.organisation.OrganisationAccessService;
 import ninja.samryecroft.returnhome.tracker.organisation.OrganisationRepository;
 import ninja.samryecroft.returnhome.tracker.organisation.OrgType;
@@ -31,16 +32,18 @@ public class UserService {
     private final OrganisationAccessService organisationAccessService;
     private final PasswordEncoder passwordEncoder;
     private final AuditEventPublisher auditEventPublisher;
+    private final RoleMatrix roleMatrix;
 
     public UserService(UserRepository userRepository, HomeRepository homeRepository,
             OrganisationRepository organisationRepository, OrganisationAccessService organisationAccessService,
-            PasswordEncoder passwordEncoder, AuditEventPublisher auditEventPublisher) {
+            PasswordEncoder passwordEncoder, AuditEventPublisher auditEventPublisher, RoleMatrix roleMatrix) {
         this.userRepository = userRepository;
         this.homeRepository = homeRepository;
         this.organisationRepository = organisationRepository;
         this.organisationAccessService = organisationAccessService;
         this.passwordEncoder = passwordEncoder;
         this.auditEventPublisher = auditEventPublisher;
+        this.roleMatrix = roleMatrix;
     }
 
     /** Platform ADMIN sees everyone; an org-admin sees only users belonging to their own organisation. */
@@ -48,22 +51,22 @@ public class UserService {
         if (principal.hasRole(Role.ADMIN)) {
             return userRepository.findAllWithHome();
         }
-        if (isCareProviderOrgAdmin(principal)) {
+        if (roleMatrix.isCareProviderOrgAdmin(principal)) {
             return userRepository.findHomeStaffByHomeOrganisationId(principal.getOrganisationId());
         }
         // Supplier ORG_ADMIN
         return userRepository.findByOrganisationId(principal.getOrganisationId());
     }
 
-    /** Which roles this principal is allowed to assign when creating/editing a user. */
+    /**
+     * Which roles this principal is allowed to assign when creating/editing a user.
+     *
+     * <p>Delegated to {@link RoleMatrix}, which is also what the templates are shown, so the roles
+     * offered on the form and the roles the server will accept are the same list rather than two
+     * lists that agree today.
+     */
     public List<Role> allowedRolesFor(AppUserPrincipal principal) {
-        if (principal.hasRole(Role.ADMIN)) {
-            return List.of(Role.values());
-        }
-        if (isCareProviderOrgAdmin(principal)) {
-            return List.of(Role.HOME_STAFF, Role.VIEWER);
-        }
-        return List.of(Role.COORDINATOR, Role.VISITOR, Role.REVIEWER);
+        return roleMatrix.assignableRoles(principal);
     }
 
     public User getAuthorized(Long id, AppUserPrincipal principal) {
@@ -73,9 +76,10 @@ public class UserService {
             return user;
         }
         boolean visible;
-        if (isCareProviderOrgAdmin(principal)) {
+        if (roleMatrix.isCareProviderOrgAdmin(principal)) {
+            HomeScope scope = organisationAccessService.homeScopeFor(principal);
             visible = user.hasRole(Role.HOME_STAFF) && !user.getHomes().isEmpty()
-                    && user.getHomes().stream().allMatch(h -> organisationAccessService.canViewHome(principal, h));
+                    && user.getHomes().stream().allMatch(scope::canView);
         } else {
             visible = user.getOrganisation() != null
                     && user.getOrganisation().getId().equals(principal.getOrganisationId());
@@ -155,9 +159,6 @@ public class UserService {
         return roles.stream().anyMatch(role -> role != Role.HOME_STAFF && role != Role.ADMIN);
     }
 
-    private boolean isCareProviderOrgAdmin(AppUserPrincipal principal) {
-        return principal.hasRole(Role.ORG_ADMIN) && principal.getOrganisationType() == OrgType.CARE_PROVIDER;
-    }
 
     /**
      * The homes to attach, for whichever role needs them - one path since V16, where HOME_STAFF and

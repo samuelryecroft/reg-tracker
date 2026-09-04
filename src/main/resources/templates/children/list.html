@@ -9,7 +9,9 @@
 <div th:replace="~{fragments/layout :: nav}"></div>
 <main id="main">
     <h1 th:text="${isAdmin} ? 'Children' : 'My Children'">Children</h1>
-    <a class="btn" href="/children/new" th:unless="${#authorization.expression('hasRole(''VIEWER'')')}">Add child</a>
+    <!-- The matrix, not a role flag. This hid the button from VIEWER only, so a supplier
+         org-admin - who can reach this page - was offered an action the server then refused. -->
+    <a class="btn" href="/children/new" th:if="${can.addChild}">Add child</a>
 
     <div class="table-wrap responsive">
     <table>

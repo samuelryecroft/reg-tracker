@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import ninja.samryecroft.returnhome.tracker.audit.AuditEventPublisher;
 import ninja.samryecroft.returnhome.tracker.theme.ThemeService;
+import ninja.samryecroft.returnhome.tracker.user.RoleMatrix;
 import ninja.samryecroft.returnhome.tracker.web.LoginController;
 import ninja.samryecroft.returnhome.tracker.web.RootController;
 import org.junit.jupiter.api.Test;
@@ -26,6 +27,12 @@ class SecurityConfigTest {
 
     @MockitoBean
     private ThemeService themeService;
+
+    // GlobalControllerAdvice exposes the role matrix to every page, so the slice needs it too.
+    // Mocked rather than imported: this test is about the filter chain's path rules, and a real
+    // matrix would quietly make it depend on role-to-capability mapping as well.
+    @MockitoBean
+    private RoleMatrix roleMatrix;
 
     // GlobalControllerAdvice is picked up by the @WebMvcTest slice and now depends on this.
     @MockitoBean

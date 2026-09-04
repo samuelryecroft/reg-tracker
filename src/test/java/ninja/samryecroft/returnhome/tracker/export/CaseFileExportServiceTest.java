@@ -68,7 +68,7 @@ class CaseFileExportServiceTest {
                 .thenReturn(List.of(requestOne, requestTwo));
         when(requestRepository.findDetailedById(1182L)).thenReturn(Optional.of(requestOne));
         when(requestRepository.findDetailedById(1191L)).thenReturn(Optional.of(requestTwo));
-        when(accessService.canViewHome(any(), any())).thenReturn(true);
+        when(accessService.homeScopeFor(any())).thenReturn(home -> true);
         when(historyService.caseHistoryFor(any())).thenReturn(List.of());
         when(principal.getUsername()).thenReturn("orgadmin");
 
@@ -156,7 +156,7 @@ class CaseFileExportServiceTest {
 
     @Test
     void aChildTheAccountCannotSeeIsIndistinguishableFromNoChild() {
-        when(accessService.canViewHome(any(), any())).thenReturn(false);
+        when(accessService.homeScopeFor(any())).thenReturn(home -> false);
 
         // Confirming that a child exists to an account that cannot see them is itself a disclosure,
         // so this must not be a different error from "no such child".
@@ -169,8 +169,9 @@ class CaseFileExportServiceTest {
         service.manifestFor(5L, ExportPeriod.all(), principal);
 
         // If an export ever re-derives scope from its filters it grows a second, weaker access rule
-        // that drifts from every other route. It must ask the same question they do.
-        verify(accessService, org.mockito.Mockito.atLeastOnce()).canViewHome(any(), any());
+        // that drifts from every other route. It must ask the same question they do - now via the
+        // scope the access service hands out, resolved once for the list rather than per row.
+        verify(accessService, org.mockito.Mockito.atLeastOnce()).homeScopeFor(any());
     }
 
     @Test
