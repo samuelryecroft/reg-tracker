@@ -7,6 +7,7 @@ import ninja.samryecroft.returnhome.tracker.child.NameRevealService;
 import ninja.samryecroft.returnhome.tracker.document.DocumentNotFoundException;
 import ninja.samryecroft.returnhome.tracker.document.DocumentSecurityException;
 import ninja.samryecroft.returnhome.tracker.document.KeyUnavailableException;
+import ninja.samryecroft.returnhome.tracker.fieldcrypto.FieldCryptoException;
 import ninja.samryecroft.returnhome.tracker.home.Home;
 import ninja.samryecroft.returnhome.tracker.home.HomeRepository;
 import ninja.samryecroft.returnhome.tracker.organisation.Organisation;
@@ -313,6 +314,51 @@ public class GlobalControllerAdvice {
         model.addAttribute("status", status.value());
         model.addAttribute("message", message);
         return "error";
+    }
+
+    /**
+     * The fail-closed boundary for encrypted <em>field</em> data (the fieldcrypto path), sibling of
+     * {@link #handleDocumentSecurity}. {@link FieldCryptoException} is a {@link RuntimeException}
+     * rather than a {@link DocumentSecurityException} - the two crypto paths deliberately do not share
+     * a type (see FieldCryptoException's javadoc) - so without this handler it falls through to a
+     * default 500, which is what made a not-yet-provisioned organisation KEK surface as an opaque 500
+     * on add-child rather than the actionable 503 the document path already returns (T168).
+     *
+     * <p>A missing or unreachable KEK is transient/operational: the right answer is 503, and the
+     * remedy is provisioning, not retrying blindly - so the log names the failure (its message
+     * carries the "provision org-&lt;id&gt;-kek" detail for whoever operates the vault). A genuine
+     * integrity failure stays a 500. Either way the field is never stored in the clear - there is no
+     * variant of this that keeps the record without its encryption.
+     *
+     * <p>The user-facing message stays generic for the same reason the document handler's does:
+     * telling a caller <em>why</em> a crypto operation failed tells them how to probe it. The
+     * actionable key name goes to the log and the audit trail, not the response.
+     */
+    @ExceptionHandler(FieldCryptoException.class)
+    public String handleFieldCrypto(FieldCryptoException ex, Model model,
+            jakarta.servlet.http.HttpServletResponse response) {
+        boolean keyUnavailable = hasCause(ex, KeyUnavailableException.class);
+        HttpStatus status = keyUnavailable ? HttpStatus.SERVICE_UNAVAILABLE : HttpStatus.INTERNAL_SERVER_ERROR;
+        String message = keyUnavailable
+                ? "The secure key service for this organisation is temporarily unavailable, so this "
+                        + "record could not be saved. Please contact your administrator."
+                : "This record could not be securely saved, and no unencrypted copy is ever kept.";
+        log.error("Refusing to store a field without encryption ({}): {}", status.value(),
+                ex.getClass().getSimpleName(), ex);
+        response.setStatus(status.value());
+        model.addAttribute("status", status.value());
+        model.addAttribute("message", message);
+        return "error";
+    }
+
+    /** True if {@code t} or anything in its cause chain is an instance of {@code type}. */
+    private static boolean hasCause(Throwable t, Class<? extends Throwable> type) {
+        for (Throwable cause = t; cause != null; cause = cause.getCause()) {
+            if (type.isInstance(cause)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)

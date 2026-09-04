@@ -9,6 +9,15 @@
 <div th:replace="~{fragments/layout :: nav}"></div>
 <main id="main">
     <h1>Organisations</h1>
+
+    <div class="banner warn" th:if="${kekWarning != null}" role="status">
+        <span class="ic" aria-hidden="true">◆</span>
+        <div>
+            <strong>Encryption key not yet provisioned</strong>
+            <p th:text="${kekWarning}">The care provider’s encryption key is not yet provisioned.</p>
+        </div>
+    </div>
+
     <a class="btn" href="/admin/organisations/new" th:if="${can.addOrganisation}">Add organisation</a>
 
     <div class="table-wrap responsive">
