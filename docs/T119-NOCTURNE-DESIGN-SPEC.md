@@ -945,10 +945,13 @@ whatever it lands on, so it cannot be reasoned about locally.**
   report before reading it. The design already has this metric — 2d's reviewer cards show questions-answered
   — so this is reusing an established idea rather than inventing one.
 
-### Still open on 1a, and being settled next
+### Still open on 1a, and being settled next — NOW ALL CLOSED
 The five-step status rail, the section tab row, the 316px history column's behaviour below the shell's
 900px breakpoint, and the collapsed `<details>` for the home's original request. None of these are blocked;
 they are simply next.
+
+**Closed in D-1a-2/2a (rail), D-1a-3 (section index), D-1a-4 (1060px), and D-1a-5/5a/5b/5c in §5i
+(the disclosure). 1a has no open design questions.**
 
 ### D-1a-2 · The status rail — five steps for a seven-state model
 
@@ -1157,3 +1160,105 @@ decision rather than two coincidences.
 
 **This banner is the highest-stakes copy surface in the whole sent-back vocabulary**: the rail is a
 coordinator glancing at progress, this is a visitor reading that their own work has come back.
+
+## 5i · Screen 1a, the last open item — the original request disclosure (Creed, 4 Sep)
+
+Pam flagged that the collapsed `<details>` and the "the record leads with the report" ordering were the one
+item on 1a's *Still open* list with no numbered decision, so batch 2 was being built against batch 1's card
+order. Numbering it now, so it is transcribed rather than inferred like the other four.
+
+### D-1a-5 · The original request is a disclosure — and the "Request" card stops existing
+
+The instruction "the record leads with the report" is usually read as *move the report up*. Looking at what
+`interview/detail.html` actually renders, that is not the change. The page opens with a **Request** card of
+six fields, and **four of those six are the meta line the mockup already puts under the H1** — home,
+returned, allocated visitor, scheduled visit. The card is not context standing in front of the report; it is
+the header, rendered twice the size and in the wrong place.
+
+So the reorder is a re-homing, and no field is lost:
+
+| Field | Goes | Why |
+|---|---|---|
+| `home.name` | **meta line** (outside) | already specified there in the screen map |
+| `returnedAt` | **meta line** (outside) | starts the 72-hour clock; belongs beside the in-time tag |
+| `allocatedVisitor` | **meta line** (outside) | mockup meta line |
+| `scheduledAt` | **the rail** (outside) | step 3 already carries it — do not print it twice |
+| `requestedBy.fullName` + `createdAt` | **the `<summary>` meta line** | provenance, which is what a summary is for |
+| `missingSince` | **inside**, into the Young Person group | sits directly above "Details relating to the missing episode", where it reads |
+
+**The `Request` card is then empty and is deleted.** Nothing else moves: Young Person, Professionals,
+Submitted By and Additional Notes keep their existing markup and field order, in that order, inside the
+disclosure. Regrouping them to match 2e's four intake groups is a legitimate improvement and is **explicitly
+not part of this** — it is a separate follow-up, so this stays the fast one Pam scoped it as.
+
+### D-1a-5a · Default state is derived from the status, not from the user
+
+Do not persist a per-user open/closed preference, and do not pick one constant.
+
+- **`REQUESTED`, `ALLOCATED`, `SCHEDULED`, `CANCELLED` → `open`.** There is no report yet. Collapsing the
+  request here leaves the page as a rail above an empty state, hiding the only content it has.
+- **`REPORT_SUBMITTED`, `REPORT_REJECTED`, `REPORT_APPROVED` → closed.** The report exists, so it leads and
+  the request becomes provenance.
+
+One expression over `InterviewStatus`, server-rendered, deterministic, and testable — no client state, no
+role branching. Bind it by removing the attribute rather than emptying it (`th:attr="open=… ? 'open' : null"`
+or the codebase's existing boolean-attribute idiom); `open=""` is still open.
+
+**This is also the answer to the risk question, which is why it is worth doing properly.** "Any known
+risks", the three recurrence booleans and the strategy-meeting flag all live inside the disclosure, and the
+instinct is to promote them onto the summary as a warning chip. Don't: on a genuine RHI request those fields
+are populated most of the time, so a red chip on the majority of records is an alarm that trains people to
+ignore it. The status rule already places them correctly — **risk is actionable before a report exists,
+which is exactly when the disclosure is open, and it is context afterwards.** Consent is the one exception
+and it is already handled the right way: `detail.html` promotes *"Consent not yet confirmed"* to a tag beside
+the H1, and only when it is absent. Alert on the header, record in the disclosure.
+
+### D-1a-5b · Summary copy, and the marker
+
+```html
+<details class="request-disclosure" id="original-request" tabindex="-1"
+         th:attr="open=${hasReport} ? null : 'open'">
+  <summary>
+    <span class="rd-title">Original request from the home</span>
+    <span class="rd-meta">Raised 12 Mar 2026 by J. Patel</span>
+  </summary>
+  …Young Person · Professionals · Submitted By · Additional Notes, unchanged…
+</details>
+```
+
+Two lines: the title is the canvas's own wording, and the meta line is `Raised {createdAt:dd MMM yyyy} by
+{requestedBy.fullName}` — a staff name, so **never masked** (masking is child identities only).
+
+**No "N of M answered" count in the summary**, even though D-1a-1 puts exactly that on the report's sections.
+The report has a fixed, known question set; the request does not — `notes` is `th:if`-gated, several fields
+are legitimately optional, and someone would have to define the denominator in the view model to render the
+number. That is a place to guess wrong for a nicety. The sparseness is still visible on open, because
+D-1a-1's `--color-text-muted` italic "Not answered" treatment applies to these `dl` rows too. **If the
+per-section count is ever generalised into a shared component, adopt it here then** — follow-up, not blocker.
+
+Marker: suppress the UA triangle (`list-style: none` plus `::-webkit-details-marker { display: none }`) and
+draw `ph-caret-right` / `ph-caret-down` — both vendored, regular and fill. The marker is a **graphical object
+required to understand the control**, so it is 1.4.11 at 3:1, not a hairline; take it from
+`--color-text-muted`, not `--color-control-border`.
+
+### D-1a-5c · It sits last in the left column, and it gets an index entry
+
+Order: H1 + status tag → meta line → rail → two-column body, with the report sections leading the left column
+and the history in the 316px right column → **the disclosure last in the left column.**
+
+**It gets a seventh entry, "Original request", in D-1a-3's section index** (an eighth, "History", appears
+below D-1a-4's 1060px breakpoint). An index that silently omits a whole region of the page is a broken index,
+and here the entry is doing a second job.
+
+**The honest cost of a disclosure, stated:** find-in-page does not reach closed `<details>` content in
+Firefox. Chrome and Safari now auto-expand on find; Firefox does not. This is the same objection that killed
+real tabs in D-1a-3, and it is answered differently here for a reason that has to hold: **the report is the
+artefact a reviewer scans, prints and generates a .docx from, so it never hides; the request is intake
+context, and on every status where it is decision-relevant it is already open.** The index entry is the
+mitigation — a permanent visible pointer saying the request is on this page and where.
+
+The anchor targets the `<details>`, with `scroll-margin-top` and `tabindex="-1"` exactly as the other six
+sections have them. Landing on a closed disclosure is not a dead end: the next focusable thing is the
+`<summary>`, which is a real control, natively focusable, and one keypress from open. What we must **not** do
+is try to force it open from `:target` — CSS cannot open a `<details>`, and reaching for JS to fake it would
+buy a nicety with the app's third script.
