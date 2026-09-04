@@ -10,6 +10,21 @@ public enum AuditEventType {
     LOGIN_SUCCESS,
     LOGIN_FAILURE,
 
+    /**
+     * A sign-in through the emergency local credential path, and the highest-attention event in this
+     * catalogue. Recorded IN ADDITION to LOGIN_SUCCESS rather than instead of it: the ordinary event
+     * keeps the sign-in trail uniform, and this one exists so that "did anyone use break-glass" is a
+     * question the feed answers directly rather than by inference over usernames.
+     */
+    BREAK_GLASS_LOGIN,
+
+    /**
+     * The emergency path being switched on, which is the act worth noticing early - before it is
+     * used rather than after. Raised at startup when the flag is set, because on App Service a
+     * configuration change restarts the app, so startup is when the change becomes real.
+     */
+    BREAK_GLASS_ENABLED,
+
     USER_CREATED,
     USER_UPDATED,
 

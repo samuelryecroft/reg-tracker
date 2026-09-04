@@ -53,3 +53,68 @@ resource "azurerm_monitor_metric_alert" "latency" {
     action_group_id = azurerm_monitor_action_group.oncall.id
   }
 }
+
+# --- Break-glass sign-in (T113 Inc 4 / P5) ---------------------------------------------------
+#
+# The emergency local credential path being used. BreakGlassAuditListener logs a WARN line carrying
+# the marker below on every such sign-in, and the App Insights Java agent already ships application
+# logs at INFO and above (deploy/appservice/applicationinsights.json), so the trace is in Log
+# Analytics without any new plumbing. This is NOT the R5 phase-3 audit stream and does not wait on
+# it: that is every audit event reaching aggregation; this is one event reaching one rule.
+#
+# DELIBERATELY NOT GATED ON var.entra_enabled. The rollback in ENTRA-AUTH-DESIGN.md §5 is "disable
+# Entra, go back to form login" - so the moment break-glass becomes the primary way in is exactly
+# the moment the Entra flag is off. Gating this would destroy the alert at the point it matters
+# most, with a trigger we have already written down as something we might deliberately do.
+#
+# THE MARKER IS DUPLICATED IN JAVA AND HERE, AND THE DUPLICATION FAILS OPEN. Reword either side and
+# the query silently stops matching - and silence is this alert's normal state, so a broken rule
+# looks exactly like a quiet week. BreakGlassAlertMarkerGuardTest reads this file and asserts the
+# string below matches BreakGlassAuditListener.ALERT_MARKER, so the two cannot drift apart without
+# a red build.
+# COMPLETE BUT UNPROVEN until someone with apply rights fires it once. Nothing here can demonstrate
+# that a notification actually arrives - that needs a real apply and a real break-glass sign-in, and
+# it is already a cutover gate in ENTRA-AUTH-DESIGN.md §8 ("break-glass verified: enabling it works,
+# using it raises the audit event, and the alert actually arrives"). Deliberately not repeated as a
+# second procedure: two checklists for one action is how they start disagreeing.
+resource "azurerm_monitor_scheduled_query_rules_alert_v2" "break_glass_login" {
+  name                = "alert-${var.name_prefix}-break-glass-login"
+  resource_group_name = var.resource_group_name
+  location            = var.location
+  scopes              = [azurerm_application_insights.this.id]
+  description         = "The emergency local sign-in path was used. Expected to be rare and always deliberate."
+
+  # Severity 0, matching health_probe rather than inheriting a default. A health-probe failure is
+  # self-announcing - users tell you the app is down - whereas a break-glass sign-in is silent, so
+  # this alert is the ONLY signal it happened. The usual reason to hold 0 back is alert fatigue, and
+  # the expected rate here is approximately zero by construction: one account, disabled by default.
+  severity = 0
+
+  # PT5M, and the reason matters more than the value: AppTraces INGESTION DELAY dominates
+  # time-to-notify, not evaluation cadence. PT1M would look like it halves the time to know and
+  # would not - so this is set explicitly to stop someone "tightening" it later believing it helps.
+  evaluation_frequency = "PT5M"
+  window_duration      = "PT5M"
+
+  criteria {
+    query                   = <<-KQL
+      AppTraces
+      | where Message has "BREAK_GLASS_LOGIN"
+    KQL
+    time_aggregation_method = "Count"
+    threshold               = 0
+    operator                = "GreaterThan"
+
+    failing_periods {
+      minimum_failing_periods_to_trigger_alert = 1
+      number_of_evaluation_periods             = 1
+    }
+  }
+
+  auto_mitigation_enabled = false
+  tags                    = var.tags
+
+  action {
+    action_groups = [azurerm_monitor_action_group.oncall.id]
+  }
+}

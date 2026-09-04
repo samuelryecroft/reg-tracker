@@ -41,6 +41,30 @@ public class AuditEventPublisher {
 
     // --- Authentication (A.1) ---
 
+    /**
+     * A sign-in through the emergency local credential path.
+     *
+     * <p>Published in addition to {@link #loginSuccess}, not instead of it - see
+     * {@link AuditEventType#BREAK_GLASS_LOGIN}.
+     */
+    public void breakGlassLogin(AppUserPrincipal principal) {
+        publish(actor(AuditEventRecord.of(AuditEventType.BREAK_GLASS_LOGIN), principal)
+                .target("User", principal.getUserId())
+                .scope(principal.getOrganisationId(), actorHomeId(principal))
+                .build());
+    }
+
+    /**
+     * The emergency path being switched on. No actor: this is a deployment's configuration, not a
+     * person's action, and inventing one would put a name against something nobody in the
+     * application did.
+     */
+    public void breakGlassEnabled() {
+        publish(AuditEventRecord.of(AuditEventType.BREAK_GLASS_ENABLED)
+                .actor(null, "system", null)
+                .build());
+    }
+
     public void loginSuccess(AppUserPrincipal principal) {
         publish(actor(AuditEventRecord.of(AuditEventType.LOGIN_SUCCESS), principal)
                 .target("User", principal.getUserId())
