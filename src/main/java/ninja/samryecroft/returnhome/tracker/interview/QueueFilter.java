@@ -78,11 +78,13 @@ public enum QueueFilter {
     /**
      * No recorded return time, so no clock can start.
      *
-     * <p>Retired from the menu by D-2a-6: canvas decision 1 makes return time required at raise, so
-     * this selects a state that can no longer be created. It stays resolvable because rows created
-     * before that lands still exist and the dashboard tile that counts them still links here -
-     * retiring the URL as well as the chip is a data question (Kevin's), not a design one, and a
-     * link that stops resolving would land on the whole queue rather than on nothing.
+     * <p>Retired from the menu by D-2a-6, and the reason is stronger than the spec knew: T97
+     * already made {@code returned_at} NOT NULL and enforced it in the raise form, so this state
+     * cannot be created at all any more - the chip would permanently read zero. It stays
+     * RESOLVABLE because rows predating T97 may still exist and the dashboard tile that counts
+     * them still links here; retiring the URL as well as the chip is a data question (Kevin's),
+     * not a design one, and a link that stopped resolving would land on the whole queue rather
+     * than on nothing.
      */
     NO_CLOCK("noClock", "Return time not recorded", Placement.OFF_MENU, (r, now) -> isState(r, now, DueState.NO_CLOCK)),
 
