@@ -102,6 +102,16 @@ class OrganisationActivationGuardIntegrationTest extends AbstractIntegrationTest
         staff.setRoles(new HashSet<>(Set.of(Role.HOME_STAFF)));
         staff.setHomes(new HashSet<>(Set.of(pendingHome, activeHome)));
         userRepository.save(staff);
+
+        User admin = new User();
+        admin.setUsername("guard-admin" + suffix);
+        admin.setPassword(passwordEncoder.encode("password123"));
+        admin.setFirstName("Guard");
+        admin.setLastName("Admin");
+        admin.setEmail("guard-admin" + suffix + "@example.test");
+        admin.setRoles(new HashSet<>(Set.of(Role.ADMIN)));
+        admin.setHomes(new HashSet<>());
+        userRepository.save(admin);
     }
 
     @Test
@@ -156,6 +166,59 @@ class OrganisationActivationGuardIntegrationTest extends AbstractIntegrationTest
     void theMigrationLeftPreExistingOrganisationsActive() {
         assertThat(seededSupplier().getStatus()).isEqualTo(OrgStatus.ACTIVE);
         assertThat(seededCareProvider().getStatus()).isEqualTo(OrgStatus.ACTIVE);
+    }
+
+    /**
+     * T168(b), the floor under the narrowing. {@link OrganisationLifecycleService} requires a KEK for
+     * CARE_PROVIDERs only, which is correct BECAUSE every encrypted entity resolves its owning
+     * organisation through {@code home.getOrganisation()} and homes belong to care providers.
+     *
+     * <p>Kevin's review: nothing enforced the second half. The admin form's dropdown is filtered to
+     * care providers, but <b>a filtered dropdown shapes the form, not the POST</b> - a platform admin
+     * could post a supplier's id, and V6's foreign key does not care about the type either. That is
+     * the most common way an invariant gets believed without existing, because every screenshot of
+     * the working system shows it holding.
+     *
+     * <p>It mattered here specifically because the unconditional KEK check I removed had been
+     * catching this by accident: before that change a supplier with a home was un-activatable, so no
+     * child was ever created into one. Removing a bug removed a net, and this is the net put back
+     * deliberately - as a constraint on the thing that was actually wrong, rather than as a check
+     * that made correct configurations impossible.
+     */
+    @Test
+    void aHomeCannotBeHungOffASupplierOrganisation() throws Exception {
+        long before = homeRepository.count();
+
+        String html = mockMvc.perform(post("/admin/homes")
+                        .with(asUser("guard-admin" + suffix)).with(csrf())
+                        .param("name", "Misfiled House" + suffix)
+                        .param("organisationId", seededSupplier().getId().toString())
+                        .param("addressLine1", "1 Wrong Street")
+                        .param("postcode", "AB1 2CD"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(homeRepository.count())
+                .as("a home under a supplier would make the CARE_PROVIDER-only KEK check wrong, and "
+                        + "its children would fail closed against a key that never should exist")
+                .isEqualTo(before);
+        assertThat(html).contains("care provider");
+    }
+
+    /** The paired positive: the same POST against a care provider must still work. */
+    @Test
+    void aHomeUnderACareProviderIsStillAccepted() throws Exception {
+        long before = homeRepository.count();
+
+        mockMvc.perform(post("/admin/homes")
+                        .with(asUser("guard-admin" + suffix)).with(csrf())
+                        .param("name", "Correctly Filed House" + suffix)
+                        .param("organisationId", seededCareProvider().getId().toString())
+                        .param("addressLine1", "1 Right Street")
+                        .param("postcode", "AB1 2CD"))
+                .andExpect(status().is3xxRedirection());
+
+        assertThat(homeRepository.count()).isEqualTo(before + 1);
     }
 
     private RequestPostProcessor asUser(String username) {

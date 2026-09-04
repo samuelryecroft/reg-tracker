@@ -6,8 +6,11 @@ import static org.mockito.Mockito.verifyNoInteractions;
 
 import java.util.List;
 import ninja.samryecroft.returnhome.tracker.audit.AuditEventPublisher;
+import ninja.samryecroft.returnhome.tracker.child.Child;
 import ninja.samryecroft.returnhome.tracker.child.ChildRepository;
+import ninja.samryecroft.returnhome.tracker.home.Home;
 import ninja.samryecroft.returnhome.tracker.home.HomeRepository;
+import ninja.samryecroft.returnhome.tracker.interview.InterviewRequest;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewRequestRepository;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewRequestService;
 import ninja.samryecroft.returnhome.tracker.organisation.Organisation;
@@ -17,8 +20,10 @@ import ninja.samryecroft.returnhome.tracker.organisation.OrganisationRepository;
 import ninja.samryecroft.returnhome.tracker.report.InterviewReportRepository;
 import ninja.samryecroft.returnhome.tracker.report.ReportService;
 import ninja.samryecroft.returnhome.tracker.theme.ThemeSettingsRepository;
+import ninja.samryecroft.returnhome.tracker.user.User;
 import ninja.samryecroft.returnhome.tracker.user.UserRepository;
 import org.junit.jupiter.api.Test;
+import org.mockito.InOrder;
 import org.mockito.Mockito;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Bean;
@@ -99,6 +104,39 @@ class DemoDataSeederTest {
                 mocks.reports, mocks.themes, mocks.reportService, mocks.audit,
                 mocks.passwordEncoder);
         Mockito.verify(mocks.organisations, Mockito.never()).save(Mockito.any());
+    }
+
+    /**
+     * T168(b). {@code ChildCreationPathGuardTest} permits DemoDataSeeder to persist children on one
+     * stated ground: it ACTIVATES its organisations first, so it cannot seed into a PENDING one.
+     * Kevin's review: that justification lived only in a javadoc, so a future reorder of the seeder
+     * would leave the path guard green while the ground under its permission had gone.
+     *
+     * <p>This makes the entry earn itself. Ordering is asserted rather than the mere fact of
+     * activation, because "activates" and "activates BEFORE creating children" are different claims
+     * and only the second one licenses the exemption.
+     */
+    @Test
+    void activatesEveryOrganisationBeforeAnyChildIsCreated() {
+        Mocks mocks = new Mocks();
+        mocks.suppliersInDatabase();
+        Mockito.when(mocks.organisations.save(Mockito.any(Organisation.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        Mockito.when(mocks.children.save(Mockito.any(Child.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        Mockito.when(mocks.homes.save(Mockito.any(Home.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        Mockito.when(mocks.users.save(Mockito.any(User.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        Mockito.when(mocks.requests.save(Mockito.any(InterviewRequest.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        mocks.seeder().run(null);
+
+        InOrder inOrder = Mockito.inOrder(mocks.lifecycle, mocks.children);
+        inOrder.verify(mocks.lifecycle, Mockito.atLeastOnce())
+                .activate(Mockito.any(Organisation.class), Mockito.isNull());
+        inOrder.verify(mocks.children, Mockito.atLeastOnce()).save(Mockito.any(Child.class));
     }
 
     private static Organisation supplier(String name) {
