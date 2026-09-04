@@ -67,14 +67,55 @@ public class ReportService {
                 .orElseGet(() -> blankFormFor(principal));
     }
 
+    /**
+     * Saves the visitor's work in progress, and refuses to do so once the report has left their
+     * hands.
+     *
+     * <p>Guarded on entry, before anything is mutated - the same shape and the same reasoning as
+     * {@link #submitForReview}. T145(B) surveyed this state machine, found the write sites that
+     * checked nothing, and fixed {@code submitForReview}; this method is the sibling it left behind,
+     * and it wrote {@code DRAFT} unconditionally over whatever the report already was.
+     *
+     * <p><b>Why refusing APPROVED is not merely tidiness.</b> A demoted report keeps its generated
+     * document, its {@code reviewedBy} and its {@code reviewedAt}, so the row reads "Draft" while
+     * carrying an approval. Four things downstream read this status and every one of them then
+     * answers a question wrongly. The one that matters is
+     * {@code CaseFileExportService.approvedReportFor}: it excludes the report from the case file
+     * pack, and {@code exclusionReasonFor} - deriving from the same corrupted field - writes into
+     * the manifest that "the report is still a draft and has not been submitted". The pack does not
+     * merely omit an approved safeguarding report; <em>it states in writing that none exists, and
+     * gives a false reason</em>. Because both halves derive from the one field they agree with each
+     * other, so the artefact is self-consistently wrong and carries no tell - and it goes to a
+     * court, an IRO, a local authority or a subject access request.
+     * {@code DashboardService.completedInPeriod} is the milder member of the same family: the
+     * report silently drops out of completion statistics and nothing looks broken.
+     *
+     * <p><b>Why SUBMITTED is refused too</b>, which is a different harm and not a smaller version of
+     * the same one: a report awaiting review is being read by a reviewer, and editing it underneath
+     * them changes what they are reviewing without their knowledge.
+     *
+     * <p>REJECTED stays permitted, deliberately - that is precisely the resubmission round, and the
+     * whole point of a rejection is that the visitor goes back and reworks the report.
+     *
+     * <p>The refusal is an {@link IllegalStateException} rather than an
+     * {@link AccessDeniedException} because it is a statement about the report, not about the
+     * person: the allocated visitor is exactly who is allowed here, and the report has simply moved
+     * past the point where saving means anything.
+     */
     @Transactional
     public InterviewReport saveDraft(Long requestId, SubmitReportForm form, AppUserPrincipal principal) {
         InterviewReport report = existingOrNewReport(requestId, principal);
+        ReportStatus statusBefore = report.getStatus();
+        if (statusBefore == ReportStatus.SUBMITTED || statusBefore == ReportStatus.APPROVED) {
+            throw new IllegalStateException(
+                    "This report has already been " + (statusBefore == ReportStatus.APPROVED ? "approved" : "submitted for review")
+                            + " and can no longer be saved as a draft");
+        }
         applyFormValues(report, form);
         report.setStatus(ReportStatus.DRAFT);
         report.setUpdatedAt(LocalDateTime.now());
         InterviewReport saved = interviewReportRepository.save(report);
-        auditEventPublisher.reportDraftSaved(saved, principal);
+        auditEventPublisher.reportDraftSaved(saved, statusBefore, principal);
         return saved;
     }
 

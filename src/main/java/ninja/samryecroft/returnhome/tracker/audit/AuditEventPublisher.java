@@ -211,8 +211,32 @@ public class AuditEventPublisher {
 
     // --- Report lifecycle (A.3) ---
 
-    public void reportDraftSaved(InterviewReport report, AppUserPrincipal principal) {
-        publish(reportEvent(AuditEventType.REPORT_DRAFT_SAVED, report, principal).build());
+    /**
+     * Records the status this save overwrote, for the same reason {@link #reportSubmitted} does.
+     *
+     * <p>T145(B) applied two remedies to {@code submitForReview} - an entry guard and a
+     * {@code statusBefore} - and neither to its sibling {@code saveDraft}. This is the second half.
+     *
+     * <p>It stays worth having now that the guard refuses SUBMITTED and APPROVED, for a reason that
+     * is not about that defect at all: REJECTED &rarr; DRAFT is a permitted and meaningful
+     * transition - the moment a visitor began reworking a report that was sent back - and without
+     * this field it is indistinguishable from an ordinary DRAFT &rarr; DRAFT save. Once per-step
+     * autosave exists (T174) there will be many of the latter per interview, so a display layer that
+     * wants to collapse the noise needs a way to tell the one from the others. The rule that field
+     * makes possible is <em>collapse DRAFT &rarr; DRAFT, never collapse a transition</em>, which is
+     * correct rather than approximate.
+     *
+     * <p>A status name is not content, so this keeps the event within the rule that report audit
+     * rows carry ids and scope only. Nothing derived from the form may ever go in this builder: it
+     * would be a plaintext leak out of the encrypted columns, multiplied by the autosave frequency.
+     *
+     * @param statusBefore the report's status before this save, or null if this save created it
+     */
+    public void reportDraftSaved(InterviewReport report, ReportStatus statusBefore,
+            AppUserPrincipal principal) {
+        publish(reportEvent(AuditEventType.REPORT_DRAFT_SAVED, report, principal)
+                .meta("statusBefore", statusBefore)
+                .build());
     }
 
     /**
