@@ -76,6 +76,7 @@ public class AuditFeedController {
         List<AuditFeedRow> rows = auditHistoryService.caseActivityFeed(scope, homeId, from, to);
 
         model.addAttribute("rows", rows);
+        model.addAttribute("days", auditHistoryService.groupFeedByDay(rows));
         model.addAttribute("homes", homesInScope(principal));
         model.addAttribute("homeId", homeId);
         model.addAttribute("from", from);
