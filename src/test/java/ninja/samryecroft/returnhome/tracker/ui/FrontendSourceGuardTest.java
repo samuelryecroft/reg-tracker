@@ -241,11 +241,34 @@ class FrontendSourceGuardTest {
      */
     @Test
     void everyThemedBackgroundPairsWithAThemedInkNeverAHardcodedColour() throws IOException {
-        String rawCss = Files.readString(CSS_DIR.resolve("app.css"), StandardCharsets.UTF_8);
-        String css = rawCss.replaceAll("(?s)/\\*.*?\\*/", "");
+        List<String> offendingRules = themedBackgroundsWithHardcodedInk(
+                Files.readString(CSS_DIR.resolve("app.css"), StandardCharsets.UTF_8));
 
+        assertThat(offendingRules)
+                .as("a themed background paired with a hard-coded ink instead of that same family's "
+                        + "var(--x) token - correct in one theme by coincidence, wrong the moment "
+                        + "anyone reaches the other one")
+                .isEmpty();
+    }
+
+    /**
+     * The {@code color} property itself, never the tail of a longhand that merely ends in it.
+     *
+     * <p>{@code border-color}, {@code background-color}, {@code outline-color},
+     * {@code caret-color} and {@code text-decoration-color} all <em>contain</em> the substring
+     * {@code color:}, so an unanchored pattern matches whichever of them comes first in the rule
+     * and reports its value as the ink. That made the check above depend on declaration order:
+     * {@code .banner.err} passed only because its {@code color:} happened to precede its
+     * {@code border-color:}. A guard whose verdict depends on the order someone wrote two
+     * unrelated declarations in is not one you can trust the green from (T159).
+     */
+    private static final Pattern THEMED_INK = Pattern.compile("(?<![-\\w])color:\\s*([^;]+);");
+
+    /** Rules in {@code css} pairing a themed {@code var(--X-bg)} background with a literal ink. */
+    private static List<String> themedBackgroundsWithHardcodedInk(String css) {
+        String stripped = css.replaceAll("(?s)/\\*.*?\\*/", "");
         List<String> offendingRules = new ArrayList<>();
-        Matcher rule = Pattern.compile("([^{}]+)\\{([^{}]*)\\}").matcher(css);
+        Matcher rule = Pattern.compile("([^{}]+)\\{([^{}]*)\\}").matcher(stripped);
         while (rule.find()) {
             String selector = rule.group(1).trim();
             String body = rule.group(2);
@@ -256,17 +279,35 @@ class FrontendSourceGuardTest {
             if (!background.find()) {
                 continue;
             }
-            Matcher color = Pattern.compile("color:\\s*([^;]+);").matcher(body);
-            if (color.find() && !color.group(1).trim().startsWith("var(")) {
+            Matcher ink = THEMED_INK.matcher(body);
+            if (ink.find() && !ink.group(1).trim().startsWith("var(")) {
                 offendingRules.add(selector + " { background: var(--" + background.group(1) + "-bg); color: "
-                        + color.group(1).trim() + "; }");
+                        + ink.group(1).trim() + "; }");
             }
         }
+        return offendingRules;
+    }
 
-        assertThat(offendingRules)
-                .as("a themed background paired with a hard-coded ink instead of that same family's "
-                        + "var(--x) token - correct in one theme by coincidence, wrong the moment "
-                        + "anyone reaches the other one")
+    /**
+     * Pins the reading of the ink against the two false positives the unanchored pattern produced,
+     * with a genuine violation alongside them so a check that simply stopped finding anything could
+     * not pass this by going quiet.
+     */
+    @Test
+    void theThemedInkCheckReadsTheInkAndNotEveryPropertyWhoseNameEndsInColour() {
+        assertThat(themedBackgroundsWithHardcodedInk(
+                ".genuine { background: var(--error-bg); color: #991B1B; }"))
+                .as("a themed background with a literal ink is still the bug this guard exists for")
+                .hasSize(1);
+
+        assertThat(themedBackgroundsWithHardcodedInk(".ordered { background: var(--error-bg); "
+                + "border-color: color-mix(in srgb, var(--error) 25%, transparent); color: var(--error); }"))
+                .as("the ink is themed; a border-color declared before it must not be read as the ink")
+                .isEmpty();
+
+        assertThat(themedBackgroundsWithHardcodedInk(
+                ".borderOnly { background: var(--error-bg); border-color: #F3C0C0; }"))
+                .as("a literal BORDER colour is not an ink, and this rule declares no ink at all")
                 .isEmpty();
     }
 
