@@ -104,7 +104,7 @@ class JourneyCapture {
         // 6. The approved report and its generated Word document.
         as(browser, "homestaff", page -> {
             signIn(page, "homestaff");
-            shot(page, "approved-report", () -> page.navigate(baseUrl + "/reports/6/view"));
+            shot(page, "approved-report", () -> page.navigate(baseUrl + "/interview-requests/6"));
         });
 
         // Administration, for the "how is it set up" part of a pitch.

@@ -4,6 +4,8 @@ import ninja.samryecroft.returnhome.tracker.audit.AuditEventPublisher;
 import ninja.samryecroft.returnhome.tracker.audit.AuditHistoryService;
 import ninja.samryecroft.returnhome.tracker.child.ChildIdentity;
 import ninja.samryecroft.returnhome.tracker.child.NameRevealService;
+import ninja.samryecroft.returnhome.tracker.report.InterviewReport;
+import ninja.samryecroft.returnhome.tracker.report.ReportService;
 import ninja.samryecroft.returnhome.tracker.user.AppUserPrincipal;
 import ninja.samryecroft.returnhome.tracker.user.Role;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -21,14 +23,16 @@ public class InterviewRequestDetailController {
     private final AuditHistoryService auditHistoryService;
     private final AuditEventPublisher auditEventPublisher;
     private final NameRevealService nameRevealService;
+    private final ReportService reportService;
 
     public InterviewRequestDetailController(InterviewRequestService interviewRequestService,
             AuditHistoryService auditHistoryService, AuditEventPublisher auditEventPublisher,
-            NameRevealService nameRevealService) {
+            NameRevealService nameRevealService, ReportService reportService) {
         this.interviewRequestService = interviewRequestService;
         this.auditHistoryService = auditHistoryService;
         this.auditEventPublisher = auditEventPublisher;
         this.nameRevealService = nameRevealService;
+        this.reportService = reportService;
     }
 
     @GetMapping("/{id}")
@@ -52,7 +56,28 @@ public class InterviewRequestDetailController {
                 && request.getStatus() == InterviewStatus.REPORT_SUBMITTED
                 && !isAllocatedVisitor;
 
+        // The interview record and the report used to live on separate routes, the report's own
+        // gated a level further by this same condition (ReportController#approvedReportFor, now
+        // folded in here - T155 batch 2). A report row can exist in SUBMITTED or REJECTED state
+        // while under review; it must stay invisible on this page until REPORT_APPROVED, exactly as
+        // it was invisible via the old /reports/{id}/view route until then. This is the one gate
+        // Kevin's auth-equivalence review needs to check is preserved.
+        //
+        // Kevin's review (PR #57): the OLD gate asked "is the report APPROVED" (ReportStatus, read
+        // off the report row itself); this one asks "is the REQUEST REPORT_APPROVED" (InterviewStatus,
+        // read off the request). Those are two different columns, and this substitutes one for the
+        // other - safe only because three invariants live elsewhere: ReportService#approve sets both
+        // atomically in one transaction, REPORT_APPROVED is terminal in InterviewStatusTransitions (so
+        // the request can't move back off it once set), and InterviewStatusWriterGuardTest fails the
+        // build on any status write that bypasses markStatus. If a future path ever sets one without
+        // the other, this line silently starts answering the wrong question.
         boolean canDownload = request.getStatus() == InterviewStatus.REPORT_APPROVED;
+        // findByRequestId, not getByRequestId: REPORT_APPROVED with no report row is a can't-happen
+        // today (the same three invariants above), but getByRequestId would throw and take the WHOLE
+        // page down with it - a strictly wider blast radius than the old route, where only the
+        // separate /reports/{id}/view broke and this page still rendered. Optional.orElse(null) keeps
+        // that same narrower failure: report content silently doesn't render, same as pre-approval.
+        InterviewReport report = canDownload ? reportService.findByRequestId(id).orElse(null) : null;
 
         model.addAttribute("request", request);
         model.addAttribute("childIdentity", ChildIdentity.of(request.getChild(), nameRevealService.isRevealed()));
@@ -61,7 +86,7 @@ public class InterviewRequestDetailController {
         model.addAttribute("canConfirmSchedule", canConfirmSchedule);
         model.addAttribute("canReview", canReview);
         model.addAttribute("canDownload", canDownload);
-        model.addAttribute("canView", canDownload);
+        model.addAttribute("report", report);
         model.addAttribute("auditHistory", auditHistoryService.historyFor(request));
         auditEventPublisher.auditViewOpened("InterviewRequest", request.getId(),
                 request.getHome() == null || request.getHome().getOrganisation() == null

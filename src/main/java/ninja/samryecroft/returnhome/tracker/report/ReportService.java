@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import ninja.samryecroft.returnhome.tracker.audit.AuditEventPublisher;
 import ninja.samryecroft.returnhome.tracker.config.AppProperties;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewRequest;
@@ -164,6 +165,15 @@ public class ReportService {
     public InterviewReport getByRequestId(Long requestId) {
         return interviewReportRepository.findByInterviewRequestId(requestId)
                 .orElseThrow(() -> new IllegalArgumentException("No report found for request " + requestId));
+    }
+
+    /** Unlike {@link #getByRequestId}, tolerates a request that has not reached REPORT_SUBMITTED yet
+     * (no report row at all), or the can't-happen case Kevin's PR #57 review flagged: REPORT_APPROVED
+     * with no matching report row. A caller gating report CONTENT on approval status must still apply
+     * that gate itself - this only changes what happens if the row is unexpectedly missing (a graceful
+     * absence rather than a request that fails to render at all). */
+    public Optional<InterviewReport> findByRequestId(Long requestId) {
+        return interviewReportRepository.findByInterviewRequestId(requestId);
     }
 
     /** Loads (or starts) the report row for this request, enforcing only the allocated Visitor
