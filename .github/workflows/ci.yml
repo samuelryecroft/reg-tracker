@@ -67,6 +67,18 @@ jobs:
           distribution: temurin
           java-version: '21'
           cache: maven
+      # WebKit's Linux shared libraries, which the runner does not ship. Playwright downloads the
+      # browser binaries itself (pom.xml, install-playwright-browsers) but never the OS packages
+      # they link against, and every UI test launched chromium until T128 added an iOS-icon smoke
+      # test on webkit - so only chromium's deps were ever present, and webkit failed with "Host
+      # system is missing dependencies to run browsers: libgtk-4.so.1, libgraphene-1.0.so.0".
+      # That made this lane permanently red, which is worse than one failing test: a quarantine
+      # lane exists to surface intermittent flakes, and a lane that is always red surfaces nothing.
+      #
+      # Pinned to the same version as the Java binding in pom.xml so the two cannot drift apart.
+      # If a test ever launches firefox, add it to this line - the failure will look identical.
+      - name: Install WebKit's Linux system dependencies
+        run: npx --yes playwright@1.60.0 install-deps webkit
       - name: Run only flaky-infra tests (reported, not required)
         run: ./mvnw -B -ntp verify -Dgroups=flaky-infra
 
