@@ -132,7 +132,17 @@ Round to a whole degree in **one** place and pass the integer around. Two implem
 their own way will disagree by a degree on some colours, and a document whose accent is one degree off the
 screen's is the kind of defect nobody can describe and everybody can see.
 
-Beacon = hue 289 (`#9184d9`), Northgate = hue 232 (`#6f9ee0`).
+Beacon = hue **289**, Northgate = hue **257**.
+
+> **Do not read a hue and a hex here as a matched pair.** The canvas stores both per organisation and for
+> Northgate they disagree: `northgate: { hue: 232, hex: "#6f9ee0" }`, where `#6f9ee0` actually derives
+> **257** (L 0.693 / C 0.110 — not a step-500 colour at all). Hue 232 renders to `#259ED1`. Beacon's pair is
+> self-consistent, Northgate's is not, and an earlier draft of this line quoted both as if they were.
+> **Only the colour is stored in production; the hue is derived from it.** So a derivation returning 257 for
+> `#6f9ee0` is correct, and any review that 'finds' 232 missing has found an error in this sentence, not in
+> the code. Beacon's `#9184d9` is Nocturne's own published colour rather than the ramp's `#9084DA` and
+> derives 290, not 289 — see the round-trip note below. Caught by Pam (T138) and Jim (T131) independently,
+> each while implementing this paragraph.
 
 ### 2.3 Appearance — per user, server-rendered
 Appearance is an account setting, not an org setting and not `prefers-color-scheme` alone. Render it on the
@@ -771,10 +781,18 @@ and all ten reproduce exactly. Assert them.
 **Ramp implementation, signed off.** Nine fixed L/C pairs, hue injected:
 `100 .975/.020 · 200 .925/.045 · 300 .860/.090 · 400 .775/.115 · 500 .660/.125 · 600 .565/.110 ·
 700 .460/.090 · 800 .360/.070 · 900 .280/.055`.
-OKLCH → OKLab → LMS (cube each) → linear sRGB via the standard matrix → **clamp to [0,1] in linear space**
-→ gamma-encode. Clipping is required and safe: **797 of the 3240 hue×step combinations fall outside sRGB**,
-almost all in the pale steps, and a pale step clips toward white, which only raises its contrast with dark
-ink.
+OKLCH → OKLab → LMS (cube each) → linear sRGB via the standard matrix → clamp to [0,1] → gamma-encode.
+Clipping is required and safe: **797 of the 3240 hue×step channels fall outside sRGB**, almost all in the
+pale steps, and a pale step clips toward white, which only raises its contrast with dark ink. (Independently
+reproduced: Jim's separately-written sweep found the same 797.)
+
+**Correction to an earlier emphasis of mine.** I told two people to clamp in *linear* space specifically,
+before encoding, as though the order were a hazard. Jim checked whether his tests actually proved it and
+found they could not, because the two orders **disagree on 0 of the 797 channels** — for any value below 0
+or above 1 both routes land on the same endpoint. He was right and I have verified it. **The clamp order is
+free; the guard that matters is the double *decode*** (reintroducing it fails 13 of his 19 tests). Write
+tests for the decode, not for the clamp order, and do not spend review time on an order that cannot be
+observed.
 
 Test vectors:
 
