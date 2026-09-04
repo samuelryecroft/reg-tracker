@@ -225,26 +225,37 @@ class OrganisationActivationGuardIntegrationTest extends AbstractIntegrationTest
     }
 
     /**
-     * V20's contract half, asserted against the real schema rather than trusted to the file existing.
+     * The surviving column default is the SAFE value, and the database agrees with the entity.
      *
-     * <p>V19 keeps {@code DEFAULT 'ACTIVE'} so the migration stays compatible with the jar still
-     * serving while it runs; V20 removes it. The end state is what matters: a default in the
-     * permissive direction fails OPEN, silently producing a usable organisation for any insert that
-     * forgets to set a status. This fails if V20 is ever reverted, or if someone re-adds a default
-     * later - the two ways the guarantee could quietly disappear.
+     * <p>V19 backfills existing organisations to ACTIVE - they are in use - and then sets the
+     * default for FUTURE inserts to PENDING. That second statement exists because of a real deploy
+     * window: {@code deploy.yml} runs the DB-plane job to Succeeded before the new jar is live, so
+     * an old jar briefly writes to this schema without knowing the column. With no default that is a
+     * NOT NULL violation; with a default of ACTIVE it would silently produce a usable organisation
+     * whose key was never verified. PENDING is the only value that is both survivable and correct.
+     *
+     * <p>Asserted as "contains PENDING and not ACTIVE" rather than string-equal to Postgres's
+     * rendering ({@code 'PENDING'::character varying}), because the claim being pinned is WHICH
+     * VALUE a forgotten insert gets - not how the catalogue formats it.
+     *
+     * <p>The end state we still want is no default at all, so a bypassing insert fails LOUDLY rather
+     * than merely landing safe. That ships in a later release once no old jar can be running, and
+     * this assertion flips to null then. A test that must be edited when the schema intentionally
+     * changes is working correctly.
      */
     @Test
-    void theStatusColumnEndsUpWithNoDefaultSoAForgottenInsertFailsLoudly() {
+    void theSurvivingColumnDefaultIsPendingSoAForgottenInsertLandsSafeRatherThanUsable() {
         String columnDefault = jdbcTemplate.query(
                 "select column_default from information_schema.columns "
                         + "where table_name = 'organisations' and column_name = 'status'",
                 rs -> rs.next() ? rs.getString(1) : "COLUMN MISSING");
 
         assertThat(columnDefault)
-                .as("organisations.status must have no column default once V20 has run - a default "
-                        + "of ACTIVE would make any insert that omits status silently produce a "
-                        + "usable organisation instead of failing NOT NULL")
-                .isNull();
+                .as("an insert that omits status - an old jar mid-deploy, or any future path that "
+                        + "bypasses the entity - must land PENDING and go through the KEK gate, "
+                        + "never ACTIVE")
+                .contains("PENDING")
+                .doesNotContain("ACTIVE");
     }
 
     private RequestPostProcessor asUser(String username) {
