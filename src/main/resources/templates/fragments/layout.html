@@ -136,9 +136,21 @@
              Both states use Phosphor's regular/fill pair for an active state (Nocturne's own idiom,
              R-Q11) rather than one glyph doing double duty: ph-eye-slash masked, ph-fill-eye-slash
              revealed. -->
+        <!-- Creed's follow-up review: no aria-pressed on either state. It's invalid on the <a>
+             below (only supported on role="button", and adding that role would then obligate
+             hand-wiring Space-key activation for what should stay a plain link). And it's the
+             wrong pattern on the <button>, not just redundant there: aria-pressed exists for a
+             control whose LABEL STAYS CONSTANT while its state changes (a Bold button, on or off)
+             - this one's label changes between "Reveal" and "Hide", which already communicates the
+             state through the accessible name, and carrying both would double the information (in
+             the masked state it would read as a double negative: a control named "Reveal names on
+             this page" announced as *not pressed*). The changing-label pattern and the
+             constant-label-plus-aria-pressed pattern are two different, complete solutions - never
+             combine them. The appearance cycle below already uses the changing-label pattern
+             correctly with no aria-pressed; this brings the two header controls into line. -->
         <form th:if="${!namesRevealed}" method="post" th:action="@{/account/reveal-names}" class="shell-reveal-form">
             <input type="hidden" name="returnTo" th:value="${currentPath}">
-            <button type="submit" class="shell-toggle shell-reveal-toggle" aria-pressed="false">
+            <button type="submit" class="shell-toggle shell-reveal-toggle">
                 <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-eye-slash'"></use></svg>
                 <span>Reveal</span>
                 <!-- Spec §2.5: the control's accessible name must state what it does and what it
@@ -147,7 +159,7 @@
                 <span class="visually-hidden">names on this page</span>
             </button>
         </form>
-        <a th:if="${namesRevealed}" th:href="${currentPath}" class="shell-toggle shell-reveal-toggle" aria-pressed="true">
+        <a th:if="${namesRevealed}" th:href="${currentPath}" class="shell-toggle shell-reveal-toggle">
             <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-fill-eye-slash'"></use></svg>
             <span>Hide</span>
             <span class="visually-hidden">names on this page</span>
