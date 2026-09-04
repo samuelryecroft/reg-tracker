@@ -6,6 +6,11 @@
 <link rel="stylesheet" th:href="@{/css/app.css}">
 <style th:if="${theme != null}"
        th:text="${':root { --accent: ' + theme.primaryColor + '; --accent-dark: ' + theme.primaryColorDark + '; --accent-ink: ' + theme.primaryColorInk + '; --tint: ' + theme.secondaryColor + '; }'}"></style>
+<!-- T138 (phase 2, batch 1a): overrides app.css's hardcoded default hue (289) with the signed-in
+     user's actual effective supplier theme, derived by ThemeService.brandHueOf from the same
+     primaryColor hex the legacy override above already reads - one shared derivation point, so this
+     and the docx report's own hue ramp (T137) can never silently disagree for the same supplier. -->
+<style th:if="${theme != null}" th:text="${':root { --brand-hue: ' + theme.brandHue + '; }'}"></style>
 </th:block>
 
 <!-- FE-02: shared field-error rendering. Pairs with th:errorclass="is-invalid" and aria-describedby
@@ -22,7 +27,13 @@
      sidebar clears main without a shared wrapper element). The appearance/reveal buttons are
      structural for now: Phase 2 wires their behaviour (per-user preference, session-backed,
      server-rendered - design spec §2.3/§2.5); until then they render correctly but are disabled. -->
-<th:block th:fragment="nav" th:with="ico=@{/icons/phosphor.svg}">
+<!-- T138 (phase 2, batch 1a): aria-current, carried forward as an unfixed defect from the T86
+     review ("aria-current is styled in app.css and set by no template - no page tells you where you
+     are"). `path` comes from GlobalControllerAdvice's currentPath model attribute, not Thymeleaf's own
+     #httpServletRequest (which evaluates to null in this app's wiring) - matched against each nav
+     item's own href below, either exactly or as a path prefix (`path + '/'`) so a detail page under a
+     section (e.g. /children/42) still marks that section's own nav link current. -->
+<th:block th:fragment="nav" th:with="ico=@{/icons/phosphor.svg}, path=${currentPath}">
 <a class="skip-link" href="#main">Skip to main content</a>
 
 <aside class="shell-side">
@@ -41,37 +52,49 @@
 
     <nav class="shell-nav" aria-label="Main">
         <span class="shell-nav-group">Work</span>
-        <a th:if="${#authorization.expression('hasAnyRole(''ORG_ADMIN'',''VIEWER'',''COORDINATOR'')')}" href="/dashboard">
+        <a th:if="${#authorization.expression('hasAnyRole(''ORG_ADMIN'',''VIEWER'',''COORDINATOR'')')}" href="/dashboard"
+           th:aria-current="${path == '/dashboard' or #strings.startsWith(path, '/dashboard/')} ? 'page'">
             <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-squares-four'"></use></svg>Dashboard</a>
-        <a th:if="${#authorization.expression('hasRole(''HOME_STAFF'')')}" href="/requests">
+        <a th:if="${#authorization.expression('hasRole(''HOME_STAFF'')')}" href="/requests"
+           th:aria-current="${path == '/requests' or #strings.startsWith(path, '/requests/')} ? 'page'">
             <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-tray'"></use></svg>My Requests</a>
-        <a th:if="${#authorization.expression('hasRole(''COORDINATOR'')')}" href="/coordinator/requests">
+        <a th:if="${#authorization.expression('hasRole(''COORDINATOR'')')}" href="/coordinator/requests"
+           th:aria-current="${path == '/coordinator/requests' or #strings.startsWith(path, '/coordinator/requests/')} ? 'page'">
             <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-tray'"></use></svg>All Requests</a>
-        <a th:if="${#authorization.expression('hasRole(''VISITOR'')')}" href="/visitor/interviews">
+        <a th:if="${#authorization.expression('hasRole(''VISITOR'')')}" href="/visitor/interviews"
+           th:aria-current="${path == '/visitor/interviews' or #strings.startsWith(path, '/visitor/interviews/')} ? 'page'">
             <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-user-focus'"></use></svg>My Interviews</a>
-        <a th:if="${#authorization.expression('hasRole(''REVIEWER'')')}" href="/reviewer/reports">
+        <a th:if="${#authorization.expression('hasRole(''REVIEWER'')')}" href="/reviewer/reports"
+           th:aria-current="${path == '/reviewer/reports' or #strings.startsWith(path, '/reviewer/reports/')} ? 'page'">
             <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-seal-check'"></use></svg>Review Queue</a>
 
         <span class="shell-nav-group" th:if="${#authorization.expression('hasRole(''HOME_STAFF'')')}">Records</span>
-        <a th:if="${#authorization.expression('hasRole(''HOME_STAFF'')')}" href="/children">
+        <a th:if="${#authorization.expression('hasRole(''HOME_STAFF'')')}" href="/children"
+           th:aria-current="${path == '/children' or #strings.startsWith(path, '/children/')} ? 'page'">
             <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-users-three'"></use></svg>My Children</a>
 
         <span class="shell-nav-group"
               th:if="${#authorization.expression('hasAnyRole(''ADMIN'',''ORG_ADMIN'',''VIEWER'',''COORDINATOR'')')}">Records</span>
-        <a th:if="${#authorization.expression('hasAnyRole(''ADMIN'',''ORG_ADMIN'',''VIEWER'')')}" href="/children">
+        <a th:if="${#authorization.expression('hasAnyRole(''ADMIN'',''ORG_ADMIN'',''VIEWER'')')}" href="/children"
+           th:aria-current="${path == '/children' or #strings.startsWith(path, '/children/')} ? 'page'">
             <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-users-three'"></use></svg>Children</a>
-        <a th:if="${#authorization.expression('hasAnyRole(''ADMIN'',''ORG_ADMIN'')')}" href="/admin/homes">
+        <a th:if="${#authorization.expression('hasAnyRole(''ADMIN'',''ORG_ADMIN'')')}" href="/admin/homes"
+           th:aria-current="${path == '/admin/homes' or #strings.startsWith(path, '/admin/homes/')} ? 'page'">
             <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-house-line'"></use></svg>Homes</a>
-        <a th:if="${#authorization.expression('hasAnyRole(''ORG_ADMIN'',''VIEWER'',''COORDINATOR'',''ADMIN'')')}" href="/audit">
+        <a th:if="${#authorization.expression('hasAnyRole(''ORG_ADMIN'',''VIEWER'',''COORDINATOR'',''ADMIN'')')}" href="/audit"
+           th:aria-current="${path == '/audit' or #strings.startsWith(path, '/audit/')} ? 'page'">
             <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-clock-counter-clockwise'"></use></svg>Audit</a>
 
         <span class="shell-nav-group"
               th:if="${#authorization.expression('hasAnyRole(''ADMIN'',''ORG_ADMIN'')') or canEditTheme}">Admin</span>
-        <a th:if="${#authorization.expression('hasAnyRole(''ADMIN'',''ORG_ADMIN'')')}" href="/admin/users">
+        <a th:if="${#authorization.expression('hasAnyRole(''ADMIN'',''ORG_ADMIN'')')}" href="/admin/users"
+           th:aria-current="${path == '/admin/users' or #strings.startsWith(path, '/admin/users/')} ? 'page'">
             <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-users-three'"></use></svg>Users</a>
-        <a th:if="${canEditTheme}" href="/admin/theme">
+        <a th:if="${canEditTheme}" href="/admin/theme"
+           th:aria-current="${path == '/admin/theme' or #strings.startsWith(path, '/admin/theme/')} ? 'page'">
             <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-eyedropper'"></use></svg>Branding</a>
-        <a th:if="${#authorization.expression('hasRole(''ADMIN'')')}" href="/admin/organisations">
+        <a th:if="${#authorization.expression('hasRole(''ADMIN'')')}" href="/admin/organisations"
+           th:aria-current="${path == '/admin/organisations' or #strings.startsWith(path, '/admin/organisations/')} ? 'page'">
             <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-buildings'"></use></svg>Organisations</a>
     </nav>
 
