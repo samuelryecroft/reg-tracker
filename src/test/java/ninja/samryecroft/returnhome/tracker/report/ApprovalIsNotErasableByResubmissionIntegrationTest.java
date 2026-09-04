@@ -45,19 +45,27 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
  * {@code reviewComments} while leaving the generated approved document attached to a row that now
  * read "awaiting review", with no reviewer on it and no coordinator involved.
  *
- * <p><b>Two defences, and one shadows the other - which is worth stating rather than implying.</b>
- * The submission is refused when the report is already APPROVED, checked on the report's own status
- * because the interview request's status is a different state machine that merely happens to be in
- * step. Behind that, the clearing is scoped to a REJECTED round, so a path that did reach this
- * method still could not erase a verdict.
+ * <p><b>Three defences sit on this path, and what this file can and cannot prove about them was
+ * measured rather than assumed - the first version of this comment claimed more than was true.</b>
+ * In order: the transition table refuses REPORT_APPROVED -> REPORT_SUBMITTED at the top of
+ * {@code submitForReview}; a report-status check refuses a resubmission of an APPROVED report
+ * directly, on the report's own status, because the request's status is a separate state machine
+ * that merely happens to be in step; and {@code markStatus} enforces the table again as a backstop
+ * at the end. Behind all three, the clearing is scoped to a REJECTED round.
  *
- * <p>The measurement, since a claim of "two layers" is easy to make and easy to be wrong about:
- * removing the refusal fails {@link #resubmittingOverAnApprovedReportIsRefusedAndLeavesTheVerdictIntact},
- * but making the clearing unconditional again fails <em>nothing</em> - the refusal gets there first,
- * so no test can reach the erasure any more. The scoping's only remaining direct evidence is
+ * <p>What the mutations actually showed: removing any one refusal fails nothing, removing both
+ * top-of-method refusals STILL fails nothing - the {@code markStatus} backstop refuses and the
+ * transaction rolls the field writes back - and making the clearing unconditional again fails
+ * nothing either, because nothing reaches it. So this file pins "an approved report cannot be
+ * resubmitted, and the verdict survives", which is the behaviour that matters. It does <em>not</em>
+ * pin <em>which</em> layer refuses, and it cannot distinguish a guard at the top of the operation
+ * from a guard at the end plus rollback - the very distinction the top-of-method placement exists
+ * for. That placement is a design property held by review and by the class javadoc on
+ * {@code InterviewStatusTransitions}, not by this test.
+ *
+ * <p>The scoping's remaining direct evidence is
  * {@link #resubmittingAfterARejectionStillClearsThatRejectionsVerdict}, which pins that clearing
- * still happens on the round it exists for. It is deliberate defence in depth for the day someone
- * relaxes the refusal, and it is honestly untested for the case it was written for.
+ * still happens on the round it exists for.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -145,11 +153,9 @@ class ApprovalIsNotErasableByResubmissionIntegrationTest extends AbstractIntegra
      * The visitor resubmits over their own approved report. Reached through the real HTTP path rather
      * than by calling the service, because the whole question is what an ordinary account can do.
      *
-     * <p>Two independent reasons this now holds, asserted together on one request: the submission is
-     * refused outright, and the verdict survives even if it weren't. The refusal is checked against
-     * the <em>report's</em> own status rather than the interview request's - the two are separate
-     * state machines that happen to be in step, and resting this on their agreement would make it a
-     * coincidence rather than a rule.
+     * <p>Asserts the refusal and the surviving verdict on the same request. The refusal is checked
+     * against the report's own status as well as the request's transition table - resting it on the
+     * two machines agreeing would make it a coincidence rather than a rule.
      */
     @Test
     void resubmittingOverAnApprovedReportIsRefusedAndLeavesTheVerdictIntact() throws Exception {

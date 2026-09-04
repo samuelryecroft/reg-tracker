@@ -9,6 +9,7 @@ import ninja.samryecroft.returnhome.tracker.audit.AuditEventPublisher;
 import ninja.samryecroft.returnhome.tracker.child.ChildRepository;
 import ninja.samryecroft.returnhome.tracker.home.HomeRepository;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewRequestRepository;
+import ninja.samryecroft.returnhome.tracker.interview.InterviewRequestService;
 import ninja.samryecroft.returnhome.tracker.organisation.Organisation;
 import ninja.samryecroft.returnhome.tracker.organisation.OrgType;
 import ninja.samryecroft.returnhome.tracker.organisation.OrganisationRepository;
@@ -116,6 +117,7 @@ class DemoDataSeederTest {
         @Bean UserRepository userRepository() { return mock(UserRepository.class); }
         @Bean InterviewRequestRepository interviewRequestRepository() { return mock(InterviewRequestRepository.class); }
         @Bean InterviewReportRepository interviewReportRepository() { return mock(InterviewReportRepository.class); }
+        @Bean InterviewRequestService interviewRequestService() { return mock(InterviewRequestService.class); }
         @Bean ReportService reportService() { return mock(ReportService.class); }
         @Bean AuditEventPublisher auditEventPublisher() { return mock(AuditEventPublisher.class); }
         @Bean PasswordEncoder passwordEncoder() { return mock(PasswordEncoder.class); }
@@ -130,6 +132,7 @@ class DemoDataSeederTest {
         final UserRepository users = mock(UserRepository.class);
         final InterviewRequestRepository requests = mock(InterviewRequestRepository.class);
         final InterviewReportRepository reports = mock(InterviewReportRepository.class);
+        final InterviewRequestService interviewRequestService = mock(InterviewRequestService.class);
         final ReportService reportService = mock(ReportService.class);
         final AuditEventPublisher audit = mock(AuditEventPublisher.class);
         final PasswordEncoder passwordEncoder = mock(PasswordEncoder.class);
@@ -141,7 +144,8 @@ class DemoDataSeederTest {
 
         DemoDataSeeder seeder() {
             return new DemoDataSeeder(organisations, themes, homes, children, users, requests,
-                    reports, reportService, audit, passwordEncoder, new DemoProperties());
+                    reports, interviewRequestService, reportService, audit, passwordEncoder,
+                    new DemoProperties());
         }
     }
 }

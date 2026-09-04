@@ -17,6 +17,7 @@ import ninja.samryecroft.returnhome.tracker.home.Home;
 import ninja.samryecroft.returnhome.tracker.home.HomeRepository;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewRequest;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewRequestRepository;
+import ninja.samryecroft.returnhome.tracker.interview.InterviewRequestService;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewStatus;
 import ninja.samryecroft.returnhome.tracker.organisation.Organisation;
 import ninja.samryecroft.returnhome.tracker.organisation.OrganisationRepository;
@@ -65,6 +66,8 @@ class DashboardIntegrationTest extends AbstractIntegrationTest {
     private UserRepository userRepository;
     @Autowired
     private InterviewRequestRepository interviewRequestRepository;
+    @Autowired
+    private InterviewRequestService interviewRequestService;
     @Autowired
     private InterviewReportRepository interviewReportRepository;
     @Autowired
@@ -164,8 +167,12 @@ class DashboardIntegrationTest extends AbstractIntegrationTest {
         request.setChild(child);
         request.setHome(home);
         request.setRequestedBy(visitor);
-        request.setStatus(InterviewStatus.REPORT_APPROVED);
         request.setReturnedAt(returnedAt);
+        // Constructed directly in a terminal state. InterviewRequest.setStatus is package-private so
+        // markStatus is provably the only writer (T145(B)); on a row that has never been persisted
+        // it treats the write as a construction rather than a transition, which is exactly what a
+        // fixture like this one is.
+        interviewRequestService.markStatus(request, InterviewStatus.REPORT_APPROVED);
         InterviewRequest savedRequest = interviewRequestRepository.save(request);
 
         InterviewReport report = new InterviewReport();
@@ -183,8 +190,8 @@ class DashboardIntegrationTest extends AbstractIntegrationTest {
         request.setChild(child);
         request.setHome(home);
         request.setRequestedBy(visitor);
-        request.setStatus(status);
         request.setReturnedAt(returnedAt);
+        interviewRequestService.markStatus(request, status);
         return interviewRequestRepository.save(request);
     }
 
