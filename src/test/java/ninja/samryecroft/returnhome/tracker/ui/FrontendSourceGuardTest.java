@@ -311,6 +311,47 @@ class FrontendSourceGuardTest {
                 .isEmpty();
     }
 
+    /** Every value {@code token} is given in {@code css}, across all the appearance blocks. */
+    private static Set<String> valuesOf(String css, String token) {
+        Matcher m = Pattern.compile(Pattern.quote(token) + "\\s*:\\s*([^;]+);").matcher(css);
+        Set<String> values = new HashSet<>();
+        while (m.find()) {
+            values.add(m.group(1).trim());
+        }
+        return values;
+    }
+
+    /**
+     * An ink named for a FILL must not resolve to the page ink.
+     *
+     * <p>T163. {@code .btn} paints {@code background: var(--accent)} and takes its ink from
+     * {@code --accent-ink}, so that ink has to contrast with the ACCENT. T119 (#22) redefined it
+     * from a fixed {@code #1F2328} to {@code var(--color-text)} at the point {@code --accent}
+     * stopped being a pale fill, and {@code --color-text} is the PAGE ink - it moves between
+     * appearances the same way the accent does, so the two travel together and never separate.
+     * The resting button measured 2.39:1 dark / 2.08:1 light, failing 1.4.3 at all 360 hues in
+     * BOTH appearances, for as long as that definition stood.
+     *
+     * <p>Deliberately not part of {@link #everyThemedBackgroundPairsWithAThemedInkNeverAHardcodedColour}:
+     * that guard's tell is a LITERAL ink under a themed fill, and this failure is two perfectly
+     * themed tokens that happen to move in the same direction. No pattern over the source can see
+     * it, so what is pinned here is the relationship the tokens must keep, not a measurement -
+     * an ink minted for a fill and the page ink being the same value is the mistake itself, and it
+     * is the exact form the T119 regression took.
+     */
+    @Test
+    void theInkMintedForAnAccentFillIsNotAlsoThePageInk() throws IOException {
+        String css = Files.readString(CSS_DIR.resolve("app.css"), StandardCharsets.UTF_8);
+
+        Set<String> accentInk = valuesOf(css, "--accent-ink");
+        assertThat(accentInk).as("--accent-ink is declared").isNotEmpty();
+        assertThat(accentInk)
+                .as("--accent-ink sits on an --accent fill, so it must not be the page ink "
+                        + "(%s) - those two move together between appearances and never separate",
+                        valuesOf(css, "--ink"))
+                .doesNotContainAnyElementsOf(valuesOf(css, "--ink"));
+    }
+
     private static List<Path> sourceFilesUnder(Path dir) throws IOException {
         try (Stream<Path> walk = Files.walk(dir)) {
             return walk.filter(Files::isRegularFile)

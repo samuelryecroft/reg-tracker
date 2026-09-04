@@ -198,7 +198,16 @@
     --control-border: var(--color-control-border);
     --muted: var(--color-text-muted);
     --accent: var(--color-accent);
-    --accent-ink: var(--color-text);
+    /* The ink that sits ON an --accent fill, so it has to contrast with the ACCENT, not with
+       the page. --color-text is the page ink and moves between appearances the same way the
+       accent does, which left the RESTING .btn at 2.39:1 dark / 2.08:1 light - 360/360 hues
+       failing WCAG 2.2 AA 1.4.3 in BOTH appearances. Regressed in T119 (#22), which swapped a
+       fixed #1F2328 for var(--color-text) at the point --accent stopped being a pale fill.
+       --color-bg is the same inversion #59 gives .btn:hover: an accent fill under
+       page-background ink is the spec's locked accent-on-background floor read the other way
+       round, and contrast is symmetric, so it inherits that guarantee rather than needing a
+       new one - 5.31:1 dark / 5.06:1 light, 0/360. It also keeps rest and hover on one ink. */
+    --accent-ink: var(--color-bg);
     /* Not arbitrary picks: the accent ramp MIRRORS between appearances, so step 900 is
        the pale step in light and the deep step in dark - --tint: accent-900 holds the
        same role (a quiet tinted fill) in both, and --accent-dark: accent-300 is the ink
