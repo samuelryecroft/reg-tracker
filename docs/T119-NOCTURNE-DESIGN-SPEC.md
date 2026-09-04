@@ -1051,3 +1051,45 @@ underneath a full report would actually mean.
 This converges 1a on 1b's arrangement at narrow widths, and that is coherent rather than a compromise: 1a's
 whole differentiator is history *permanently adjacent*, and below 1060px there is no second column for it
 to be adjacent to.
+
+### D-1a-2a · The status rail's five position states, with values
+
+D-1a-2 specified the exception treatment as a rule rather than values, because no mockup frame shows a
+rejected or cancelled rail. That left the one part of the component that has to be invented rather than
+transcribed as the only part without numbers. Closing it.
+
+| position state | glyph | colour | connector | label |
+| --- | --- | --- | --- | --- |
+| `COMPLETE` | `ph-fill-check-circle` | `--color-accent` | solid, accent | `--color-text` |
+| `CURRENT` | `ph-fill-dot-outline` in an outlined ring | `--color-accent` | solid to here | `--color-text`, weight 500 |
+| `UPCOMING` | `ph-circle-dashed` | marker `--color-control-border`, label `--color-text-muted` | solid, `--color-divider` | `--color-text-muted` |
+| `EXCEPTION` (sent back) | **`ph-arrow-u-up-left`** | `--sent-back` on `--sent-back-bg` | solid to here | `--sent-back`, text from `displayName` |
+| `NOT_APPLICABLE` (after cancel) | `ph-prohibit` | `--color-text-muted` | **dashed** | `--color-text-muted` |
+| the cancelled position itself | `ph-x-circle` | `--neutral` on `--neutral-bg` | dashed after | "Cancelled" |
+
+**All six glyphs are already in the vendored set** — no second expansion of R-Q11.
+
+`ph-arrow-u-up-left` is the reason the exception state reads without explanation: it depicts going back,
+which is precisely what happened. A generic warning triangle would say "something is wrong" when nothing is
+wrong — the report was returned for more detail, which is the process working.
+
+**Contrast, measured, both appearances and both grounds:**
+
+| token | dark on surface | dark on own bg | light on surface | light on own bg |
+| --- | --- | --- | --- | --- |
+| `--sent-back` | 9.79:1 | 8.94:1 | 7.20:1 | 6.12:1 |
+| `--neutral` | 9.00:1 | 8.38:1 | 10.15:1 | 9.16:1 |
+
+Worst case 6.12:1, clear of 4.5:1 for the label and 3:1 for the glyph in every combination.
+
+**Two rules the table encodes.** Every state has a **distinct glyph**, so none of them depends on colour —
+the standing "never colour alone" rule, which matters most here because the exception *is* the message.
+And `NOT_APPLICABLE` additionally changes the **connector to dashed**: a shape change is the strongest
+non-colour signal available for "this path will not be walked", and it is what stops a cancelled request's
+remaining steps reading as work still to come.
+
+**A note on the markers and 1.4.11.** The rail's markers are not controls, so it is tempting to treat them
+as decorative. They are not: they are graphical objects required to understand the content, so 3:1 applies.
+Because each state also carries a text label the requirement is satisfied twice over, but the marker colours
+above are chosen to hold 3:1 on their own — a rail that is only legible by reading every label is not doing
+its job, which is to be read at a glance.
