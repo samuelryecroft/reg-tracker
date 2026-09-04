@@ -710,7 +710,21 @@ fixed in the same pass:
 
 ---
 
-## 7 · Phosphor icons to vendor (55, regular + fill)
+## 7 · Phosphor icons to vendor (56, regular + fill)
+
+> **Amended 4 Sep — one icon added: `ph-user-list`, for the Users nav item.**
+> The 55 were sampled from the mockups, and **the sidebar nav was never one of the sampled screens** — it
+> was built in phase 1 from the brief. That is why the gap exists, and why the first pass had to invent
+> `ph-users` and `ph-palette` for nav items with no sampled glyph. The set was never sized for a nav.
+>
+> The symptom: `ph-users-three` ended up marking both **Children** (a caseload) and **Users** (staff
+> accounts) — a child record and a staff account sharing one glyph in the same sidebar. **Children keeps
+> `ph-users-three`**: it is the domain-central entity, and a group of people fits a caseload. **Users takes
+> `ph-user-list`** — a person beside a list, which is literally what that screen is, and distinguishable
+> from three figures at 16px.
+>
+> Forcing two concepts onto one glyph to preserve a round number is the wrong trade. Expanding a fixed
+> vocabulary is a decision; sharing a glyph is a defect.
 
 ```
 ph-archive           ph-arrow-left        ph-arrow-right       ph-arrow-u-up-left   ph-battery-medium
@@ -852,3 +866,33 @@ and a derivation that returns 257 is correct, not off by 25. Found by Pam buildi
   `ph-users-three` marks three different nav items, so a child record and a staff account share a glyph; and
   because roles stack (only Home Staff and Admin are exclusive) a Home Staff + Viewer account renders two
   "Records" group headers with "My Children" and "Children" both pointing at `/children`.
+
+
+---
+
+## 5f · Shell affordances that are not yet wired (Creed, 4 Sep — T132)
+
+Two controls in the phase-1 shell carry the visual signals of interactivity without being interactive. The
+rule they break is one line: **anything in the shell that is not wired must not look like a control.** No
+`cursor: pointer`, no caret, no control-like ring, no field styling. Render it as static text or status
+until it works, or don't render it at all.
+
+**`.shell-search` — remove until search exists.** It is a `<div>` styled as a search field: surface fill,
+hairline ring, magnifying glass, the word "Search". It is the most prominent thing in the header, it does
+nothing, and it has no state at all — not focusable, not announced, not marked unavailable. A sighted user
+clicks it and nothing happens, with no explanation.
+
+Search is a *designed* feature rather than decoration — the canvas states its scope on the control itself:
+**"Search child ref, home or visitor."** So this is not deleting something unwanted; it is declining to ship
+the shell of a feature. A dead search box holding the primary header slot for an unknown number of batches
+is worse than its absence: it consumes the space, invites clicks, and teaches people that the header lies.
+Remove it and raise search as its own ticket, with the canvas's scope line as the requirement. Restoring it
+is one commit once there is something behind it.
+
+**`.shell-org` — keep the information, drop the affordance.** Unlike search, this displays something
+genuinely useful: which organisation the signed-in user is under. Keep that. What goes until supplier
+switching is wired is everything promising a control — `cursor: pointer` and the `ph-caret-up-down` glyph,
+which is the specific element that says "this opens something".
+
+Worth stating in general, because it recurs through every screen migration: **a placeholder that looks
+operable is a worse defect than a missing feature, because the missing feature is honest.**
