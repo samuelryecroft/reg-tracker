@@ -10,11 +10,11 @@
 <main id="main">
     <h1>Organisations</h1>
 
-    <div class="banner warn" th:if="${kekWarning != null}" role="status">
-        <span class="ic" aria-hidden="true">◆</span>
+    <div class="banner warn" th:if="${kekWarning != null}" th:with="ico=@{/icons/phosphor.svg}">
+        <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-warning-circle'"></use></svg>
         <div>
-            <strong>Encryption key not yet provisioned</strong>
-            <p th:text="${kekWarning}">The care provider’s encryption key is not yet provisioned.</p>
+            <strong>Encryption key could not be confirmed</strong>
+            <p th:text="${kekWarning}">The care provider’s encryption key could not be confirmed.</p>
         </div>
     </div>
 

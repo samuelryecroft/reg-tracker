@@ -10,11 +10,14 @@ import org.springframework.ui.ExtendedModelMap;
 import org.springframework.ui.Model;
 
 /**
- * T168: a field-crypto failure caused by a missing/unreachable KEK must map to 503 (transient,
- * "provision the key / contact your administrator"), the same way the document path already does -
- * not the opaque 500 that a not-yet-provisioned organisation KEK produced on add-child before this.
- * A genuine (non-key) crypto failure still fails closed as a 500. The handler under test uses none
- * of the advice's collaborators, so they are left null deliberately.
+ * T168: unit-tests the {@code handleFieldCrypto} mapping in isolation - a missing/unreachable KEK
+ * (a {@link KeyUnavailableException} in the cause chain) maps to 503, a genuine crypto failure to a
+ * fail-closed 500. Note this proves the mapping, not that Spring selects this handler: the live
+ * add-child failure already returned 503 via {@code handleDocumentSecurity} (which matches the
+ * KeyUnavailableException cause), so this handler's job is to change the <em>message</em> from the
+ * document-path wording to an add-child-appropriate one, at the same 503. The end-to-end routing +
+ * render test proves the selection and that the notice reaches the page. The handler under test uses
+ * none of the advice's collaborators, so they are left null deliberately.
  */
 class GlobalControllerAdviceFieldCryptoTest {
 

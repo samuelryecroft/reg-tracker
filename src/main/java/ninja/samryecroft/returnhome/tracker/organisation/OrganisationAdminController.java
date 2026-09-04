@@ -1,6 +1,7 @@
 package ninja.samryecroft.returnhome.tracker.organisation;
 
 import jakarta.validation.Valid;
+import ninja.samryecroft.returnhome.tracker.document.DocumentStorageProperties;
 import ninja.samryecroft.returnhome.tracker.document.KeyProvider;
 import ninja.samryecroft.returnhome.tracker.document.KeyUnavailableException;
 import ninja.samryecroft.returnhome.tracker.organisation.dto.CreateOrganisationForm;
@@ -22,12 +23,14 @@ public class OrganisationAdminController {
     private final OrganisationRepository organisationRepository;
     private final ThemeService themeService;
     private final KeyProvider keyProvider;
+    private final DocumentStorageProperties documentStorageProperties;
 
     public OrganisationAdminController(OrganisationRepository organisationRepository, ThemeService themeService,
-            KeyProvider keyProvider) {
+            KeyProvider keyProvider, DocumentStorageProperties documentStorageProperties) {
         this.organisationRepository = organisationRepository;
         this.themeService = themeService;
         this.keyProvider = keyProvider;
+        this.documentStorageProperties = documentStorageProperties;
     }
 
     @GetMapping
@@ -73,30 +76,39 @@ public class OrganisationAdminController {
             themeService.ensureThemeExistsFor(organisation);
         }
 
-        // T168 preflight: a CARE_PROVIDER's field data is encrypted under a per-organisation KEK that
-        // the application cannot create (it is Key Vault Crypto User only - see DOCUMENT-KEYS.md). If
-        // that key was not provisioned at onboarding, the organisation's first child record fails
-        // closed later - historically an opaque error in front of a client (the org-2 P0). Surfacing
-        // it here, to the admin who just created the org and can arrange provisioning, turns that late
-        // failure into an actionable notice at the moment of onboarding. Advisory only: it never blocks
-        // creation, and the encrypt path still fail-closes if the key is genuinely missing at write time.
-        if (organisation.getType() == OrgType.CARE_PROVIDER && !fieldKekExists(organisation.getId())) {
+        // T168 preflight: a CARE_PROVIDER's field data is encrypted under a per-organisation KEK. Where
+        // the application cannot create keys (Key Vault Crypto User only, auto-create disabled - the
+        // production shape, see DOCUMENT-KEYS.md), a KEK not provisioned at onboarding makes the
+        // organisation's first child record fail closed later - a confusing error in front of a client
+        // (the org-2 P0). Surfacing it here, to the admin who can arrange provisioning, turns that late
+        // failure into an actionable notice at onboarding. Advisory only: never blocks creation, and the
+        // encrypt path still fail-closes at write time if the key is genuinely missing.
+        //
+        // Guarded on !auto-create precisely because currentKeyFor is NOT non-mutating when auto-create
+        // is on: there the provider creates the key on first reference, so probing would mint it as a
+        // side effect and the notice could never fire. Where auto-create is on the write path provisions
+        // the key anyway, so no notice is needed - which is exactly the branch we skip.
+        if (organisation.getType() == OrgType.CARE_PROVIDER
+                && !documentStorageProperties.getKeyVault().isAutoCreateKeys()
+                && !fieldKekConfirmed(organisation.getId())) {
             redirectAttributes.addFlashAttribute("kekWarning",
                     "This care provider’s encryption key (" + KeyProvider.keyNameFor(organisation.getId())
-                            + ") is not yet provisioned. An operator must create it before any child "
-                            + "records can be added for this organisation. See DOCUMENT-KEYS.md.");
+                            + ") could not be confirmed. It must exist before any child records can be "
+                            + "added for this organisation; if it has not been provisioned, an operator "
+                            + "needs to create it. See DOCUMENT-KEYS.md.");
         }
 
         return "redirect:/admin/organisations";
     }
 
     /**
-     * Whether the organisation's field KEK can be resolved right now. A probe, not a mutation: in
-     * production the provider is Crypto User with auto-create disabled, so this is a read that either
-     * returns the handle or raises {@link KeyUnavailableException} (missing, or the vault is
-     * unreachable) - both of which mean "not usable yet" for the purposes of the onboarding notice.
+     * Whether the organisation's field KEK could be confirmed available right now. Called only when
+     * auto-create is disabled (see the caller), where {@code currentKeyFor} is a pure read: it either
+     * returns the handle or raises {@link KeyUnavailableException}. That exception collapses four causes
+     * - missing key, vault unreachable, RBAC denied, network partition - so a {@code false} here means
+     * "not confirmed", not specifically "missing"; the notice is worded accordingly.
      */
-    private boolean fieldKekExists(long organisationId) {
+    private boolean fieldKekConfirmed(long organisationId) {
         try {
             keyProvider.currentKeyFor(organisationId);
             return true;
