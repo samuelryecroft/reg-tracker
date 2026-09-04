@@ -1,6 +1,8 @@
 package ninja.samryecroft.returnhome.tracker.config;
 
 import ninja.samryecroft.returnhome.tracker.auth.EntraOidcUserService;
+import org.springframework.security.oauth2.client.oidc.web.logout.OidcClientInitiatedLogoutSuccessHandler;
+import ninja.samryecroft.returnhome.tracker.auth.EntraAwareLogoutSuccessHandler;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.health.actuate.endpoint.HealthEndpoint;
@@ -118,6 +120,20 @@ public class SecurityConfig {
         // browser on a shared device in a care home (§5 D1). EntraLoginEnabledTest asserts the
         // code_challenge is really on the wire, so a downgrade or a future default change shows up
         // as a failing test rather than as a quietly weaker flow.
+        // RP-initiated logout, branched: see EntraAwareLogoutSuccessHandler for why an
+        // unconditional one would break sign-out for form-login users while both paths are live.
+        //
+        // {baseUrl} rather than a literal host, matching the redirect-uri in
+        // application-entra.properties and for the same reason recorded there - a custom domain is
+        // expected (WS-I), and hardcoding here would leave sign-IN surviving that move while
+        // sign-OUT quietly stopped matching what the tenant has registered.
+        OidcClientInitiatedLogoutSuccessHandler oidcLogout =
+                new OidcClientInitiatedLogoutSuccessHandler(registrations);
+        oidcLogout.setPostLogoutRedirectUri("{baseUrl}/login?logout");
+        http.logout(logout -> logout
+                .logoutSuccessHandler(new EntraAwareLogoutSuccessHandler(oidcLogout, "/login?logout"))
+                .permitAll());
+
         http.oauth2Login(oauth2 -> oauth2
                 // The same page as form login, so there is one place a signed-out user lands
                 // whichever path is live.
