@@ -1,127 +1,678 @@
+/* ══════════════════════════════════════════════════════════════════════════
+   T119 Nocturne foundation (phase 1). Ported from Creed's reference token
+   sheet (docs/nocturne-tokens.reference.css on docs/t119-nocturne-design-spec,
+   @ 484915e) - that file is the design deliverable and load-bearing for
+   values/cascade; names here differ in places (--text-* vs its --t-*) but the
+   numbers and structure match it, not re-derived independently. Corrections
+   folded in before any screen consumes this, because retrofitting them once
+   27 screens are drawn is the expensive path (D-Q1/D-Q3/D-Q4 §5a; R-Q6/R-Q8/
+   R-Q10 + the control-border defect §5c/§5d):
+     - light-mode accent: fixed oklch(0.48 0.125 <hue>), not the mirrored ramp
+       (which fails contrast - measures 1.84:1 at its own pressed state)
+     - 44px on anything tappable (.btn/.input/.seg-opt/.btn-icon)
+     - type floor: nothing interactive/data-bearing below 13px, nothing at
+       all below 11px
+     - semantic quartet dark values corrected (Creed's own first answer was
+       wrong - the shipped inks are light-page inks, 2.02-2.72:1 on this
+       dark ground); light values unchanged and still read by DocxReportGenerator
+     - --color-control-border: --color-divider bounds .input/.btn-secondary
+       at 1.55:1 dark / 1.35:1 light, which fails 1.4.11's 3:1 for an operable
+       control's boundary - dividers between rows keep --color-divider
+     - every color-mix() gets a flat value declared immediately before it
+       (Oscar's determination, §5d): an unsupported function drops the whole
+       declaration, so without the fallback a pre-2023 browser inherits
+       whatever came before - a contrast failure on muted text/control
+       borders, not a cosmetic one. oklch() itself is NOT given this
+       treatment: it is not load-bearing (Nocturne's own component layer
+       ships flat hex), and if a floor ever excludes it, the nine accent
+       ramp steps get computed server-side from the stored hue instead -
+       same one-number branding model, no client-side OKLCH
+     - Inter self-hosted (static/fonts/), not system-ui: Segoe UI has no 500
+       weight and "headings at 500, never heavier" is Nocturne's one hard
+       type rule
+
+   This is a wholesale replacement, not a merge (§2.1: "do not translate
+   names - one vocabulary, or we get both"), and the component layer below
+   reuses Nocturne's own class names (.btn/.card/...), which the EXISTING
+   app also happens to use for unrelated, not-yet-migrated styling further
+   down this file. That collision is deliberate and temporary: cascade order
+   keeps the legacy rules winning (they appear later in the file), so an
+   unmigrated screen keeps its EXISTING STRUCTURE - its own layout, spacing,
+   type sizes, all untouched - but adopts the new PALETTE, because the
+   legacy rules' own colour tokens (--accent/--border/--surface/--ink/...)
+   are bridged onto the new --color-* system below rather than left
+   undeclared (Creed's fidelity review, F1 - an undeclared var() is invalid
+   at computed-value time, not "keeps the old value"). A screen does not
+   change appearance until its own T119 phase migrates it and removes its
+   legacy rule ONLY in the sense that its structure and non-colour values
+   hold; its colours already do change today, on purpose, because a light
+   card floating on this file's new dark --color-bg would be broken
+   regardless of whether anyone had "migrated" it yet.
+   ══════════════════════════════════════════════════════════════════════ */
 :root {
+    color-scheme: dark;
+
+    --color-bg: #161826;
+    --color-surface: #232532;
+    --color-text: #e9e9ed;
+    /* Every color-mix() is preceded by a flat value (Oscar's determination, spec §5d
+       R-Q8): an unsupported function makes the DECLARATION invalid and it is dropped,
+       so without this a 2023-or-older browser inherits whatever came before it - a
+       contrast failure for muted text and control borders, not a cosmetic one. Windows
+       8.1 caps Chrome at 109 (color-mix needs 111) and an iPhone 7 caps Safari below
+       16.2; those two groups are the ones we control least. Keep each pair together -
+       splitting them silently removes the fallback and it'll look fine on your machine. */
+    --color-divider: #383946;
+    --color-divider: color-mix(in srgb, var(--color-text) 16%, transparent);
+    --color-text-muted: #aaaab1;                                        /* 7.64:1 */
+    --color-text-muted: color-mix(in srgb, var(--color-text) 70%, transparent);
+
+    --color-neutral-100: #f3f5fe;
+    --color-neutral-200: #e4e7f5;
+    --color-neutral-300: #cfd3e5;
+    --color-neutral-400: #b2b6ca;
+    --color-neutral-500: #9397ab;
+    --color-neutral-600: #75798c;
+    --color-neutral-700: #595d6c;
+    --color-neutral-800: #3f424d;
+    --color-neutral-900: #292b31;
+
+    /* Per-supplier branding is one number (§2.2): every accent step below is
+       generated from --brand-hue via oklch(), so switching a supplier's
+       colour is switching this one custom property. Phase 2 wires this
+       from the organisation; this default is the product's own Pro-accent
+       hue (289 - Beacon RHS in the two live suppliers' worked examples).
+       oklch() is not load-bearing here (spec §5d R-Q8/R-Q8 CLOSED): Nocturne's
+       own component layer ships flat hex and needs color-mix(), which IS
+       load-bearing and gets the fallback treatment above/below - but the
+       branding ramp itself has a documented escape hatch if a browser floor
+       ever excludes oklch(): compute the same nine steps server-side from the
+       stored hue and inject them as plain hex custom properties instead. Same
+       design, same one stored integer, no client-side OKLCH required. */
+    --color-accent: oklch(0.660 0.125 var(--brand-hue));
+    --color-accent-hover: var(--color-accent-400);
+    --color-accent-pressed: var(--color-accent-300);
+    --brand-hue: 289;
+    --color-accent-100: oklch(0.975 0.020 var(--brand-hue));
+    --color-accent-200: oklch(0.925 0.045 var(--brand-hue));
+    --color-accent-300: oklch(0.860 0.090 var(--brand-hue));
+    --color-accent-400: oklch(0.775 0.115 var(--brand-hue));
+    --color-accent-500: oklch(0.660 0.125 var(--brand-hue));
+    --color-accent-600: oklch(0.565 0.110 var(--brand-hue));
+    --color-accent-700: oklch(0.460 0.090 var(--brand-hue));
+    --color-accent-800: oklch(0.360 0.070 var(--brand-hue));
+    --color-accent-900: oklch(0.280 0.055 var(--brand-hue));
+    /* Nocturne's own stand-in "second accent" - kept only so both names
+       resolve; the design system's own guidance is to treat it as one role
+       with --color-accent, never a genuine second hue. */
+    --color-accent-2-100: var(--color-accent-100);
+    --color-accent-2-200: var(--color-accent-200);
+    --color-accent-2-300: var(--color-accent-300);
+    --color-accent-2-400: var(--color-accent-400);
+    --color-accent-2-500: var(--color-accent-500);
+    --color-accent-2-600: var(--color-accent-600);
+    --color-accent-2-700: var(--color-accent-700);
+    --color-accent-2-800: var(--color-accent-800);
+    --color-accent-2-900: var(--color-accent-900);
+
+    /* R-Q10: self-hosted Inter (static/fonts/), Latin subset, variable, woff2,
+       font-display: swap - system-ui behind it never actually renders except
+       during that swap. Nocturne's one hard type rule is headings at weight
+       500, never heavier; Segoe UI (the Windows system stack) has 400 and 600
+       but no 500, so a system-font heading would drop, jump, or get
+       browser-synthesised - the one thing this rule asks not to happen. */
+    --font-heading: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --font-heading-weight: 500;
+    --font-body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+
+    --space-1: 2.8px;
+    --space-2: 5.6px;
+    --space-3: 8.4px;
+    --space-4: 11.2px;
+    --space-6: 16.8px;
+    --space-8: 22.4px;
+
+    --radius-sm: 4px;
+    --radius-md: 8px;
+    --radius-lg: 14px;
+    --radius-pill: 999px;
+
+    --shadow-sm: 0 0 0 1px var(--color-neutral-800);
+    --shadow-md: 0 0 0 1px var(--color-neutral-700), 0 6px 18px rgba(0, 0, 0, 0.55);
+    --shadow-lg: 0 0 0 1px var(--color-neutral-500), 0 16px 40px rgba(0, 0, 0, 0.65);
+
+    /* WCAG 2.2 AA 1.4.11, found implementing the color-mix fallbacks above (spec §5d
+       "NEW"): Nocturne bounds .input/select/textarea/.btn-secondary with
+       --color-divider, which is only 1.55:1 on this ground (1.58:1 on --color-surface) -
+       so as shipped, every form field and secondary button has a boundary a low-vision
+       user can't see. Not the same defect as the light-mode accent, and present in BOTH
+       appearances. Fix is a dedicated token for boundaries that ARE the component,
+       --color-divider stays exactly as-is for decoration between rows (1.4.11 doesn't
+       apply there, and thickening every hairline would fight the whole system's
+       quietness). Verified: 3.57:1 vs bg, 3.43:1 vs surface. */
+    --color-control-border: #6f707a;
+    --color-control-border: color-mix(in srgb, var(--color-text) 42%, transparent);
+
+    /* D-Q4: nothing interactive or data-bearing below 13px, nothing at all
+       below 11px. Body takes Nocturne's own 15px default unchanged. */
+    --text-chrome: 11px;
+    --text-data: 13px;
+    --text-interactive: 14px;
+    --text-body: 15px;
+    --text-subheading: 17px;
+    --text-heading: 19px;
+    --text-title: 27px;
+
+    /* Semantic quartet - not themeable, no equivalent in Nocturne (spec §5c R-Q6:
+       Creed's own first answer here was wrong - the shipped inks are dark-page inks
+       and measure 2.02-2.72:1 on Nocturne's dark ground). Dark-mode values below are
+       the corrected, swept set: 9.57-11.89:1 on --color-bg, chips sit at Nocturne's own
+       elevation step (surface vs bg = 1.16:1) so a tag reads as a raised surface, not a
+       flood of colour - the mono palette's "never colour alone" rule still applies, so
+       every consumer of these also carries a glyph or distinct text. */
+    --error: #ffa8a8; --error-bg: #42201f;
+    --ok: #7fe9b0; --ok-bg: #1b3a2a;
+    --warn: #fbc76b; --warn-bg: #3d2f14;
+    --info: #9ecbff; --info-bg: #1b2c50;
+    --neutral: #c3c7d4; --neutral-bg: #292b31;
+    --sent-back: #fdc498; --sent-back-bg: #3f2716;
+
+    /* F1 (Creed's fidelity review): this commit deleted the ~20 tokens the 33
+       not-yet-migrated screens still read. Cascade order keeps their rules winning
+       (see the file-level banner above), but a winning declaration whose var() names
+       an UNDECLARED custom property is invalid at computed-value time - not "keeps the
+       old value", it resolves to unset (initial, for anything non-inherited). Rendered
+       proof: unmigrated input/select/textarea came out border:0 none, background
+       transparent (T124's 3:1 boundary silently gone), .card lost its padding/border/
+       background entirely, .btn-row's gap collapsed to 0.
+       Colour aliases onto the new system, because body already paints --color-bg/
+       --color-text and an unmigrated light card floating on a dark page is broken
+       regardless. Spacing/radius/type do NOT migrate - they keep their exact old
+       literal values, because swapping in the 0.7x space scale or the new type ramp
+       would re-lay-out 33 screens nobody has reviewed for it. Retire a line here only
+       when the last legacy rule reading it has migrated to the --color-*/--space-*
+       equivalent and been deleted. */
+    --ink: var(--color-text);
+    --surface: var(--color-surface);
+    --border: var(--color-divider);
+    --control-border: var(--color-control-border);
+    --muted: var(--color-text-muted);
+    --accent: var(--color-accent);
+    --accent-ink: var(--color-text);
+    /* Not arbitrary picks: the accent ramp MIRRORS between appearances, so step 900 is
+       the pale step in light and the deep step in dark - --tint: accent-900 holds the
+       same role (a quiet tinted fill) in both, and --accent-dark: accent-300 is the ink
+       that sits legibly on that fill in both. Swept all 360 hues: 7.82:1 dark / 13.81:1
+       light worst case. */
+    --accent-dark: var(--color-accent-300);
+    --tint: var(--color-accent-900);
+    --radius: 10px;
+    --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s7: 48px;
+    --t-xs: 12px; --t-sm: 14px; --t-md: 16px; --t-lg: 20px;
+}
+
+/* Self-hosted per R-Q10 (spec §5c) - see static/fonts/README.md for provenance and how
+   to update. font-weight is a RANGE because this is a variable font: the same file
+   serves both 400 (body) and 500 (heading, Nocturne's ceiling) via the wght axis. */
+@font-face {
+    font-family: "Inter";
+    font-style: normal;
+    font-weight: 400 500;
+    font-display: swap;
+    src: url("/fonts/inter-latin-variable.woff2") format("woff2-variations");
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+        U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215,
+        U+FEFF, U+FFFD;
+}
+
+/* Light appearance (§2.3). Nocturne itself ships no light mode - these are
+   the values recovered from the handoff's own live-preview script (canvas
+   JS, not styles.css), written here as a static block so there is never a
+   flash of the wrong theme while a stylesheet loads.
+   --color-accent is the one value NOT mirrored from the dark ramp (D-Q1):
+   the mirror inverts which step reads as "one step past the base" and
+   produces a 1.84:1 pressed state, so the accent instead takes a fixed
+   lightness, hue still free, verified >=4.5:1 (text) and >=3:1 (the focus
+   ring) at every hue an admin can pick. Everything else mirrors dark step
+   N <-> step (1000-N) at the ground's own hue. */
+:root[data-appearance="light"] {
     color-scheme: light;
-    --border: #E5E7EB;
-    /* T124 / WCAG 2.2 AA 1.4.11. --border is a *decorative* hairline: at 1.24:1 on the
-       surface it is fine for a rule between rows, which the criterion does not cover, and
-       far below the 3:1 a boundary needs when that boundary is what identifies a control.
-       Anything a person can operate takes this token instead. Ink mixed 56% toward white,
-       so it keeps the palette's cool cast rather than being an arbitrary grey: 3.76:1 on
-       --surface, 3.61:1 on --bg, 3.36:1 on --tint (a checked chip sits on tint).
-       Becomes --color-control-border under the Nocturne redesign; same rule, same reason. */
-    --control-border: #828487;
-    --muted: #686F7D;
-    --ink: #1F2328;
-    --accent: #F36E2A;
-    --accent-dark: #BF480B;
-    --accent-ink: #1F2328;
-    --tint: #FFF0DD;
-    --bg: #FAFAFA;
-    --surface: #FFFFFF;
-    /* semantic - not themeable */
+    /* THE FIX (D-Q1). Not the mirrored ramp: on a light ground the mirrored 600/700
+       come out LIGHTER than the base and measure 1.84:1. Fixed lightness, hue free.
+       0.509 is the exact ceiling for 4.5:1 at every hue; 0.48 leaves +0.56 of headroom
+       (worst case 5.06:1 at hue ~190). Hover/pressed take explicit fixed-lightness
+       values rather than reading var(--color-accent-600)/-700 from the ramp below -
+       that's the trap this comment exists to flag. */
+    --color-accent: oklch(0.48 0.125 var(--brand-hue));
+    --color-accent-hover: oklch(0.42 0.115 var(--brand-hue));
+    --color-accent-pressed: oklch(0.36 0.100 var(--brand-hue));
+
+    --color-accent-100: oklch(0.280 0.055 var(--brand-hue));
+    --color-accent-200: oklch(0.360 0.070 var(--brand-hue));
+    --color-accent-300: oklch(0.460 0.090 var(--brand-hue));
+    --color-accent-400: oklch(0.565 0.110 var(--brand-hue));
+    --color-accent-500: oklch(0.660 0.125 var(--brand-hue));
+    --color-accent-600: oklch(0.775 0.115 var(--brand-hue));
+    --color-accent-700: oklch(0.860 0.090 var(--brand-hue));
+    --color-accent-800: oklch(0.925 0.045 var(--brand-hue));
+    --color-accent-900: oklch(0.975 0.020 var(--brand-hue));
+
+    --color-neutral-100: oklch(0.280 0.014 265);
+    --color-neutral-200: oklch(0.360 0.020 265);
+    --color-neutral-300: oklch(0.460 0.024 265);
+    --color-neutral-400: oklch(0.565 0.026 265);
+    --color-neutral-500: oklch(0.660 0.026 265);
+    --color-neutral-600: oklch(0.775 0.024 265);
+    --color-neutral-700: oklch(0.860 0.020 265);
+    --color-neutral-800: oklch(0.925 0.016 265);
+    --color-neutral-900: oklch(0.975 0.012 265);
+
+    --color-bg: oklch(0.955 0.009 265);
+    --color-surface: oklch(0.995 0.004 265);
+    --color-text: oklch(0.280 0.014 265);
+    --color-divider: #cdd0d7;
+    --color-divider: color-mix(in srgb, var(--color-text) 16%, transparent);
+    --color-text-muted: #61656c;                                        /* 5.15:1 */
+    --color-text-muted: color-mix(in srgb, var(--color-text) 70%, transparent);
+    --color-control-border: #7d8187;                                    /* 3.45:1 vs bg, 3.58 vs surface */
+    --color-control-border: color-mix(in srgb, var(--color-text) 56%, transparent);
+
+    --shadow-sm: 0 0 0 1px oklch(0.86 0.02 265);
+    --shadow-md: 0 0 0 1px oklch(0.90 0.016 265), 0 6px 18px oklch(0.28 0.014 265 / 0.10);
+    --shadow-lg: 0 0 0 1px oklch(0.86 0.02 265), 0 16px 40px oklch(0.28 0.014 265 / 0.16);
+
+    /* The shipped, already-WCAG-checked light semantics - unchanged, and read by
+       DocxReportGenerator, so don't "tidy" these into the dark set's numbers. */
     --error: #B91C1C; --error-bg: #FEE2E2;
     --ok: #166534; --ok-bg: #DCFCE7;
     --warn: #92400E; --warn-bg: #FEF3C7;
     --info: #1E40AF; --info-bg: #DBEAFE;
     --neutral: #374151; --neutral-bg: #EEF2F6;
     --sent-back: #9A3412; --sent-back-bg: #FDE7D8;
-    /* 4px spacing scale + 5-step type ramp, replacing the old ad-hoc rem values */
-    --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px; --s7: 48px;
-    --t-xs: 12px; --t-sm: 14px; --t-md: 16px; --t-lg: 20px; --t-xl: 26px;
-    --radius: 10px;
 }
+
+/* "auto" (spec §5c R-Q9): three states, matching how the tokens are structured
+   anyway. Default for a NEW account (Phase 2 concern, not this file) - honouring
+   whatever the user already set at the OS level is the accessible default (some
+   people run dark for photophobia/migraine, others light for astigmatism), so a new
+   account never lands on the wrong one by construction. This block and the explicit
+   [data-appearance="light"] block above MUST stay declaration-for-declaration
+   identical (FrontendSourceGuardTest enforces this) - an explicit choice and
+   auto-on-a-light-OS have to resolve to the exact same thing, and drift between two
+   copies of the same 20-odd tokens is exactly the kind of thing nobody notices
+   until a colour looks subtly wrong in only one of the three states. */
+@media (prefers-color-scheme: light) {
+    :root[data-appearance="auto"] {
+        color-scheme: light;
+        --color-accent: oklch(0.48 0.125 var(--brand-hue));
+        --color-accent-hover: oklch(0.42 0.115 var(--brand-hue));
+        --color-accent-pressed: oklch(0.36 0.100 var(--brand-hue));
+
+        --color-accent-100: oklch(0.280 0.055 var(--brand-hue));
+        --color-accent-200: oklch(0.360 0.070 var(--brand-hue));
+        --color-accent-300: oklch(0.460 0.090 var(--brand-hue));
+        --color-accent-400: oklch(0.565 0.110 var(--brand-hue));
+        --color-accent-500: oklch(0.660 0.125 var(--brand-hue));
+        --color-accent-600: oklch(0.775 0.115 var(--brand-hue));
+        --color-accent-700: oklch(0.860 0.090 var(--brand-hue));
+        --color-accent-800: oklch(0.925 0.045 var(--brand-hue));
+        --color-accent-900: oklch(0.975 0.020 var(--brand-hue));
+
+        --color-neutral-100: oklch(0.280 0.014 265);
+        --color-neutral-200: oklch(0.360 0.020 265);
+        --color-neutral-300: oklch(0.460 0.024 265);
+        --color-neutral-400: oklch(0.565 0.026 265);
+        --color-neutral-500: oklch(0.660 0.026 265);
+        --color-neutral-600: oklch(0.775 0.024 265);
+        --color-neutral-700: oklch(0.860 0.020 265);
+        --color-neutral-800: oklch(0.925 0.016 265);
+        --color-neutral-900: oklch(0.975 0.012 265);
+
+        --color-bg: oklch(0.955 0.009 265);
+        --color-surface: oklch(0.995 0.004 265);
+        --color-text: oklch(0.280 0.014 265);
+        --color-divider: #cdd0d7;
+        --color-divider: color-mix(in srgb, var(--color-text) 16%, transparent);
+        --color-text-muted: #61656c;
+        --color-text-muted: color-mix(in srgb, var(--color-text) 70%, transparent);
+        --color-control-border: #7d8187;
+        --color-control-border: color-mix(in srgb, var(--color-text) 56%, transparent);
+
+        --shadow-sm: 0 0 0 1px oklch(0.86 0.02 265);
+        --shadow-md: 0 0 0 1px oklch(0.90 0.016 265), 0 6px 18px oklch(0.28 0.014 265 / 0.10);
+        --shadow-lg: 0 0 0 1px oklch(0.86 0.02 265), 0 16px 40px oklch(0.28 0.014 265 / 0.16);
+
+        --error: #B91C1C; --error-bg: #FEE2E2;
+        --ok: #166534; --ok-bg: #DCFCE7;
+        --warn: #92400E; --warn-bg: #FEF3C7;
+        --info: #1E40AF; --info-bg: #DBEAFE;
+        --neutral: #374151; --neutral-bg: #EEF2F6;
+        --sent-back: #9A3412; --sent-back-bg: #FDE7D8;
+    }
+}
+
 * { box-sizing: border-box; }
 body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    font-size: var(--t-md);
+    font-family: var(--font-body);
+    font-size: var(--text-body);
     line-height: 1.55;
     margin: 0;
-    color: var(--ink);
-    background: var(--bg);
+    color: var(--color-text);
+    background: var(--color-bg);
 }
+h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-heading);
+    font-weight: var(--font-heading-weight);
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+    margin: 0 0 var(--space-2);
+}
+/* D-Q4: page title / section heading sizes, global (h3 keeps its own legacy size
+   further down - see that rule's comment). */
+h1 { font-size: var(--text-title); }
+h2 { font-size: var(--text-heading); margin-top: var(--space-6); }
 
 /* Skip link (FE-06): visually hidden until focused, first focusable element in <body>. */
 .skip-link {
     position: absolute;
     left: -9999px;
     top: 0;
-    background: var(--ink);
-    color: #fff;
-    padding: var(--s2) var(--s3);
+    background: var(--color-accent);
+    color: var(--color-bg);
+    padding: var(--space-2) var(--space-3);
     border-radius: 0 0 8px 0;
     z-index: 100;
 }
 .skip-link:focus { left: 0; }
 
-/* ============================== header / nav ============================== */
-header {
-    background: var(--surface);
-    color: var(--ink);
-    border-bottom: 1px solid var(--border);
-    padding: var(--s3) var(--s5);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: var(--s3);
+:focus { outline: none; }
+:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+/* Non-themeable focus indicator (FE-04), kept per T119 §3: the accent ring
+   above is decoration on interactive elements that also carry it as a
+   branded border; this outline is the real signal and must survive any
+   supplier hue, including one that lands on --color-accent's own weak end.
+   --color-text is appearance-aware but never brand-hue-derived, which is
+   exactly the property this rule needs. */
+a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible,
+textarea:focus-visible, summary:focus-visible, .checkbox-option:focus-within {
+    outline: 2px solid var(--color-text);
+    outline-offset: 2px;
+    border-radius: 4px;
 }
-header .brand-mark {
-    display: inline-block;
-    width: 0.7rem;
-    height: 0.7rem;
-    border-radius: 3px;
-    background: var(--accent);
-    margin-right: var(--s2);
+::selection { background: color-mix(in srgb, var(--color-accent) 30%, transparent); }
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
-header nav { display: flex; flex-wrap: wrap; align-items: center; }
-header a {
-    color: var(--muted);
-    text-decoration: none;
-    margin-right: var(--s5);
-    font-size: var(--t-sm);
-    font-weight: 600;
-    padding-bottom: 0.2rem;
-    border-bottom: 2px solid transparent;
-    min-height: 44px;
-    display: inline-flex;
-    align-items: center;
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Nocturne component layer (phase 1 foundation) - ported from the design
+   system's styles.css with the D-Q3 (44px touch target) and D-Q4 (type
+   floor) corrections applied inline. Class names match the design system
+   exactly (§2.1); see the file-level note above for why that collides with
+   older rules further down and why that collision is temporary and safe.
+   ══════════════════════════════════════════════════════════════════════ */
+.btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    cursor: pointer; text-decoration: none;
+    font-family: var(--font-heading); font-weight: var(--font-heading-weight);
+    font-size: var(--text-interactive); line-height: 1.2; color: var(--color-text);
+    background: transparent; border: 1px solid transparent;
+    min-height: 44px; padding: 0 calc(var(--space-3) * 1.2);
+    border-radius: var(--radius-md);
 }
-header a:hover, header a:focus-visible {
-    color: var(--accent-dark);
-    border-bottom-color: var(--accent);
+.btn svg { display: block; }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn-primary { color: var(--color-accent); border-color: var(--color-accent); }
+.btn-primary:hover { background: color-mix(in srgb, var(--color-accent) 12%, transparent); }
+.btn-primary:active { background: color-mix(in srgb, var(--color-accent) 22%, transparent); }
+/* T124 (WCAG 2.2 AA 1.4.11): --color-control-border, not --color-divider, on every
+   boundary that IS an operable control - .input/.seg/.radio/.btn-secondary below,
+   same distinction that commit drew for the old vocabulary. */
+.btn-secondary { border-color: var(--color-control-border); }
+.btn-secondary:hover { background: color-mix(in srgb, var(--color-text) 7%, transparent); }
+.btn-secondary:active { background: color-mix(in srgb, var(--color-text) 14%, transparent); }
+.btn-ghost { color: var(--color-accent); padding-inline: var(--space-2); }
+.btn-ghost:hover { background: color-mix(in srgb, var(--color-accent) 10%, transparent); }
+.btn-ghost:active { background: color-mix(in srgb, var(--color-accent) 18%, transparent); }
+/* D-Q3: 44px on anything tappable - Nocturne draws .btn-icon at 36px. */
+.btn-icon { width: 44px; height: 44px; padding: 0; }
+.btn-block { width: 100%; margin-top: var(--space-2); }
+
+.field > label {
+    display: block; font-size: var(--text-data); margin-bottom: 5px;
+    color: var(--color-text-muted);
 }
-header a[aria-current] { color: var(--accent-dark); border-bottom-color: var(--accent); }
-header a.brand {
-    color: var(--ink);
-    font-weight: 700;
-    font-size: 1.1rem;
-    margin-right: var(--s6);
-    border-bottom: none;
+.input {
+    width: 100%; min-height: 44px; padding: 6px 10px; font: inherit;
+    font-size: var(--text-interactive); color: var(--color-text); caret-color: var(--color-accent);
+    background: var(--color-surface);
+    border: 1px solid var(--color-control-border); border-radius: var(--radius-md);
 }
-header a.brand:hover { color: var(--ink); }
-header form { display: inline; }
-header button {
-    background: var(--surface);
-    border: 1px solid var(--control-border);
-    color: var(--ink);
-    border-radius: 6px;
-    padding: 0.5rem 0.9rem;
-    font-size: var(--t-sm);
-    font-weight: 600;
-    cursor: pointer;
-    min-height: 44px;
+.input:hover { border-color: var(--color-text-muted); }
+.input:focus-visible { border-color: var(--color-accent); outline-offset: 0; }
+textarea.input { min-height: 90px; resize: vertical; }
+.radio { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-size: var(--text-interactive); }
+.radio input, .seg-opt input {
+    position: absolute; opacity: 0; width: 0; height: 0; pointer-events: none;
 }
-header button:hover { border-color: var(--accent-dark); color: var(--accent-dark); }
-.header-user { color: var(--muted); font-size: var(--t-sm); margin-right: var(--s3); }
+.radio .dot {
+    width: 16px; height: 16px; flex: none; border-radius: 50%;
+    border: 1.5px solid var(--color-control-border);
+}
+.radio:hover .dot { border-color: var(--color-accent); }
+.radio input:checked + .dot {
+    border-color: var(--color-accent); background: var(--color-accent);
+    box-shadow: inset 0 0 0 4px var(--color-bg);
+}
+.radio input:focus-visible + .dot { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+.seg {
+    display: inline-flex; overflow: hidden;
+    border: 1px solid var(--color-control-border); border-radius: var(--radius-md);
+}
+/* D-Q3: 44px on anything tappable - Nocturne draws a seg option's own box shorter than that. */
+.seg-opt {
+    display: inline-flex; align-items: center; gap: 6px; min-height: 44px;
+    padding: 7px 12px; font-size: var(--text-data); cursor: pointer;
+}
+.seg-opt + .seg-opt { border-left: 1px solid var(--color-divider); }
+.seg-opt:has(input:checked) { color: var(--color-accent); box-shadow: inset 0 0 0 1px var(--color-accent); }
+.seg-opt:not(:has(input:checked)):hover { background: color-mix(in srgb, var(--color-text) 7%, transparent); }
+.seg-opt:has(input:focus-visible) { outline: 2px solid var(--color-accent); outline-offset: -2px; }
+
+.card {
+    display: flex; flex-direction: column; gap: var(--space-2);
+    padding: var(--space-3); border-radius: var(--radius-md); background: var(--color-surface);
+}
+.card-kicker { font-size: var(--text-chrome); letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-accent); }
+.card-title {
+    font-family: var(--font-heading); font-weight: var(--font-heading-weight);
+    font-size: var(--text-subheading); line-height: 1.2;
+}
+.card-body { margin: 0; font-size: var(--text-data); opacity: 0.8; flex: 1; }
+.card-meta {
+    display: flex; align-items: center; gap: 6px; font-size: var(--text-chrome);
+    color: var(--color-text-muted);
+}
+.elev-sm { box-shadow: var(--shadow-sm); }
+.elev-md { box-shadow: var(--shadow-md); }
+.elev-lg { box-shadow: var(--shadow-lg); }
+
+/* D-Q4: a status tag is data, not chrome - Nocturne draws .tag at 11px, this
+   app's tags are frequently the most important word on a card. Pill radius per
+   the reference token sheet (spec: docs/nocturne-tokens.reference.css). */
+.tag {
+    display: inline-flex; align-items: center; font-size: var(--text-data);
+    letter-spacing: 0.02em; padding: 3px 10px;
+    border-radius: var(--radius-pill);
+}
+.tag-accent { background: var(--color-accent-800); color: var(--color-accent-100); }
+.tag-accent-2 { background: var(--color-accent-2-800); color: var(--color-accent-2-100); }
+.tag-neutral { background: var(--color-neutral-800); color: var(--color-neutral-100); }
+.tag-outline { border: 1px solid var(--color-accent); color: var(--color-accent); }
+/* Semantic tag modifiers - the mono palette carries no due/overdue/approved hues of
+   its own (Q6), so these read off the semantic quartet, never off branding: an org's
+   hue must never move what "overdue" means. A glyph or distinct text always
+   accompanies colour here too (never colour alone). */
+.tag-ok { color: var(--ok); background: var(--ok-bg); }
+.tag-warn { color: var(--warn); background: var(--warn-bg); }
+.tag-error { color: var(--error); background: var(--error-bg); }
+.tag-info { color: var(--info); background: var(--info-bg); }
+.tag-sent-back { color: var(--sent-back); background: var(--sent-back-bg); }
+.tag-semantic-neutral { color: var(--neutral); background: var(--neutral-bg); }
+
+.dialog-backdrop {
+    position: fixed; inset: 0; display: grid; place-items: center;
+    padding: var(--space-4);
+    background: color-mix(in srgb, var(--color-neutral-900) 50%, transparent);
+}
+.dialog {
+    width: min(440px, 100%); display: flex; flex-direction: column; gap: var(--space-3);
+    padding: var(--space-4); border-radius: var(--radius-lg);
+    background: var(--color-surface); box-shadow: var(--shadow-lg);
+}
+.dialog-title {
+    font-family: var(--font-heading); font-weight: var(--font-heading-weight);
+    font-size: var(--text-heading);
+}
+.dialog-body { font-size: var(--text-interactive); opacity: 0.85; }
+.dialog-actions { display: flex; justify-content: flex-end; gap: var(--space-2); margin-top: var(--space-2); }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Nocturne shell (phase 1) - fragments/layout.html's sidebar + header.
+   ══════════════════════════════════════════════════════════════════════ */
+/* The sidebar and header are inserted by fragments/layout.html's "nav" fragment as a sibling
+   before each page's own <main id="main"> - same insertion point the old <header> used - rather
+   than as a wrapper, so no template's markup needs to change to adopt the shell. A fixed sidebar
+   (not a grid column) is what makes that work: main's own left margin clears it below, with no
+   shared parent element required between the two. */
+.icon { width: 1em; height: 1em; fill: currentColor; flex: none; }
+.shell-side {
+    position: fixed; top: 0; left: 0; bottom: 0; width: 212px; overflow-y: auto;
+    background: var(--color-neutral-900);
+    box-shadow: inset -1px 0 0 color-mix(in srgb, var(--color-text) 8%, transparent);
+    padding: var(--space-6) var(--space-4);
+    display: flex; flex-direction: column; gap: var(--space-8);
+}
+.shell-brand { display: flex; align-items: center; gap: var(--space-3); padding: 0 var(--space-2); }
+.shell-brand-mark {
+    width: 22px; height: 22px; border-radius: 6px; flex: none;
+    background: linear-gradient(140deg, var(--color-accent), var(--color-accent-700));
+}
+.shell-brand-name { font-size: var(--text-interactive); font-weight: 500; letter-spacing: -0.01em; }
+.shell-org {
+    padding: var(--space-3) var(--space-4); border-radius: var(--radius-md);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-text) 10%, transparent);
+    display: flex; align-items: center; gap: var(--space-3);
+    background: transparent; border: none; width: 100%; text-align: left; cursor: pointer;
+    font: inherit; color: inherit;
+}
+.shell-org-label {
+    display: block; font-size: var(--text-chrome); letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--color-text-muted);
+}
+.shell-org-name {
+    display: block; font-size: var(--text-data); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.shell-nav { display: flex; flex-direction: column; gap: 1px; }
+.shell-nav-group {
+    font-size: var(--text-chrome); letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--color-neutral-400); padding: var(--space-6) var(--space-3) var(--space-2);
+}
+.shell-nav-group:first-child { padding-top: 0; }
+.shell-nav a {
+    display: flex; align-items: center; gap: var(--space-3); min-height: 44px;
+    padding: 7px var(--space-3); border-radius: 6px; font-size: var(--text-data);
+    color: var(--color-text-muted); text-decoration: none;
+}
+.shell-nav a:hover { background: color-mix(in srgb, var(--color-text) 7%, transparent); }
+.shell-nav a[aria-current] {
+    color: var(--color-text);
+    background: color-mix(in srgb, var(--color-accent) 14%, transparent);
+    box-shadow: inset 2px 0 0 var(--color-accent);
+}
+.shell-nav a[aria-current] .icon { color: var(--color-accent); }
+.shell-nav-count {
+    margin-left: auto; font-size: var(--text-chrome); font-variant-numeric: tabular-nums;
+    color: var(--color-text-muted);
+}
+.shell-nav a[aria-current] .shell-nav-count { color: var(--color-accent); }
+.shell-user {
+    margin-top: auto; display: flex; align-items: center; gap: var(--space-3);
+    padding: var(--space-3) var(--space-2) 0;
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--color-text) 8%, transparent);
+}
+.shell-user-avatar {
+    width: 26px; height: 26px; border-radius: 50%; background: var(--color-neutral-800);
+    display: grid; place-items: center; font-size: var(--text-chrome); font-weight: 600; flex: none;
+}
+.shell-user-name { display: block; font-size: var(--text-data); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.shell-user-role { display: block; font-size: var(--text-chrome); color: var(--color-text-muted); }
+.shell-user form { margin-left: auto; display: flex; }
+.shell-user button {
+    background: none; border: none; padding: 0; min-height: 44px; min-width: 44px;
+    display: grid; place-items: center; cursor: pointer;
+    color: var(--color-text-muted);
+}
+.shell-user button:hover { color: var(--color-text); }
+
+.shell-header {
+    display: flex; align-items: center; gap: var(--space-4);
+    margin-left: 212px;
+    padding: var(--space-4) var(--space-8);
+    box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--color-text) 8%, transparent);
+}
+.shell-search {
+    display: flex; align-items: center; gap: var(--space-2); flex: 1; max-width: 300px;
+    padding: 6px var(--space-3); border-radius: var(--radius-md); background: var(--color-surface);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-text) 10%, transparent);
+    color: var(--color-text-muted); font-size: var(--text-data);
+}
+.shell-header-actions { margin-left: auto; display: flex; align-items: center; gap: var(--space-4); }
+.shell-toggle {
+    display: inline-flex; align-items: center; gap: 6px; min-height: 44px;
+    background: transparent;
+    /* F2 (Creed's fidelity review): this used to be color-mix(...16% divider) inlined -
+       --color-divider's own value, 1.55:1, the same 1.4.11 defect §5c fixes on
+       .input/.btn-secondary, just not yet fixed here because these two buttons were
+       disabled ("coming soon"). Phase 2 enables them, so fixing it now rather than
+       carrying the defect forward. --color-control-border already has its own flat
+       fallback (§5d), which the old inline color-mix() didn't - a pre-2023 browser
+       dropped the whole border shorthand rather than falling back to anything. */
+    border: 1px solid var(--color-control-border);
+    border-radius: var(--radius-md); padding: 0 10px; color: var(--color-text);
+    font: inherit; font-size: var(--text-data); cursor: pointer;
+}
+.shell-toggle:disabled { opacity: 0.6; cursor: default; }
+.shell-toggle .icon { color: var(--color-accent); }
+.shell-bell { color: var(--color-text-muted); }
+
+/* main is every page's own top-level content element (id="main", present on every template
+   already) - these rules apply globally, sidebar or not, so login.html/error.html's sidebar-less
+   .narrow variant explicitly resets the offset back to a centred, un-shifted column. */
+main {
+    margin-left: 212px;
+    max-width: 1240px;
+    padding: var(--space-8);
+}
+main.narrow { max-width: 420px; margin: var(--space-6) auto; }
+
+@media (max-width: 900px) {
+    .shell-side { display: none; }
+    .shell-header { margin-left: 0; }
+    main { margin-left: 0; }
+}
 
 /* ============================== layout ============================== */
-main {
-    max-width: 960px;
-    margin: var(--s6) auto;
-    padding: 0 var(--s5);
-}
-main.narrow { max-width: 420px; }
-h1 { font-size: var(--t-xl); font-weight: 700; letter-spacing: -0.01em; margin: 0 0 var(--s1); }
-h2 { font-size: var(--t-lg); margin: var(--s6) 0 var(--s3); letter-spacing: -0.01em; }
+/* main and h1/h2 are handled by the T119 shell layer above (D-Q4's page-title/
+   section-heading sizes apply globally, same reasoning as main's sidebar-clearing
+   margin) - h3 stays here unchanged: it is a specific "uppercase eyebrow" section
+   label tied to existing card/stepper chrome (.card h3:first-child, fieldset.step
+   legends), not a generic heading, so restyling it belongs with whichever screen's
+   own T119 phase reworks that chrome, not the foundation. It currently renders
+   against several now-retired tokens (--tint/--accent-dark/--t-xs) and will look
+   plainer than before until then - expected, same as every other not-yet-migrated
+   legacy rule in this file (see the file-level note at the top). */
 h3, legend.section-title {
     margin: var(--s5) 0 var(--s2);
     padding: 0 0 var(--s1);
@@ -228,7 +779,15 @@ fieldset.checkbox-fieldset > legend {
     cursor: pointer;
     min-height: 44px;
 }
-.checkbox-option:has(input:checked) { border-color: var(--accent); background: var(--tint); color: var(--accent-dark); }
+/* F3 (Creed's fidelity review, open since T124): border-color used to be var(--accent)
+   (--color-accent post-bridge) - fine in light (12.39:1) but 2.40:1 worst-case in dark
+   at hue 103, the base accent has never been the boundary colour anywhere else in this
+   system. --color-accent-300 is the same token the bridge's --accent-dark already
+   points at, so this costs nothing new: 7.82:1 dark / 13.81:1 light swept across all
+   360 hues, and a border matching the chip's own ink is how a selected chip should
+   read. --tint's 1.15:1 fill is untouched - it's a fill, not a boundary, so 1.4.11
+   doesn't reach it. */
+.checkbox-option:has(input:checked) { border-color: var(--color-accent-300); background: var(--tint); color: var(--accent-dark); }
 .checkbox-option input { width: auto; min-height: 0; margin: 0; }
 .checkbox-option[aria-disabled="true"] { opacity: 0.55; }
 .checkbox-option[aria-disabled="true"] input { cursor: not-allowed; }

@@ -21,6 +21,13 @@ import org.springframework.security.crypto.password.PasswordEncoder;
  * real headless Chrome against the real dashboard to check the same things Creed checked:
  * {@code .tiles} must be a grid, not a stacked block, and {@code .num} must be the large 30px
  * figure, not 16px body text.
+ *
+ * <p>T119 (Nocturne foundation) later retired the old {@code --border}/{@code --surface}/{@code
+ * --radius} tokens wholesale (deliberately - see app.css's file-level note), so {@code .tile}/
+ * {@code .zone}'s old border/background declarations now resolve to nothing until the dashboard
+ * gets its own T119 rework phase. This test was narrowed to the two checks that are still real
+ * signals of the T93 bug class (a value from a literal, not a now-retired token) rather than
+ * dropped, since a conflict marker recurring would still break both.
  */
 class DashboardCssRenderingUiTest extends AbstractUiTest {
 
@@ -66,17 +73,9 @@ class DashboardCssRenderingUiTest extends AbstractUiTest {
                 .evaluate("el => getComputedStyle(el).display");
         assertThat(tilesDisplay).isEqualTo("grid");
 
-        String tileBorderWidth = (String) page.locator(".tile").first()
-                .evaluate("el => getComputedStyle(el).borderTopWidth");
-        assertThat(tileBorderWidth).isNotEqualTo("0px");
-
         String numFontSize = (String) page.locator(".tile .num").first()
                 .evaluate("el => getComputedStyle(el).fontSize");
         assertThat(numFontSize).isEqualTo("30px");
-
-        String zoneBorderWidth = (String) page.locator(".zone").first()
-                .evaluate("el => getComputedStyle(el).borderTopWidth");
-        assertThat(zoneBorderWidth).isNotEqualTo("0px");
     }
 
     @Test

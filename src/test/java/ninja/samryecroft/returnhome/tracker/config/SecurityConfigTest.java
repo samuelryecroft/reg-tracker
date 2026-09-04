@@ -6,6 +6,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import ninja.samryecroft.returnhome.tracker.audit.AuditEventPublisher;
+import ninja.samryecroft.returnhome.tracker.home.HomeRepository;
+import ninja.samryecroft.returnhome.tracker.organisation.OrganisationAccessService;
 import ninja.samryecroft.returnhome.tracker.theme.ThemeService;
 import ninja.samryecroft.returnhome.tracker.user.RoleMatrix;
 import ninja.samryecroft.returnhome.tracker.web.LoginController;
@@ -37,6 +39,13 @@ class SecurityConfigTest {
     // GlobalControllerAdvice is picked up by the @WebMvcTest slice and now depends on this.
     @MockitoBean
     private AuditEventPublisher auditEventPublisher;
+
+    // T119: GlobalControllerAdvice's shellOrg() resolves the sidebar org box off these.
+    @MockitoBean
+    private OrganisationAccessService organisationAccessService;
+
+    @MockitoBean
+    private HomeRepository homeRepository;
 
     @Test
     void anonymousRequestToRootRedirectsToLogin() throws Exception {

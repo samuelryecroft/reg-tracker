@@ -36,7 +36,12 @@ public class SecurityConfig {
             ObjectProvider<ClientRegistrationRepository> clientRegistrations) throws Exception {
         http
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/login", "/css/**", "/js/**", "/webjars/**", "/error").permitAll()
+                        // T119: /fonts/** and /icons/** are static assets the login page itself
+                        // loads (the self-hosted Inter @font-face, the Phosphor sprite) - without
+                        // permitAll, an unauthenticated fetch of either is intercepted, saved as a
+                        // "continue to this URL" target, and redirects a real login back to a font
+                        // or icon file instead of the intended landing page.
+                        .requestMatchers("/login", "/css/**", "/js/**", "/fonts/**", "/icons/**", "/webjars/**", "/error").permitAll()
                         // WS-C: the health endpoint (and its liveness/readiness groups) is public so
                         // App Service probes can reach it unauthenticated. show-details=when-authorized
                         // means anonymous callers still only see {"status":"UP"}. Every OTHER actuator

@@ -16,28 +16,90 @@
 </th:block>
 </head>
 <body>
-<th:block th:fragment="nav">
+<!-- T119 shell (phase 1): sidebar + header, inserted as a sibling immediately before each page's
+     own <main id="main"> - the same insertion point the old plain <header> used - so no page
+     template needs to change shape to adopt it (see app.css's shell section for how the fixed
+     sidebar clears main without a shared wrapper element). The appearance/reveal buttons are
+     structural for now: Phase 2 wires their behaviour (per-user preference, session-backed,
+     server-rendered - design spec §2.3/§2.5); until then they render correctly but are disabled. -->
+<th:block th:fragment="nav" th:with="ico=@{/icons/phosphor.svg}">
 <a class="skip-link" href="#main">Skip to main content</a>
-<header>
-    <nav aria-label="Main">
-        <a class="brand" href="/"><span class="brand-mark"></span>Return Home Tracker</a>
-        <a th:if="${#authorization.expression('hasAnyRole(''ORG_ADMIN'',''VIEWER'',''COORDINATOR'')')}" href="/dashboard">Dashboard</a>
-        <a th:if="${#authorization.expression('hasRole(''HOME_STAFF'')')}" href="/requests">My Requests</a>
-        <a th:if="${#authorization.expression('hasRole(''HOME_STAFF'')')}" href="/children">My Children</a>
-        <a th:if="${#authorization.expression('hasRole(''COORDINATOR'')')}" href="/coordinator/requests">All Requests</a>
-        <a th:if="${#authorization.expression('hasRole(''VISITOR'')')}" href="/visitor/interviews">My Interviews</a>
-        <a th:if="${#authorization.expression('hasRole(''REVIEWER'')')}" href="/reviewer/reports">Review Queue</a>
-        <a th:if="${#authorization.expression('hasAnyRole(''ADMIN'',''ORG_ADMIN'')')}" href="/admin/users">Users</a>
-        <a th:if="${#authorization.expression('hasAnyRole(''ADMIN'',''ORG_ADMIN'')')}" href="/admin/homes">Homes</a>
-        <a th:if="${#authorization.expression('hasAnyRole(''ADMIN'',''ORG_ADMIN'',''VIEWER'')')}" href="/children">Children</a>
-        <a th:if="${#authorization.expression('hasAnyRole(''ORG_ADMIN'',''VIEWER'',''COORDINATOR'',''ADMIN'')')}" href="/audit">Audit</a>
-        <a th:if="${canEditTheme}" href="/admin/theme">Branding</a>
-        <a th:if="${#authorization.expression('hasRole(''ADMIN'')')}" href="/admin/organisations">Organisations</a>
+
+<aside class="shell-side">
+    <div class="shell-brand">
+        <span class="shell-brand-mark" aria-hidden="true"></span>
+        <span class="shell-brand-name">Return Home</span>
+    </div>
+
+    <div class="shell-org" th:if="${shellOrg != null}">
+        <span style="flex:1;min-width:0">
+            <span class="shell-org-label" th:text="${shellOrg.kicker()}">Supplier</span>
+            <span class="shell-org-name" th:text="${shellOrg.name()}">Organisation</span>
+        </span>
+        <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-caret-up-down'"></use></svg>
+    </div>
+
+    <nav class="shell-nav" aria-label="Main">
+        <span class="shell-nav-group">Work</span>
+        <a th:if="${#authorization.expression('hasAnyRole(''ORG_ADMIN'',''VIEWER'',''COORDINATOR'')')}" href="/dashboard">
+            <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-squares-four'"></use></svg>Dashboard</a>
+        <a th:if="${#authorization.expression('hasRole(''HOME_STAFF'')')}" href="/requests">
+            <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-tray'"></use></svg>My Requests</a>
+        <a th:if="${#authorization.expression('hasRole(''COORDINATOR'')')}" href="/coordinator/requests">
+            <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-tray'"></use></svg>All Requests</a>
+        <a th:if="${#authorization.expression('hasRole(''VISITOR'')')}" href="/visitor/interviews">
+            <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-user-focus'"></use></svg>My Interviews</a>
+        <a th:if="${#authorization.expression('hasRole(''REVIEWER'')')}" href="/reviewer/reports">
+            <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-seal-check'"></use></svg>Review Queue</a>
+
+        <span class="shell-nav-group" th:if="${#authorization.expression('hasRole(''HOME_STAFF'')')}">Records</span>
+        <a th:if="${#authorization.expression('hasRole(''HOME_STAFF'')')}" href="/children">
+            <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-users-three'"></use></svg>My Children</a>
+
+        <span class="shell-nav-group"
+              th:if="${#authorization.expression('hasAnyRole(''ADMIN'',''ORG_ADMIN'',''VIEWER'',''COORDINATOR'')')}">Records</span>
+        <a th:if="${#authorization.expression('hasAnyRole(''ADMIN'',''ORG_ADMIN'',''VIEWER'')')}" href="/children">
+            <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-users-three'"></use></svg>Children</a>
+        <a th:if="${#authorization.expression('hasAnyRole(''ADMIN'',''ORG_ADMIN'')')}" href="/admin/homes">
+            <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-house-line'"></use></svg>Homes</a>
+        <a th:if="${#authorization.expression('hasAnyRole(''ORG_ADMIN'',''VIEWER'',''COORDINATOR'',''ADMIN'')')}" href="/audit">
+            <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-clock-counter-clockwise'"></use></svg>Audit</a>
+
+        <span class="shell-nav-group"
+              th:if="${#authorization.expression('hasAnyRole(''ADMIN'',''ORG_ADMIN'')') or canEditTheme}">Admin</span>
+        <a th:if="${#authorization.expression('hasAnyRole(''ADMIN'',''ORG_ADMIN'')')}" href="/admin/users">
+            <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-users-three'"></use></svg>Users</a>
+        <a th:if="${canEditTheme}" href="/admin/theme">
+            <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-eyedropper'"></use></svg>Branding</a>
+        <a th:if="${#authorization.expression('hasRole(''ADMIN'')')}" href="/admin/organisations">
+            <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-buildings'"></use></svg>Organisations</a>
     </nav>
-    <form method="post" th:action="@{/logout}">
-        <span sec:authentication="name" class="header-user"></span>
-        <button type="submit">Log out</button>
-    </form>
+
+    <div class="shell-user">
+        <span class="shell-user-avatar" aria-hidden="true" th:text="${shellUserInitials}">AB</span>
+        <span style="flex:1;min-width:0">
+            <span class="shell-user-name" sec:authentication="name">Full Name</span>
+        </span>
+        <form method="post" th:action="@{/logout}">
+            <button type="submit" title="Log out" aria-label="Log out">
+                <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-sign-out'"></use></svg>
+            </button>
+        </form>
+    </div>
+</aside>
+
+<header class="shell-header">
+    <div class="shell-search">
+        <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-magnifying-glass'"></use></svg>
+        <span>Search</span>
+    </div>
+    <div class="shell-header-actions">
+        <button type="button" class="shell-toggle" disabled title="Reveal names on this page - coming soon">
+            <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-eye-slash'"></use></svg>Reveal</button>
+        <button type="button" class="shell-toggle" disabled title="Switch appearance - coming soon">
+            <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-moon'"></use></svg>Dark</button>
+        <svg class="icon shell-bell" aria-hidden="true"><use th:href="${ico} + '#ph-bell'"></use></svg>
+    </div>
 </header>
 </th:block>
 </body>

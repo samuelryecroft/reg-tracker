@@ -1,10 +1,16 @@
 package ninja.samryecroft.returnhome.tracker.web;
 
 import jakarta.servlet.http.HttpServletRequest;
+import java.util.List;
 import ninja.samryecroft.returnhome.tracker.audit.AuditEventPublisher;
 import ninja.samryecroft.returnhome.tracker.document.DocumentNotFoundException;
 import ninja.samryecroft.returnhome.tracker.document.DocumentSecurityException;
 import ninja.samryecroft.returnhome.tracker.document.KeyUnavailableException;
+import ninja.samryecroft.returnhome.tracker.home.Home;
+import ninja.samryecroft.returnhome.tracker.home.HomeRepository;
+import ninja.samryecroft.returnhome.tracker.organisation.Organisation;
+import ninja.samryecroft.returnhome.tracker.organisation.OrganisationAccessService;
+import ninja.samryecroft.returnhome.tracker.organisation.OrgType;
 import ninja.samryecroft.returnhome.tracker.theme.ThemeService;
 import ninja.samryecroft.returnhome.tracker.user.AppUserPrincipal;
 import ninja.samryecroft.returnhome.tracker.user.RoleMatrix;
@@ -30,12 +36,17 @@ public class GlobalControllerAdvice {
     private final ThemeService themeService;
     private final AuditEventPublisher auditEventPublisher;
     private final RoleMatrix roleMatrix;
+    private final OrganisationAccessService organisationAccessService;
+    private final HomeRepository homeRepository;
 
     public GlobalControllerAdvice(ThemeService themeService, AuditEventPublisher auditEventPublisher,
-            RoleMatrix roleMatrix) {
+            RoleMatrix roleMatrix, OrganisationAccessService organisationAccessService,
+            HomeRepository homeRepository) {
         this.themeService = themeService;
         this.auditEventPublisher = auditEventPublisher;
         this.roleMatrix = roleMatrix;
+        this.organisationAccessService = organisationAccessService;
+        this.homeRepository = homeRepository;
     }
 
     /**
@@ -71,6 +82,67 @@ public class GlobalControllerAdvice {
     @ModelAttribute("canEditTheme")
     public boolean canEditTheme(@AuthenticationPrincipal AppUserPrincipal principal) {
         return themeService.canEditOwnTheme(principal);
+    }
+
+    /**
+     * T119 shell: the sidebar's org box (kicker + name), source of truth for whichever
+     * organisation/home(s) scope the signed-in user. Organisation access uses the same lazy
+     * association Hibernate access pattern already proven safe by
+     * {@link ThemeService#canEditOwnTheme} (a principal's {@code User} carries a LAZY
+     * {@code organisation}, and this runs with no wrapping transaction). Home-STAFF/VIEWER users
+     * have no such single field any more (T116: a user can cover several homes, all one care
+     * provider organisation) - {@link OrganisationAccessService#homeIdsFor} answers that from the
+     * database rather than from anything carried on the principal, same reason that method gives
+     * for not reading the entity's own lazy {@code homes} collection here.
+     */
+    @ModelAttribute("shellOrg")
+    public ShellOrg shellOrg(@AuthenticationPrincipal AppUserPrincipal principal) {
+        if (principal == null) {
+            return null;
+        }
+        Organisation organisation = principal.getUser().getOrganisation();
+        if (organisation != null) {
+            String kicker = organisation.getType() == OrgType.SUPPLIER ? "Supplier" : "Care provider";
+            return new ShellOrg(kicker, organisation.getName());
+        }
+        List<Long> homeIds = organisationAccessService.homeIdsFor(principal);
+        if (homeIds.size() == 1) {
+            Home home = homeRepository.findById(homeIds.get(0)).orElse(null);
+            if (home != null) {
+                return new ShellOrg("Home", home.getName());
+            }
+        } else if (homeIds.size() > 1) {
+            // Several homes with no single owning organisation to name (T116: home staff have
+            // none of their own) - a count, not a pick of one, matching that migration's own
+            // reasoning for the audit actor-home column: choosing one of several invents a fact.
+            return new ShellOrg("Homes", homeIds.size() + " homes");
+        }
+        return new ShellOrg("Platform", "Return Home Tracker");
+    }
+
+    public record ShellOrg(String kicker, String name) {
+    }
+
+    /** T119 shell: the sidebar footer's avatar initials. Staff are never masked (spec §2.5), so this
+     * is a plain display convenience, not a masking projection - unlike a child's initials, which
+     * Kevin's data half computes server-side as an actual privacy control. */
+    @ModelAttribute("shellUserInitials")
+    public String shellUserInitials(@AuthenticationPrincipal AppUserPrincipal principal) {
+        if (principal == null) {
+            return "";
+        }
+        String fullName = principal.getUser().getFullName();
+        if (fullName == null || fullName.isBlank()) {
+            return "";
+        }
+        StringBuilder initials = new StringBuilder();
+        for (String word : fullName.trim().split("\\s+")) {
+            String letters = word.replaceAll("[^\\p{L}]", "");
+            if (!letters.isEmpty() && initials.length() < 2) {
+                initials.append(Character.toUpperCase(letters.charAt(0)));
+            }
+        }
+        return initials.toString();
     }
 
     /**
