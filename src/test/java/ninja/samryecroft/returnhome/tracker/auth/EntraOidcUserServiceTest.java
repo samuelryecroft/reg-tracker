@@ -92,6 +92,26 @@ class EntraOidcUserServiceTest {
                 .hasMessageContaining(EntraOidcUserService.REFUSED);
     }
 
+    /**
+     * The claim is normalised on the way out of the token, exactly as the stored value is normalised
+     * on the way in.
+     *
+     * <p>Normalising only the storage side would leave the match resting on "Entra emits lower
+     * case" - an external assumption we do not control, whose failure mode is a silent no-match,
+     * which is the precise defect the storage-side normalisation exists to remove. Normalising both
+     * ends makes it an invariant rather than a dependency.
+     */
+    @Test
+    void anUpperCasedClaimStillMatchesTheLowerCasedValueWeStored() {
+        User user = enabledUser("nadia.khan");
+        when(userRepository.findByIdpSubject(OBJECT_ID)).thenReturn(Optional.of(user));
+
+        OidcUser loaded = service(tokenWith("oid", OBJECT_ID.toUpperCase()))
+                .loadUser(mock(OidcUserRequest.class));
+
+        assertThat(((AppUserPrincipal) loaded).getUsername()).isEqualTo("nadia.khan");
+    }
+
     private String messageFrom(OidcUser token) {
         try {
             service(token).loadUser(mock(OidcUserRequest.class));

@@ -1,5 +1,6 @@
 package ninja.samryecroft.returnhome.tracker.auth;
 
+import java.util.Locale;
 import ninja.samryecroft.returnhome.tracker.user.User;
 import org.springframework.beans.factory.annotation.Autowired;
 import ninja.samryecroft.returnhome.tracker.user.UserRepository;
@@ -94,7 +95,12 @@ public class EntraOidcUserService implements OAuth2UserService<OidcUserRequest, 
         if (objectId == null || objectId.isBlank()) {
             throw refuse();
         }
-        return objectId;
+        // Lower-cased here as well as on the way in (UserService.applyObjectId). Normalising only
+        // the stored side would leave the match resting on "Entra emits lowercase" - an external
+        // assumption we do not control, and one whose failure is a silent no-match, which is the
+        // exact defect the storage-side normalisation exists to remove. Normalising both ends turns
+        // the assumption into an invariant instead of depending on it.
+        return objectId.toLowerCase(Locale.ROOT);
     }
 
     private OAuth2AuthenticationException refuse() {
