@@ -1697,3 +1697,80 @@ Tone is factual, not alarming: it records a normal event, and a reviewer sees it
 legitimate outcomes. Use the **`--sent-back` family**, not `--warn`: this is the vocabulary the rail, the
 status tag and the visitor's banner already share, and calling it a warning here would fork that. State when,
 and link to the history section that holds the previous comment.
+
+
+## 6d · 2a, second pass — a reversal of my own D-2a-1, and the filter-set collision (Creed, 6 Sep)
+
+### 2b · DROPPED — god's ruling. **D-Q2's 2b row is superseded.**
+
+Recorded here so the document does not contradict itself: **D-Q2's table still lists 2b as `?view=feed` on
+2a's route. That row no longer applies.** god has dropped 2b outright; if chronology is ever wanted it is a
+sort toggle on 2a, not a view and not a screen.
+
+**A caveat I owe the record:** god ruled partly on a framing I supplied and later found wrong — I called 2b
+"one of seven screens", when D-Q2 had already folded it into 2a's route. The half of his reasoning that
+depended on my framing (*a dated re-rendering recreates the duplication*) does **not** hold for a same-route
+toggle. The half that does not depend on it — *a queue answers "what next", which is urgency, not
+chronology* — stands on its own and is sufficient. The ruling holds; the reasoning is narrower than stated.
+
+### D-2a-1 REVISED · Keep both words. **My first answer was wrong, and the rule needed sharpening, not applying**
+
+I ruled that inside a tier group the card's due badge should shed its state word and carry magnitude only.
+**Withdrawn.** Andy pushed back with two facts I did not have:
+
+1. The badge copy is now **`Due soon — 6h 10m left`**, produced by `DueStateCopy`, **signed off by the human
+   and pinned character-for-character by a test as statutory-surface copy.**
+2. A card is scanned — and deep-linked — **on its own**, where nothing else supplies the tier.
+
+And the arithmetic I skipped: a group heading is announced **once per group**, not once per card, so the
+repetition is `1 + N`, not `2N`. One extra word per card buys a card that is complete wherever it appears.
+
+**Both keep their word.** The sharpening this forces, which matters well beyond 2a:
+
+> **D-1a-2b's converse is about a HIDDEN word duplicating a VISIBLE one. It does not govern two pieces of
+> VISIBLE text at different scopes** — a group heading and an item inside it are different scopes, and an
+> item that restates its group is self-contained, not redundant.
+
+Applying the converse to visible text at two scopes is over-application, and I did it. **The axis labels of
+D-2a-2 are unaffected** — those genuinely are hidden text naming something no visible text says.
+
+### D-2a-6 · The filter chips: a menu of common choices, plus a chip for whatever is actually on
+
+`DashboardService`'s "needs attention" tiles deep-link into six filters — `overdue`, `dueSoon`, `noClock`,
+`consent`, `unallocated`, `awaitingReview` — under Oscar's contract that **the list a tile opens visibly
+matches the tile.** The canvas's chip row is a different set (All / Needs allocating / Awaiting report /
+Awaiting review / Closed). Adopting the canvas set wholesale would land every dashboard tile on a queue with
+no chip selected, breaking that contract **silently**, which is the worst way to break it.
+
+They are different kinds of thing, which is why neither set is simply right: the canvas chips are **workflow
+stages**; `overdue`/`dueSoon` are **urgency** — already the page's grouping — and `consent` is a **missing
+precondition**, not a stage at all.
+
+> **The chip row is a menu of the common choices; an active filter always shows a chip, even one not in the
+> menu.**
+
+So the row renders the canvas's stage chips by default, and any deep-linked filter renders as an additional
+chip in the selected state, with R-Q13's **[Clear filters]** beside it. The tile and the list visibly match,
+without six rarely-used filters permanently occupying the row.
+
+**`noClock` retires.** Canvas decision 1 made return time **required**, which is exactly what removed the
+"no return time recorded" group — so the filter selects a state that can no longer be created. Retiring the
+chip is applying that decision; whether historical rows still need the URL to resolve is a data question for
+Kevin, not a design one.
+
+### D-2a-7 · Drop the trailing caret
+
+The canvas card carries a `min-width` action button **and** a trailing caret, reading as a whole-row target.
+S-1 already rejects the whole-card link (an overlay that must be kept off the button, leaving a second
+interactive region with no accessible name). **The caret is that pattern's visual signature, so it goes with
+it.** Keeping it promises a click the card does not honour, and a promise the interface does not keep is
+worse than a missing decoration. The name link carries its own affordance; the button carries the action.
+
+### The canvas is authoritative for layout — not for a colour decision a later ruling has superseded
+
+Andy flagged that the canvas draws the due tag `tag-accent` and the status tag `tag-neutral`, while the app
+ships them on the semantic `--error/--warn/--ok/--info/--sent-back` families, and said he would keep the
+semantic tokens. **Correct, and worth stating as precedence so it is not reopened:** R-Q14 makes the canvas
+authoritative, but **R-Q6 explicitly corrected the semantic set to be theme-aware**, and #48/#62 fixed the
+contrast on it. Re-monochroming to accent would walk R-Q6 backwards and reopen work that is done. **A later
+explicit decision supersedes the canvas within its own domain**; the canvas keeps the card's layout.
