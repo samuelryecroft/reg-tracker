@@ -28,6 +28,13 @@
                 <option th:each="c : ${children}" th:value="${c.id}" th:text="${c.fullName}">Child</option>
             </select>
             <div th:replace="~{fragments/layout :: fieldError('childId')}"></div>
+            <!-- T138 1c: masking applies where a child is being read about, not where one is being
+                 identified (Creed's review) - this picker is how the person raising the request
+                 tells the system which real child they mean, and staff think in names, not case
+                 references, so a masked option they can't resolve isn't a protected control, it's
+                 a broken one. Exempting it silently would read as a bug and as an unannounced
+                 privacy behaviour, so it's stated here rather than left for someone to notice. -->
+            <p class="hint">Full names are shown here so you pick the right child, even when names are masked elsewhere.</p>
             <p class="muted" th:if="${can.addChild}"><a href="/children/new">+ Add a child</a> not in this list</p>
 
             <label for="legalStatus">Legal status</label>

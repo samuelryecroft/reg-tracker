@@ -1,6 +1,11 @@
 package ninja.samryecroft.returnhome.tracker.report;
 
 import jakarta.validation.Valid;
+import java.util.List;
+import ninja.samryecroft.returnhome.tracker.child.ChildIdentities;
+import ninja.samryecroft.returnhome.tracker.child.ChildIdentity;
+import ninja.samryecroft.returnhome.tracker.child.NameRevealService;
+import ninja.samryecroft.returnhome.tracker.interview.InterviewRequest;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewRequestService;
 import ninja.samryecroft.returnhome.tracker.interview.dto.ConfirmScheduleForm;
 import ninja.samryecroft.returnhome.tracker.report.dto.SubmitReportForm;
@@ -22,21 +27,29 @@ public class VisitorController {
 
     private final InterviewRequestService interviewRequestService;
     private final ReportService reportService;
+    private final NameRevealService nameRevealService;
 
-    public VisitorController(InterviewRequestService interviewRequestService, ReportService reportService) {
+    public VisitorController(InterviewRequestService interviewRequestService, ReportService reportService,
+            NameRevealService nameRevealService) {
         this.interviewRequestService = interviewRequestService;
         this.reportService = reportService;
+        this.nameRevealService = nameRevealService;
     }
 
     @GetMapping("/interviews")
     public String list(@AuthenticationPrincipal AppUserPrincipal principal, Model model) {
-        model.addAttribute("requests", interviewRequestService.listForVisitor(principal));
+        List<InterviewRequest> requests = interviewRequestService.listForVisitor(principal);
+        model.addAttribute("requests", requests);
+        model.addAttribute("childIdentities",
+                ChildIdentities.mapOf(requests, InterviewRequest::getChild, nameRevealService.isRevealed()));
         return "visitor/interview-list";
     }
 
     @GetMapping("/interviews/{id}/schedule")
     public String scheduleForm(@PathVariable Long id, @AuthenticationPrincipal AppUserPrincipal principal, Model model) {
-        model.addAttribute("request", interviewRequestService.getAuthorized(id, principal));
+        InterviewRequest request = interviewRequestService.getAuthorized(id, principal);
+        model.addAttribute("request", request);
+        model.addAttribute("childIdentity", ChildIdentity.of(request.getChild(), nameRevealService.isRevealed()));
         model.addAttribute("form", new ConfirmScheduleForm());
         return "visitor/schedule-form";
     }
@@ -45,7 +58,9 @@ public class VisitorController {
     public String confirmSchedule(@PathVariable Long id, @AuthenticationPrincipal AppUserPrincipal principal,
             @Valid @ModelAttribute("form") ConfirmScheduleForm form, BindingResult bindingResult, Model model) {
         if (bindingResult.hasErrors()) {
-            model.addAttribute("request", interviewRequestService.getAuthorized(id, principal));
+            InterviewRequest request = interviewRequestService.getAuthorized(id, principal);
+            model.addAttribute("request", request);
+            model.addAttribute("childIdentity", ChildIdentity.of(request.getChild(), nameRevealService.isRevealed()));
             return "visitor/schedule-form";
         }
         interviewRequestService.confirmSchedule(id, form.getScheduledAt(), principal);
@@ -54,7 +69,9 @@ public class VisitorController {
 
     @GetMapping("/interviews/{id}/report")
     public String reportForm(@PathVariable Long id, @AuthenticationPrincipal AppUserPrincipal principal, Model model) {
-        model.addAttribute("request", interviewRequestService.getAuthorized(id, principal));
+        InterviewRequest request = interviewRequestService.getAuthorized(id, principal);
+        model.addAttribute("request", request);
+        model.addAttribute("childIdentity", ChildIdentity.of(request.getChild(), nameRevealService.isRevealed()));
         model.addAttribute("form", reportService.formFor(id, principal));
         return "visitor/report-form";
     }
@@ -72,7 +89,9 @@ public class VisitorController {
             }
         }
         if (bindingResult.hasErrors()) {
-            model.addAttribute("request", interviewRequestService.getAuthorized(id, principal));
+            InterviewRequest request = interviewRequestService.getAuthorized(id, principal);
+            model.addAttribute("request", request);
+            model.addAttribute("childIdentity", ChildIdentity.of(request.getChild(), nameRevealService.isRevealed()));
             return "visitor/report-form";
         }
         if ("submit".equals(action)) {

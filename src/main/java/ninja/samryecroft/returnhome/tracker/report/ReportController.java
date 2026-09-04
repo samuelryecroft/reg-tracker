@@ -1,6 +1,8 @@
 package ninja.samryecroft.returnhome.tracker.report;
 
 import ninja.samryecroft.returnhome.tracker.audit.AuditEventPublisher;
+import ninja.samryecroft.returnhome.tracker.child.ChildIdentity;
+import ninja.samryecroft.returnhome.tracker.child.NameRevealService;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewRequest;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewRequestService;
 import ninja.samryecroft.returnhome.tracker.user.AppUserPrincipal;
@@ -26,13 +28,16 @@ public class ReportController {
     private final ReportService reportService;
     private final ReportDocumentService reportDocumentService;
     private final AuditEventPublisher auditEventPublisher;
+    private final NameRevealService nameRevealService;
 
     public ReportController(InterviewRequestService interviewRequestService, ReportService reportService,
-            ReportDocumentService reportDocumentService, AuditEventPublisher auditEventPublisher) {
+            ReportDocumentService reportDocumentService, AuditEventPublisher auditEventPublisher,
+            NameRevealService nameRevealService) {
         this.interviewRequestService = interviewRequestService;
         this.reportService = reportService;
         this.reportDocumentService = reportDocumentService;
         this.auditEventPublisher = auditEventPublisher;
+        this.nameRevealService = nameRevealService;
     }
 
     @GetMapping("/reports/{requestId}/download")
@@ -69,6 +74,7 @@ public class ReportController {
         InterviewRequest request = interviewRequestService.getAuthorized(requestId, principal);
         InterviewReport report = approvedReportFor(requestId);
         model.addAttribute("request", request);
+        model.addAttribute("childIdentity", ChildIdentity.of(request.getChild(), nameRevealService.isRevealed()));
         model.addAttribute("report", report);
         return "report/view";
     }

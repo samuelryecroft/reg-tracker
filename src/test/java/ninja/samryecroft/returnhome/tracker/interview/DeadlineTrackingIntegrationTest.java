@@ -98,6 +98,11 @@ class DeadlineTrackingIntegrationTest extends AbstractIntegrationTest {
         Child child = new Child();
         child.setFirstName(firstName);
         child.setLastName("Deadline");
+        // T138 1c: coordinator/requests.html (and home-staff/request-list.html) now mask child
+        // names by default (spec §2.5) - the case reference is the part of a masked identity that
+        // IS shown, so this fixture's own marker string still appears on those pages via it,
+        // rather than the tests below needing to know about masking at all.
+        child.setLocalCaseReference(firstName);
         child.setDateOfBirth(LocalDate.of(2011, 3, 4));
         child.setHome(childHome);
         return childRepository.save(child);

@@ -2,13 +2,13 @@
 <html xmlns:th="http://www.thymeleaf.org" lang="en" th:attr="data-appearance=${#strings.toLowerCase(appearancePreference)}">
 <head>
     <meta charset="UTF-8"/>
-    <title th:text="${'Report: ' + request.child.fullName}">Report</title>
+    <title th:text="${'Report: ' + childIdentity.label()}">Report</title>
     <th:block th:replace="~{fragments/layout :: styles}"></th:block>
 </head>
 <body>
 <div th:replace="~{fragments/layout :: nav}"></div>
 <main id="main">
-    <h1 th:text="${request.child.fullName}">Child Name</h1>
+    <h1 th:text="${childIdentity.label()}">Child Name</h1>
     <p class="muted" th:text="${'Home: ' + request.home.name}">Home</p>
     <a class="btn secondary" th:href="@{/reports/{id}/download(id=${request.id})}">Download .docx</a>
 

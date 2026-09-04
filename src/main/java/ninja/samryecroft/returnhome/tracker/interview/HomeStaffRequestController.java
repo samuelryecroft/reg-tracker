@@ -3,7 +3,9 @@ package ninja.samryecroft.returnhome.tracker.interview;
 import jakarta.validation.Valid;
 import java.util.List;
 import ninja.samryecroft.returnhome.tracker.child.Child;
+import ninja.samryecroft.returnhome.tracker.child.ChildIdentities;
 import ninja.samryecroft.returnhome.tracker.child.ChildRepository;
+import ninja.samryecroft.returnhome.tracker.child.NameRevealService;
 import ninja.samryecroft.returnhome.tracker.interview.dto.NewRequestForm;
 import ninja.samryecroft.returnhome.tracker.organisation.OrganisationAccessService;
 import ninja.samryecroft.returnhome.tracker.user.AppUserPrincipal;
@@ -25,14 +27,16 @@ public class HomeStaffRequestController {
     private final ChildRepository childRepository;
     private final DeadlineTrackingService deadlineTrackingService;
     private final OrganisationAccessService organisationAccessService;
+    private final NameRevealService nameRevealService;
 
     public HomeStaffRequestController(InterviewRequestService interviewRequestService,
             ChildRepository childRepository, DeadlineTrackingService deadlineTrackingService,
-            OrganisationAccessService organisationAccessService) {
+            OrganisationAccessService organisationAccessService, NameRevealService nameRevealService) {
         this.interviewRequestService = interviewRequestService;
         this.childRepository = childRepository;
         this.deadlineTrackingService = deadlineTrackingService;
         this.organisationAccessService = organisationAccessService;
+        this.nameRevealService = nameRevealService;
     }
 
     @GetMapping
@@ -40,6 +44,8 @@ public class HomeStaffRequestController {
         List<InterviewRequest> requests = interviewRequestService.listForHomeStaff(principal);
         model.addAttribute("requests", requests);
         model.addAttribute("dueGroups", deadlineTrackingService.groupByUrgency(requests));
+        model.addAttribute("childIdentities",
+                ChildIdentities.mapOf(requests, InterviewRequest::getChild, nameRevealService.isRevealed()));
         return "home-staff/request-list";
     }
 

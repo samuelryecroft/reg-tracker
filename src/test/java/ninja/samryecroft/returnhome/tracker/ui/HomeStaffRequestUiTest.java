@@ -43,6 +43,7 @@ class HomeStaffRequestUiTest extends AbstractUiTest {
         child.setFirstName("Morgan");
         child.setLastName("Taylor");
         child.setDateOfBirth(LocalDate.of(2011, 6, 15));
+        child.setLocalCaseReference("CH-UITEST");
         child.setHome(home);
         childRepository.save(child);
 
@@ -71,7 +72,10 @@ class HomeStaffRequestUiTest extends AbstractUiTest {
         page.waitForLoadState();
 
         assertThat(page.url()).matches(".*/interview-requests/\\d+$");
-        assertThat(page.getByText("Morgan Taylor").first().isVisible()).isTrue();
+        // T138 1c: the detail page is a reading surface, masked by default (spec §2.5) - the child
+        // picker on the form that got us here is the one exempt control (Creed's review), so it
+        // showed the full name, but this page shows "M.T. · CH-UITEST" until reveal is clicked.
+        assertThat(page.getByText("M.T. · CH-UITEST").first().isVisible()).isTrue();
         assertThat(page.locator("span.status", new com.microsoft.playwright.Page.LocatorOptions().setHasText("Requested"))
                 .isVisible()).isTrue();
     }

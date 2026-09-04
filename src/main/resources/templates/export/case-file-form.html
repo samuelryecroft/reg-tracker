@@ -2,14 +2,14 @@
 <html xmlns:th="http://www.thymeleaf.org" lang="en" th:attr="data-appearance=${#strings.toLowerCase(appearancePreference)}">
 <head>
     <meta charset="UTF-8"/>
-    <title th:text="${'Export Case File: ' + child.fullName}">Export Case File</title>
+    <title th:text="${'Export Case File: ' + childIdentity.label()}">Export Case File</title>
     <th:block th:replace="~{fragments/layout :: styles}"></th:block>
 </head>
 <body>
 <div th:replace="~{fragments/layout :: nav}"></div>
 <main id="main">
     <h1>Export case file</h1>
-    <p class="sub" th:text="${child.fullName + ' · ' + child.home.name + ' · ' + child.home.organisation.name}">Child</p>
+    <p class="sub" th:text="${childIdentity.label() + ' · ' + child.home.name + ' · ' + child.home.organisation.name}">Child</p>
 
     <div class="consequence">
         <strong style="font-size:16px">This pack contains special-category personal data about a child.</strong>
@@ -94,7 +94,7 @@
 
             <div class="banner info" style="margin-top:22px">
                 <span class="ic" aria-hidden="true">◆</span>
-                <div><strong th:text="${'This export will be recorded in ' + child.fullName + '’s case history.'}">Recorded</strong>
+                <div><strong th:text="${'This export will be recorded in ' + childIdentity.label() + '’s case history.'}">Recorded</strong>
                     <p>Who produced it, when, the stated purpose and reference, and what it contained — visible to
                         anyone who can already see this child's record. The pack itself is not kept: it is built,
                         held for one download, and discarded.</p>

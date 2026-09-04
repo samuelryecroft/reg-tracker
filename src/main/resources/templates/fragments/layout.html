@@ -24,9 +24,9 @@
 <!-- T119 shell (phase 1): sidebar + header, inserted as a sibling immediately before each page's
      own <main id="main"> - the same insertion point the old plain <header> used - so no page
      template needs to change shape to adopt it (see app.css's shell section for how the fixed
-     sidebar clears main without a shared wrapper element). The appearance/reveal buttons are
-     structural for now: Phase 2 wires their behaviour (per-user preference, session-backed,
-     server-rendered - design spec §2.3/§2.5); until then they render correctly but are disabled. -->
+     sidebar clears main without a shared wrapper element). The appearance and reveal controls are
+     both now fully wired (batches 1b and 1c): per-user preference / session-backed one-shot flag,
+     server-rendered, design spec §2.3/§2.5. -->
 <!-- T138 (phase 2, batch 1a): aria-current, carried forward as an unfixed defect from the T86
      review ("aria-current is styled in app.css and set by no template - no page tells you where you
      are"). `path` comes from GlobalControllerAdvice's currentPath model attribute, not Thymeleaf's own
@@ -117,8 +117,38 @@
         <span>Search</span>
     </div>
     <div class="shell-header-actions">
-        <button type="button" class="shell-toggle" disabled title="Reveal names on this page - coming soon">
-            <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-eye-slash'"></use></svg>Reveal</button>
+        <!-- T138 1c: revealing is a real POST + full-page redirect, not a client-side class toggle -
+             a client-side toggle cannot be audited (Kevin's review: no server event, so nothing
+             would record that someone unmasked a list of children). Masked is the state on every
+             page load except the one immediately following this POST's own redirect - see
+             NameRevealService's javadoc for why the flag is one-shot and resets on navigation.
+
+             Creed's review: this needs an OFF switch too. A user who reveals to check a name has
+             no way to cover the screen again short of leaving the page - on a part-filled form
+             that means losing their place. Hiding is not itself privacy-sensitive (nothing is
+             armed, nothing is audited - it's just a plain reload of the same page, which is
+             already masked the moment reveal's one-shot flag is gone), so it's a plain link, not a
+             second POST endpoint.
+
+             Both states use Phosphor's regular/fill pair for an active state (Nocturne's own idiom,
+             R-Q11) rather than one glyph doing double duty: ph-eye-slash masked, ph-fill-eye-slash
+             revealed. -->
+        <form th:if="${!namesRevealed}" method="post" th:action="@{/account/reveal-names}" class="shell-reveal-form">
+            <input type="hidden" name="returnTo" th:value="${currentPath}">
+            <button type="submit" class="shell-toggle shell-reveal-toggle" aria-pressed="false">
+                <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-eye-slash'"></use></svg>
+                <span>Reveal</span>
+                <!-- Spec §2.5: the control's accessible name must state what it does and what it
+                     affects, not just its visible word - same WCAG 2.5.3 reasoning as the
+                     appearance toggle below (Creed's review, PR #29). -->
+                <span class="visually-hidden">names on this page</span>
+            </button>
+        </form>
+        <a th:if="${namesRevealed}" th:href="${currentPath}" class="shell-toggle shell-reveal-toggle" aria-pressed="true">
+            <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-fill-eye-slash'"></use></svg>
+            <span>Hide</span>
+            <span class="visually-hidden">names on this page</span>
+        </a>
         <!-- T138 batch 1b: a real POST + full-page redirect, not a client-side class toggle - spec
              §2.3 requires the appearance to be server-rendered with no flash, which a JS-driven
              instant swap can't give (the whole page, including this button's own icon/label below,

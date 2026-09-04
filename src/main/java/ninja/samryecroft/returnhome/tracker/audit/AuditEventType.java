@@ -49,5 +49,11 @@ public enum AuditEventType {
     // trail does not record. This is NOT sign-in monitoring and does not touch that decision.
     AUDIT_VIEW_OPENED,
 
+    // Masking (T138 1c, spec §2.5). Revealing a masked list of children's names is professional
+    // access to safeguarding data - at least as much as opening one child's own record, which
+    // AUDIT_VIEW_OPENED already covers. One event per reveal ACTION, not per row shown, matching
+    // the click that caused it rather than the count of names it happened to affect.
+    NAMES_REVEALED,
+
     ACCESS_DENIED
 }

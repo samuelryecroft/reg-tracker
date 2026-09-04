@@ -2,6 +2,8 @@ package ninja.samryecroft.returnhome.tracker.interview;
 
 import ninja.samryecroft.returnhome.tracker.audit.AuditEventPublisher;
 import ninja.samryecroft.returnhome.tracker.audit.AuditHistoryService;
+import ninja.samryecroft.returnhome.tracker.child.ChildIdentity;
+import ninja.samryecroft.returnhome.tracker.child.NameRevealService;
 import ninja.samryecroft.returnhome.tracker.user.AppUserPrincipal;
 import ninja.samryecroft.returnhome.tracker.user.Role;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -18,12 +20,15 @@ public class InterviewRequestDetailController {
     private final InterviewRequestService interviewRequestService;
     private final AuditHistoryService auditHistoryService;
     private final AuditEventPublisher auditEventPublisher;
+    private final NameRevealService nameRevealService;
 
     public InterviewRequestDetailController(InterviewRequestService interviewRequestService,
-            AuditHistoryService auditHistoryService, AuditEventPublisher auditEventPublisher) {
+            AuditHistoryService auditHistoryService, AuditEventPublisher auditEventPublisher,
+            NameRevealService nameRevealService) {
         this.interviewRequestService = interviewRequestService;
         this.auditHistoryService = auditHistoryService;
         this.auditEventPublisher = auditEventPublisher;
+        this.nameRevealService = nameRevealService;
     }
 
     @GetMapping("/{id}")
@@ -50,6 +55,7 @@ public class InterviewRequestDetailController {
         boolean canDownload = request.getStatus() == InterviewStatus.REPORT_APPROVED;
 
         model.addAttribute("request", request);
+        model.addAttribute("childIdentity", ChildIdentity.of(request.getChild(), nameRevealService.isRevealed()));
         model.addAttribute("canAllocate", canAllocate);
         model.addAttribute("canSubmitReport", canSubmitReport);
         model.addAttribute("canConfirmSchedule", canConfirmSchedule);

@@ -28,7 +28,7 @@
         <tbody th:each="group : ${dueGroups}">
         <tr class="group"><th colspan="6" scope="colgroup" th:text="${group.label()}">Group</th></tr>
         <tr th:each="row : ${group.rows()}" th:with="r=${row.request()}">
-            <td><a class="rowlink" th:href="@{/interview-requests/{id}(id=${r.id})}" th:text="${r.child.fullName}">Child Name</a></td>
+            <td><a class="rowlink" th:href="@{/interview-requests/{id}(id=${r.id})}" th:text="${childIdentities[r.child.id].label()}">Child Name</a></td>
             <td>
                 <span th:if="${row.badge()} != null" class="due" th:classappend="${row.badge().cssClass()}" th:text="${row.badge().text()}">Deadline</span>
                 <span th:if="${row.badge()} == null" class="muted">—</span>
@@ -48,7 +48,7 @@
         <h2 style="font-size:15px;margin:20px 0 10px" th:text="${group.label()}">Group</h2>
         <div class="srow" th:each="row : ${group.rows()}" th:with="r=${row.request()}">
             <div class="top">
-                <span class="name" th:text="${r.child.fullName}">Child Name</span>
+                <span class="name" th:text="${childIdentities[r.child.id].label()}">Child Name</span>
                 <span th:if="${row.badge()} != null" class="due" th:classappend="${row.badge().cssClass()}" th:text="${row.badge().text()}">Deadline</span>
             </div>
             <span class="status" th:classappend="${r.status}" th:text="${r.status.displayName}">STATUS</span>

@@ -9,7 +9,7 @@
 <div th:replace="~{fragments/layout :: nav}"></div>
 <main id="main">
     <h1>Export case file</h1>
-    <p class="sub" th:text="${child.fullName}">Child</p>
+    <p class="sub" th:text="${childIdentity.label()}">Child</p>
 
     <div class="card">
         <div class="banner ok" style="margin-bottom:14px">
