@@ -1290,6 +1290,13 @@ the CURRENT step also takes `aria-current="step"`:
 | CANCELLED | cancelled |
 | NOT_APPLICABLE | not applicable |
 
+**And the converse, found the moment D-1a-2b and D-1a-2c landed together:** once D-1a-2c gave the cancelled
+position a *visible* note reading "Cancelled", the hidden word made a screen reader say **"Scheduled,
+cancelled, Cancelled"**. So the hidden word is dropped for CANCELLED and kept for the other five. **The hidden
+state word exists BECAUSE the state was otherwise only in an `aria-hidden` glyph and a colour. The moment the
+state is carried in visible text, the hidden word stops being access and becomes duplication.** Carve out the
+exception rather than keep the switch uniform — uniformity is not worth a word said twice into someone's ear.
+
 **The general rule, which applies to every status surface we build, not just this rail:** a decorative icon
 is `aria-hidden` and costs nothing; **a state-bearing icon is `aria-hidden` plus a text equivalent, or it is
 a state that only sighted users have.** "Never colour alone" is routinely read as "add an icon" — but an
