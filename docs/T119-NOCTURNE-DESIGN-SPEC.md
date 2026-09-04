@@ -114,6 +114,20 @@ must produce the same number, so the derivation is specified here rather than tw
 > If chroma `sqrt(a² + b²)` is below **0.02** the colour is effectively grey and has no reliable hue — fall
 > back to the neutral hue **265** rather than amplifying rounding noise into an arbitrary brand colour.
 
+**Why the floor is 0.02 and not "is it exactly grey".** Guarding only the achromatic case (chroma within
+floating-point noise of zero) leaves the colours a picker actually produces unprotected: `#7F8285` has
+chroma 0.006 and `#8A8A90` has 0.009, two greys nobody can tell apart, and they derive hues **248** and
+**286** — 38 degrees apart, from what is effectively rounding noise. The floor also has to fall back to the
+**neutral hue 265**, not to 0: hue 0 is a strong red, so a supplier who picks white, black or grey would get
+a red application. 0.02 is placed so the transition is continuous rather than a jump — `#6B7280` sits just
+above it at chroma 0.023 and derives 264, one degree from neutral.
+
+**Do not expect hue → hex → hue to round-trip.** An 8-bit hex cannot carry sub-degree precision, so the hue
+recovered from a rendered swatch can differ from the integer that generated it. Beacon is the worked
+example: the canvas declares `hue: 289`, the ramp renders step 500 to `#9184d9`, and converting that hex
+back gives **289.6 → 290**. Both numbers are right about different things — 289 is the ramp's input, 290 is
+what the rendered colour actually is. **Test the ramp hue → hex only; never assert on a round trip.**
+
 Round to a whole degree in **one** place and pass the integer around. Two implementations that each round
 their own way will disagree by a degree on some colours, and a document whose accent is one degree off the
 screen's is the kind of defect nobody can describe and everybody can see.
@@ -766,8 +780,25 @@ Test vectors:
 
 | hue | 100 | 300 | 500 | 700 | 900 |
 | --- | --- | --- | --- | --- | --- |
-| 289 (Beacon) | `#F6F5FF` | `#CEC8FF` | `#9084DA` | `#574F87` | `#282442` |
-| 232 (Northgate) | `#EAFAFF` | `#93DCFF` | `#259ED1` | `#0C6081` | `#022D3F` |
+| 289 | `#F6F5FF` | `#CEC8FF` | `#9084DA` | `#574F87` | `#282442` |
+| 232 | `#EAFAFF` | `#93DCFF` | `#259ED1` | `#0C6081` | `#022D3F` |
+
+Labelled by hue, not by organisation — see the correction below. Both rows are valid ramp inputs regardless.
+
+**Correction: "Northgate hue 232" was wrong, and the canvas is where it came from.** The canvas hardcodes
+two independent fields per organisation — `northgate: { hue: 232, hex: "#6f9ee0" }` — and for Northgate they
+disagree. `#6f9ee0` is OKLCH **L 0.693 C 0.110 h 257**, which is not step 500 (L 0.660 / C 0.125) at any hue;
+it is simply a different colour, not a rendering of hue 232. Beacon's pair is self-consistent (`#9184d9`
+→ h 289.6), which is why it works as a worked example and Northgate does not.
+
+This is **not** sRGB gamut clipping, which was the natural hypothesis: hue 232 is comfortably in gamut —
+it renders to `#259ED1`, which converts back to **232.3°**, a round-trip error of a third of a degree.
+Clipping also could not move L and C the way this pair differs.
+
+**Under this model the discrepancy dissolves.** Only the colour is stored; the hue is *derived*. The
+canvas's separate `hue` field is an artefact of a mock that hardcoded both because it derived nothing.
+In production there is one input, so Northgate's hue is whatever `brandHueOf("#6f9ee0")` returns — **257** —
+and a derivation that returns 257 is correct, not off by 25. Found by Pam building it (T138).
 
 ### Banked for phase 2/3, from the same review
 - **T131** — `--control-min` was never declared (44px is hard-coded at 13 sites: right value, wrong shape),
