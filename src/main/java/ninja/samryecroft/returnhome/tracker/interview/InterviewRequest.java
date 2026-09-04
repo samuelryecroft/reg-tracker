@@ -237,7 +237,13 @@ public class InterviewRequest implements EncryptedEntity {
         return status;
     }
 
-    public void setStatus(InterviewStatus status) {
+    /**
+     * Package-private so {@code InterviewRequestService.markStatus} is provably the only writer -
+     * the transition table it enforces is worth nothing if callers can reach past it. Narrowing this
+     * is what makes the compiler, rather than a grep, enumerate everything that writes the field.
+     * Hibernate uses field access here (the {@code @Id} is on the field), so it is unaffected.
+     */
+    void setStatus(InterviewStatus status) {
         this.status = status;
     }
 

@@ -130,7 +130,7 @@ public class InterviewRequestService {
         request.setRequestedBy(requestedBy);
         request.setReturnedAt(form.getReturnedAt());
         request.setNotes(form.getNotes());
-        request.setStatus(InterviewStatus.REQUESTED);
+        markStatus(request, InterviewStatus.REQUESTED);
 
         request.setLegalStatus(form.getLegalStatus());
         request.setMissingSince(form.getMissingSince());
@@ -169,6 +169,14 @@ public class InterviewRequestService {
         // actually see it - closes the gap where the URL alone was previously the only gate.
         InterviewRequest request = getAuthorized(id, principal);
 
+        // Checked before anything is mutated, not at the point of the status write. Re-allocating a
+        // REPORT_SUBMITTED or REPORT_APPROVED request used to walk it silently backwards, dropping a
+        // submitted safeguarding report out of the review queue - T145(B). Doing the check up here
+        // means the refusal doesn't depend on the transaction rolling the field writes back.
+        InterviewStatus target = form.getScheduledAt() != null
+                ? InterviewStatus.SCHEDULED : InterviewStatus.ALLOCATED;
+        InterviewStatusTransitions.require(request.getStatus(), target);
+
         User visitor = userRepository.findById(form.getVisitorId())
                 .orElseThrow(() -> new IllegalArgumentException("No such visitor: " + form.getVisitorId()));
         if (!visitor.hasRole(Role.VISITOR)) {
@@ -185,8 +193,7 @@ public class InterviewRequestService {
         // the 72 hours the supplier actually controls, and it is only measurable if it is recorded.
         request.setAllocatedAt(LocalDateTime.now());
         request.setScheduledAt(form.getScheduledAt());
-        request.setStatus(form.getScheduledAt() != null ? InterviewStatus.SCHEDULED : InterviewStatus.ALLOCATED);
-        request.setUpdatedAt(LocalDateTime.now());
+        markStatus(request, target);
         InterviewRequest saved = interviewRequestRepository.save(request);
         auditEventPublisher.interviewRequestAllocated(saved, visitor.getId(), statusBefore, principal);
         return saved;
@@ -196,20 +203,43 @@ public class InterviewRequestService {
     @Transactional
     public InterviewRequest confirmSchedule(Long id, LocalDateTime scheduledAt, AppUserPrincipal principal) {
         InterviewRequest request = getAuthorized(id, principal);
+        // Kept, and deliberately NOT replaced by the transition table: the table permits
+        // SCHEDULED -> SCHEDULED (re-allocation), so expressing this precondition through it would
+        // widen the operation to allow re-confirming an already-scheduled interview. "Awaiting a
+        // scheduled time" is a statement about this operation, not about the machine.
         if (request.getStatus() != InterviewStatus.ALLOCATED) {
             throw new IllegalStateException("This interview is not awaiting a scheduled time");
         }
         InterviewStatus statusBefore = request.getStatus();
         request.setScheduledAt(scheduledAt);
-        request.setStatus(InterviewStatus.SCHEDULED);
-        request.setUpdatedAt(LocalDateTime.now());
+        markStatus(request, InterviewStatus.SCHEDULED);
         InterviewRequest saved = interviewRequestRepository.save(request);
         auditEventPublisher.interviewRequestScheduled(saved, statusBefore, principal);
         return saved;
     }
 
+    /**
+     * The only writer of {@code InterviewRequest.status}, and the place the transition table is
+     * enforced.
+     *
+     * <p>{@code InterviewRequest.setStatus} is package-private so this stays true by compilation
+     * rather than by convention - an authority with callers reaching past it is the shape T139 spent
+     * three PRs closing.
+     *
+     * <p>Callers that can refuse an illegal transition before mutating anything else should still
+     * call {@link InterviewStatusTransitions#require} at the top of their operation; the check here
+     * is the backstop, and the one that catches a caller nobody thought about.
+     */
     @Transactional
     public void markStatus(InterviewRequest request, InterviewStatus status) {
+        // A row that has never been persisted has no history to violate, so setting its initial
+        // status is a construction rather than a transition. That distinction is what lets the table
+        // describe the real machine honestly - CANCELLED needs no invented in-edge just so a demo
+        // fixture or a test can build a row in that state, and createRequest's own REQUESTED write
+        // doesn't need a self-edge carved out for it either.
+        if (request.getId() != null) {
+            InterviewStatusTransitions.require(request.getStatus(), status);
+        }
         request.setStatus(status);
         request.setUpdatedAt(LocalDateTime.now());
         interviewRequestRepository.save(request);
