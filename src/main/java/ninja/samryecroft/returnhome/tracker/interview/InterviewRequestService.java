@@ -217,19 +217,28 @@ public class InterviewRequestService {
 
     /**
      * Reports awaiting review for this Reviewer's Supplier org (platform ADMIN sees every org's),
-     * excluding any request this principal was themselves the allocated Visitor for - a Reviewer
-     * can't approve/reject their own submission.
+     * excluding any request this principal must not review themselves.
+     *
+     * <p>Two exclusions, and they are not the same test. The <em>author</em> exclusion (in the query)
+     * is the one that mirrors the control at the endpoint: {@code ReportService.getReviewable}
+     * refuses a report whose {@code visitor} is the principal, so the queue must not offer one
+     * either - offering an action the server then refuses is the defect T145 exists to close. The
+     * <em>allocated visitor</em> exclusion (below) is kept as-is: it hides a request allocated to
+     * this principal even where someone else authored the report, which the endpoint would in fact
+     * allow. That is over-filtering, not a hole, and widening the queue is a behaviour change with
+     * no defect behind it - so this change moves exactly one of the two divergence directions.
      */
     public List<InterviewRequest> listPendingReview(AppUserPrincipal principal) {
         // The non-ADMIN branch was a bare ternary with no role test at all - everyone who was not a
         // platform admin got a supplier-scoped query keyed on their own organisation id. /reviewer/**
         // admits REVIEWER, which is supplier-side by convention only.
         List<InterviewRequest> pending = principal.hasRole(Role.ADMIN)
-                ? interviewRequestRepository.findByStatusOrderByCreatedAtDesc(InterviewStatus.REPORT_SUBMITTED)
+                ? interviewRequestRepository.findByStatusExcludingReportsAuthoredBy(
+                        InterviewStatus.REPORT_SUBMITTED, principal.getUserId())
                 : organisationAccessService.supplierScopeFor(principal)
                         .map(supplierOrgId -> interviewRequestRepository
-                                .findByStatusAndHomeOrganisationSupplierOrganisationId(
-                                        InterviewStatus.REPORT_SUBMITTED, supplierOrgId))
+                                .findByStatusAndHomeOrganisationSupplierOrganisationIdExcludingReportsAuthoredBy(
+                                        InterviewStatus.REPORT_SUBMITTED, supplierOrgId, principal.getUserId()))
                         .orElseGet(List::of);
         return pending.stream().filter(r -> !isAllocatedVisitor(r, principal)).toList();
     }

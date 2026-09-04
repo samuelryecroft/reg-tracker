@@ -180,10 +180,78 @@ class SelfReviewSeparationOfDutiesIntegrationTest extends AbstractIntegrationTes
         assertThat(interviewRequestRepository.findDetailedById(secondRequestId).orElseThrow().getStatus())
                 .isEqualTo(InterviewStatus.REPORT_SUBMITTED);
 
-        // Deliberately no queue assertion here. This account authored the report but is NOT its
-        // allocated visitor, and listPendingReview filters on the allocated visitor - so the queue
-        // still offers it while the endpoint refuses. That mismatch is the T145 defect, reported
-        // rather than asserted, because pinning current behaviour would make the bug the spec.
+        // The queue's side of this is T145's own test below - when this was written the queue still
+        // offered it, because it filtered on the allocated visitor rather than on the author.
+    }
+
+    /**
+     * T145: the queue now mirrors the endpoint, because it tests the same field the endpoint tests.
+     *
+     * <p>This is the case the two fields disagree about. The admin authored the report (so
+     * {@code getReviewable} refuses them, asserted above) but is not the request's allocated visitor
+     * (that is still the visitor-reviewer), so the old {@code allocatedVisitor} filter did not hide
+     * it - the queue offered an action the server refused. Asserting the endpoint's refusal above
+     * and the queue's silence here in the same fixture is what makes the two provably about the same
+     * report rather than about two similar-looking ones.
+     */
+    @Test
+    void theQueueNoLongerOffersAnAuthorAReportTheyWroteButWereNotAllocated() throws Exception {
+        Long secondRequestId = raiseAndAllocateASecondRequest();
+        submitReportAs("t143-platform-admin" + suffix, secondRequestId);
+
+        mockMvc.perform(post("/reviewer/reports/{id}/review", secondRequestId)
+                        .with(asUser("t143-platform-admin" + suffix)).with(csrf())
+                        .param("action", "approve"))
+                .andExpect(status().isForbidden());
+
+        String html = mockMvc.perform(get("/reviewer/reports")
+                        .with(asUser("t143-platform-admin" + suffix)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(html).doesNotContain("/reviewer/reports/" + secondRequestId + "/review");
+    }
+
+    /**
+     * The paired positive for the exclusion itself. A {@code not exists} subquery that matched too
+     * broadly - keyed on the report existing at all rather than on who wrote it - would empty the
+     * queue for everyone and still pass the test above, which is the failure mode a one-sided
+     * exclusion test cannot see.
+     */
+    @Test
+    void anIndependentReviewerIsStillOfferedAReportSomebodyElseAuthored() throws Exception {
+        Long secondRequestId = raiseAndAllocateASecondRequest();
+        submitReportAs("t143-platform-admin" + suffix, secondRequestId);
+
+        String html = mockMvc.perform(get("/reviewer/reports")
+                        .with(asUser("t143-other-reviewer" + suffix)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(html).contains("/reviewer/reports/" + secondRequestId + "/review");
+    }
+
+    /**
+     * Pins the SCOPE of the T145 change, not the desirability of what it pins.
+     *
+     * <p>The other divergence direction - allocated to this reviewer, authored by somebody else -
+     * leaves the queue hiding a report the endpoint would let them review. That is over-filtering
+     * rather than an access hole, so T145 deliberately <em>added</em> the author exclusion instead
+     * of swapping the allocated-visitor one out for it. This test is what fails if someone later
+     * tidies the two filters into one and silently widens the queue as a side effect; changing it
+     * needs to be a decision, not a refactor.
+     */
+    @Test
+    void aReportAllocatedToTheReviewerButAuthoredByAnotherIsStillHiddenFromTheirQueue() throws Exception {
+        Long secondRequestId = raiseAndAllocateASecondRequest();
+        submitReportAs("t143-platform-admin" + suffix, secondRequestId);
+
+        String html = mockMvc.perform(get("/reviewer/reports")
+                        .with(asUser("t143-visitor-reviewer" + suffix)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(html).doesNotContain("/reviewer/reports/" + secondRequestId + "/review");
     }
 
     private Long raiseAndAllocateASecondRequest() throws Exception {
