@@ -7,6 +7,7 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Optional;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -18,6 +19,7 @@ import ninja.samryecroft.returnhome.tracker.interview.DueState;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewRequest;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewRequestRepository;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewStatus;
+import ninja.samryecroft.returnhome.tracker.organisation.OrganisationAccessService;
 import ninja.samryecroft.returnhome.tracker.organisation.Organisation;
 import ninja.samryecroft.returnhome.tracker.organisation.OrganisationRepository;
 import ninja.samryecroft.returnhome.tracker.report.InterviewReport;
@@ -49,17 +51,20 @@ public class DashboardService {
     private final ChildRepository childRepository;
     private final UserRepository userRepository;
     private final OrganisationRepository organisationRepository;
+    private final OrganisationAccessService organisationAccessService;
 
     public DashboardService(InterviewRequestRepository interviewRequestRepository,
             InterviewReportRepository interviewReportRepository, HomeRepository homeRepository,
             ChildRepository childRepository, UserRepository userRepository,
-            OrganisationRepository organisationRepository) {
+            OrganisationRepository organisationRepository,
+            OrganisationAccessService organisationAccessService) {
         this.interviewRequestRepository = interviewRequestRepository;
         this.interviewReportRepository = interviewReportRepository;
         this.homeRepository = homeRepository;
         this.childRepository = childRepository;
         this.userRepository = userRepository;
         this.organisationRepository = organisationRepository;
+        this.organisationAccessService = organisationAccessService;
     }
 
     public CareProviderDashboard careProviderDashboard(AppUserPrincipal principal, DashboardPeriod periodOption) {
@@ -110,12 +115,21 @@ public class DashboardService {
     public SupplierDashboard supplierDashboard(AppUserPrincipal principal, DashboardPeriod periodOption, Long careProviderFilterId) {
         LocalDateTime now = LocalDateTime.now();
         PeriodRange period = PeriodRange.resolve(periodOption, now);
-        Long supplierOrgId = principal.getOrganisationId();
+        // DashboardController routes everyone who is not a VIEWER or a care-provider org-admin
+        // here, HOME_STAFF included - and they have no organisation at all, so this used to run four
+        // queries with a null id and return nothing by accident. Now the scope is resolved once and
+        // an absent scope renders as no rows, which is the same page for a legitimate user and a
+        // stated deny rather than a coincidence for everyone else (T139).
+        Optional<Long> supplierScope = organisationAccessService.supplierScopeFor(principal);
 
-        List<Organisation> careProviders = organisationRepository.findBySupplierOrganisationIdOrderByName(supplierOrgId);
-        List<Home> allHomes = homeRepository.findByOrganisationSupplierOrganisationId(supplierOrgId);
-        List<InterviewRequest> allRequests = interviewRequestRepository.findByHomeOrganisationSupplierOrganisationId(supplierOrgId);
-        List<InterviewReport> allReports = interviewReportRepository.findByHomeOrganisationSupplierOrganisationId(supplierOrgId);
+        List<Organisation> careProviders = supplierScope
+                .map(organisationRepository::findBySupplierOrganisationIdOrderByName).orElseGet(List::of);
+        List<Home> allHomes = supplierScope
+                .map(homeRepository::findByOrganisationSupplierOrganisationId).orElseGet(List::of);
+        List<InterviewRequest> allRequests = supplierScope
+                .map(interviewRequestRepository::findByHomeOrganisationSupplierOrganisationId).orElseGet(List::of);
+        List<InterviewReport> allReports = supplierScope
+                .map(interviewReportRepository::findByHomeOrganisationSupplierOrganisationId).orElseGet(List::of);
 
         boolean filtered = careProviderFilterId != null;
         List<InterviewRequest> requests = !filtered ? allRequests
@@ -134,12 +148,13 @@ public class DashboardService {
         List<CareProviderOption> options = careProviders.stream()
                 .map(o -> new CareProviderOption(o.getId(), o.getName())).toList();
 
-        String orgName = organisationRepository.findById(supplierOrgId).map(Organisation::getName).orElse("Your organisation");
+        String orgName = supplierScope.flatMap(organisationRepository::findById)
+                .map(Organisation::getName).orElse("Your organisation");
 
         return new SupplierDashboard(
                 orgName, careProviders.size(), allHomes.size(),
                 options, careProviderFilterId,
-                supplierLiveTiles(requests, now, supplierOrgId),
+                supplierLiveTiles(requests, now, supplierScope.orElse(null)),
                 period, overallRate,
                 ranked(rows), tooFew(rows),
                 homeLevelRecurrenceCounts(requests));
