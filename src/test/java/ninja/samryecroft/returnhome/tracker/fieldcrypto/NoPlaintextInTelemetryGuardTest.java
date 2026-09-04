@@ -49,8 +49,15 @@ import org.junit.jupiter.api.Test;
  * <p><b>What these guards do not cover</b>, stated so their silence is not mistaken for assurance:
  * a third-party library that logs a value we passed it; a value reaching telemetry through a channel
  * that is not a log call or an exception (a metric dimension, a span attribute, an HTTP path); and
- * a catch block containing nested braces, which the second guard's matcher will not parse and will
- * therefore skip rather than fail on.
+ * <b>a value that reaches the call through a local variable rather than directly from its getter</b>
+ * - {@code String dob = child.getDateOfBirth(); log.info("{}", dob);} passes the first guard, because
+ * what it can actually test is that the value is not read <em>inside</em> the call's arguments. That
+ * limit is inherent to a source scan and is the reason the second guard exists at all: the axes are
+ * chosen so that the realistic mistakes fall inside at least one of them.
+ *
+ * <p>The nested-brace limitation the first version of this file declared is gone rather than
+ * documented - see {@link #blockBodyAt}. A limitation that can be removed with the technique already
+ * in the file is not a limitation, it is a to-do.
  */
 class NoPlaintextInTelemetryGuardTest {
 
@@ -122,12 +129,18 @@ class NoPlaintextInTelemetryGuardTest {
             String source = Files.readString(file, StandardCharsets.UTF_8);
             for (String type : VALUE_ECHOING) {
                 Matcher m = Pattern.compile(
-                        "catch\\s*\\(\\s*" + type + "\\s+(\\w+)\\s*\\)\\s*\\{([^{}]*)\\}")
+                        "catch\\s*\\(\\s*" + type + "\\s+(\\w+)\\s*\\)\\s*\\{")
                         .matcher(source);
                 while (m.find()) {
                     String variable = m.group(1);
-                    String body = m.group(2);
-                    if (Pattern.compile(",\\s*" + variable + "\\s*\\)").matcher(body).find()) {
+                    String body = blockBodyAt(source, m.end());
+                    if (body == null) {
+                        continue;
+                    }
+                    boolean asCause = Pattern.compile(
+                            "(?:,|\\()\\s*" + variable + "\\s*\\)|\\.initCause\\(\\s*" + variable + "\\s*\\)")
+                            .matcher(body).find();
+                    if (asCause) {
                         offences.add(file.getFileName() + " wraps " + type + " as a cause");
                     }
                 }
@@ -180,6 +193,39 @@ class NoPlaintextInTelemetryGuardTest {
             }
         }
         return arguments;
+    }
+
+    /**
+     * The body of the block whose opening brace has just been consumed, found by MATCHING BRACES.
+     *
+     * <p>Review fix (Jim, on Kevin's T179 branch). The first version required the catch body to
+     * contain no braces at all - {@code catch (...) \{([^\{\}]*)\}} - so any catch containing an
+     * {@code if}, a lambda or a nested try was <b>silently skipped rather than checked</b>. Three
+     * catch blocks in the tree are in that shape today; none of them catches a value-echoing type,
+     * so the skip costs nothing right now, and that is exactly the problem: <b>this is the failure
+     * mode where the guard goes quiet instead of going red</b>, and nothing about a green run tells
+     * you it happened.
+     *
+     * <p>The technique was already in this file - {@link #argumentListsOfLogAndThrowCalls} counts
+     * parentheses for precisely this reason. Applying the same counting to braces removes the
+     * limitation instead of documenting it, so the javadoc no longer has to warn about it.
+     *
+     * @return the block's body, or null if the braces do not balance (a file we cannot parse is not
+     *         a file we may quietly pass)
+     */
+    private static String blockBodyAt(String source, int afterOpeningBrace) {
+        int depth = 1;
+        int i = afterOpeningBrace;
+        while (i < source.length() && depth > 0) {
+            char c = source.charAt(i);
+            if (c == '{') {
+                depth++;
+            } else if (c == '}') {
+                depth--;
+            }
+            i++;
+        }
+        return depth == 0 ? source.substring(afterOpeningBrace, i - 1) : null;
     }
 
     private static Set<String> encryptedGetterNames() throws IOException {
