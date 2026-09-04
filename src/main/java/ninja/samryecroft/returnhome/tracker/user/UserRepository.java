@@ -12,6 +12,18 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @EntityGraph(attributePaths = {"homes", "organisation", "roles"})
     Optional<User> findByUsername(String username);
 
+    /**
+     * The Entra sign-in lookup: the directory object id recorded on the account by an ORG_ADMIN.
+     *
+     * <p>Carries the same entity graph as {@link #findByUsername} because it is load-bearing, not
+     * decorative. {@code spring.jpa.open-in-view} is false, so the principal built from this row is
+     * dereferenced entirely outside a transaction - a bare derived finder would return a row whose
+     * roles, organisation and homes all throw on first touch, and it would be the only finder in
+     * this interface without the graph.
+     */
+    @EntityGraph(attributePaths = {"homes", "organisation", "roles"})
+    Optional<User> findByIdpSubject(String idpSubject);
+
     @Query("select case when count(u) > 0 then true else false end from User u where :role member of u.roles")
     boolean existsByRole(@Param("role") Role role);
 

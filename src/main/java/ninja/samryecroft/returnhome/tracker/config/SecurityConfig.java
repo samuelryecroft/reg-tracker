@@ -1,5 +1,6 @@
 package ninja.samryecroft.returnhome.tracker.config;
 
+import ninja.samryecroft.returnhome.tracker.auth.EntraOidcUserService;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.health.actuate.endpoint.HealthEndpoint;
@@ -33,7 +34,8 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http,
-            ObjectProvider<ClientRegistrationRepository> clientRegistrations) throws Exception {
+            ObjectProvider<ClientRegistrationRepository> clientRegistrations,
+            ObjectProvider<EntraOidcUserService> entraOidcUserService) throws Exception {
         http
                 .authorizeHttpRequests(auth -> auth
                         // T119: /fonts/** and /icons/** are static assets the login page itself
@@ -86,7 +88,7 @@ public class SecurityConfig {
                         .permitAll());
 
         if (entraEnabled) {
-            configureEntraLogin(http, clientRegistrations);
+            configureEntraLogin(http, clientRegistrations, entraOidcUserService);
         }
         return http.build();
     }
@@ -106,7 +108,8 @@ public class SecurityConfig {
      * the flag is off by default and why nothing sets the {@code entra} profile.
      */
     private void configureEntraLogin(HttpSecurity http,
-            ObjectProvider<ClientRegistrationRepository> clientRegistrations) throws Exception {
+            ObjectProvider<ClientRegistrationRepository> clientRegistrations,
+            ObjectProvider<EntraOidcUserService> entraOidcUserService) throws Exception {
         ClientRegistrationRepository registrations = requireClientRegistrations(clientRegistrations.getIfAvailable());
 
         // PKCE is not configured here because Spring Security 7 applies it to every client,
@@ -119,6 +122,12 @@ public class SecurityConfig {
                 // The same page as form login, so there is one place a signed-out user lands
                 // whichever path is live.
                 .loginPage("/login")
+                // P4: without this the stock OidcUserService returns a DefaultOidcUser, which is not
+                // an AppUserPrincipal - and the resulting failure is silent rather than loud. See
+                // EntraUserPrincipal's javadoc: 50 @AuthenticationPrincipal parameters would be
+                // injected null, and AuthenticationAuditListener would stop writing LOGIN_SUCCESS
+                // without anything throwing.
+                .userInfoEndpoint(userInfo -> userInfo.oidcUserService(requireOidcUserService(entraOidcUserService)))
                 .defaultSuccessUrl("/", false));
     }
 
@@ -136,5 +145,22 @@ public class SecurityConfig {
                             + "spring.security.oauth2.client.registration.entra.*, or set the flag back to false.");
         }
         return registrations;
+    }
+
+    /**
+     * Same fail-fast reasoning as {@link #requireClientRegistrations}: without our user service the
+     * OIDC path would silently fall back to a DefaultOidcUser, which is not an AppUserPrincipal -
+     * and that failure does not throw. It injects null into every controller and stops the audit
+     * listener writing sign-in rows. Refusing to start beats starting into that.
+     */
+    static EntraOidcUserService requireOidcUserService(ObjectProvider<EntraOidcUserService> provider) {
+        EntraOidcUserService service = provider.getIfAvailable();
+        if (service == null) {
+            throw new IllegalStateException(
+                    "app.auth.entra.enabled is true but no EntraOidcUserService is available. Without it "
+                            + "a successful Entra sign-in would produce a principal with no application user "
+                            + "behind it, injected as null rather than failing.");
+        }
+        return service;
     }
 }

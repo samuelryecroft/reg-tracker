@@ -34,22 +34,42 @@ public class User {
     private String username;
 
     /**
-     * Null for an account that has no local credential - one created for Entra sign-in, before
-     * {@code password} is dropped altogether in P8. Form login fails closed for such a row:
-     * {@code BCryptPasswordEncoder.matches} rejects a null encoding rather than matching anything.
+     * Null for an account that has no local credential - which, after cutover, is every account but
+     * one. Form login fails closed for such a row: {@code BCryptPasswordEncoder.matches} rejects a
+     * null encoding rather than matching anything.
+     *
+     * <p>This column is <b>not</b> being dropped. P8 originally said to remove it; D5 withdrew that,
+     * because dropping it would have removed the break-glass admin D2 requires - a tenant-wide
+     * single sign-on outage would otherwise lock out the one person who could fix it. What P8 still
+     * removes is the general form-login entry point and the seeder's password path, leaving exactly
+     * one enabled account holding a credential.
      */
     private String password;
 
     /**
-     * Entra's {@code sub} (or {@code oid}) claim once this account has been linked to a directory
-     * identity, null until then. Unique when present.
+     * The directory <b>object id</b> ({@code oid}) of the Entra identity this account belongs to,
+     * null for an account with no directory identity. Unique when present.
      *
-     * <p>This is the persistent identity key and the only value a login may link on. Email is the
-     * admin-entered identifier and the lookup for the one-time link, never the join key - it is
-     * mutable and addresses get recycled, so binding identity to it would let a new starter inherit
-     * a leaver's access (ENTRA-AUTH-DESIGN.md §3).
+     * <p>This is the persistent identity key and the only value a login may link on. Email is
+     * display only and is never consulted at sign-in: it is mutable and addresses get recycled, so
+     * binding identity to it would let a new starter inherit a leaver's access
+     * (ENTRA-AUTH-DESIGN.md §3). D4 additionally withdrew the first-login email-match ceremony this
+     * javadoc used to describe, because matching a verified email <em>binds</em> an Entra identity
+     * to an existing enabled account.
      *
-     * <p>Nothing reads or writes this yet; the link is P4.
+     * <p><b>{@code oid}, not {@code sub}, and the difference is not cosmetic.</b> {@code sub} is
+     * pairwise - Entra derives it per (user, application), so it differs between app registrations
+     * and cannot be looked up in the portal at all. Under D4 an {@code ORG_ADMIN} records this value
+     * <em>before</em> the person has ever signed in, so {@code sub} is not a worse key, it is an
+     * unavailable one. See {@code EntraOidcUserService.objectIdOf}.
+     *
+     * <p><b>V14 still hedges as "{@code sub} (or {@code oid})" and must be left alone.</b> That
+     * migration has already run, {@code validate-on-migrate} is on by default, and a comment is
+     * content - editing it changes the checksum and fails startup where V14 is applied. This javadoc
+     * is the resolution of that hedge; the migration cannot be.
+     *
+     * <p>Written by an {@code ORG_ADMIN} at account creation, and read at sign-in by
+     * {@code UserRepository.findByIdpSubject}.
      */
     @Column(name = "idp_subject", unique = true)
     private String idpSubject;
