@@ -6,12 +6,25 @@ The test suite builds **6 Spring application contexts** across **33
 context-using test classes**, and **5 Hikari pools** against the one shared
 Testcontainers Postgres.
 
-That is the number to watch. At Hikari's default pool size, 5 pools is 50
-connections against Postgres' default ceiling of 100. T148 was the suite
-walking into that ceiling: 10 pools exhausted it, and the 11th context died
-with `FATAL: sorry, too many clients already` — in whichever class happened to
-run eleventh, which is why it was twice written off as environmental flakiness
-(T93/T120) rather than measured.
+**Pools are the number to watch, not contexts.** A context is only expensive
+if it builds a `DataSource`; context 4 below builds none. Reading this document
+— or `DynamicPropertySourceGuardTest` — as "minimise contexts" will make things
+worse, not better.
+
+The budget, all three numbers measured rather than assumed:
+
+| | | |
+|---|---|---|
+| `max_connections` on `postgres:16-alpine` | **100** | `SHOW max_connections` |
+| `superuser_reserved_connections` | **3** | so **97** are usable |
+| HikariCP `DEFAULT_POOL_SIZE` | **10** | and `minIdle` defaults to it, so a pool tends toward 10 held connections |
+
+97 usable at 10 per pool is **9 pools**. Today's 5 is up to 50 of 97.
+
+T148 was the suite walking into that ceiling: with the tenth pool live, the
+eleventh context failed to start with `FATAL: sorry, too many clients already`
+— in whichever class happened to run eleventh, which is why it was twice
+written off as environmental flakiness (T93/T120) rather than measured.
 
 `DynamicPropertySourceGuardTest` fences the one mechanism that caused that.
 It does not fence context creation in general. This document is the rest of
@@ -21,7 +34,7 @@ the answer: what the 6 are, and which of them have to exist.
 
 | # | What makes it distinct | Classes | Pool | Verdict |
 |---|---|---|---|---|
-| 1 | `@SpringBootTest`, no `@AutoConfigureMockMvc` | 4 | yes | **collapsible** — see below |
+| 1 | `@SpringBootTest`, no `@AutoConfigureMockMvc` | 4 | yes | collapsible, but **don't** — see below |
 | 2 | `@SpringBootTest` + `@AutoConfigureMockMvc` | 19 | yes | necessary (the main one) |
 | 3 | `@TestPropertySource` enabling Entra/OAuth2 login | 1 | yes | necessary |
 | 4 | `@WebMvcTest` slice (different bootstrapper) | 1 | **no** | necessary, and the cheapest |
@@ -57,7 +70,7 @@ different bootstrapper, so it can never share with a `@SpringBootTest`. It is
 also the only context that costs no database connection. Converting it to
 `@SpringBootTest` to save a context would *add* a pool. Leave it.
 
-### Contexts 1 and 2 — the only collapsible pair, and probably not worth it
+### Contexts 1 and 2 — the only collapsible pair, and it is all-or-nothing
 
 These two are identical in every cache-key field except one context customizer:
 `@AutoConfigureMockMvc`'s `ImportsContextCustomizer`. Context 1 is a strict
@@ -69,15 +82,19 @@ The four classes in context 1 — `DatabaseResetIntegrationTest`,
 `@AutoConfigureMockMvc`. Adding that annotation to all four would merge them
 into context 2 and return one context and one pool (10 connections).
 
-**Recommendation: don't, for now.** It buys 10 connections against 50 already
-free, and it costs something real: `ReturnHomeTrackerApplicationTests` exists
-to prove the application context loads, and the closer that context is to the
-production one, the more the test is worth. Adding MockMvc autoconfiguration to
-it to save a pool makes the smoke test slightly less honest about what it
-proves. The other three simply do not use MockMvc.
+**Recommendation: don't.** Not as a weighing of costs — the choice is
+structurally narrower than it looks.
 
-Worth revisiting only if the pool count climbs — at which point this is the
-first place to look, which is the point of writing it down.
+A context exists as long as *any* class needs it. So moving three of the four
+saves nothing at all: group 1 survives for the fourth, and the count stays at 6
+contexts and 5 pools. The collapse is all-or-nothing, and the "all" necessarily
+includes `ReturnHomeTrackerApplicationTests`, whose entire value is proving that
+a context *close to the production one* loads.
+
+So the question is not "are 10 connections worth one test's fidelity". It is
+"is a production-fidelity context-load test worth one context and one pool",
+and that answer is plainly yes. There is no partial version of this trade to
+tune.
 
 ## How to re-measure
 
@@ -106,6 +123,32 @@ BootstrapUtils.resolveTestContextBootstrapper(testClass).buildMergedContextConfi
 
 Group by the result. It runs in about two seconds, starts no container, and
 tells you *why* two classes differ rather than only that they do.
+
+## When this becomes a ticket
+
+A baseline is only useful if it arms a decision, so here is the number rather
+than a description of the state:
+
+| Pools | What to do |
+|---|---|
+| 5 (today) | nothing |
+| **7** | open a ticket — a third of the margin is gone and two more slips reproduce T148 |
+| **9** | stop: the next context to appear will fail, in whichever class happens to run last |
+
+**Reach for the ceiling before reaching for the test design.** The 100 is
+Postgres' default, not a law, and the container can be told otherwise in one
+line:
+
+```java
+new PostgreSQLContainer<>("postgres:16-alpine")
+        .withCommand("postgres", "-c", "max_connections=200")
+```
+
+That is not free — each backend costs memory on the runner — but it is the
+right *first* lever precisely because it costs nothing in test design. Anyone
+hitting this wall under time pressure should raise the ceiling rather than
+start merging contexts that exist for good reasons; the contexts above are
+isolation, and trading isolation for connections is the wrong direction.
 
 ## What would add a seventh
 
