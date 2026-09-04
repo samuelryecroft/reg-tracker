@@ -1307,3 +1307,20 @@ body:has(#history:target) .section-index a[href="#history"] {
     display: inline-flex; align-items: center; gap: 6px; font-size: var(--t-xs); font-weight: 700;
     background: var(--warn-bg); color: var(--warn); padding: 3px 10px; border-radius: 999px;
 }
+
+/* ============================== 2a · queue filter chips ==============================
+   D-2a-4: the chips are .seg/.seg-opt, the shipped single-choice treatment - the controller
+   takes one `filter` param, so filtering IS single-choice, and .checkbox-option would promise
+   a combination the backend cannot honour. The component ships keyed off `:has(input:checked)`
+   because its first use was radio inputs; here the options are links, so selection arrives as
+   aria-current instead. These two rules give a selected LINK the same accent ink plus inset
+   ring - the ring is the point: it is what stops the active chip being colour alone.
+   Additive only; the existing .seg-opt rules above are untouched. */
+.seg-opt[aria-current] { color: var(--color-accent); box-shadow: inset 0 0 0 1px var(--color-accent); }
+.seg-opt:not([aria-current]):hover { background: color-mix(in srgb, var(--color-text) 7%, transparent); }
+/* The chip row is a link group, so its options need the link ink reset and a wrap: a coordinator
+   with a deep-linked filter on sees six chips, which will not fit one line on a narrow window. */
+nav.seg { flex-wrap: wrap; text-decoration: none; }
+nav.seg .seg-opt { color: inherit; text-decoration: none; }
+/* Tabular figures so the counts do not jitter the chip widths between renders. */
+.seg-count { font-variant-numeric: tabular-nums; opacity: 0.75; }
