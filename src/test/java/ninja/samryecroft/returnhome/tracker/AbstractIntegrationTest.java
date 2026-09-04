@@ -1,5 +1,10 @@
 package ninja.samryecroft.returnhome.tracker;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -13,6 +18,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
 
 /**
@@ -31,6 +38,17 @@ import org.testcontainers.containers.PostgreSQLContainer;
  *
  * <p>The container is deliberately never stopped: Testcontainers' Ryuk sidecar removes it when the
  * JVM exits.
+ *
+ * <p>{@link #DOCUMENT_STORE} is the same arrangement for the document store, for the same reason
+ * and arrived at the same way. Six test classes each declared their own {@code @TempDir} plus a
+ * {@code @DynamicPropertySource} pointing {@code app.documents.local.directory} at it. Registering
+ * an identical value is not enough to share a context: Spring keys its test-context cache on
+ * {@code DynamicPropertiesContextCustomizer}, whose {@code equals} compares the <em>set of
+ * registrar methods</em> and never looks at what they register - so six identical method bodies on
+ * six classes were six cache keys, six contexts and six Hikari pools against one Postgres. Ten
+ * pools of ten exhausts the container's hundred connections, and the eleventh context died on
+ * "FATAL: sorry, too many clients already" - always in whichever class happened to be eleventh, so
+ * it read as flakiness rather than as a bug (T148, the same shape as the T21 story above).
  */
 public abstract class AbstractIntegrationTest {
 
@@ -39,6 +57,28 @@ public abstract class AbstractIntegrationTest {
 
     static {
         POSTGRES.start();
+    }
+
+    /**
+     * One document store for the whole run, emptied before every test by {@link #resetDatabase()}.
+     *
+     * <p>Deliberately not a {@code @TempDir}. That annotation is resolved per test class, and this
+     * field is static on a superclass every integration test shares, so each class would overwrite
+     * it with a fresh directory and delete it again afterwards - while the cached Spring context
+     * kept the {@code LocalFileStorageProvider} built from whichever value was registered first.
+     * Every later class would then be writing through a bean that points at a deleted path. A
+     * plain directory created once, like the container above, has no such per-class lifecycle.
+     */
+    protected static final Path DOCUMENT_STORE = createDocumentStore();
+
+    /**
+     * The single registrar for {@code app.documents.local.directory}. It has to live here rather
+     * than on each test class precisely because the method identity <em>is</em> the cache key - see
+     * the class javadoc.
+     */
+    @DynamicPropertySource
+    static void documentStoreDirectory(DynamicPropertyRegistry registry) {
+        registry.add("app.documents.local.directory", DOCUMENT_STORE::toString);
     }
 
     /**
@@ -90,6 +130,7 @@ public abstract class AbstractIntegrationTest {
         // ACCESS EXCLUSIVE lock per table and doing them separately invites deadlocks.
         jdbc.execute(truncateStatement(jdbc));
         dropNonReferenceOrganisations(jdbc);
+        clearDocumentStore();
         if (fieldKeyService != null) {
             fieldKeyService.clearCache();
         }
@@ -98,6 +139,45 @@ public abstract class AbstractIntegrationTest {
             // at startup still has it. Skips itself when no seed password is configured, which is
             // exactly what happens on a real boot.
             adminUserSeeder.run(null);
+        }
+    }
+
+    private static Path createDocumentStore() {
+        try {
+            Path directory = Files.createTempDirectory("rht-test-documents");
+            // The container above is left to Ryuk; this is the equivalent, since a directory the
+            // tests keep writing into cannot be deleted until the JVM is done with it.
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> deleteRecursively(directory)));
+            return directory;
+        } catch (IOException e) {
+            throw new UncheckedIOException("Could not create the shared test document store", e);
+        }
+    }
+
+    /**
+     * Empties the store without removing it, so the path the cached context resolved at startup
+     * stays valid. The database equivalent is the truncate above: a test starts from an empty
+     * store rather than seeing documents an earlier one approved.
+     */
+    private static void clearDocumentStore() {
+        try (var entries = Files.list(DOCUMENT_STORE)) {
+            entries.forEach(AbstractIntegrationTest::deleteRecursively);
+        } catch (IOException e) {
+            throw new UncheckedIOException("Could not clear the shared test document store", e);
+        }
+    }
+
+    private static void deleteRecursively(Path root) {
+        try (var paths = Files.walk(root)) {
+            paths.sorted(Comparator.reverseOrder()).forEach(path -> {
+                try {
+                    Files.deleteIfExists(path);
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+            });
+        } catch (IOException e) {
+            throw new UncheckedIOException("Could not delete " + root, e);
         }
     }
 

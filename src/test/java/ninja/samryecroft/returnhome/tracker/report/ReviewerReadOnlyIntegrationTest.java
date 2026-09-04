@@ -7,7 +7,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import java.nio.file.Path;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashSet;
@@ -26,7 +25,6 @@ import ninja.samryecroft.returnhome.tracker.user.User;
 import ninja.samryecroft.returnhome.tracker.user.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -34,8 +32,6 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextImpl;
 import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
@@ -56,14 +52,6 @@ class ReviewerReadOnlyIntegrationTest extends AbstractIntegrationTest {
     private static final String VISITOR_LOCATION = "Visitor's own record of the location";
     private static final String VISITOR_COMMENTS = "Visitor's own interviewer comments";
     private static final String TAMPERED = "TAMPERED BY REVIEWER";
-
-    @TempDir
-    static Path documentStoreDir;
-
-    @DynamicPropertySource
-    static void documentStoreDir(DynamicPropertyRegistry registry) {
-        registry.add("app.documents.local.directory", () -> documentStoreDir.toString());
-    }
 
     @Autowired
     private MockMvc mockMvc;
@@ -142,7 +130,7 @@ class ReviewerReadOnlyIntegrationTest extends AbstractIntegrationTest {
         // The approval itself still happened...
         assertThat(after.getStatus()).isEqualTo(ReportStatus.APPROVED);
         assertThat(after.getGeneratedDocumentPath()).isNotBlank();
-        assertThat(documentStoreDir.resolve(after.getGeneratedDocumentPath())).exists();
+        assertThat(DOCUMENT_STORE.resolve(after.getGeneratedDocumentPath())).exists();
         assertThat(interviewRequestRepository.findDetailedById(requestId).orElseThrow().getStatus())
                 .isEqualTo(InterviewStatus.REPORT_APPROVED);
 

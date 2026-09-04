@@ -11,7 +11,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.HashSet;
 import java.util.Set;
 import ninja.samryecroft.returnhome.tracker.audit.AuditEventRepository;
@@ -30,7 +29,6 @@ import ninja.samryecroft.returnhome.tracker.user.UserRepository;
 import ninja.samryecroft.returnhome.tracker.user.AppUserDetailsService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -38,22 +36,12 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextImpl;
 import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 @SpringBootTest
 @AutoConfigureMockMvc
 class GoldenPathIntegrationTest extends AbstractIntegrationTest {
-
-    @TempDir
-    static Path documentStoreDir;
-
-    @DynamicPropertySource
-    static void documentStoreDir(DynamicPropertyRegistry registry) {
-        registry.add("app.documents.local.directory", () -> documentStoreDir.toString());
-    }
 
     @Autowired
     private MockMvc mockMvc;
@@ -213,7 +201,7 @@ class GoldenPathIntegrationTest extends AbstractIntegrationTest {
 
         var report = interviewReportRepository.findByInterviewRequestId(requestId).orElseThrow();
         assertThat(report.getGeneratedDocumentPath()).isNotBlank();
-        assertThat(documentStoreDir.resolve(report.getGeneratedDocumentPath())).exists();
+        assertThat(DOCUMENT_STORE.resolve(report.getGeneratedDocumentPath())).exists();
 
         // 6. Home staff can now download the generated report
         byte[] downloaded = mockMvc.perform(get("/reports/{id}/download", requestId).with(asUser("gp-home")))
@@ -230,7 +218,7 @@ class GoldenPathIntegrationTest extends AbstractIntegrationTest {
         // workstream exists for, and the only one that would catch a regression to a plain write:
         // the download can look perfect while the bytes on disk are readable to anyone who reaches
         // the storage account.
-        byte[] stored = Files.readAllBytes(documentStoreDir.resolve(report.getGeneratedDocumentPath()));
+        byte[] stored = Files.readAllBytes(DOCUMENT_STORE.resolve(report.getGeneratedDocumentPath()));
         assertThat(stored).isNotEqualTo(downloaded);
         assertThat(new String(stored, 0, 2, StandardCharsets.UTF_8)).isNotEqualTo("PK");
 
@@ -240,7 +228,7 @@ class GoldenPathIntegrationTest extends AbstractIntegrationTest {
                 .startsWith("org-" + careProviderOrgId + "/")
                 .doesNotContain("Riley")
                 .doesNotContain("Doe");
-        assertThat(documentStoreDir.resolve(report.getGeneratedDocumentPath() + ".meta")).exists();
+        assertThat(DOCUMENT_STORE.resolve(report.getGeneratedDocumentPath() + ".meta")).exists();
 
         // 6d. Both key operations reached the audit trail, scoped to the owning organisation.
         assertThat(auditEventRepository.findByEventTypeOrderByOccurredAtDesc(AuditEventType.DOCUMENT_KEY_WRAPPED))
