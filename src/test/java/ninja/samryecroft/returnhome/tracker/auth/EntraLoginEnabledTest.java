@@ -49,9 +49,10 @@ class EntraLoginEnabledTest extends AbstractIntegrationTest {
         ClientRegistration entra = clientRegistrations.findByRegistrationId("entra");
 
         assertThat(entra).isNotNull();
-        // sub is what we link on, email is the one-time link lookup, name is display. Roles,
-        // organisations, homes and export capability stay in our database, so there is nothing to
-        // ask the directory for beyond identity (ENTRA-AUTH-DESIGN.md §3).
+        // oid is what we link on (see EntraOidcUserService.objectIdOf), name is display, and email
+        // is display only - D4 withdrew the one-time link ceremony this comment used to describe.
+        // Roles, organisations, homes and export capability stay in our database, so there is
+        // nothing to ask the directory for beyond identity (ENTRA-AUTH-DESIGN.md §3).
         assertThat(entra.getScopes()).containsExactlyInAnyOrder("openid", "profile", "email");
         assertThat(entra.getRedirectUri()).isEqualTo("{baseUrl}/login/oauth2/code/{registrationId}");
     }
