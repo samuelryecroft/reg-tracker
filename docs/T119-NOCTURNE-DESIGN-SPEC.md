@@ -1364,3 +1364,114 @@ removal call is `structureHandler.removeElement()`, which removes the element ca
 nothing around it. With `.icon { width: 1em; flex: none }` that is 96px of non-shrinking content in an 18px
 marker. **Put `th:case` on the element you want gone, which for an icon switch is the `<svg>`.**
 Assert that a marker renders exactly one `<svg>` — no existing test can see this.
+
+
+## 6a · Screen 1b — the reviewer's decision surface (Creed, 6 Sep)
+
+Specced against **main @1593d88**, so every component named here is one that has actually shipped.
+
+The canvas presents 1a and 1b as two treatments of one record, which reads like a choice. It is not one.
+**1a shipped as the record view for every role. 1b is the reviewer's decision surface**, and it lands on the
+existing `reviewer/review-form.html` route. What makes it a screen rather than a skin: it is the only place
+in the app where **an irreversible action is taken on someone else's work**. Every decision below follows
+from that sentence.
+
+### D-1b-1 · 1b is a route, not a variant of 1a — and it stops linking away
+
+`review-form.html` currently offers *"View full request details"* as a link to 1a. **Replace it with the
+in-place `<details class="disclosure">` D-1a-5 shipped (PR #68)** — same component, same summary copy, same
+status-derived default (here always closed, since a report exists by definition). A reviewer holding an
+irreversible decision should not have to leave the decision to check the intake and then find their way back.
+
+### D-1b-2 · One column, 920px — and a measure cap that the container alone does not give you
+
+Single column, `max-width: 920px`. No `.detail-layout` grid: 1b has no second column.
+
+**920px is a container width, not a measure.** A free-text answer set to 920px runs to ~123ch, roughly double
+comfortable reading. Cap the *value* slot — `dl.detail dd { max-width: min(100%, 66ch) }` — and nothing else
+needs classifying: dates, names and yes/no answers are already shorter than the cap, so one rule handles the
+whole report and only the long prose answers are affected.
+
+### D-1b-3 · History is a section, not a tab — the same answer as D-1a-3, and for a stronger reason
+
+The canvas says "history behind a tab". **No.** D-1a-3 rejected real tabs because they hide panels and break
+Ctrl-F and print; on 1b that argument is *stronger*, because this is the screen where a reviewer scans and
+prints the report before generating the document from it.
+
+1b is single-column, so it is structurally **identical to 1a below its 1060px breakpoint**: history becomes
+the last section plus its own entry in `.section-index`. That is already built — reuse it and change nothing.
+
+### D-1b-4 · Numbered sections — and the number goes in the markup, not a CSS counter
+
+Sections are numbered 1–6, matching the generated document. **Numbering here is not decoration, and the test
+it passes is worth keeping:** the send-back dialog asks the reviewer *what needs to change, and where.*
+Numbered sections give them the vocabulary for "where" — and the number they cite is the number the visitor
+sees when the report reopens to them, and the number in the final `.docx`. **Number a sequence only when the
+number is a shared reference across surfaces.** Here it is one; on most screens it is not.
+
+Put the number **in the heading text** (`<h2>3. Future incidents</h2>`), not a CSS counter. A counter is not
+selectable, so a reviewer cannot copy the reference they are being asked to cite, and generated content in
+the accessibility tree is a liability this codebase has already been bitten by twice — `.field-error::before`
+(§5j) and PR #66's rail connector.
+
+### D-1b-5 · The sticky action bar, and why send-back must be a dialog
+
+Reuse the shipped `.sticky-actions`. Two things it needs that it does not have today:
+
+1. **`main` needs `padding-bottom` of at least the bar's height.** `position: sticky; bottom: 0` pins the bar
+   over content that scrolls beneath it, so without the padding the last section can never be fully read.
+2. **The approve consequence gets the shipped `.consequence` panel, immediately above the bar** — the last
+   thing before the decision. That component already exists for exactly this job (the export panel stating
+   what the CSV does and does not contain). Its copy: approving generates the final document, releases it to
+   the child's home, and cannot be undone.
+
+**Send back opens the 5c dialog; it does not submit the page.** The comment is required when sending back,
+and today that textarea sits in a card while the button is sticky — so a validation failure targets a field
+that may be scrolled far off screen: **you press a button you can see and get an error you cannot.** The
+dialog co-locates the control, its requirement and its error, and 5c already specifies it. `.dialog` is
+shipped.
+
+### D-1b-6 · "Send back with comments" is not `danger`
+
+It is currently `.btn.danger` — error red. **Send back is not destructive.** It is one of two legitimate
+outcomes of a review, and it *creates* work rather than destroying any: the report reopens to the visitor and
+nothing is lost. Red tells a reviewer choosing between two valid paths that one of them is dangerous, and it
+fights the `--sent-back` vocabulary already carried by the status tag, the rail marker and the visitor's own
+banner.
+
+- **Approve** → `.btn-primary` (accent).
+- **Send back** → `.btn-secondary`'s structure with `--sent-back` as ink and border. **Not a new component**,
+  a modifier: the token exists and means precisely this event; only the button variant was missing.
+  Measured on the page background: **11.34:1 dark / 6.41:1 light**, past 1.4.3 for the label and 1.4.11 for
+  the border.
+
+Copy: **"Approve and generate document"**, matching the canvas and saying what actually happens — the current
+"Approve and publish" names no artefact.
+
+### D-1b-7 · The reviewer guard: an attestation when satisfied, never a disabled button when not
+
+`canReview` already enforces it server-side (`!isAllocatedVisitor`, so the submitter cannot review their own
+report). The screen's job is only to *say* so.
+
+- **Satisfied** — a small muted attestation beside the actions: *you did not submit this report*. On an
+  auditable irreversible decision, the system confirming the separation-of-duties rule is worth one line.
+- **Not satisfied** — **render no action bar at all.** Do not render disabled buttons: a disabled control is
+  not focusable, so a keyboard user meets a dead end that cannot explain itself, and this rule is permanent —
+  there is nothing that could later enable it. Replace the bar with a banner stating the rule and the way
+  forward (another reviewer must take it).
+
+### D-1b-8 · Keep the rail, but the signal a reviewer actually needs is not in it
+
+Keep the shipped rail for orientation. But note what it cannot tell them: a report **sent back once and
+resubmitted is back at `REPORT_SUBMITTED`**, so the rail shows CURRENT and the earlier send-back is invisible
+— while *"this has already come back once"* is exactly the context that changes the judgement.
+
+The audit history already holds the transition. **Surface a prior send-back on 1b** — a single line near the
+actions, from the existing history data, no new state and no schema change. Flagging it as a design finding
+rather than specifying the copy, because how emphatic it should be is a product call.
+
+### D-1b-9 · Icons and the a11y floor
+
+`🔒` → `ph-lock-simple`, `▲` → `ph-warning-circle`; both already vendored (§5j sweep), both `aria-hidden`.
+Neither needs a hidden state word: each sits in a banner whose visible text already carries the state, and
+per D-1a-2b's converse a hidden word there would be duplication, not access.
