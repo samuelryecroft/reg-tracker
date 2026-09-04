@@ -75,6 +75,29 @@ public class KeyVaultKeyProvider implements KeyProvider {
         return new KeyHandle(organisationId, keyName, key.getProperties().getVersion(), wrapAlgorithm.toString());
     }
 
+    /**
+     * A bare {@code getKey}, with NO {@link #createKey} fallback - that omission is the whole point
+     * (T168(b)). {@link #currentKeyFor} creates on a miss when auto-creation is enabled, so it can
+     * never be used to ask whether a key exists; this can, in either configuration.
+     *
+     * <p>Only {@link ResourceNotFoundException} - a definite "no such key" - answers false. Anything
+     * else means we could not determine existence, and saying "absent" then would refuse activation
+     * for an organisation whose key is fine and the vault merely unreachable.
+     */
+    @Override
+    public boolean keyExists(long organisationId) {
+        String keyName = KeyProvider.keyNameFor(organisationId);
+        try {
+            keyClient.getKey(keyName);
+            return true;
+        } catch (ResourceNotFoundException absent) {
+            return false;
+        } catch (RuntimeException e) {
+            throw new KeyUnavailableException(
+                    "Could not determine whether " + keyName + " exists", e);
+        }
+    }
+
     private KeyVaultKey createKey(String keyName, long organisationId, RuntimeException notFound) {
         if (!autoCreateKeys) {
             // Least-privilege deployments provision keys from IaC and grant the app Crypto User

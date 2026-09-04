@@ -51,6 +51,18 @@ public class LocalKeyProvider implements KeyProvider {
         return new KeyHandle(organisationId, KeyProvider.keyNameFor(organisationId), KEY_VERSION, WRAP_ALGORITHM);
     }
 
+    /**
+     * Always true, and not as a stub: this provider DERIVES each organisation's KEK from the key
+     * name, so there is no provisioning step that could be outstanding and nothing an operator could
+     * be asked to create. The activation guard is therefore a no-op here by construction rather than
+     * by oversight - it exists for the deployment where the application deliberately cannot create
+     * keys and provisioning is somebody's job.
+     */
+    @Override
+    public boolean keyExists(long organisationId) {
+        return true;
+    }
+
     @Override
     public WrappedKey wrap(KeyHandle handle, byte[] dataKey) {
         byte[] kek = derive(handle.keyName());

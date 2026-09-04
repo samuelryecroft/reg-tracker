@@ -107,6 +107,12 @@ class UnprovisionedKekIntegrationTest extends AbstractIntegrationTest {
                 public byte[] unwrap(long organisationId, WrappedKey wrappedKey) {
                     throw new KeyUnavailableException("No usable key for organisation " + organisationId);
                 }
+
+                @Override
+                public boolean keyExists(long organisationId) {
+                    // The organisation this test stands up has never had its KEK provisioned.
+                    return false;
+                }
             };
         }
     }

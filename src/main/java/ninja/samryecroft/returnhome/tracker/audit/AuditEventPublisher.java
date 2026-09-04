@@ -7,6 +7,8 @@ import ninja.samryecroft.returnhome.tracker.export.ExportPurpose;
 import ninja.samryecroft.returnhome.tracker.home.Home;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewRequest;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewStatus;
+import ninja.samryecroft.returnhome.tracker.organisation.OrgStatus;
+import ninja.samryecroft.returnhome.tracker.organisation.Organisation;
 import ninja.samryecroft.returnhome.tracker.report.InterviewReport;
 import ninja.samryecroft.returnhome.tracker.report.ReportStatus;
 import ninja.samryecroft.returnhome.tracker.user.AppUserPrincipal;
@@ -123,6 +125,51 @@ public class AuditEventPublisher {
                 .meta("identityLinkBefore", identityLinkBefore)
                 .meta("identityLinkAfter", updated.getIdpSubject())
                 .meta("passwordChanged", passwordChanged)
+                .build());
+    }
+
+    // --- Organisation lifecycle (T168(b)) ---
+
+    /**
+     * An organisation became able to hold children's records. Recorded with the key name that was
+     * verified, because the check is a point-in-time fact: "the KEK existed when we looked" is only
+     * useful if the trail says when we looked and who asked.
+     */
+    public void organisationActivated(Organisation organisation, String verifiedKeyName,
+            AppUserPrincipal principal) {
+        AuditEventRecord.Builder builder = AuditEventRecord.of(AuditEventType.ORGANISATION_ACTIVATED);
+        // A null principal means the SYSTEM activated it, and the row says so by carrying no actor -
+        // the same shape breakGlassEnabled uses. That is not a hole to be tidied later: the demo
+        // seeder activates without a person today, and T166 §5's auto-provisioning will do exactly
+        // the same in production. Inventing a fake actor would make an automated activation
+        // indistinguishable from a human one in the trail, which is the opposite of what it is for.
+        publish((principal == null ? builder : actor(builder, principal))
+                .target("Organisation", organisation.getId())
+                .scope(organisation.getId(), null)
+                .meta("kekVerified", verifiedKeyName)
+                .build());
+    }
+
+    /**
+     * An organisation was taken out of service. {@code intent} is the whole reason this event
+     * carries a field at all: {@link OrgStatus} has ONE archived state, because nothing behaves
+     * differently between "archived" and "removed" today, so the difference between what a human
+     * meant lives here instead of forking the domain model on a distinction it cannot act on.
+     */
+    public void organisationArchived(Organisation organisation, String intent,
+            AppUserPrincipal principal) {
+        publish(actor(AuditEventRecord.of(AuditEventType.ORGANISATION_ARCHIVED), principal)
+                .target("Organisation", organisation.getId())
+                .scope(organisation.getId(), null)
+                .meta("intent", intent)
+                .build());
+    }
+
+    /** An archived organisation was put back into service. Never a physical restore - only a state. */
+    public void organisationRestored(Organisation organisation, AppUserPrincipal principal) {
+        publish(actor(AuditEventRecord.of(AuditEventType.ORGANISATION_RESTORED), principal)
+                .target("Organisation", organisation.getId())
+                .scope(organisation.getId(), null)
                 .build());
     }
 
