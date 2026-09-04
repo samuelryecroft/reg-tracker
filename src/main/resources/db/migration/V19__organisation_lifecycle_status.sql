@@ -9,18 +9,19 @@
 --    moment this deploys. The default does the backfill in one statement, which is also why NOT
 --    NULL can be declared here - adding it before a backfill fails on a populated table.
 --
--- 2. DROP DEFAULT immediately afterwards. A column that keeps 'ACTIVE' as its default fails OPEN in
---    the one direction that matters: any future insert that forgets to set a status silently
---    produces a usable organisation and the guard becomes decorative without anything failing.
---    Without a default it is a NOT NULL violation - loud, immediate, and impossible to ship past.
---    Organisation.status also initialises to PENDING in Java, which is what covers the ordinary
---    path; this covers everything that bypasses the entity.
+-- 2. THE DEFAULT IS KEPT HERE, and dropped in V20. That split is the expand/contract half of this
+--    change and it is deliberate. Our deploy has a real coexistence window - the migration job runs
+--    to completion BEFORE the new jar is serving - during which the OLD jar is talking to this new
+--    schema. It never writes `status`, so an organisation INSERT in that window would fail NOT NULL
+--    if the default were already gone. Every other migration in this estate is old-jar compatible;
+--    "do not create an organisation for ten minutes" is operational discipline, and by this
+--    codebase's own standard that is not a control.
+--
+--    The default is DORMANT in the meantime: Organisation.status initialises to PENDING in Java, so
+--    the new jar always writes a value and never sees it. It exists solely to keep the window safe.
 --
 -- Stored as varchar rather than a native enum to match how org_type is already persisted
 -- (@Enumerated(STRING)): one convention in this table, not two.
 
 ALTER TABLE organisations
     ADD COLUMN status VARCHAR(20) DEFAULT 'ACTIVE' NOT NULL;
-
-ALTER TABLE organisations
-    ALTER COLUMN status DROP DEFAULT;

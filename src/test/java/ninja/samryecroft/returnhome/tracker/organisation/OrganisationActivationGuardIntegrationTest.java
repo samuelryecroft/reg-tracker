@@ -21,6 +21,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContext;
@@ -61,6 +62,8 @@ class OrganisationActivationGuardIntegrationTest extends AbstractIntegrationTest
     private AppUserDetailsService appUserDetailsService;
     @Autowired
     private PasswordEncoder passwordEncoder;
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     private Home pendingHome;
     private Home activeHome;
@@ -219,6 +222,29 @@ class OrganisationActivationGuardIntegrationTest extends AbstractIntegrationTest
                 .andExpect(status().is3xxRedirection());
 
         assertThat(homeRepository.count()).isEqualTo(before + 1);
+    }
+
+    /**
+     * V20's contract half, asserted against the real schema rather than trusted to the file existing.
+     *
+     * <p>V19 keeps {@code DEFAULT 'ACTIVE'} so the migration stays compatible with the jar still
+     * serving while it runs; V20 removes it. The end state is what matters: a default in the
+     * permissive direction fails OPEN, silently producing a usable organisation for any insert that
+     * forgets to set a status. This fails if V20 is ever reverted, or if someone re-adds a default
+     * later - the two ways the guarantee could quietly disappear.
+     */
+    @Test
+    void theStatusColumnEndsUpWithNoDefaultSoAForgottenInsertFailsLoudly() {
+        String columnDefault = jdbcTemplate.query(
+                "select column_default from information_schema.columns "
+                        + "where table_name = 'organisations' and column_name = 'status'",
+                rs -> rs.next() ? rs.getString(1) : "COLUMN MISSING");
+
+        assertThat(columnDefault)
+                .as("organisations.status must have no column default once V20 has run - a default "
+                        + "of ACTIVE would make any insert that omits status silently produce a "
+                        + "usable organisation instead of failing NOT NULL")
+                .isNull();
     }
 
     private RequestPostProcessor asUser(String username) {

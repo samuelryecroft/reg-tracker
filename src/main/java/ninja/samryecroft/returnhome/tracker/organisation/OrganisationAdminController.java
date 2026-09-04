@@ -1,6 +1,7 @@
 package ninja.samryecroft.returnhome.tracker.organisation;
 
 import jakarta.validation.Valid;
+import ninja.samryecroft.returnhome.tracker.document.KeyUnavailableException;
 import ninja.samryecroft.returnhome.tracker.organisation.dto.CreateOrganisationForm;
 import ninja.samryecroft.returnhome.tracker.user.AppUserPrincipal;
 import ninja.samryecroft.returnhome.tracker.theme.ThemeService;
@@ -60,6 +61,22 @@ public class OrganisationAdminController {
                     organisation.getName() + " cannot be activated yet: its encryption key ("
                             + notYet.getKeyName() + ") does not exist. An operator needs to create it "
                             + "before any records can be added for this organisation.");
+        } catch (KeyUnavailableException cannotVerify) {
+            // ABSENT and UNREACHABLE are different answers and get different words. The organisation
+            // stays PENDING either way - failing closed on "we could not tell" is the whole point of
+            // not conflating them - but the remedy differs completely: one needs an operator to
+            // create a key, the other needs a retry in five minutes. Telling an admin to provision a
+            // key that may already exist is the T168 mistake inverted.
+            //
+            // Caught HERE rather than left to the advice, and that is not tidiness: uncaught, this
+            // is a DocumentSecurityException, so handleDocumentSecurity matches it by cause and
+            // answers "this REPORT cannot be opened right now" - to an admin who just clicked
+            // Activate on an organisation. That is exactly the wrong-noun defect T168 was raised to
+            // fix, reappearing on the screen built to fix it.
+            redirectAttributes.addFlashAttribute("activationError",
+                    "Could not confirm " + organisation.getName() + "'s encryption key: the key "
+                            + "service is unavailable. " + organisation.getName() + " has not been "
+                            + "activated. This is usually temporary - please try again shortly.");
         }
         return "redirect:/admin/organisations";
     }
