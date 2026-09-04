@@ -145,7 +145,23 @@ public class EncryptedFields {
             try {
                 return LocalDate.parse(value);
             } catch (DateTimeParseException e) {
-                throw new FieldCryptoException("Decrypted " + context + " is not a date", e);
+                // T179: the CAUSE IS DELIBERATELY DROPPED, and that is the whole point of this catch.
+                //
+                // DateTimeParseException's message is "Text '<value>' could not be parsed at index N"
+                // - and <value> here is the DECRYPTED plaintext, which for the only LocalDate field we
+                // encrypt is a child's date of birth. GlobalControllerAdvice.handleFieldCrypto logs
+                // this exception with the throwable attached, which serialises the whole cause chain
+                // into Application Insights and therefore into a Log Analytics workspace that is
+                // shared across every tenant and has no field-level encryption. Attaching the cause
+                // would put a child's date of birth outside the per-organisation key boundary.
+                //
+                // Nothing diagnostic is lost. The cause's only information IS the value, which is
+                // precisely the thing that must not travel; the context already names the field, and
+                // the row can be found from that. THE GENERAL RULE, which is why this comment is
+                // longer than the code: A CAUSE IS NOT NEUTRAL METADATA - IT IS ANOTHER AUTHOR'S
+                // MESSAGE, AND WRAPPING IT INHERITS THEIR DISCLOSURE DECISIONS. Sanitising a message
+                // and then attaching a cause that echoes its input undoes the sanitising silently.
+                throw new FieldCryptoException("Decrypted " + context + " is not a date");
             }
         }
         throw new FieldCryptoException("Cannot decrypt into a " + type.getSimpleName() + " field");
