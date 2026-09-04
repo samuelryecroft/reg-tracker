@@ -25,6 +25,19 @@ import org.junit.jupiter.api.Test;
  * one gate is closed: a new encrypted entity is caught by the other test, a new door to the existing
  * one is caught here.
  *
+ * <p><b>What this guard actually contracts on</b>, recorded because Kevin checked the two ways such
+ * a guard usually leaks and neither is guaranteed by anything. It matches the string
+ * {@code childRepository.save}, so it holds while (1) every injection site names the field
+ * {@code childRepository}, and (2) nothing persists a Child by CASCADE from another entity.
+ *
+ * <p>Those two fail differently, which is the part worth knowing. A RENAME fails LOUDLY: the scan
+ * would find neither permitted site and the exact-match assertion goes red, because it demands the
+ * permitted list rather than merely forbidding extras. A CASCADE fails QUIETLY: it would create a
+ * Child through no {@code save} call at all and this guard would never see it. There are zero
+ * cascades anywhere in {@code src/main/java} today - verified, not assumed - so the gap is
+ * theoretical; but it is the gap, and a guard whose limits are unwritten is one whose silence gets
+ * mistaken for assurance.
+ *
  * <p>The controller placement it protects is deliberate, not convenient. There is no
  * {@code ChildService} in this codebase, so "enforce it deeper" would mean inventing a service layer
  * to host a single rule; and the guard's whole value is refusing EARLY with something the person can
