@@ -40,6 +40,41 @@
     </p>
 </th:block>
 
+<!-- The validation summary, derived from the binding result rather than from a hand-written list
+     of which fields to mention.
+
+     Every form in the app writes its own summary as an explicit <li th:if="hasErrors('thisField')">
+     per field - which makes the summary a SECOND list of the form's validatable fields, and it
+     drifts silently the moment a constraint is added to a field nobody remembered to add here. The
+     failure mode is an alert that fires and names nothing: request-form.html listed only childId
+     while NewRequestForm also has @NotNull on returnedAt, so submitting without the return time -
+     the field the statutory 72-hour clock depends on, and the one 2e exists to make required -
+     rendered "Before this request can be raised" above an EMPTY list. Status 200, banner present,
+     nothing said.
+
+     #fields.detailedErrors() cannot miss a field, because it reports what failed rather than being
+     told what to ask about. Each entry links to its own control, and the inline message under that
+     control (fieldError above) still says the same thing in place - the summary is the way in, not
+     a replacement for it. Global errors have no field to link to, so they render as plain text
+     rather than as a link to #null.
+
+     Adopted by 2e here; the other nine forms carry the hand-written version still and should move
+     to this one. -->
+<th:block th:fragment="errorSummary(heading)">
+    <div class="banner err" role="alert" th:if="${#fields.hasErrors('*')}">
+        <svg class="icon ic" aria-hidden="true"><use th:href="@{/icons/phosphor.svg} + '#ph-warning-circle'"></use></svg>
+        <div>
+            <strong th:text="${heading}">Before this can be saved</strong>
+            <ul>
+                <li th:each="e : ${#fields.detailedErrors()}">
+                    <a th:unless="${e.global}" th:href="'#' + ${e.fieldName}" th:text="${e.message}">Error</a>
+                    <span th:if="${e.global}" th:text="${e.message}">Error</span>
+                </li>
+            </ul>
+        </div>
+    </div>
+</th:block>
+
 <!-- T165: a due state's glyph lives HERE, aria-hidden, and not in the Java that builds the
      announced text - inside th:text it is read out as the character's name ("circle with upper right
      quadrant black"), which is the exact converse of the rail defect: the state arrives, but as the

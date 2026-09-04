@@ -148,6 +148,16 @@ class DeadlineTrackingIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
 
+        // Deliberately not `contains("returnedAt")` alone: the id is on the <input> regardless, so
+        // that assertion passes against a page whose validation summary names nothing at all -
+        // which is exactly what this page used to do. The summary listed only childId while the
+        // form also has @NotNull on returnedAt, so THIS submission rendered "Before this request
+        // can be raised" above an EMPTY list: 200, banner present, nothing said, and the missing
+        // field was the one the statutory 72-hour clock is measured from. The summary now derives
+        // from the binding result (fragments/layout :: errorSummary), so it cannot miss a field.
+        assertThat(html)
+                .as("the validation summary must NAME the field at fault, not merely appear")
+                .contains("href=\"#returnedAt\"");
         assertThat(html).contains("returnedAt");
         assertThat(interviewRequestRepository.findAllDetailed()).isEmpty();
 
