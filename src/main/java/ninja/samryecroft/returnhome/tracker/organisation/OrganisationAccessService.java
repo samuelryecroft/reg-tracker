@@ -114,7 +114,11 @@ public class OrganisationAccessService {
 
         @Override
         public boolean canView(Home home) {
-            if (home == null) {
+            // The id is checked as well as the home, because directHomeIds is an immutable Set and
+            // the JDK's immutable sets throw on contains(null) rather than answering false. An
+            // unsaved Home cannot reach these paths today, but the null guard above sets an
+            // expectation the next line has to keep.
+            if (home == null || home.getId() == null) {
                 return false;
             }
             if (directHomeIds.contains(home.getId())) {
