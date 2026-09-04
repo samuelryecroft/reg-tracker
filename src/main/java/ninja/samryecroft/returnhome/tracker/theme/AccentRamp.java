@@ -13,9 +13,11 @@ package ninja.samryecroft.returnhome.tracker.theme;
  * it is not a fallback: there is no browser anywhere in the document path, so the server must
  * produce hex regardless of how the browser-baseline question resolves (§5e, R-Q8 amended).
  *
- * <p>Shared deliberately. Pam's CSS half derives {@code --brand-hue} from the same
- * {@code primaryColor} this reads, and the two must agree exactly - so {@link #hueFrom} is the one
- * place the rounding happens, and an {@code int} degree is what travels from here on.
+ * <p><b>This class does not derive hues.</b> One direction each:
+ * {@link ThemeService#brandHueOf} owns hex to hue, this owns hue to hex. The sRGB to linear to
+ * OKLab path deliberately does not exist here - an unused copy of it sitting beside the encode path
+ * is exactly where a double gamma decode hides, and the next person needing a hue would reach for
+ * the local helper instead of the shared one, leaving two derivations that nobody chose to have.
  */
 public final class AccentRamp {
 
@@ -35,15 +37,6 @@ public final class AccentRamp {
             {0.360, 0.070}, // 800
             {0.280, 0.055}, // 900
     };
-
-    /**
-     * Below this chroma a colour is effectively grey and its hue is rounding noise, so deriving a
-     * brand hue from it would amplify that noise into an arbitrary colour (§2.2).
-     */
-    private static final double GREY_CHROMA_FLOOR = 0.02;
-
-    /** The neutral hue a grey falls back to - Nocturne's own neutral (§2.2). */
-    public static final int NEUTRAL_HUE = 265;
 
     /** Ramp step 100: the document's band tint, replacing {@code secondaryColor} (R-Q7). */
     public static final int TINT_STEP = 100;
@@ -75,31 +68,13 @@ public final class AccentRamp {
     }
 
     /**
-     * The brand hue of a stored {@code #RRGGBB} colour, per the normative derivation in §2.2.
-     *
-     * <p>Rounded to a whole degree <b>here and nowhere else</b>. Two implementations that each round
-     * their own way disagree by a degree on some colours, and a document whose accent is one degree
-     * off the screen's is the kind of defect nobody can describe and everybody can see.
-     */
-    public static int hueFrom(String hexColor) {
-        double[] rgb = linearFromHex(hexColor);
-        double[] lab = linearRgbToOklab(rgb[0], rgb[1], rgb[2]);
-        double a = lab[1];
-        double b = lab[2];
-        if (Math.hypot(a, b) < GREY_CHROMA_FLOOR) {
-            return NEUTRAL_HUE;
-        }
-        return Math.floorMod(Math.round((float) Math.toDegrees(Math.atan2(b, a))), 360);
-    }
-
-    /**
      * OKLCH to sRGB hex.
      *
      * <p><b>Clamped in LINEAR space, then gamma-encoded, and in that order.</b> The OKLab matrix
      * already yields linear values, so applying the sRGB <em>decode</em> to its output - the natural
      * mistake, and one this project has made once already (§5e F3) - is a double decode that
      * silently corrupts every derived colour. Decode only when the input is a hex string, which is
-     * what {@link #linearFromHex} is for.
+     * what {@link ThemeService#brandHueOf}'s own decode is for.
      *
      * <p>Clipping is expected here, not a symptom: 797 of the 3240 hue x step combinations fall
      * outside sRGB, almost all in the pale steps. A pale step clips toward white, which only raises
@@ -133,37 +108,4 @@ public final class AccentRamp {
         return (int) Math.round(encoded * 255.0);
     }
 
-    /** Hex to linear sRGB. This is the one direction that legitimately gamma-decodes. */
-    private static double[] linearFromHex(String hexColor) {
-        String hex = hexColor == null ? "" : hexColor.trim();
-        if (hex.startsWith("#")) {
-            hex = hex.substring(1);
-        }
-        if (hex.length() != 6) {
-            throw new IllegalArgumentException("Expected a #RRGGBB colour, was: " + hexColor);
-        }
-        double[] linear = new double[3];
-        for (int channel = 0; channel < 3; channel++) {
-            int value = Integer.parseInt(hex.substring(channel * 2, channel * 2 + 2), 16);
-            double normalised = value / 255.0;
-            linear[channel] = normalised <= 0.04045
-                    ? normalised / 12.92
-                    : Math.pow((normalised + 0.055) / 1.055, 2.4);
-        }
-        return linear;
-    }
-
-    private static double[] linearRgbToOklab(double red, double green, double blue) {
-        double l = 0.4122214708 * red + 0.5363325363 * green + 0.0514459929 * blue;
-        double m = 0.2119034982 * red + 0.6806995451 * green + 0.1073969566 * blue;
-        double s = 0.0883024619 * red + 0.2817188376 * green + 0.6299787005 * blue;
-        double lRoot = Math.cbrt(l);
-        double mRoot = Math.cbrt(m);
-        double sRoot = Math.cbrt(s);
-        return new double[] {
-                0.2104542553 * lRoot + 0.7936177850 * mRoot - 0.0040720468 * sRoot,
-                1.9779984951 * lRoot - 2.4285922050 * mRoot + 0.4505937099 * sRoot,
-                0.0259040371 * lRoot + 0.7827717662 * mRoot - 0.8086757660 * sRoot,
-        };
-    }
 }

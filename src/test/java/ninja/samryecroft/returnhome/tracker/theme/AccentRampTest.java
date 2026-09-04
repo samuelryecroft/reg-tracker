@@ -96,7 +96,7 @@ class AccentRampTest {
         // guard against nothing. What makes the screen and the document agree is that the hue is
         // derived ONCE from primaryColor and the integer travels - which is what ThemeService.toView
         // does, and what this asserts: both document steps are functions of the same brandHue.
-        int brandHue = AccentRamp.hueFrom("#F36E2A");
+        int brandHue = ThemeService.brandHueOf("#F36E2A");
 
         assertThat(AccentRamp.step(brandHue, AccentRamp.TINT_STEP))
                 .isEqualTo(AccentRamp.step(brandHue, 100));
@@ -104,50 +104,7 @@ class AccentRampTest {
                 .isEqualTo(AccentRamp.step(brandHue, 700));
         // A second derivation from the same colour must land on the same integer, or the two halves
         // of the branding work would drift for one supplier.
-        assertThat(AccentRamp.hueFrom("#F36E2A")).isEqualTo(brandHue);
-    }
-
-    @ParameterizedTest(name = "{0} derives hue {1}")
-    @CsvSource({
-            // Carried from ThemeServiceBrandHueTest when brandHueOf was consolidated into this class.
-            "#9184d9, 290",  // Nocturne's published Beacon accent - one unit per channel from the
-                             // ramp's own #9084DA, so it derives 290 rather than 289. Not an error:
-                             // hex cannot carry sub-degree precision.
-            "#6f9ee0, 257",  // The spec's former "Northgate = 232" example. Creed has since withdrawn
-                             // that label: the canvas hardcodes a hue and a hex per organisation and
-                             // for Northgate the two disagree. NOT gamut clipping - hue 232 renders
-                             // to #259ED1 and converts back to 232 comfortably in gamut.
-            "9184d9, 290",   // no leading '#', the convention readableForegroundOn also accepts
-            "#FF0000, 29",   // pure red
-            "#FFFFFF, 265",  // achromatic - hue genuinely undefined, so the floor answers
-            "#7F8285, 265",  // chroma 0.0058, below the floor. Real stakes: this and #8A8A90 are two
-                             // greys nobody could tell apart, and without the floor they would derive
-                             // hues 38 degrees apart from what is only rounding noise.
-            "#8A8A90, 265",  // chroma 0.0089, below the floor, same reason
-            "#6B7280, 264",  // chroma 0.0234 - just ABOVE the floor, so it derives its own hue. This
-                             // is the case that pins the floor as a THRESHOLD rather than a blanket
-                             // "grey returns 265", and the one that would fail if someone collapsed
-                             // the guard into an isGrey() test.
-    })
-    void theHueDerivationMatchesTheConsolidatedCases(String hexColor, int expectedHue) {
-        assertThat(AccentRamp.hueFrom(hexColor)).isEqualTo(expectedHue);
-    }
-
-    @Test
-    void aGreyFallsBackToTheNeutralHueRatherThanAmplifyingNoise() {
-        // Without the floor, a supplier who picks a near-grey gets a hue derived from rounding noise
-        // and their whole scheme lands on an arbitrary colour (§2.2).
-        assertThat(AccentRamp.hueFrom("#808080")).isEqualTo(AccentRamp.NEUTRAL_HUE);
-        assertThat(AccentRamp.hueFrom("#FFFFFF")).isEqualTo(AccentRamp.NEUTRAL_HUE);
-        assertThat(AccentRamp.hueFrom("#000000")).isEqualTo(AccentRamp.NEUTRAL_HUE);
-        // Just inside the floor: visibly grey, no reliable hue.
-        assertThat(AccentRamp.hueFrom("#807F81")).isEqualTo(AccentRamp.NEUTRAL_HUE);
-    }
-
-    @Test
-    void aSaturatedColourKeepsItsOwnHue() {
-        assertThat(AccentRamp.hueFrom("#9084DA")).isEqualTo(289);
-        assertThat(AccentRamp.hueFrom("#259ED1")).isEqualTo(232);
+        assertThat(ThemeService.brandHueOf("#F36E2A")).isEqualTo(brandHue);
     }
 
     @Test
@@ -160,12 +117,6 @@ class AccentRampTest {
     void anImpossibleStepIsRejectedRatherThanRounded() {
         assertThatThrownBy(() -> AccentRamp.step(289, 450)).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> AccentRamp.step(289, 1000)).isInstanceOf(IllegalArgumentException.class);
-    }
-
-    @Test
-    void aMalformedColourIsRejectedRatherThanSilentlyBecomingBlack() {
-        assertThatThrownBy(() -> AccentRamp.hueFrom("not-a-colour")).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> AccentRamp.hueFrom("#FFF")).isInstanceOf(IllegalArgumentException.class);
     }
 
     private int channelDistance(String left, String right) {
