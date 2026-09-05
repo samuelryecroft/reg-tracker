@@ -3390,3 +3390,94 @@ Yes — and for a better reason than matching `report-stepper.js`:
   its shape one screen later.
 - **T129 (CSP) is on the backlog.** An inline script needs a nonce or `unsafe-inline`; a file needs neither.
   Building it inline is choosing to rewrite it.
+## 7l · 4c Sign in — the half that is knowable today (Creed, 7 Sep)
+
+4c was marked *"Skipped. Leave alone"* on a premise that no longer holds (§5b banner). It is back in scope,
+and it is **the only screen every user meets, every session, on their own device.** This specs what does not
+depend on the auth model Kevin is designing. **§7l-B below marks the half that deliberately waits** — that
+boundary is the point, not an aside.
+
+### D-4c-1 · The lockout is real, timed, and invisible — and the message shown instead cannot be acted on
+
+`LoginAttemptService` / `LoginAttemptListener` lock an account after repeated failures (T22), and
+`LockedException` is a distinct outcome. But `SecurityConfig` installs no failure handler, so Spring's
+default sends **every** `AuthenticationException` to `/login?error`, and `login.html` has exactly one error
+banner: **"Check your username and password and try again."**
+
+**So a locked-out user is told to do the one thing that cannot work — and told it again on every attempt,
+for the whole window.** This is D-4a-3's family (*a label true in one state and wrong in the other*) at its
+worst: the advice is not merely unhelpful, **it instructs the user to keep retrying**, which is the behaviour
+the lock exists to stop.
+
+**Two states, two banners.** `?error` keeps the credentials message. The locked state gets its own, naming
+what happened and **what to do instead** — wait, or contact the organisation's administrator, which the
+support line already says and which is now correct again.
+
+> **A REQUIREMENT ON THE COPY, NOT A SUGGESTION: the locked message must render identically whether or not
+> the account exists.** A message that appears only for real accounts is an enumeration oracle — it confirms
+> a username to anyone who guesses one. So the copy names the *state*, never the account: *"Too many sign-in
+> attempts. For security, sign-in is paused for a short time."* **Whether the counter tracks unknown
+> usernames as well as real ones is an implementation constraint, not a design one — but the screen cannot
+> be correct unless it does.** Flag it to whoever builds this rather than assuming.
+
+### D-4c-2 · `login.html` has an unmatched `</div>` on main today
+
+The `<div class="card">` is closed, and then closed again. Browsers swallow it, every test passes, and it is
+still wrong. **`FrontendSourceGuardTest` catches conflict markers and table/stack pairs but not unbalanced
+tags** — noted, not specced; a guard is not mine to write.
+
+### D-4c-3 · The Nocturne rework here is small, and it must NOT gain the shell
+
+The page already uses `.narrow`, `.card`, `.banner` and `.btn.block`, so this is not a redraw:
+
+- **The `▲` and `✓` literals become vendored Phosphor** (`ph-warning-circle`, `ph-check-circle`), per §5j —
+  a character is not a state, and both currently sit in `aria-hidden` spans doing decorative work that an
+  icon should do properly.
+- **D-Q3 (44px) and D-Q4 (the type floor)** apply as everywhere.
+- **No sidebar, no header, no nav.** There is no navigation available to someone not signed in, and the shell
+  exists to orient a user inside the product. The page keeps its `<h1>` as the product name because it is the
+  only screen with nothing else to identify it.
+
+### D-4c-4 · No appearance control here — and the OS preference is already honoured. Verified, not assumed.
+
+**I checked this specifically, because it is exactly the class of defect the dark-mode review was about, on
+the highest-traffic screen: it is not one.** `GlobalControllerAdvice:137` returns `AppearancePreference.AUTO`
+for a null principal, so the page renders `data-appearance="auto"` and the `prefers-color-scheme` branch
+matches. **A light-OS user gets light. Recorded so nobody re-opens it.**
+
+**The screen must not gain an appearance toggle.** The preference is per-user and there is no user yet — a
+toggle here would either fail to persist or would need anonymous storage invented for it. Silence is correct.
+
+### D-4c-5 · `required` on both fields, and no summary panel
+
+Both inputs lack `required`, so an empty submit costs a round trip to be told something the browser knew.
+Add it. **The server-rendered banner remains the authority** — the no-JS path must still produce it (the
+fallback rule).
+
+**Do not build the floor's summary panel here.** Two fields, one generic outcome: a summary that says *"1
+problem: Password"* above a form the user can see in full is ceremony. The floor pattern earns its keep on
+2e's four groups, not on a two-field card.
+
+---
+
+## 7l-B · 4c — the half that is DELIBERATELY not specced (Creed, 7 Sep)
+
+**This is a decision, not an omission, and it is written down because 4c's own history is the reason.** The
+screen was left unspecced for a year behind the words *"leave alone"*, which read as a decision and got
+silence. **The next reader must be able to tell "not yet" from "not thought about".**
+
+**Not specced, and not to be built, until Kevin's auth model lands:**
+
+| Not built | Why |
+|---|---|
+| **"Forgot password?" link** | **There is no flow behind it.** §5f: a styled control that does nothing is worse than the space its absence leaves — and a link promising a flow someone else owns is precisely the §5b shape that produced this whole thread. |
+| Self-service reset / activation / invitation | Entra's SSPR used to own these. **It does not exist, so nobody does** — the inversion §5b records. They must be designed from nothing; the canvas has none of them (I swept it). |
+| **MFA challenge and enrolment** | Asked for by the human as part 2. **The auth model decides the shape** — per-session, per-device, enrolment timing — and none of that is a design call yet. |
+| "Remember me" | A session-lifetime decision with a security dimension, not a layout one. |
+
+> **Speccing any of these before Kevin's design lands is how we get a second §5b:** a confident instruction
+> describing a platform that does not exist, which a builder follows correctly and ships as a hole.
+
+**When the auth model lands, this section is the checklist** — each row becomes a screen or an explicit
+decision not to have one. **It must not be quietly deleted; a row removed without a ruling is how the first
+one happened.**
