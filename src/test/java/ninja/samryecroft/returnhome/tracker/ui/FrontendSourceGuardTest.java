@@ -488,4 +488,116 @@ class FrontendSourceGuardTest {
         }
         return count;
     }
+
+    /**
+     * T211 (Creed): no template may assign a colour custom property.
+     *
+     * <p>A custom property set from a template - in a {@code <style>} block or a {@code style=}
+     * attribute - is ONE server-rendered value. An appearance-varying token needs two: app.css
+     * declares the dark value on {@code :root} and the light one in the appearance-conditioned
+     * blocks, and a template cannot participate in that because the server does not know which
+     * appearance the browser will resolve to. So the assignment is appearance-blind BY
+     * CONSTRUCTION - not blind depending on the value, or on which org is loaded, or on whether the
+     * branch is taken.
+     *
+     * <p>That is deliberately what this fires on: the ASSIGNMENT EXISTING, not the branch running.
+     * It would have caught the legacy per-org block (T186) while Creed's and Kevin's accounts of
+     * that defect still disagreed about which branch executed, because under either account the
+     * assignment was there.
+     *
+     * <p><strong>Why an allowlist and not a list of colour names.</strong> The brief named
+     * {@code --accent} / {@code --color-*} / {@code --tint}, which are today's colour tokens. Written
+     * that way the rule would be scoped by the NAMING of the instances it was built from - which is
+     * the exact amendment this floor already adopted after the T163 sweep, where a guard matched
+     * only backgrounds whose token ended in {@code -bg} and was therefore structurally unable to see
+     * the accent family. The hazard is not the word "colour" in a token's name; it is that a single
+     * server-rendered value cannot carry two appearance variants. So every custom-property
+     * assignment in a template is a violation unless the property is on a short, justified list of
+     * appearance-INVARIANT scalars, and a newly-invented colour token is caught without anyone
+     * remembering to add it here.
+     *
+     * <p>The list holds one entry, and it is checked rather than asserted:
+     * {@code --brand-hue} is a hue ANGLE, declared once in app.css ({@code --brand-hue: 289}) and
+     * consumed as {@code oklch(L C var(--brand-hue))} at every step of the accent ramp. The ramp
+     * mirrors LIGHTNESS and chroma between appearances; the hue is the same number in both. One
+     * server-rendered value is therefore correct for it, which is precisely what T186 relies on when
+     * it replaces the colour block with a hue-only one.
+     */
+    @Test
+    void noTemplateAssignsAnAppearanceVaryingCustomProperty() throws IOException {
+        List<String> violations = new ArrayList<>();
+        for (Path file : sourceFilesUnder(TEMPLATES_DIR)) {
+            List<String> lines = Files.readAllLines(file, StandardCharsets.UTF_8);
+            for (int i = 0; i < lines.size(); i++) {
+                Matcher m = CUSTOM_PROPERTY_ASSIGNMENT.matcher(lines.get(i));
+                while (m.find()) {
+                    String property = m.group(1);
+                    if (!APPEARANCE_INVARIANT_PROPERTIES.contains(property)) {
+                        violations.add(file.getFileName() + ":" + (i + 1) + "  " + property);
+                    }
+                }
+            }
+        }
+
+        assertThat(violations)
+                .describedAs("A template renders ONE value; an appearance-varying custom property "
+                        + "needs two. Declare it in app.css beside its light counterpart instead - "
+                        + "or, if it genuinely cannot vary by appearance, add it to "
+                        + "APPEARANCE_INVARIANT_PROPERTIES with the reason.")
+                .isEmpty();
+    }
+
+    /**
+     * Matches an assignment, not a reference: {@code --accent: ...} but never {@code var(--accent)}.
+     * The negative lookbehind for {@code -} keeps a longer property name from matching as a shorter
+     * one, and requiring the colon rules out a bare mention in prose.
+     */
+    private static final Pattern CUSTOM_PROPERTY_ASSIGNMENT =
+            Pattern.compile("(?<![-\\w])(--[a-zA-Z][a-zA-Z0-9-]*)\\s*:");
+
+    /**
+     * Custom properties a template MAY set, because one value is correct in every appearance. Each
+     * entry needs a reason that can be checked against app.css, not merely asserted - see the
+     * javadoc above for {@code --brand-hue}'s.
+     */
+    private static final Set<String> APPEARANCE_INVARIANT_PROPERTIES = Set.of("--brand-hue");
+
+    /**
+     * The detector's own negative control. A check that matched every {@code --} it saw would flag
+     * {@code var(--accent)} references and the hue-only block T186 leaves behind, and would then be
+     * a guard that fights the fix it exists to protect; one that matched too little would pass over
+     * the very block it was written from. Neither failure is visible on a tree that happens to be
+     * clean, so both are pinned here.
+     */
+    @Test
+    void theCustomPropertyCheckReadsAnAssignmentAndNotAReference() {
+        assertThat(assignedProperties("<style>:root { --accent: #F36E2A; }</style>"))
+                .containsExactly("--accent");
+        assertThat(assignedProperties("th:text=\"':root { --accent: ' + theme.primaryColor + '; "
+                + "--accent-dark: ' + theme.primaryColorDark + '; }'\""))
+                .containsExactly("--accent", "--accent-dark");
+        assertThat(assignedProperties("<div style=\"--tint: #eee\">"))
+                .containsExactly("--tint");
+
+        // References are not assignments - the whole estate is built on them.
+        assertThat(assignedProperties("background: var(--color-accent);")).isEmpty();
+        assertThat(assignedProperties("oklch(0.66 0.125 var(--brand-hue))")).isEmpty();
+
+        // The allowlisted scalar, and the shape T186 leaves behind, must both stay legal.
+        assertThat(allowed("<style th:text=\"':root { --brand-hue: ' + theme.brandHue + '; }'\">"))
+                .isTrue();
+    }
+
+    private static List<String> assignedProperties(String line) {
+        List<String> found = new ArrayList<>();
+        Matcher m = CUSTOM_PROPERTY_ASSIGNMENT.matcher(line);
+        while (m.find()) {
+            found.add(m.group(1));
+        }
+        return found;
+    }
+
+    private static boolean allowed(String line) {
+        return assignedProperties(line).stream().allMatch(APPEARANCE_INVARIANT_PROPERTIES::contains);
+    }
 }
