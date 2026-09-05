@@ -214,6 +214,147 @@ class ReviewerReadOnlyIntegrationTest extends AbstractIntegrationTest {
         assertThat(tagWithId(visitorHtml, "previouslyMissing")).doesNotContain("disabled");
     }
 
+    @Test
+    void reviewFormNumbersSectionsAndSurfacesRequestContextInPlace() throws Exception {
+        // D-1b-4: the number goes in the heading text, matching the generated document - a
+        // reviewer cites it when sending a report back with comments.
+        Long requestId = submittedReport();
+        String html = mockMvc.perform(get("/reviewer/reports/{id}/review", requestId)
+                        .with(asUser("ro-reviewer" + suffix)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(html).contains("1. Details");
+        assertThat(html).contains("2. Return Home Interview");
+        assertThat(html).contains("3. Future Incidents");
+        assertThat(html).contains("4. Interviewer's Comments");
+        assertThat(html).contains("5. Recommendations");
+        assertThat(html).contains("6. Declaration");
+
+        // D-1b-1: the request's own context (known risks etc.) renders in place - no more link to
+        // /interview-requests/{id} taking a reviewer holding an irreversible decision away from it.
+        assertThat(html).doesNotContain("View full request details</a>");
+        assertThat(html).contains("View full request details");
+        assertThat(html).contains("<details class=\"card disclosure\">");
+    }
+
+    @Test
+    void sendingBackWithNoCommentReopensTheDialogWithTheError() throws Exception {
+        // D-1b-5: the comment's requirement and its error must be co-located with the control - a
+        // reviewer who never opened the dialog client-side (JS disabled, or a direct POST) must
+        // still see the error attached to a dialog that is actually open, not one rendered closed
+        // with the error invisible inside it - the exact failure shape the dialog was built to fix.
+        Long requestId = submittedReport();
+
+        String html = mockMvc.perform(post("/reviewer/reports/{id}/review", requestId)
+                        .with(asUser("ro-reviewer" + suffix)).with(csrf())
+                        .param("action", "reject"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(html).contains("Comments are required when sending a report back");
+        assertThat(tagWithId(html, "sendBackDialog")).contains("open");
+    }
+
+    @Test
+    void aResubmittedReportShowsThePriorSendBackAtTheTopAloneNotBesideTheActions() throws Exception {
+        // D-1b-8 CLOSED (spec §6c/§6d): the rail alone shows CURRENT for a resubmitted report - a
+        // prior send-back is invisible there - so this note is the only place a reviewer learns
+        // "this has come back once before" before they start reading. Placement matters: it must
+        // appear before the numbered sections (D-1b-4), not down by the sticky actions, since it's
+        // context for READING the report, not a caveat on pressing a button - and it stands ALONE
+        // (the D-1b-7 attestation stays beside the actions; the two notes have different jobs).
+        Long requestId = submittedReport();
+        mockMvc.perform(post("/reviewer/reports/{id}/review", requestId)
+                        .with(asUser("ro-reviewer" + suffix)).with(csrf())
+                        .param("action", "reject")
+                        .param("reviewComments", "Please expand on the risk section"))
+                .andExpect(status().is3xxRedirection());
+        resubmitAfterRejection(requestId);
+
+        String html = mockMvc.perform(get("/reviewer/reports/{id}/review", requestId)
+                        .with(asUser("ro-reviewer" + suffix)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        // Ratified copy (god, ratifying Creed's version), plural-aware branch for exactly one.
+        assertThat(html).contains("This report was sent back once before, on");
+        assertThat(html).contains("history below");
+        assertThat(html).contains("href=\"#history\"");
+        // Not a banner/alert (god's register call: a resubmission isn't a fault) - a plain
+        // context line using --sent-back ink, not --warn (would fork the vocabulary the rail/tag/
+        // visitor banner already share) and not a class the not-satisfied banner below also uses.
+        assertThat(html).contains("class=\"prior-send-back\"");
+        assertThat(html).doesNotContain("class=\"banner sent-back\"");
+
+        // The D-1b-7 attestation is a SEPARATE note and stays beside the actions, not folded into
+        // the one above - the two were briefly conflated in an earlier version of this ticket.
+        assertThat(html).contains("You did not submit this report.");
+
+        // Placement: the note must appear before the numbered sections, not after them.
+        int noteIndex = html.indexOf("sent back once before");
+        int firstSectionIndex = html.indexOf("1. Details");
+        assertThat(noteIndex).isGreaterThan(-1);
+        assertThat(firstSectionIndex).isGreaterThan(-1);
+        assertThat(noteIndex).as("the prior-send-back note must render before the report sections, not beside the actions at the bottom")
+                .isLessThan(firstSectionIndex);
+    }
+
+    @Test
+    void aReportSentBackTwiceUsesThePluralRatifiedCopy() throws Exception {
+        // The ratified copy is explicitly plural-aware ("This report was sent back once before"
+        // vs "...has been sent back N times before") - this is the only test exercising the
+        // second branch, since every other fixture in this file goes through at most one round.
+        Long requestId = submittedReport();
+        mockMvc.perform(post("/reviewer/reports/{id}/review", requestId)
+                        .with(asUser("ro-reviewer" + suffix)).with(csrf())
+                        .param("action", "reject")
+                        .param("reviewComments", "First round: expand the risk section"))
+                .andExpect(status().is3xxRedirection());
+        resubmitAfterRejection(requestId);
+        mockMvc.perform(post("/reviewer/reports/{id}/review", requestId)
+                        .with(asUser("ro-reviewer" + suffix)).with(csrf())
+                        .param("action", "reject")
+                        .param("reviewComments", "Second round: still missing detail"))
+                .andExpect(status().is3xxRedirection());
+        resubmitAfterRejection(requestId);
+
+        String html = mockMvc.perform(get("/reviewer/reports/{id}/review", requestId)
+                        .with(asUser("ro-reviewer" + suffix)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        // Two separate checks rather than one long string: the source template wraps this across
+        // multiple lines for readability, so the rendered HTML carries the same line break as
+        // literal whitespace - a browser collapses it to one space, but an exact-substring
+        // assertion should not depend on the template's own line wrapping.
+        assertThat(html).contains("This report has been sent back", "2", "times before");
+        assertThat(html).contains("most recently on");
+        assertThat(html).doesNotContain("sent back once before");
+    }
+
+    /** Resubmits the same request after a reject round, landing it back at REPORT_SUBMITTED. */
+    private void resubmitAfterRejection(Long requestId) throws Exception {
+        mockMvc.perform(post("/visitor/interviews/{id}/report", requestId)
+                        .with(asUser("ro-visitor" + suffix)).with(csrf())
+                        .param("action", "submit")
+                        .param("heldAt", "2026-07-21T10:00")
+                        .param("interviewLocation", VISITOR_LOCATION)
+                        .param("previouslyMissing", "false")
+                        .param("confidentialityExplained", "true")
+                        .param("interviewAccepted", "true")
+                        .param("consideredSelfMissing", "false")
+                        .param("whereWereYouWhileMissing", "At a friend's house")
+                        .param("interviewerComments", VISITOR_COMMENTS)
+                        .param("recommendations", "No further action")
+                        .param("conductedByStatement", "Conducted by the allocated visitor"))
+                .andExpect(status().is3xxRedirection());
+
+        assertThat(interviewRequestRepository.findDetailedById(requestId).orElseThrow().getStatus())
+                .as("resubmission must land back at REPORT_SUBMITTED for the rail-invisibility case to be real")
+                .isEqualTo(InterviewStatus.REPORT_SUBMITTED);
+    }
+
     /**
      * The single element tag bearing this id. Asserting against the whole document would be
      * meaningless here - the shared layout's stylesheet contains a {@code .disabled} rule, so a
