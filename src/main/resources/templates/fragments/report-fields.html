@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" lang="en">
 <body>
-<!--
+<!--/*
   Shared by visitor/report-form (readonly=false, editable, stepped) and reviewer/review-form
   (readonly=true, rendered as a record - see FE-05). Depends on an enclosing th:object bound to a
   SubmitReportForm-shaped bean exposed as the model attribute "form" - the readonly branch below
@@ -19,7 +19,7 @@
   factored into its own sectionN(readonly) fragment so it exists ONCE and is called from both
   wrappers - the alternative (duplicating ~30 fields across two copies of this file) is exactly
   the kind of divergence risk a shared fragment exists to prevent.
--->
+*/-->
 <th:block th:fragment="fields(readonly)">
     <fieldset class="step" data-step="1">
     <legend class="section-title">Details</legend>
@@ -52,7 +52,7 @@
     </fieldset>
 </th:block>
 
-<!--
+<!--/*
   1b only ever renders readonly - a report exists by definition on the review screen, so this
   fragment takes no parameter (unlike fields(readonly) above, which genuinely needs both branches
   for the same visitor screen at different times). Ids match 1a's own report-content cards exactly
@@ -60,7 +60,7 @@
   deliberately: two pages never render at once, so id collision isn't a concern, and reusing 1a's
   own names means "the same anchor means the same thing" on both screens rather than inventing a
   second vocabulary for one entity.
--->
+*/-->
 <th:block th:fragment="reviewerFields()">
     <div class="card" id="report-details" tabindex="-1"
          th:with="notAnswered=${(form.interviewLocation == null ? 1 : 0) + (form.ifNotWhyLate == null ? 1 : 0)

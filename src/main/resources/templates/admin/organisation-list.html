@@ -18,9 +18,9 @@
         </div>
     </div>
 
-    <!-- T168(b): the activation outcome. The failure names the key because this is the privileged
+    <!--/* T168(b): the activation outcome. The failure names the key because this is the privileged
          admin screen and the admin is the person who can have it provisioned - the opposite of the
-         end-user 503 on the write path, which withholds it. -->
+         end-user 503 on the write path, which withholds it. */-->
     <div class="banner ok" th:if="${activationMessage != null}" th:with="ico=@{/icons/phosphor.svg}">
         <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-check-circle'"></use></svg>
         <p th:text="${activationMessage}">Activated.</p>

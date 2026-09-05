@@ -4,7 +4,7 @@
 <th:block th:fragment="styles">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" th:href="@{/css/app.css}">
-<!-- T186: a per-org inline <style> used to sit here overriding four bridge tokens - --accent,
+<!--/* T186: a per-org inline <style> used to sit here overriding four bridge tokens - --accent,
      --accent-dark, --accent-ink and --tint - with values computed from a theme's brand hex.
      It is gone, and its removal IS the fix: those four now fall back to app.css's ramp definitions,
      which mirror between light and dark. The overrides could not - they were single fixed values -
@@ -24,12 +24,12 @@
      T138 (phase 2, batch 1a): overrides app.css's hardcoded default hue (289) with the signed-in
      user's actual effective supplier theme, derived by ThemeService.brandHueOf from the same
      primaryColor hex - one shared derivation point, so this and the docx report's own hue ramp
-     (T137) can never silently disagree for the same supplier. -->
+     (T137) can never silently disagree for the same supplier. */-->
 <style th:if="${theme != null}" th:text="${':root { --brand-hue: ' + theme.brandHue + '; }'}"></style>
 </th:block>
 </head>
 <body>
-<!-- FE-02: shared field-error rendering. Pairs with th:errorclass="is-invalid" and aria-describedby
+<!--/* FE-02: shared field-error rendering. Pairs with th:errorclass="is-invalid" and aria-describedby
      on the input, so validation is never signalled by colour alone.
 
      T165 - THIS FRAGMENT LIVED IN <head> AND RENDERED NOTHING. The parser auto-closes <head> at the
@@ -47,7 +47,7 @@
      renders it would have prefixed every message with a character name before the sentence that
      says what is wrong. It is aria-hidden markup instead. th:errors moves to the inner <span>
      because it REPLACES the element's content: left on the <p> it would overwrite the icon.
-     aria-describedby still points at the <p>, whose accessible text is now exactly the message. -->
+     aria-describedby still points at the <p>, whose accessible text is now exactly the message. */-->
 <th:block th:fragment="fieldError(field)">
     <p class="field-error" th:if="${#fields.hasErrors(field)}" th:id="${field} + '-error'">
         <svg class="icon" aria-hidden="true"><use th:href="@{/icons/phosphor.svg} + '#ph-warning-circle'"></use></svg>
@@ -55,7 +55,7 @@
     </p>
 </th:block>
 
-<!-- The validation summary, derived from the binding result rather than from a hand-written list
+<!--/* The validation summary, derived from the binding result rather than from a hand-written list
      of which fields to mention.
 
      Every form in the app writes its own summary as an explicit <li th:if="hasErrors('thisField')">
@@ -74,7 +74,7 @@
      rather than as a link to #null.
 
      Adopted by 2e here; the other nine forms carry the hand-written version still and should move
-     to this one. -->
+     to this one. */-->
 <th:block th:fragment="errorSummary(heading)">
     <div class="banner err" role="alert" th:if="${#fields.hasErrors('*')}">
         <svg class="icon ic" aria-hidden="true"><use th:href="@{/icons/phosphor.svg} + '#ph-warning-circle'"></use></svg>
@@ -90,29 +90,29 @@
     </div>
 </th:block>
 
-<!-- T165: a due state's glyph lives HERE, aria-hidden, and not in the Java that builds the
+<!--/* T165: a due state's glyph lives HERE, aria-hidden, and not in the Java that builds the
      announced text - inside th:text it is read out as the character's name ("circle with upper right
      quadrant black"), which is the exact converse of the rail defect: the state arrives, but as the
      wrong thing. The state reaches the reader as a word (DueStateCopy); this is decoration.
      Renders nothing for the two tiers that never had a glyph - NO_CLOCK, and the null state of the
-     "No active deadline" group - which is what the unmatched th:switch does with no th:case="*". -->
+     "No active deadline" group - which is what the unmatched th:switch does with no th:case="*". */-->
 <th:block th:fragment="dueIcon(state)" th:switch="${state?.name()}">
     <svg th:case="'OVERDUE'" class="icon" aria-hidden="true"><use th:href="@{/icons/phosphor.svg} + '#ph-warning-circle'"></use></svg>
     <svg th:case="'DUE_SOON'" class="icon" aria-hidden="true"><use th:href="@{/icons/phosphor.svg} + '#ph-clock-countdown'"></use></svg>
     <svg th:case="'ON_TRACK'" class="icon" aria-hidden="true"><use th:href="@{/icons/phosphor.svg} + '#ph-check-circle'"></use></svg>
 </th:block>
-<!-- T119 shell (phase 1): sidebar + header, inserted as a sibling immediately before each page's
+<!--/* T119 shell (phase 1): sidebar + header, inserted as a sibling immediately before each page's
      own <main id="main"> - the same insertion point the old plain <header> used - so no page
      template needs to change shape to adopt it (see app.css's shell section for how the fixed
      sidebar clears main without a shared wrapper element). The appearance and reveal controls are
      both now fully wired (batches 1b and 1c): per-user preference / session-backed one-shot flag,
-     server-rendered, design spec §2.3/§2.5. -->
-<!-- T138 (phase 2, batch 1a): aria-current, carried forward as an unfixed defect from the T86
+     server-rendered, design spec §2.3/§2.5. */-->
+<!--/* T138 (phase 2, batch 1a): aria-current, carried forward as an unfixed defect from the T86
      review ("aria-current is styled in app.css and set by no template - no page tells you where you
      are"). `path` comes from GlobalControllerAdvice's currentPath model attribute, not Thymeleaf's own
      #httpServletRequest (which evaluates to null in this app's wiring) - matched against each nav
      item's own href below, either exactly or as a path prefix (`path + '/'`) so a detail page under a
-     section (e.g. /children/42) still marks that section's own nav link current. -->
+     section (e.g. /children/42) still marks that section's own nav link current. */-->
 <th:block th:fragment="nav" th:with="ico=@{/icons/phosphor.svg}, path=${currentPath}">
 <a class="skip-link" href="#main">Skip to main content</a>
 
@@ -122,9 +122,9 @@
         <span class="shell-brand-name">Return Home</span>
     </div>
 
-    <!-- Creed's review (spec 12d10e8): the name is useful information and stays, but the caret
+    <!--/* Creed's review (spec 12d10e8): the name is useful information and stays, but the caret
          promised switching supplier/organisation, which isn't wired - removed along with the
-         pointer cursor (app.css) until it is, so this reads as information, not a dead control. -->
+         pointer cursor (app.css) until it is, so this reads as information, not a dead control. */-->
     <div class="shell-org" th:if="${shellOrg != null}">
         <span style="flex:1;min-width:0">
             <span class="shell-org-label" th:text="${shellOrg.kicker()}">Supplier</span>
@@ -150,12 +150,12 @@
            th:aria-current="${path == '/reviewer/reports' or #strings.startsWith(path, '/reviewer/reports/')} ? 'page'">
             <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-seal-check'"></use></svg>Review Queue</a>
 
-        <!-- T132: ONE "Records" group and ONE /children link, gated by the union of every role that
+        <!--/* T132: ONE "Records" group and ONE /children link, gated by the union of every role that
              used to gate either of the two separate blocks this replaced - HOME_STAFF ("My
              Children") and ADMIN/ORG_ADMIN/VIEWER/COORDINATOR ("Children") never lost or gained
              visibility, they just can no longer both render at once for a stacked-role account. See
              GlobalControllerAdvice#childrenNav / RoleMatrix#isChildrenListPersonalisedToOwnHomes for
-             why the label, not the visibility, is the only thing that still varies by role. -->
+             why the label, not the visibility, is the only thing that still varies by role. */-->
         <span class="shell-nav-group"
               th:if="${childrenNav.visible() or #authorization.expression('hasRole(''COORDINATOR'')')}">Records</span>
         <a th:if="${childrenNav.visible()}" href="/children"
@@ -172,10 +172,10 @@
 
         <span class="shell-nav-group"
               th:if="${#authorization.expression('hasAnyRole(''ADMIN'',''ORG_ADMIN'')') or canEditTheme}">Admin</span>
-        <!-- Creed's review (spec 12d10e8): Users and Children shared ph-users-three - the 55-icon
+        <!--/* Creed's review (spec 12d10e8): Users and Children shared ph-users-three - the 55-icon
              set was sampled from the mockup screens, and the sidebar nav was never one of them, so
              it was never sized for a nav. ph-user-list (a person beside a list) is what this screen
-             actually is; Children keeps the group glyph as the domain-central entity. -->
+             actually is; Children keeps the group glyph as the domain-central entity. */-->
         <a th:if="${#authorization.expression('hasAnyRole(''ADMIN'',''ORG_ADMIN'')')}" href="/admin/users"
            th:aria-current="${path == '/admin/users' or #strings.startsWith(path, '/admin/users/')} ? 'page'">
             <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-user-list'"></use></svg>Users</a>
@@ -201,12 +201,12 @@
 </aside>
 
 <header class="shell-header">
-    <!-- Creed's review (spec 12d10e8): removed rather than left as a dead box. Search is a real,
+    <!--/* Creed's review (spec 12d10e8): removed rather than left as a dead box. Search is a real,
          scoped feature ("Search child ref, home or visitor" per the canvas) tracked as its own
          ticket - a styled control that does nothing is worse than the empty space its absence
-         leaves, since it invites a click that goes nowhere. Comes back when it's wired. -->
+         leaves, since it invites a click that goes nowhere. Comes back when it's wired. */-->
     <div class="shell-header-actions">
-        <!-- T138 1c: revealing is a real POST + full-page redirect, not a client-side class toggle -
+        <!--/* T138 1c: revealing is a real POST + full-page redirect, not a client-side class toggle -
              a client-side toggle cannot be audited (Kevin's review: no server event, so nothing
              would record that someone unmasked a list of children). Masked is the state on every
              page load except the one immediately following this POST's own redirect - see
@@ -221,8 +221,8 @@
 
              Both states use Phosphor's regular/fill pair for an active state (Nocturne's own idiom,
              R-Q11) rather than one glyph doing double duty: ph-eye-slash masked, ph-fill-eye-slash
-             revealed. -->
-        <!-- Creed's follow-up review: no aria-pressed on either state. It's invalid on the <a>
+             revealed. */-->
+        <!--/* Creed's follow-up review: no aria-pressed on either state. It's invalid on the <a>
              below (only supported on role="button", and adding that role would then obligate
              hand-wiring Space-key activation for what should stay a plain link). And it's the
              wrong pattern on the <button>, not just redundant there: aria-pressed exists for a
@@ -233,15 +233,15 @@
              this page" announced as *not pressed*). The changing-label pattern and the
              constant-label-plus-aria-pressed pattern are two different, complete solutions - never
              combine them. The appearance cycle below already uses the changing-label pattern
-             correctly with no aria-pressed; this brings the two header controls into line. -->
+             correctly with no aria-pressed; this brings the two header controls into line. */-->
         <form th:if="${!namesRevealed}" method="post" th:action="@{/account/reveal-names}" class="shell-reveal-form">
             <input type="hidden" name="returnTo" th:value="${currentPath}">
             <button type="submit" class="shell-toggle shell-reveal-toggle">
                 <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-eye-slash'"></use></svg>
                 <span>Reveal</span>
-                <!-- Spec §2.5: the control's accessible name must state what it does and what it
+                <!--/* Spec §2.5: the control's accessible name must state what it does and what it
                      affects, not just its visible word - same WCAG 2.5.3 reasoning as the
-                     appearance toggle below (Creed's review, PR #29). -->
+                     appearance toggle below (Creed's review, PR #29). */-->
                 <span class="visually-hidden">names on this page</span>
             </button>
         </form>
@@ -250,20 +250,20 @@
             <span>Hide</span>
             <span class="visually-hidden">names on this page</span>
         </a>
-        <!-- T138 batch 1b: a real POST + full-page redirect, not a client-side class toggle - spec
+        <!--/* T138 batch 1b: a real POST + full-page redirect, not a client-side class toggle - spec
              §2.3 requires the appearance to be server-rendered with no flash, which a JS-driven
              instant swap can't give (the whole page, including this button's own icon/label below,
              has to come back freshly rendered from the new state). returnTo carries the shell's own
-             currentPath so switching appearance from any page returns to that same page. -->
+             currentPath so switching appearance from any page returns to that same page. */-->
         <form method="post" th:action="@{/account/appearance}" class="shell-appearance-form">
             <input type="hidden" name="returnTo" th:value="${currentPath}">
             <input type="hidden" name="preference" th:value="${appearanceToggle.next()}">
-            <!-- Creed's review (PR #29): the visible label alone ("Auto") names the STATE, not the
+            <!--/* Creed's review (PR #29): the visible label alone ("Auto") names the STATE, not the
                  action a click performs - `title` isn't reliably announced, isn't shown on touch,
                  and is unreachable without a mouse to hover. The visually-hidden span completes the
                  accessible name into "Auto appearance - switch to light": it still contains the
                  visible word (WCAG 2.5.3 Label in Name - a voice-control user saying "click Auto"
-                 still works), while a screen reader announces the destination, not just the state. -->
+                 still works), while a screen reader announces the destination, not just the state. */-->
             <button type="submit" class="shell-toggle"
                     th:title="'Currently ' + ${appearanceToggle.label()} + ' appearance - switch to ' + ${#strings.toLowerCase(appearanceToggle.next())}">
                 <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-' + ${appearanceToggle.icon()}"></use></svg>
