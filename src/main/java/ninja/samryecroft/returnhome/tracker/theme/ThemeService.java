@@ -1,6 +1,8 @@
 package ninja.samryecroft.returnhome.tracker.theme;
 
 import java.time.LocalDateTime;
+import java.util.Set;
+import java.util.HashSet;
 import ninja.samryecroft.returnhome.tracker.home.HomeRepository;
 import ninja.samryecroft.returnhome.tracker.organisation.Organisation;
 import ninja.samryecroft.returnhome.tracker.organisation.OrganisationRepository;
@@ -99,6 +101,34 @@ public class ThemeService {
 
     /** Called when a new Supplier org is created, so it starts with its own (default-coloured) theme. */
     @Transactional
+    /**
+     * The suppliers whose brand colour someone has actually CHOSEN, for 4e's tree.
+     *
+     * <p><b>Not "has a theme row".</b> That was 4e's first predicate and it is true of every
+     * supplier ever created through the app, because {@link #ensureThemeExistsFor} gives each one
+     * a default-coloured row the moment it exists. So the tree's "branding set" line rendered for
+     * everybody and <b>a label that is true in every state is not a weak signal, it is not a
+     * signal</b> - it occupied the one slot on that row meant to tell a platform admin whether a
+     * supplier has been set up. Creed's ruling, and the fix is the predicate rather than the
+     * wording.
+     *
+     * <p>Lives here rather than in the controller so it can compare against {@code DEFAULT_PRIMARY}
+     * without that constant leaving this class - the definition of "default" and the test for
+     * "not default" belong together, or the next person changing the default silently changes what
+     * the tree claims.
+     */
+    public Set<Long> organisationIdsWithChosenBranding() {
+        Set<Long> chosen = new HashSet<>();
+        for (ThemeSettings settings : themeSettingsRepository.findAll()) {
+            if (settings.getOrganisation() != null
+                    && settings.getPrimaryColor() != null
+                    && !DEFAULT_PRIMARY.equalsIgnoreCase(settings.getPrimaryColor())) {
+                chosen.add(settings.getOrganisation().getId());
+            }
+        }
+        return chosen;
+    }
+
     public void ensureThemeExistsFor(Organisation supplierOrganisation) {
         if (themeSettingsRepository.findByOrganisationId(supplierOrganisation.getId()).isPresent()) {
             return;

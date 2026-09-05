@@ -48,8 +48,24 @@
                  unhandled exception is the exception's own text, which on this application can
                  name an internal type or an identifier from a safeguarding record. The person
                  cannot act on it either way, and the server log is where it belongs. */-->
-            <p class="error-body">The page could not be loaded. Nothing you had entered has been
-                submitted. Try again, and if it keeps happening tell your administrator.</p>
+            <!--/* "Nothing you had entered has been submitted" was a promise this page CANNOT
+                 KEEP, and Creed caught it. error.html renders for every unhandled failure,
+                 including one thrown AFTER a POST's transaction has committed - a view-render
+                 fault, or anything post-commit, and this application drives its audit trail from
+                 @TransactionalEventListener(AFTER_COMMIT). In that case the work WAS saved and
+                 the page said it was not.
+
+                 The harm is concrete rather than theoretical: told nothing was saved, a worker
+                 saves again, and a duplicate safeguarding record is the exact harm flagged at 5d
+                 and again in D-6c-3. "Could not be loaded" was wrong for a failed save too -
+                 nothing was being loaded.
+
+                 So the copy now says what is actually known, which is less than I wanted it to
+                 say. A page that cannot tell whether the write landed must send the reader to
+                 look, not reassure them. */-->
+            <p class="error-body">Something went wrong and the page couldn't be shown. If you were
+                saving something, check the record before trying again — it may or may not have
+                gone through. If it keeps happening, tell your administrator.</p>
         </th:block>
 
         <div class="error-actions">
