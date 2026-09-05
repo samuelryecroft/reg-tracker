@@ -784,9 +784,18 @@ input[type="color"].swatch-input { padding: 0.25rem; height: 3rem; cursor: point
    input in the app silently loses its focus ring. No test fails and no screenshot moves, because
    nothing in a static render is focused. With the suppression gone, either duplicate can go safely.
 
-   The border turning accent-coloured stays as reinforcement. It measures 1.47-1.79:1
-   focused-vs-unfocused at every brand hue in both appearances, which is why it must never become the
-   only signal - that ratio is the cost of the hazard above, not a description of today. */
+   The border turning accent-coloured stays as reinforcement, and the outline is what carries the AA
+   obligation: 1.4.11 Non-text Contrast (AA) requires a focus indicator to reach 3:1 AGAINST ADJACENT
+   COLOURS, which the 2px --color-text ring does at any brand hue and a border on the brand hue does
+   not guarantee.
+
+   Citation corrected against the published Recommendation rather than carried over: this said
+   "2.4.11", which in WCAG 2.2 is Focus Not Obscured (Minimum) and is not about contrast at all. And
+   the 1.47-1.79:1 figure is a FOCUSED-VS-UNFOCUSED measurement, which belongs to 2.4.13 Focus
+   Appearance - AAA, not AA. 1.4.11 explicitly declines to require anything about the difference
+   between the two states. So that ratio is the AAA cost of the hazard above, not the AA obligation
+   and not a description of today - swapping the number's criterion without swapping its measurement
+   would have been the right criterion attached to the wrong pair. */
 input:focus, select:focus, textarea:focus { border-color: var(--accent); }
 /* Non-themeable focus indicator (FE-04): the branded border above is decoration; this outline is
    the real signal and survives any supplier colour, including a pale one that fails contrast. */

@@ -13,8 +13,14 @@ import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 
 /**
- * T188 / WCAG 2.2 AA 2.4.11: a focusable control must never have its focus outline suppressed by an
- * element-qualified {@code :focus} rule.
+ * T188: a focusable control must never have its focus outline suppressed by an element-qualified
+ * {@code :focus} rule.
+ *
+ * <p>The binding criterion is <b>WCAG 2.2 AA 1.4.11 Non-text Contrast</b> - a focus indicator must
+ * reach 3:1 against adjacent colours - <em>not</em> 2.4.11, which is Focus Not Obscured (Minimum)
+ * and concerns whether the component is hidden rather than how it contrasts. Verified against the
+ * published Recommendation, because the wrong citation arrived here as a carried-over one and would
+ * have gone out that way.
  *
  * <p><b>Why a guard and not just the deletion.</b> {@code outline: none} is the single most natural
  * thing to write when a designer dislikes the default ring, it reads as tidy, and its consequence -
@@ -77,10 +83,14 @@ class FocusIndicatorGuardTest {
                         + "survives then depends on an element-qualified :focus-visible rule existing "
                         + "LATER in the file at equal specificity - correctness resting on source "
                         + "order, which the next person to tidy a duplicate will not see. If it does "
-                        + "not survive, the remaining signal is the border colour alone, measuring "
-                        + "1.47-1.79:1 focused-vs-unfocused at every brand hue in both appearances "
-                        + "against WCAG 2.2 AA 2.4.11's 3:1. The bare ':focus { outline: none }' is "
-                        + "the correct place for this; an element-qualified one is not")
+                        + "not survive, the remaining signal is the border colour alone - on the "
+                        + "brand hue, which is not guaranteed to reach the 3:1 against adjacent "
+                        + "colours that WCAG 2.2 AA 1.4.11 Non-text Contrast requires of a focus "
+                        + "indicator, and which the 2px --color-text ring reaches at every hue. "
+                        + "(The 1.47-1.79:1 focused-vs-unfocused figure measures 2.4.13 Focus "
+                        + "Appearance, which is AAA; 1.4.11 deliberately says nothing about the "
+                        + "difference between the two states.) The bare ':focus { outline: none }' "
+                        + "is the correct place for this; an element-qualified one is not")
                 .isEmpty();
     }
 
@@ -91,7 +101,7 @@ class FocusIndicatorGuardTest {
      * flagged every element-qualified {@code :focus} suppression and immediately caught
      * {@code .card[id]:focus} - which is correct code: those cards carry {@code tabindex="-1"} and
      * are <em>jump targets</em>, focused programmatically when someone activates a section link so
-     * the reading cursor follows the scroll. WCAG 2.4.11 governs components that <em>receive
+     * the reading cursor follows the scroll. The focus-indicator criteria govern components that <em>receive
      * keyboard focus</em>; a {@code tabindex="-1"} element cannot be tabbed to, and outlining a
      * whole card because someone followed an in-page link would be noise rather than a signal.
      *
