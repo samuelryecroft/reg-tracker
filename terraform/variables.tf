@@ -120,7 +120,20 @@ variable "tags" {
 # Spring profile is active, and this stack does not activate it. Flipping both is the P7 cutover,
 # gated on the §8 checklist.
 variable "entra_enabled" {
-  description = "Provision the Entra sign-in configuration (Key Vault secret container + app settings). Leave false until the tenant and app registration exist."
+  description = "Provision the Entra sign-in configuration (ENTRA_CLIENT_ID/ISSUER_URI app settings). Leave false until the tenant and app registration exist."
+  type        = bool
+  default     = false
+}
+
+# Gates the client SECRET specifically - the azurerm_key_vault_secret container AND the
+# ENTRA_CLIENT_SECRET app setting - separately from entra_enabled. Default false, because the current
+# plan is no-secret (FIC proven via T184/#73). Set true ONLY on the fallback path if that proof fails.
+# Why separate: the secret resource writes a "placeholder-replace-in-portal" value, and a placeholder
+# is a value that resolves - so creating it with entra_enabled alone would let the app start with a
+# bogus secret and defeat the fail-closed no-fallback rule in application-entra.properties (the failure
+# would move from startup to the first sign-in). Keeping it off by default keeps that control reachable.
+variable "entra_client_secret_enabled" {
+  description = "Provision the ENTRA-CLIENT-SECRET Key Vault container + the ENTRA_CLIENT_SECRET app setting. Default false (no-secret/FIC plan); set true only on the fallback path where a real secret is minted into Key Vault. Requires entra_enabled."
   type        = bool
   default     = false
 }

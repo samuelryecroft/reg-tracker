@@ -185,11 +185,23 @@ module "app_service" {
   # actually activates OIDC, and adding it is a deliberate cutover step (P7), not a side effect of
   # provisioning the configuration. So even with entra_enabled = true the app still serves form
   # login until that profile is added, which is exactly the order the §8 checklist requires.
-  entra_app_settings = var.entra_enabled ? {
-    "ENTRA_CLIENT_ID"     = var.entra_client_id
-    "ENTRA_ISSUER_URI"    = var.entra_issuer_uri
-    "ENTRA_CLIENT_SECRET" = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.entra_client_secret[0].versionless_id})"
-  } : {}
+  #
+  # ENTRA_CLIENT_SECRET is written ONLY when entra_client_secret_enabled is also true (default false).
+  # On the no-secret/FIC plan it is never written: writing it would point at a Key Vault secret whose
+  # value is the "placeholder-replace-in-portal" literal, and a placeholder IS a value - it resolves,
+  # so the app starts happily with a bogus secret and the no-fallback fail-closed rule in
+  # application-entra.properties is defeated (the failure moves from startup to first sign-in). Omitting
+  # the setting keeps that control reachable: flip the profile before a real credential exists and the
+  # app refuses to start, loudly. (Kevin, T200 review.)
+  entra_app_settings = var.entra_enabled ? merge(
+    {
+      "ENTRA_CLIENT_ID"  = var.entra_client_id
+      "ENTRA_ISSUER_URI" = var.entra_issuer_uri
+    },
+    var.entra_client_secret_enabled ? {
+      "ENTRA_CLIENT_SECRET" = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.entra_client_secret[0].versionless_id})"
+    } : {}
+  ) : {}
 }
 
 # ACR (Basic, ~£4/mo - the only new WS-E line item) holding the custom DB-plane image. Admin account
@@ -251,13 +263,23 @@ module "identity_rbac" {
 # apply. Without it, every apply would silently break sign-in.
 #
 # The target state is no secret at all: a federated identity credential against the app's managed
-# identity, consistent with WS-E having removed every other long-lived credential. This resource is
-# the interim, and it is recorded as such so it does not quietly become permanent (design §4).
+# identity, consistent with WS-E having removed every other long-lived credential. On the current plan
+# that target IS the plan - the FIC is proven first (T184/#73) and no secret is minted unless it fails.
 #
-# Record the expiry date when the real value is set. An unnoticed client-secret expiry is a total
-# sign-in outage with no warning, which is why the design calls for a calendar reminder.
+# So this is gated on its OWN flag, entra_client_secret_enabled (default false), NOT on entra_enabled.
+# The reason is not tidiness: this resource writes value="placeholder-replace-in-portal", and a
+# placeholder is a VALUE. If it existed with entra_enabled alone, the ENTRA_CLIENT_SECRET reference
+# would resolve to the placeholder, Spring's placeholder resolution would succeed, and the app would
+# start with a bogus secret - defeating the no-fallback fail-closed rule in application-entra.properties
+# and moving the failure from startup to the first sign-in (invalid_client). Under the no-secret plan
+# it would sit here forever (ignore_changes means Terraform never revisits it) and look real to anyone
+# listing the vault. Gating it separately keeps the default state honest and the fail-closed control
+# reachable, while leaving the fallback one tfvars line away. (Kevin, T200 review.)
+#
+# Record the expiry date when a real value IS set (fallback path only). An unnoticed client-secret
+# expiry is a total sign-in outage with no warning, which is why the design calls for a calendar reminder.
 resource "azurerm_key_vault_secret" "entra_client_secret" {
-  count        = var.entra_enabled ? 1 : 0
+  count        = var.entra_enabled && var.entra_client_secret_enabled ? 1 : 0
   name         = "ENTRA-CLIENT-SECRET"
   value        = "placeholder-replace-in-portal"
   key_vault_id = module.keyvault.vault_id

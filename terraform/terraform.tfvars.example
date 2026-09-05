@@ -41,14 +41,17 @@ budget_alert_email = "you@example.org"
 #   2. Merge the deploy.yml allowlist PR (#91). Anywhere before the flip; earliest is safest.
 #   3. Ship #86/V20 as an ordinary deploy while Entra is still OFF - claim-code code is inert until
 #      app.auth.entra.enabled, so the columns land unused and the flip carries no schema dependency.
-#   4. Client credential exists: FIC proven (T184/#73), or a secret minted into KV only if it fails.
-#   5. entra_enabled = true  -> apply (writes ENTRA_* app settings + the KV secret-ref; profile still
-#      "azure" so still inert - form login served, no OIDC bean). Expect an app restart (settings change).
+#   4. Client credential exists: FIC proven (T184/#73). ONLY if it fails: set entra_client_secret_enabled
+#      = true and have the human mint the real ENTRA-CLIENT-SECRET into Key Vault. Default is no secret.
+#   5. entra_enabled = true  -> apply (writes ENTRA_CLIENT_ID/ISSUER_URI; profile still "azure" so still
+#      inert - form login served, no OIDC bean). The ENTRA_CLIENT_SECRET setting + its KV container are
+#      written ONLY if entra_client_secret_enabled is also true. Expect an app restart (settings change).
 #   6. spring_profiles_active = "azure,entra"  -> apply = the cutover. NOTE: the entra profile with no
 #      client registration is a DELIBERATE boot failure (SecurityConfig throws) - that is the guard
 #      working, not a broken build. Form login + break-glass remain (coexistence is structural).
 #
-# entra_enabled          = true
-# entra_client_id        = "726d965d-e292-4e29-b6e3-0170ebcc853d"
-# entra_issuer_uri       = "https://1d7a3706-4101-4620-a57d-426e95f41971.ciamlogin.com/1d7a3706-4101-4620-a57d-426e95f41971/v2.0"
+# entra_enabled                = true
+# entra_client_id              = "726d965d-e292-4e29-b6e3-0170ebcc853d"
+# entra_issuer_uri             = "https://1d7a3706-4101-4620-a57d-426e95f41971.ciamlogin.com/1d7a3706-4101-4620-a57d-426e95f41971/v2.0"
+# entra_client_secret_enabled  = true   # FALLBACK PATH ONLY - leave unset (false) on the FIC/no-secret plan
 # spring_profiles_active = "azure,entra"   # step 6 ONLY - leave "azure" (the default) until then
