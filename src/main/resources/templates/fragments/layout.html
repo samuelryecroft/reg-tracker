@@ -5,11 +5,19 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" th:href="@{/css/app.css}">
 <!-- T186: a per-org inline <style> used to sit here overriding four bridge tokens - --accent,
-     --accent-dark, --accent-ink and --tint - with values computed from the supplier's brand hex.
+     --accent-dark, --accent-ink and --tint - with values computed from a theme's brand hex.
      It is gone, and its removal IS the fix: those four now fall back to app.css's ramp definitions,
-     which mirror between light and dark. The overrides could not - they were single fixed values,
-     so a branded organisation in dark mode got light-mode colours, which is where the WCAG
-     2.4.11/1.4.11 contrast failures came from.
+     which mirror between light and dark. The overrides could not - they were single fixed values -
+     so dark mode got light-mode colours, which is where the WCAG 2.4.11/1.4.11 failures came from.
+
+     THIS AFFECTED EVERY ORGANISATION, NOT ONLY BRANDED ONES, and the card, the severity note and
+     the review broadcast all recorded it as branded-only. The guard was th:if="${theme != null}",
+     and `theme` is never null: GlobalControllerAdvice returns getPlatformDefault() for an anonymous
+     request and getEffectiveFor() otherwise, and platformDefault() THROWS rather than returning
+     null. So the block always rendered, and pinning a token to a fixed hex defeats mirroring
+     whatever the hex is - a default-brand org's dark mode was broken by the platform default's own
+     colour. Recorded here because "invisible on a default-brand org" was the accepted explanation
+     for how this survived, and it was wrong.
 
      Per-org branding did not go with it. It travels as --brand-hue below, and always did.
 
