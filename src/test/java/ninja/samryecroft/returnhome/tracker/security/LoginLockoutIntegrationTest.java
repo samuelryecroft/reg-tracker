@@ -6,6 +6,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
 import java.util.HashSet;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.Set;
 import ninja.samryecroft.returnhome.tracker.AbstractIntegrationTest;
 import ninja.samryecroft.returnhome.tracker.user.Role;
@@ -38,6 +40,20 @@ import org.springframework.test.web.servlet.MockMvc;
 class LoginLockoutIntegrationTest extends AbstractIntegrationTest {
 
     private static final int MAX_ATTEMPTS = 5;
+
+    /**
+     * The CSRF hidden input, whatever order its attributes come in - the one thing on this page
+     * that is SUPPOSED to differ between two requests. It is a per-request nonce; two GETs would
+     * never match on it whatever the account state, so masking it is what lets the rest of the
+     * comparison mean anything. NOTHING ELSE is normalised: every other byte is a candidate answer
+     * to "does this account exist?".
+     *
+     * <p>Matched as a whole tag and rewritten inside, rather than with a lookaround that assumes
+     * which attribute comes first. This runs only in CI, so it is written to be obviously correct
+     * on reading rather than clever.
+     */
+    private static final Pattern CSRF_INPUT = Pattern.compile("<input[^>]*name=\"_csrf\"[^>]*>");
+    private static final Pattern ANY_VALUE = Pattern.compile("value=\"[^\"]*\"");
 
     @Autowired
     private MockMvc mockMvc;
@@ -76,8 +92,40 @@ class LoginLockoutIntegrationTest extends AbstractIntegrationTest {
         return attempt(username);
     }
 
+    /**
+     * The rendered page, with the CSRF token masked and nothing else.
+     *
+     * <p><b>The token is the one thing on this page that is SUPPOSED to differ between two
+     * requests</b> - it is a per-request nonce, and two GETs would never match on it whatever the
+     * account state. Masking it is what lets the rest of the comparison mean something; leaving it
+     * in would make the test fail for a reason unrelated to what it asserts, and the obvious next
+     * move - comparing a few chosen substrings instead - is how a difference elsewhere on the page
+     * gets waved through.
+     *
+     * <p>Nothing else is normalised, deliberately. Every other byte must match, because every other
+     * byte is a candidate answer to "does this account exist?".
+     */
     private String pageAt(String location) throws Exception {
-        return mockMvc.perform(get(location)).andReturn().getResponse().getContentAsString();
+        String html = mockMvc.perform(get(location)).andReturn().getResponse().getContentAsString();
+        Matcher csrf = CSRF_INPUT.matcher(html);
+        StringBuilder out = new StringBuilder();
+        while (csrf.find()) {
+            csrf.appendReplacement(out, Matcher.quoteReplacement(
+                    ANY_VALUE.matcher(csrf.group()).replaceAll("value=\"CSRF-MASKED\"")));
+        }
+        csrf.appendTail(out);
+        String masked = out.toString();
+
+        // A mask that matches nothing is worse than no mask: the comparison would then be between
+        // two pages that still carry different tokens, and the only ways out of the resulting red
+        // are to loosen the assertion or to delete it. Attribute order is Thymeleaf's business and
+        // could change under us, so the mask asserts it fired rather than assuming its own regex.
+        assertThat(masked)
+                .as("the CSRF token must have been masked - if this pattern stops matching, every "
+                        + "comparison below is between two pages that differ for a reason that has "
+                        + "nothing to do with what this class asserts")
+                .contains("CSRF-MASKED");
+        return masked;
     }
 
     @Test
