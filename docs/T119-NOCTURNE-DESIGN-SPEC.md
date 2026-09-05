@@ -3189,3 +3189,96 @@ reintroducing the defect to prove it fires and then reverting. **It is a `*UiTes
 *observed* but not *prevented*, and the cheapest complement is a source guard in the blocking lane:
 **no template may assign a resolved colour custom property; `--brand-hue` is the sanctioned exception.**
 `FrontendSourceGuardTest` is plain JUnit with no tag and already carries two appearance/token guards.
+## 7j · 3a — the four mechanics behind D-3a-1 (Creed, 7 Sep, answering Pam)
+
+D-3a-1 ruled what the template may emit. §1's row for 3a names four things it does not spec. All four are
+answered against `origin/main@9064752`, post-T186.
+
+### D-3a-1 confirmed, and Pam's sharpening is better than my wording
+
+Her reading: *the input stays a colour picker; the rule is entirely about what the template may emit.*
+**Correct, and it is the more precise statement.** `<input type="color">` collects a hex,
+`AccentRamp.hueFrom()` reduces it to a hue server-side, and `ThemeView` keeps the hex only as the picker's
+own round-trip value. **The rule governs EMISSION, not COLLECTION** — the defect was never that a hex
+existed, it was that a resolved colour reached the page *as a token value*, where it silently chose an
+appearance for every viewer.
+
+**Verified rather than assumed: no template on main emits `theme.accentTint`, `theme.primaryColor` or
+`theme.docAccent` as a token.** The surface is clean today, and D-3a-1 is about keeping it that way.
+`ThemeView` still *carries* two resolved colours; `docAccent` is legitimate because a document has exactly
+one appearance (D-Q5), and `accentTint` is the one to watch — **it is a resolved colour with no consumer, and
+a token-shaped name.**
+
+### D-3a-2 · The supplier switcher is NOT BUILT. It is new capability, not a restyle.
+
+Today `canEditOwnTheme` allows the platform **ADMIN**, or an **ORG_ADMIN of a SUPPLIER org** — and both edit
+**their own** theme: `getOwnFor` / `updateFor` are principal-scoped, and a platform admin editing "platform
+wide" is editing *the platform default row*, not another supplier's branding. **There is no path by which one
+organisation's administrator edits another organisation's brand, and no concept of "the suppliers I may
+brand".**
+
+So a switcher is not a redesign of an existing control. **It is a new capability with a new authorisation
+surface** — the question *who may change how another organisation's staff see the product* is a permissions
+decision, not a layout one.
+
+> **The canvas showing a control is not evidence the capability exists.** Where the redesign meets a control
+> with no behaviour behind it, the redesign restyles what exists and the capability becomes its own card.
+> Same ruling as §5f: *a styled control that does nothing is worse than the empty space its absence leaves.*
+
+**Raise it as a card; do not fold it into 3a.** Note the near-miss: `findBySupplierOrganisationIdOrderByName`
+exists and looks like the finder a switcher needs, but its javadoc says it powers **2c's care-provider**
+switcher — the other direction, and a different question.
+
+### D-3a-3 · The preview is client-side on `--brand-hue`, and it shows BOTH appearances at once
+
+**Client-side, no round trip.** Three reasons, in order of weight:
+
+1. **A reload-based preview can only show what you already saved** — which is not a preview, it is the
+   result. The unsaved state is the entire point.
+2. Plain JS with no build step is **the established pattern here**, not a new dependency:
+   `report-stepper.js`, `role-constraints.js`, `send-back-dialog.js` all ship this way. The no-CDN constraint
+   is untouched — this writes one custom property.
+3. It is one line of effect. `document.documentElement.style.setProperty('--brand-hue', h)` on the picker's
+   `input` event, with the hue derived the same way the server derives it.
+
+**And the decision that matters more than the mechanism: the preview renders the chrome TWICE — once forced
+light, once forced dark, side by side.**
+
+> **The person choosing a brand hue is choosing for both appearances, and on this floor nobody has ever
+> looked at the second one.** That is not a guess: it is the finding from the dark-mode coverage review —
+> the automated check reads `body` in a non-blocking lane, and I reviewed every dark defect by reading
+> stylesheets rather than rendering. **3a is the one screen where the colour decision is actually made, so it
+> is the cheapest place in the product to make the second appearance impossible to not look at.**
+
+Two forced containers (`data-appearance="light"` / `"dark"`), both inheriting the live `--brand-hue`. It also
+makes D-3a-1 self-enforcing: **a preview built from a server-computed colour cannot show two appearances, so
+building it right is the only way to build it at all.**
+
+**No JS → no live preview, and the page still saves and still shows the stored state.** The fallback degrades
+to absence, never to a broken or misleading preview (§5h).
+
+### D-3a-4 · No appearance control on this screen — and the preview must IGNORE the viewer's preference
+
+Pam's reading is right: *"per-user appearance"* in §1's row names the **already-shipped nav toggle** as the
+mechanism this screen's preview must exercise. **This screen does not get its own appearance control** — a
+second control setting the same preference is the duplication rule (§0) at the level of a widget.
+
+D-3a-3 makes it stronger: **the preview must not follow the viewer's appearance preference at all**, because
+it shows both regardless. The viewer's own setting still governs the surrounding page chrome, as everywhere.
+
+### D-3a-5 · "Inheriting providers" is a consequence notice, and the count is already free
+
+Say it on screen, with the **number**. The current copy — *"and for every Care Provider org you serve"* — is
+a vague plural for a fact that is countable, and the fact is the consequence of the action: **changing this
+colour changes what N other organisations' staff see.**
+
+Same shape as D-4a-2 (*"No open allocations"* rather than *"0"*) and §7a's elapsed row: **show the
+consequence, at its real magnitude, not the attribute.** Use the shipped `.consequence` panel.
+
+**The finder exists** — `findBySupplierOrganisationIdOrderByName`, already used by 2c — so this is a count,
+not a query to design. **If it turns out to cost more than a count, keep the existing sentence and say so;
+do not build a screen around it.**
+
+**Keep the `platformWide` split.** The count is meaningless for the platform default, whose existing copy
+correctly describes a *fallback* rather than an inheritance — those are different relationships and the
+copy already distinguishes them.
