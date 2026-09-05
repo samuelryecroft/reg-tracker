@@ -37,6 +37,7 @@ reasoning that produced it is often still useful. It is simply not the answer.**
 | **D-1b-7's placement** | **SUPERSEDED** (§6f) | Both branches of the guard sit **above the content**, not beside the actions. |
 | **D-1b-8** (§6a) | **CLOSED** (§6c) | Show the prior send-back, at the **top**, in the `--sent-back` family. |
 | **D-1b-2's selector** | **CORRECTED** (§6a) | `.readonly-val`, not `dl.detail dd`. |
+| **3a's supplier switcher** (canvas, §1) | **RULED OUT** (T213, human, 7 Sep) | *"No — suppliers brand themselves."* The canvas is aspirational here. **It nearly got built because it was drawn** — see §7o and the canvas-authority limit above. |
 | **§5b, whole section** | **⛔ SUPERSEDED** (T206 ruled, 7 Sep) | Premised on Entra shipping. **Credential block and first-password sentence STAY; email becomes the unique identifier; `Username`'s fate is Kevin's data-model call, not a spec one.** Current answer in the §5b banner. |
 | **4c "skipped, leave alone"** (§1) | **REVERSED** (7 Sep) | Entra owned sign-in; Entra is gone. **`login.html` is back in scope, unspecced, and it is the one screen every user meets.** |
 | **T186's scope** (§0, §6g) | **CORRECTED** (§7i) | It affected **every** organisation, not only branded ones — `theme` is never null. My "invisible on a default-brand org" note was wrong. **Fix is on `feat/t186-hue-only`, NOT on main.** |
@@ -74,8 +75,14 @@ building anything:
   a list** (D-4a-1 vs D-1b-5).
 - **Scope** — *a list scoped to one person, home or child does not spend a column repeating that scope*
   (D-2f-1).
-- **Canvas authority** — R-Q14 makes the canvas authoritative, **but a later explicit decision supersedes it
-  within its own domain** (§6d).
+- **Canvas authority — and its limit.** R-Q14 makes the canvas authoritative **about layout, hierarchy and
+  token values**, and a later explicit decision supersedes it within its own domain (§6d). **It is NOT
+  authoritative about capability.** A mockup can *propose* a capability; it can never *grant* one — a drawn
+  control shows what a screen would look like **if** the thing existed, and carries no information about
+  whether it does, who may use it, or what it would authorise. **Three drawn controls have now turned out
+  not to be real: 2b's dated feed (dropped), 3a's supplier switcher (ruled out by the human, §7o), and 1d as
+  a screen (it was a panel).** When the canvas shows a control, **layout is settled and capability is a
+  question** (§7o).
 
 ### Known-unsafe ground
 
@@ -3662,3 +3669,47 @@ regenerating writes a second row, and every extraction being separately recorded
   invent copy for a control that does not exist (§5f). It activates if T152's shell search reaches this list.
 - Pam checked coordinator queue, reviewer queue, visitor's interviews and the audit feed **against source**
   and all four match R-Q13 word for word. `children/detail.html` did not and she has fixed it (#110).
+## 7o · The supplier switcher is ruled out, and what the canvas is actually authoritative about (Creed, 7 Sep)
+
+### D-3a-2 CONFIRMED by the human (T213)
+
+> *"No — suppliers brand themselves."*
+
+**So the canvas's 3a — a platform administrator choosing a supplier and editing its brand — is aspirational
+and must not be built.** The current behaviour is correct and needs no change: every organisation edits its
+own theme, and a platform administrator editing *"platform wide"* is changing the **fallback** used by
+organisations that have no brand of their own. That is a different thing from editing someone else's brand,
+and the existing copy already says so.
+
+D-3a-2 reached the same answer from the code — `canEditOwnTheme` admits a platform ADMIN or a supplier
+ORG_ADMIN and **both edit their own** — so nothing built changes. **What changes is that it is now settled
+rather than deferred**, and it is in the §0 table so it is not re-raised by the next reader who sees the
+mockup.
+
+### The generalisation, which is the durable part
+
+This nearly got built **because it was drawn.** That is the third time:
+
+| Drawn | Turned out to be |
+|---|---|
+| **2b**, the dated feed | Dropped — a rival answer to a question 2a already answers better (§6d) |
+| **1d**, a section-index screen | Not a screen at all — a panel on a control being built anyway (D-1d-1) |
+| **3a**, the supplier switcher | A capability that does not exist and that the product owner does not want (T213) |
+
+> **A mockup can PROPOSE a capability. It can never GRANT one.** A drawn control shows what a screen would
+> look like **if** the thing existed — it carries no information about whether it does, who may use it, or
+> what it would authorise. **Layout, hierarchy and token values: the canvas is authoritative (R-Q14).
+> Capability, permission and data availability: the canvas is a QUESTION**, and the answer lives in the code
+> or with the product owner.
+
+**Pam is the reason this one did not ship:** she refused to infer an authorisation model from a mockup and
+asked instead. **"Who may change how another organisation's staff see the product" is a permissions decision
+wearing a layout's clothes** — and the tell is that answering it required a human, not a stylesheet.
+
+### A note on the canvas itself
+
+god asked for the canvas to be corrected as well as the spec. **The handoff canvas is not in this repository
+or in my workspace**, so I cannot make that correction durable — which is itself worth recording, because
+**R-Q14 points at an artefact this project cannot version, review or diff.** The spec is therefore the only
+place a canvas correction can actually live, and the §0 limit above is written so that a reader who has the
+canvas open still reaches the right answer without needing it to have been edited.
