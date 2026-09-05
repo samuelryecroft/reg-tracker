@@ -88,19 +88,21 @@ public class KeyWarmupRunner implements ApplicationRunner {
      * <p>Non-fatal, like everything else here: if it fails, the first real call pays what it always
      * paid.
      */
-    private void preAcquireToken() {
+    private Duration preAcquireToken() {
         if (credential == null || tokenScope == null || tokenScope.isBlank()) {
-            return;
+            return Duration.ZERO;
         }
+        Instant started = Instant.now();
         try {
-            Instant started = Instant.now();
             credential.getTokenSync(new TokenRequestContext().addScopes(tokenScope));
+            Duration took = Duration.between(started, Instant.now());
             log.info("Key Vault token acquired at startup in {}ms, so the first key lookup does not "
-                            + "answer the vault's auth challenge with a cold token",
-                    Duration.between(started, Instant.now()).toMillis());
+                    + "answer the vault's auth challenge with a cold token", took.toMillis());
+            return took;
         } catch (RuntimeException e) {
             log.warn("Could not pre-acquire the Key Vault token ({}); the first key lookup will "
                     + "acquire it inline as before", e.getClass().getSimpleName());
+            return Duration.between(started, Instant.now());
         }
     }
 
@@ -108,7 +110,7 @@ public class KeyWarmupRunner implements ApplicationRunner {
     public void run(ApplicationArguments args) {
         Instant deadline = Instant.now().plus(timeout);
         Instant started = Instant.now();
-        preAcquireToken();
+        Duration tokenTook = preAcquireToken();
         List<Organisation> organisations = organisationRepository.findByTypeOrderByName(OrgType.CARE_PROVIDER)
                 .stream()
                 // Only ACTIVE care providers hold records, so only they have a KEK to warm. A
@@ -121,9 +123,20 @@ public class KeyWarmupRunner implements ApplicationRunner {
         int absent = 0;
         for (Organisation organisation : organisations) {
             if (Instant.now().isAfter(deadline)) {
-                log.warn("Key warmup ran out of its {}s budget after {} of {} organisations; "
-                                + "starting anyway - the next request pays what is left",
-                        timeout.toSeconds(), warmed + absent, organisations.size());
+                // Says WHERE the budget went, not just that it went. The first version reported
+                // only "after N of M organisations", which reads as "the budget is too small" - and
+                // when the token pre-acquire took 49 seconds of a 30-second budget on a cold B1, it
+                // sent the reader to the wrong lever. A BUDGET-EXHAUSTED MESSAGE THAT DOES NOT SAY
+                // WHAT SPENT IT IS AN INVITATION TO RAISE THE BUDGET.
+                log.warn("Key warmup ran out of its {}s budget after {} of {} organisations, of "
+                                + "which the startup token acquisition took {}ms{}. Starting anyway "
+                                + "- the next request pays what is left",
+                        timeout.toSeconds(), warmed + absent, organisations.size(),
+                        tokenTook.toMillis(),
+                        tokenTook.compareTo(timeout) >= 0
+                                ? " - THE TOKEN ALONE EXCEEDED THE BUDGET, so a larger budget would "
+                                        + "only spend longer on the same call"
+                                : "");
                 return;
             }
             try {
