@@ -3713,3 +3713,104 @@ or in my workspace**, so I cannot make that correction durable — which is itse
 **R-Q14 points at an artefact this project cannot version, review or diff.** The spec is therefore the only
 place a canvas correction can actually live, and the §0 limit above is written so that a reader who has the
 canvas open still reaches the right answer without needing it to have been edited.
+## 7p · Jim's eight — ratified, two corrected, and a better rule than mine (Creed, 7 Sep)
+
+god asked whether 4d/4e/6e landed because §7b's generic delta was enough or because Jim filled the gaps
+himself. **He answered (b) and listed eight design calls rather than defending them.** Six are right and are
+ratified here so they stop being unrecorded; two are wrong and both are the same shape.
+
+### The rule Jim produced, which is better than mine and is adopted
+
+I diagnosed my own spec as *a defect log wearing a design spec's clothes* — true, and only diagnostic. **His
+is predictive:**
+
+> **Thin is adequate wherever the canvas draws every state the DATA can be in, and thin is a gap exactly
+> where it does not — and the second is predictable from the SCHEMA rather than from the screen.** Nullable
+> columns, empty collections, and statuses with more values than the mockup has panels are where a builder
+> starts writing design.
+
+**The structural half of §7b carried three whole screens with nothing left to decide.** Every one of his
+eight calls is either *a state the data has that the canvas does not draw*, or *copy for such a state*. So
+**"thin" is not the alarming category — "undrawn state" is**, and it is findable ahead of the build from the
+schema. On his five screens that pass would have caught six of the eight.
+
+**This supersedes my framing in §0's pattern note.** The remedy is not more ticket-level specs; it is one
+cheap question per screen: **which states can this screen's data be in that the canvas has no panel for?**
+
+### Ratified — six calls that were right
+
+| Call | Ruling |
+|---|---|
+| **"Disabled" chip on inactive accounts** (canvas only dims them) | **Right, and it is a standing rule correctly applied to a case the spec never named.** Dimming alone is colour-only; 1.4.1 does not accept it, and §5j requires a state to reach a non-visual reader **as the state**. |
+| **Contact details restored as a second meta line** after CI caught a test asserting them | **Right — and the lesson is the test's.** The canvas dropping a column is **not** evidence the data is unwanted; it is evidence the canvas was drawn without it. **A test outranked a mockup, correctly.** |
+| **"Go back" hidden until a script reveals it** | **Exactly right, and it is the fallback rule in its strict form.** A back button that cannot go back is a dead end, so no-JS must get **absence**, not a broken control (§5h). The page keeps a real link home regardless. |
+| **6d's "Served by X." folded into the option labels** rather than a per-selection hint | **Right, and better than the canvas.** It removes a script from a form that needs none, and it shows the fact **while choosing** rather than after — the same instinct as D-4c-5. |
+| **Deciding to branch `error.html` at all** | **Right.** It is Spring's view for *every* status; one screen for all of them cannot be correct. |
+| **Deliberately not printing `${message}`** | **Right, unprompted, and a real catch.** Spring's default is the exception's own text, which on this application can name an internal type or an identifier from a safeguarding record. **He found a disclosure defect nobody had specced against.** |
+
+### D-7p-1 · 4d's column order follows the canvas — and it is NOT a divergence
+
+Jim flagged that 4d puts role chips second and organisation third while `.case` puts the second fact second
+and tags third, so *"the two list families no longer scan down the same edges."* **Follow the canvas, and the
+reason matters more than the answer:**
+
+**The two cards are not the same shape of thing.** A case card is *subject + context + state*: the tag sits
+third because it is a **state that changes**, and the scan reads identity → context → urgency. A user card
+has no second subject — the person is the whole subject, and the roles are **not a state, they are the
+primary attribute the screen exists to audit.**
+
+> **The second slot means "the most important thing after identity" in both families. For a case that is the
+> child and home; for a user it is the roles.** So this is the same grammar applied to a different kind of
+> second fact, not two grammars. **Consistency of position is not the same as consistency of meaning, and
+> when they conflict, meaning wins.**
+
+### D-7p-2 · CORRECTION — "branding set" is true for every supplier, so it says nothing
+
+Jim decided *"branding set"* means **a theme row exists**, and documented it honestly. **It is wrong, and the
+code says so:** `OrganisationAdminController:175` calls `themeService.ensureThemeExistsFor(organisation)` at
+supplier creation, whose own javadoc reads *"Called when a new Supplier org is created, so it starts with its
+own (default-coloured) theme."*
+
+**So every supplier created through the app has a theme row from the moment it exists.** `brandingSet` is
+always true, *"no branding set"* can only ever render for a seeded or legacy row, and the line **carries no
+information in the one place it is meant to be informative.**
+
+> D-4a-3's family again: **a label that is true in every state is not a weak signal, it is not a signal.**
+> And D-187-5's rule decides the fix: **correct the predicate, not the presentation.**
+
+**"Branding set" must mean someone chose a colour** — `primaryColor` differing from the platform default —
+because *"has this supplier actually been set up?"* is the question a platform administrator is asking.
+
+### D-7p-3 · CORRECTION — the generic error page promises something it cannot know
+
+> *"The page could not be loaded. **Nothing you had entered has been submitted.** Try again…"*
+
+**`error.html` renders for every unhandled failure, including one thrown after a POST's transaction has
+committed** — a view-render failure, or anything in a post-commit path, of which this application has several
+(`@TransactionalEventListener(AFTER_COMMIT)` drives the audit trail). **In those cases the work *was*
+submitted and the page says it was not.**
+
+**The harm is concrete, not theoretical: told nothing was saved, a worker submits again — and a duplicate
+record is the exact harm raised at 5d and again in D-6c-3.** *"Could not be loaded"* is also wrong for a
+failed save: nothing was being loaded.
+
+> **god's rule, from the audit claim, applies verbatim: a UI claim that overstates a guarantee is a lie to
+> the user.** Here it is worse than the audit one, because acting on the false assurance is what creates the
+> damage.
+
+**The page cannot know, so it must not claim.** It should say what to do instead:
+*"Something went wrong and the page couldn't be shown. If you were saving something, check the record before
+trying again — it may or may not have gone through. If it keeps happening, tell your administrator."*
+
+### D-7p-4 · The invented "Not linked to a supplier" state — keep the branch, question the column
+
+`supplier_organisation_id` is nullable and the canvas has no orphan concept, so Jim invented a UI state.
+**Keep it** — a defensive branch that renders something sane costs nothing. **But it is the wrong layer for
+the real question:** `OrganisationAdminController` refuses to create a `CARE_PROVIDER` without a supplier, so
+**the state may be unreachable, and inventing UI for an unreachable state is the mirror of D-187-7 — the
+impossible sequence should not be reachable in the first place.**
+
+**Raise as a data-integrity question, not a design one:** should `supplier_organisation_id` be constrained
+for `CARE_PROVIDER` rows? If it should, the branch is a workaround for a missing constraint and should say so
+in a comment; if genuine orphans are possible (a soft-deleted supplier under T170), the branch is correct and
+the copy needs to survive that case too.
