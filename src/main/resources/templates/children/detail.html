@@ -109,7 +109,9 @@
         </div>
     </div>
 
-    <div class="empty" th:if="${#lists.isEmpty(requests)}">No return home interviews recorded yet.</div>
+    <!--/* R-Q13 (spec §5d), final copy - was a pre-final line ("...recorded yet.", no forward
+         pointer) until this 5e pass. */-->
+    <div class="empty" th:if="${#lists.isEmpty(requests)}">No return home interviews for this child yet. They'll appear here once one is raised.</div>
 
     <div class="card">
         <h2 style="margin-top:0">Case history</h2>

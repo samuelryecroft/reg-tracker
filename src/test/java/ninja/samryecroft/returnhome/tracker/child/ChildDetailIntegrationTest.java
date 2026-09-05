@@ -203,7 +203,7 @@ class ChildDetailIntegrationTest extends AbstractIntegrationTest {
 
         // D-4b-2: the caption promises content that isn't there if the table renders regardless.
         assertThat(html).doesNotContain("Every interview request raised for this child");
-        assertThat(html).contains("No return home interviews recorded yet.");
+        assertThat(html).contains("No return home interviews for this child yet. They'll appear here once one is raised.");
     }
 
     private static int occurrencesOf(String haystack, String needle) {
