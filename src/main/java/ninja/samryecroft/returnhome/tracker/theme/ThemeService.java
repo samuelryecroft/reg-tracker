@@ -71,6 +71,20 @@ public class ThemeService {
         return toView(resolveForViewing(editableOrganisationId(principal)));
     }
 
+    /**
+     * D-3a-5 (spec §7j): the consequence of changing this colour, as a number rather than the
+     * vague plural it replaces - "and for every Care Provider org you serve" said nothing about
+     * how many. Meaningless for the platform default (there is no supplier org to count care
+     * providers under), so callers must gate this on {@code !platformWide} themselves; the count
+     * for a platform-admin editing session ({@code editableOrganisationId} returning null) is 0.
+     */
+    public int careProviderCountFor(AppUserPrincipal principal) {
+        requireCanEditOwnTheme(principal);
+        Long organisationId = editableOrganisationId(principal);
+        return organisationId == null ? 0
+                : organisationRepository.findBySupplierOrganisationIdOrderByName(organisationId).size();
+    }
+
     @Transactional
     public void updateFor(AppUserPrincipal principal, UpdateThemeForm form) {
         requireCanEditOwnTheme(principal);

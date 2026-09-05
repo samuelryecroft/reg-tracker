@@ -80,6 +80,14 @@ public final class AccentRamp {
      * <p>Rounded to a whole degree <b>here and nowhere else</b>. Two implementations that each round
      * their own way disagree by a degree on some colours, and a document whose accent is one degree
      * off the screen's is the kind of defect nobody can describe and everybody can see.
+     *
+     * <p><b>Ported, exactly, to {@code static/js/theme-preview.js}</b> (spec §7k D-3a-7): 3a's live
+     * branding preview cannot round-trip to the server, so it re-derives this same hue client-side
+     * from the colour picker's own value. An approximation (sRGB/HSL hue, say) would diverge from
+     * this method worst through the blues, previewing faithfully for some brand colours and visibly
+     * wrong for others with no way to tell which case a given pick is in - so the JS is a line-for-
+     * line port, including the grey-chroma fallback below, not a cheaper stand-in. If this method's
+     * maths changes, that file's copy needs the same change.
      */
     public static int hueFrom(String hexColor) {
         double[] rgb = linearFromHex(hexColor);

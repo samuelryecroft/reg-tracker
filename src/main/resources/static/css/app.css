@@ -49,7 +49,15 @@
    card floating on this file's new dark --color-bg would be broken
    regardless of whether anyone had "migrated" it yet.
    ══════════════════════════════════════════════════════════════════════ */
-:root {
+/* D-3a-6 (spec §7k): 3a's two-up branding preview forces one pane to each appearance regardless
+   of the viewer's own setting, so it needs this whole dark-appearance token set on a NON-root
+   element. Extending the selector list rather than copying the declarations - every value below
+   that reads var(--brand-hue) (the whole accent ramp) re-derives PER ELEMENT against whichever
+   --brand-hue is in scope, so a pane needs nothing but its own --brand-hue and this selector to
+   render the entire dark palette correctly; a second copy of this block would be the exact
+   duplication FrontendSourceGuardTest's lightAndAutoAppearanceBlocksStayDeclarationIdentical
+   exists to catch on the light/auto pair, one file section down. */
+:root, .theme-preview[data-appearance="dark"] {
     color-scheme: dark;
 
     --color-bg: #161826;
@@ -248,7 +256,10 @@
    lightness, hue still free, verified >=4.5:1 (text) and >=3:1 (the focus
    ring) at every hue an admin can pick. Everything else mirrors dark step
    N <-> step (1000-N) at the ground's own hue. */
-:root[data-appearance="light"] {
+/* D-3a-6 (spec §7k): same reasoning as the dark block's own comment above - extending the
+   selector list, never copying the declarations, so 3a's forced-light preview pane gets this
+   whole token set re-derived against its own --brand-hue for free. */
+:root[data-appearance="light"], .theme-preview[data-appearance="light"] {
     color-scheme: light;
     /* THE FIX (D-Q1). Not the mirrored ramp: on a light ground the mirrored 600/700
        come out LIGHTER than the base and measure 1.84:1. Fixed lightness, hue free.
@@ -1611,3 +1622,22 @@ nav.seg .seg-opt { color: inherit; text-decoration: none; }
     .form-layout { grid-template-columns: 1fr; }
     .form-rail { display: none; }
 }
+
+/* ============================== 3a · branding live preview (spec §7j/§7k) ==============================
+   Layout only - the appearance-driven token set each pane renders under comes from extending the
+   existing [data-appearance="light"/"dark"] selector lists further up this file, not from anything
+   declared here (D-3a-6). background/color are the one thing that HAS to be explicit: custom
+   properties don't paint anything by themselves, and a nested pane's own --color-bg/--color-text
+   would otherwise sit unused while body's ambient background showed through. */
+.theme-preview-row { display: flex; gap: var(--s4); flex-wrap: wrap; margin: var(--s4) 0; }
+.theme-preview {
+    flex: 1 1 260px; padding: var(--s4); border-radius: var(--radius);
+    background: var(--color-bg); color: var(--color-text);
+}
+.theme-preview-label {
+    font-size: var(--t-xs); font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+    color: var(--color-text-muted); margin: 0 0 var(--s3);
+}
+.theme-preview h3 { margin: 0 0 var(--s2); }
+.theme-preview p { margin: 0 0 var(--s3); }
+.theme-preview .btn-row { margin-top: 0; }
