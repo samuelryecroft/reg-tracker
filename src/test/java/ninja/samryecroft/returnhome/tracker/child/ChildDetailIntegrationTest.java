@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.HashSet;
 import java.util.Set;
 import ninja.samryecroft.returnhome.tracker.AbstractIntegrationTest;
@@ -46,6 +47,8 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 @SpringBootTest
 @AutoConfigureMockMvc
 class ChildDetailIntegrationTest extends AbstractIntegrationTest {
+
+    private static final DateTimeFormatter DISPLAY_FMT = DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm");
 
     @Autowired
     private MockMvc mockMvc;
@@ -137,12 +140,16 @@ class ChildDetailIntegrationTest extends AbstractIntegrationTest {
         assertThat(html).doesNotContain("Hidden — reveal names to show");
     }
 
+    /**
+     * D-4b-1/D-4b-7, isolated to one live, unscheduled request: was "-" in the table and
+     * "Not yet scheduled" in the card stack - same absence, two words, on one page nobody reads
+     * both halves of at once. Now the same copy in both renderings (2 occurrences: table + stack).
+     * Also carries a due badge, since it has a running clock.
+     */
     @Test
-    void aLiveRequestShowsADueBadgeButAFinishedRequestShowsNoneAndTheNullScheduledCopyMatchesBothRenderings()
-            throws Exception {
+    void aLiveUnscheduledRequestSaysNotYetScheduledInBothRenderingsAndCarriesADueBadge() throws Exception {
         Child child = savedChild("CH-T4B" + suffix, LocalDate.of(2013, 7, 22));
 
-        // D-4b-7: live, unscheduled - has a running clock, must show a due badge.
         InterviewRequest live = InterviewRequestTestFixtures.requestAt(InterviewStatus.ALLOCATED);
         live.setChild(child);
         live.setHome(home);
@@ -150,23 +157,42 @@ class ChildDetailIntegrationTest extends AbstractIntegrationTest {
         live.setReturnedAt(LocalDateTime.now().minusHours(10));
         interviewRequestRepository.save(live);
 
-        // D-4b-7 counter-case: finished - tracksDeadline is false, badgeFor must return empty.
+        String html = getDetail(child.getId());
+
+        assertThat(occurrencesOf(html, "Not yet scheduled")).isEqualTo(2);
+        // The due badge itself (its exact words come from DeadlineTracker/DueStateCopy, not
+        // reworded here) - present, since this request has a running clock.
+        assertThat(html).contains("class=\"due");
+    }
+
+    /**
+     * D-4b-7 counter-case, isolated: a finished request has no live clock (tracksDeadline is
+     * false), so it must show no due badge - meaningfully, not as a gap. And its real scheduled
+     * time must actually render (the D-4b-1 copy fix must not swallow a value that IS present).
+     */
+    @Test
+    void aFinishedRequestShowsNoDueBadgeAndItsRealScheduledTimeRenders() throws Exception {
+        Child child = savedChild("CH-T4B" + suffix, LocalDate.of(2013, 7, 22));
+
+        LocalDateTime scheduledAt = LocalDateTime.now().minusHours(190).withSecond(0).withNano(0);
         InterviewRequest finished = InterviewRequestTestFixtures.requestAt(InterviewStatus.REPORT_APPROVED);
         finished.setChild(child);
         finished.setHome(home);
         finished.setRequestedBy(userRepository.findByUsername(staffUsername).orElseThrow());
         finished.setReturnedAt(LocalDateTime.now().minusHours(200));
-        finished.setScheduledAt(LocalDateTime.now().minusHours(190));
-        interviewRequestRepository.save(finished);
+        finished.setScheduledAt(scheduledAt);
+        Long savedId = interviewRequestRepository.save(finished).getId();
+
+        // Read straight back from the repository, before even touching the controller/template -
+        // isolates whether persistence itself round-trips scheduledAt, independent of rendering.
+        InterviewRequest reloaded = interviewRequestRepository.findById(savedId).orElseThrow();
+        assertThat(reloaded.getScheduledAt()).isEqualTo(scheduledAt);
 
         String html = getDetail(child.getId());
 
-        // D-4b-1: was "-" in the table and "Not yet scheduled" in the card stack - same absence,
-        // two words. Now the same copy in both renderings, twice (table + stack) for the live row.
-        assertThat(occurrencesOf(html, "Not yet scheduled")).isEqualTo(2);
-        // The due badge itself (its exact words come from DeadlineTracker/DueStateCopy, not
-        // reworded here) - present at least once, since the live request has a running clock.
-        assertThat(html).contains("class=\"due");
+        assertThat(html).doesNotContain("class=\"due");
+        assertThat(occurrencesOf(html, "Not yet scheduled")).isZero();
+        assertThat(occurrencesOf(html, scheduledAt.format(DISPLAY_FMT))).isEqualTo(2);
     }
 
     @Test
