@@ -15,29 +15,29 @@
         Consent not yet confirmed
     </span>
 
-    <!--
+    <!--/*
       D-1a-2/D-1a-2a (spec 1f04c68, 58494b2): the rail shows PROGRESS; the status tag above stays
       authoritative for the exact state. Both read InterviewStatus.displayName (StatusRail's ruling
       1), so they can never disagree about what to call one state - only about how much of the
       journey it represents.
-    -->
+    */-->
     <ol class="rail" aria-label="Interview status">
         <li th:each="step, stat : ${statusRail}" th:classappend="'rail-' + ${step.state()}"
             th:attr="aria-current=${step.state().name() == 'CURRENT'} ? 'step'">
-            <!--
+            <!--/*
               T165 fast-follow: the connector was a CSS ::before with `content: ""` - generated
               content is exposed to the accessibility tree by the major screen readers
               (AnnouncedGlyphSourceGuardTest), so a purely decorative line must be real,
               aria-hidden markup instead, never CSS `content`. Same visual line, no announcement.
-            -->
+            */-->
             <span class="rail-connector" aria-hidden="true" th:unless="${stat.first}"></span>
-            <!--
+            <!--/*
               Creed's review: th:case must sit on the <svg>, not the <use> inside it. A non-matching
               th:case removes only the element it's ON - putting it on <use> left all SIX <svg
               class="icon"> wrappers in the DOM (five empty), which .icon's fixed 1em size and
               .rail-marker's flex centring then packed into an 18px circle: the one surviving glyph
               landed ~40px off-centre, into a neighbouring step's cell. One <svg> per state, here.
-            -->
+            */-->
             <span class="rail-marker" aria-hidden="true" th:switch="${step.state().name()}">
                 <svg class="icon" th:case="'COMPLETE'"><use th:href="${ico} + '#ph-fill-check-circle'"></use></svg>
                 <svg class="icon" th:case="'CURRENT'"><use th:href="${ico} + '#ph-fill-dot-outline'"></use></svg>
@@ -47,7 +47,7 @@
                 <svg class="icon" th:case="*"><use th:href="${ico} + '#ph-circle-dashed'"></use></svg>
             </span>
             <span class="rail-label" th:text="${step.label()}">Label</span>
-            <!--
+            <!--/*
               Creed's review (1.3.1): the marker is aria-hidden and colour alone can't reach
               assistive tech, so without this a screen reader hears every label with no way to tell
               which have happened. aria-current="step" above covers CURRENT; this covers the rest.
@@ -59,7 +59,7 @@
               this follows: the hidden word exists BECAUSE a state was otherwise only in an
               aria-hidden glyph and a colour; the moment a state is carried in visible text instead,
               the hidden word stops being access and becomes duplication.
-            -->
+            */-->
             <span class="visually-hidden" th:if="${step.state().name() != 'CANCELLED'}"
                   th:switch="${step.state().name()}">
                 <th:block th:case="'COMPLETE'">completed</th:block>
@@ -68,26 +68,26 @@
                 <th:block th:case="'NOT_APPLICABLE'">not applicable</th:block>
                 <th:block th:case="*">not yet started</th:block>
             </span>
-            <!--
+            <!--/*
               Creed's review: a cancelled request's reached position keeps ITS OWN label above (see
               StatusRail#cancelledRail) - "Cancelled" renders here, in the slot a date would
               otherwise use, rather than overwriting the label and destroying how far the request
               got. `note` is null for every other state, so this falls through to the ordinary date.
-            -->
+            */-->
             <span class="rail-when" th:if="${step.note() != null}" th:text="${step.note()}">note</span>
             <span class="rail-when" th:if="${step.note() == null and step.occurredAt() != null}"
                   th:text="${#temporals.format(step.occurredAt(), 'dd MMM yyyy')}">date</span>
         </li>
     </ol>
 
-    <!--
+    <!--/*
       D-1a-3 (spec 6bf5119): a section index, not tabs - real ARIA tabs hide inactive panels, and
       this screen is a document a reviewer must Ctrl-F and print in full (1b already shows the same
       report full width with every section visible). Plain jump links, wrapped in a nav landmark,
       no tablist/tab/tabpanel roles (a role that lies is worse than no role) - god's steer on 1a.
       #history is CSS-hidden here and shown only below 1060px (D-1a-4): above that width history is
       already visible in its own column, so a jump link to it would be redundant chrome.
-    -->
+    */-->
     <nav class="section-index" aria-label="Report sections">
         <a href="#request">Request</a>
         <a href="#young-person">Young person</a>
@@ -243,14 +243,14 @@
     <a th:if="${canDownload}" class="btn"
        th:href="@{/reports/{id}/download(id=${request.id})}">Download report</a>
 
-    <!--
+    <!--/*
       T155 batch 2: report/view.html merged in here. A report row can exist (SUBMITTED,
       REJECTED) before it's visible - it stays out of the page entirely until
       InterviewRequestDetailController puts it on the model, which it only does once
       request.status is REPORT_APPROVED (the same gate ReportController#approvedReportFor used
       to enforce on the old standalone route). Do not gate this block on anything else: `report`
       being non-null on the model IS the authorization check.
-    -->
+    */-->
     <div class="card" id="report-details" tabindex="-1" th:if="${report != null}"
          th:with="notAnswered=${(report.interviewLocation == null ? 1 : 0) + (report.ifNotWhyLate == null ? 1 : 0)
                                + (report.consultationWithHomeStaff == null ? 1 : 0) + (report.previouslyMissing == null ? 1 : 0)

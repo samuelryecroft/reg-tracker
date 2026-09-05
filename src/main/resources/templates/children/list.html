@@ -8,45 +8,46 @@
 <body>
 <div th:replace="~{fragments/layout :: nav}"></div>
 <main id="main">
-    <h1 th:text="${isAdmin} ? 'Children' : 'My Children'">Children</h1>
-    <!-- The matrix, not a role flag. This hid the button from VIEWER only, so a supplier
-         org-admin - who can reach this page - was offered an action the server then refused. -->
+    <!--/* D-5d-1 (spec §7g): renamed from isAdmin - it never meant "is an administrator" here (a
+         multi-home HOME_STAFF sees the column too), and a name after the mechanism it was written
+         for rather than the property it encodes is exactly how a future reader mis-reasons about
+         who this applies to. Named for what it decides, matching ChildController's own local var. */-->
+    <h1 th:text="${showHomeColumn} ? 'Children' : 'My Children'">Children</h1>
+    <!--/* The matrix, not a role flag. This hid the button from VIEWER only, so a supplier
+         org-admin - who can reach this page - was offered an action the server then refused. */-->
     <a class="btn" href="/children/new" th:if="${can.addChild}">Add child</a>
 
-    <div class="table-wrap responsive">
-    <table>
-        <caption>All children, most recently added first.</caption>
-        <thead>
-        <tr>
-            <th scope="col">Name</th>
-            <th scope="col">Date of birth</th>
-            <th scope="col" th:if="${isAdmin}">Home</th>
-            <th scope="col">Case reference</th>
-        </tr>
-        </thead>
-        <tbody>
-        <tr th:each="c : ${children}">
-            <td th:text="${childIdentities[c.id].label()}">Child Name</td>
-            <td th:text="${#temporals.format(c.dateOfBirth, 'dd MMM yyyy')}">DOB</td>
-            <td th:if="${isAdmin}" th:text="${c.home.name}">Home</td>
-            <td th:text="${c.localCaseReference} ?: '—'">Case reference</td>
-        </tr>
-        </tbody>
-    </table>
-    </div>
+    <!--/*
+      6a (spec §7b): children are people, not an aggregate - R-Q12 rules cards for people and
+      tables for aggregates, so the table this page used to render alongside this same list is
+      deleted rather than kept as a second copy. It was the strongest case on the floor for that
+      backlog item (D-4b-1 cited it as evidence): the two renderings had already worded a null
+      field two different ways because nobody reads both at once. One rendering now, so that class
+      of drift has nowhere left to happen.
 
-    <div class="stack">
+      T193 (PILOT-GATE, spec §7f D-4b-11): the birth date is Article-9 encrypted, so this row reads
+      it only through childRows (built server-side in ChildController, same shape as
+      childIdentities above) - never straight off the entity, or the mask is defeated on this
+      masked page. The case reference goes through the same projection but is never gated - it is
+      already shown, by design, in the name column's own masked label (see ChildListRow's javadoc
+      for why gating this cell too would misreport its own state).
+    */-->
+    <div class="stack solo">
         <div class="srow" th:each="c : ${children}">
             <div class="top"><span class="name" th:text="${childIdentities[c.id].label()}">Child Name</span></div>
             <dl>
-                <dt>Date of birth</dt><dd th:text="${#temporals.format(c.dateOfBirth, 'dd MMM yyyy')}">DOB</dd>
-                <dt th:if="${isAdmin}">Home</dt><dd th:if="${isAdmin}" th:text="${c.home.name}">Home</dd>
-                <dt>Case reference</dt><dd th:text="${c.localCaseReference} ?: '—'">Case reference</dd>
+                <dt>Date of birth</dt><dd th:text="${childRows[c.id].dob()}">DOB</dd>
+                <dt th:if="${showHomeColumn}">Home</dt><dd th:if="${showHomeColumn}" th:text="${c.home.name}">Home</dd>
+                <dt>Case reference</dt><dd th:text="${childRows[c.id].caseReference()}">Case reference</dd>
             </dl>
         </div>
     </div>
 
-    <div class="empty" th:if="${#lists.isEmpty(children)}">No children yet.</div>
+    <!--/* R-Q13 (spec §5d), final copy - do not reword. */-->
+    <div class="empty" th:if="${#lists.isEmpty(children)}">
+        No children added yet. Add a child before you can raise an interview request.
+        <a class="btn secondary" href="/children/new" th:if="${can.addChild}">Add a child</a>
+    </div>
 </main>
 </body>
 </html>

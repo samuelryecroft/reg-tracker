@@ -63,12 +63,14 @@ public class UserAdminController {
         }
         try {
             userService.create(form, principal);
-        } catch (DuplicateObjectIdException | DataIntegrityViolationException clash) {
-            // Both arms are the same defect seen at different moments: the service's pre-check
-            // catches the ordinary case, and uq_users_idp_subject catches two admins saving the same
-            // id at once, which no pre-check can. Translating it here keeps the administrator's
-            // other input on the screen instead of losing it to a 500.
-            rejectDuplicateObjectId(bindingResult);
+        } catch (DataIntegrityViolationException clash) {
+            // Kept, and re-pointed, when the Entra object id was removed. The arm existed for
+            // uq_users_idp_subject, but it was ALSO the only thing catching uq_users_username -
+            // there is no pre-check or validator for a duplicate username anywhere - so deleting it
+            // outright would have turned a graceful form error into a 500 on an ordinary admin
+            // mistake. It also fixes a mislabel: a duplicate username used to be reported as a
+            // duplicate Directory object ID.
+            rejectDuplicateUsername(bindingResult);
             addPickerAttributes(principal, model);
             return "admin/user-form";
         }
@@ -88,7 +90,6 @@ public class UserAdminController {
         // One Homes field for both roles now - queried rather than read off the detached user,
         // whose homes are lazy.
         form.setHomeIds(new HashSet<>(userRepository.findHomeIds(id)));
-        form.setIdpSubject(user.getIdpSubject());
         form.setEnabled(user.isEnabled());
 
         model.addAttribute("user", user);
@@ -109,8 +110,8 @@ public class UserAdminController {
         }
         try {
             userService.update(id, form, principal);
-        } catch (DuplicateObjectIdException | DataIntegrityViolationException clash) {
-            rejectDuplicateObjectId(bindingResult);
+        } catch (DataIntegrityViolationException clash) {
+            rejectDuplicateUsername(bindingResult);
             model.addAttribute("user", userService.getAuthorized(id, principal));
             addPickerAttributes(principal, model);
             return "admin/user-form-edit";
@@ -118,9 +119,9 @@ public class UserAdminController {
         return "redirect:/admin/users";
     }
 
-    private void rejectDuplicateObjectId(BindingResult bindingResult) {
-        bindingResult.rejectValue("idpSubject", "duplicate",
-                "That Directory object ID is already recorded against another account.");
+    private void rejectDuplicateUsername(BindingResult bindingResult) {
+        bindingResult.rejectValue("username", "duplicate",
+                "That username is already taken.");
     }
 
     private void addPickerAttributes(AppUserPrincipal principal, Model model) {

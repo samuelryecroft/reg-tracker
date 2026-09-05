@@ -34,9 +34,13 @@ public class User {
     private String username;
 
     /**
-     * Null for an account that has no local credential - which, after cutover, is every account but
-     * one. Form login fails closed for such a row: {@code BCryptPasswordEncoder.matches} rejects a
-     * null encoding rather than matching anything.
+     * Null for an account that has no local credential. Form login fails closed for such a row:
+     * {@code BCryptPasswordEncoder.matches} rejects a null encoding rather than matching anything.
+     *
+     * <p>This used to say that after the Entra cutover a null password would be every account but
+     * one. There is no cutover: Entra was removed, form login is the only way in, and <b>a row with
+     * a null password is therefore an account nobody can sign in as</b> - the opposite of the
+     * routine case the old sentence described.
      *
      * <p>This column is <b>not</b> being dropped. P8 originally said to remove it; D5 withdrew that,
      * because dropping it would have removed the break-glass admin D2 requires - a tenant-wide
@@ -46,33 +50,6 @@ public class User {
      */
     private String password;
 
-    /**
-     * The directory <b>object id</b> ({@code oid}) of the Entra identity this account belongs to,
-     * null for an account with no directory identity. Unique when present.
-     *
-     * <p>This is the persistent identity key and the only value a login may link on. Email is
-     * display only and is never consulted at sign-in: it is mutable and addresses get recycled, so
-     * binding identity to it would let a new starter inherit a leaver's access
-     * (ENTRA-AUTH-DESIGN.md §3). D4 additionally withdrew the first-login email-match ceremony this
-     * javadoc used to describe, because matching a verified email <em>binds</em> an Entra identity
-     * to an existing enabled account.
-     *
-     * <p><b>{@code oid}, not {@code sub}, and the difference is not cosmetic.</b> {@code sub} is
-     * pairwise - Entra derives it per (user, application), so it differs between app registrations
-     * and cannot be looked up in the portal at all. Under D4 an {@code ORG_ADMIN} records this value
-     * <em>before</em> the person has ever signed in, so {@code sub} is not a worse key, it is an
-     * unavailable one. See {@code EntraOidcUserService.objectIdOf}.
-     *
-     * <p><b>V14 still hedges as "{@code sub} (or {@code oid})" and must be left alone.</b> That
-     * migration has already run, {@code validate-on-migrate} is on by default, and a comment is
-     * content - editing it changes the checksum and fails startup where V14 is applied. This javadoc
-     * is the resolution of that hedge; the migration cannot be.
-     *
-     * <p>Written by an {@code ORG_ADMIN} at account creation, and read at sign-in by
-     * {@code UserRepository.findByIdpSubject}.
-     */
-    @Column(name = "idp_subject", unique = true)
-    private String idpSubject;
 
     @Column(name = "first_name")
     private String firstName;
@@ -90,8 +67,7 @@ public class User {
      *
      * <p>Deliberately not {@code username}, and deliberately not unique. {@code username} stays the
      * login key, and shared mailboxes are ordinary in this sector. This is also the field a future
-     * Entra link will sync its {@code email} claim into and look up on for the one-time link, so it
-     * is one field rather than a profile copy beside an identity copy - see {@link #idpSubject}.
+     * contact address for this person, and the only address the application uses.
      *
      * <p>Not encrypted; V17 records why, and it is a property of the per-organisation key model
      * rather than a view about how sensitive this is.
@@ -178,13 +154,6 @@ public class User {
         this.password = password;
     }
 
-    public String getIdpSubject() {
-        return idpSubject;
-    }
-
-    public void setIdpSubject(String idpSubject) {
-        this.idpSubject = idpSubject;
-    }
 
     public String getFirstName() {
         return firstName;
@@ -232,6 +201,29 @@ public class User {
             return lastName;
         }
         return firstName + " " + lastName;
+    }
+
+    /**
+     * Initials for the 4d avatar - one letter per name token the person actually has.
+     *
+     * <p>Mirrors {@link #getFullName()}'s null handling rather than assuming a pair, and for the
+     * same recorded reason: {@code firstName} is nullable because a person with a single name has
+     * it in {@code lastName} alone. Taking {@code firstName.charAt(0)} unconditionally would throw
+     * on exactly those rows, and an avatar is not worth a 500 on a list page.
+     *
+     * <p>Staff, so never masked - the 5. masking rule covers children, and a redesign that hid
+     * colleagues' initials from the admin managing their accounts would be masking the wrong
+     * people.
+     */
+    @Transient
+    public String getInitials() {
+        if (lastName == null || lastName.isBlank()) {
+            return "";
+        }
+        if (firstName == null || firstName.isBlank()) {
+            return lastName.substring(0, 1).toUpperCase();
+        }
+        return (firstName.substring(0, 1) + lastName.substring(0, 1)).toUpperCase();
     }
 
     public Set<Role> getRoles() {

@@ -8,6 +8,8 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.WebApplicationType;
 import org.springframework.boot.builder.SpringApplicationBuilder;
@@ -27,9 +29,26 @@ class DemoProfileGuardTest {
         return environment;
     }
 
+    /**
+     * Iterates {@link DeployedEnvironment#DEPLOYED_MARKERS} rather than a copy of it.
+     *
+     * <p>This held its own {@code {prod, production, staging, PROD}} - a sixth copy of "which
+     * profiles mean deployed", and one the source scanner in
+     * {@code DeployedEnvironmentConsolidationGuardTest} can never see, because that reads
+     * {@code src/main/java}. So when the canonical set gained {@code azure}, this list would not
+     * have, and <b>the new member would have been untested: the set grows and its own test quietly
+     * does not</b>. Iterating the set means a future marker is exercised the day it is added.
+     * (Kevin, §9b.)
+     *
+     * <p>{@code "PROD"} stays as an explicit extra case because it tests case-insensitivity, which
+     * is a different property and should not be inferred from the set's contents.
+     */
     @Test
     void refusesToStartWhenDemoIsCombinedWithAProductionProfile() {
-        for (String productionProfile : new String[] {"prod", "production", "staging", "PROD"}) {
+        List<String> markers = new ArrayList<>(DeployedEnvironment.DEPLOYED_MARKERS);
+        markers.add("PROD");
+        assertThat(markers).as("iterating an empty set would test nothing").isNotEmpty();
+        for (String productionProfile : markers) {
             assertThatThrownBy(() -> DemoProfileGuard.verify(environmentWith("demo", productionProfile)))
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("Refusing to start")

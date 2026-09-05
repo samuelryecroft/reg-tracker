@@ -43,6 +43,7 @@ class AnnouncedGlyphSourceGuardTest {
 
     private static final Path MAIN_JAVA = Path.of("src/main/java");
     private static final Path CSS_DIR = Path.of("src/main/resources/static/css");
+    private static final Path TEMPLATES_DIR = Path.of("src/main/resources/templates");
 
     /**
      * The three that were actually baked into announced text (U+25B2, U+25F7, U+2713), plus the
@@ -54,6 +55,45 @@ class AnnouncedGlyphSourceGuardTest {
 
     /** Deliberately not {@code content:} alone - {@code justify-content} and friends would match. */
     private static final Pattern GENERATED_CONTENT = Pattern.compile("(^|[;{\\s])content\\s*:");
+
+    /**
+     * The third way in, and the one this guard could not see when it was written.
+     *
+     * <p>It scanned {@code src/main/java} and the CSS, because the two instances it was built from
+     * lived there - so "the character must never make the trip into Java" quietly became the
+     * definition of the rule, and TEMPLATES were never in scope. A glyph put straight into a
+     * {@code th:text} never travels through Java at all, and four live ones were sitting in
+     * templates the whole time this guard was green: both dashboards' "N further interviews
+     * excluded" line and both download pages' "Link expires in N minutes" - each announced as
+     * "circle with upper right quadrant black" before the sentence that said what was happening.
+     *
+     * <p>That is the floor's own amendment about a guard inheriting the incidental scope of the
+     * instances it was written from, applied to the guard that came out of the same sweep. The test
+     * to apply: could this check, as written, see a correct instance of the bug somewhere nobody
+     * was looking when it was written? Here it could not, and the answer cost four of them.
+     *
+     * <p>An aria-hidden glyph is fine and stays fine - that is what the {@code .ic} spans are - so
+     * the check exempts a line that marks itself hidden, rather than banning the character.
+     */
+    @Test
+    void noPresentationGlyphIsAnnouncedFromATemplate() throws IOException {
+        List<String> violations = new ArrayList<>();
+        for (Path file : sourceFilesUnder(TEMPLATES_DIR, ".html")) {
+            List<String> lines = Files.readAllLines(file, StandardCharsets.UTF_8);
+            for (int i = 0; i < lines.size(); i++) {
+                String line = lines.get(i);
+                if (PRESENTATION_GLYPH.matcher(line).find() && !line.contains("aria-hidden")) {
+                    violations.add(file + ":" + (i + 1) + ": " + line.trim());
+                }
+            }
+        }
+
+        assertThat(violations)
+                .as("a presentation glyph in announced template text reaches a screen reader as the "
+                        + "character's NAME - put it in aria-hidden markup and let the words carry "
+                        + "the meaning")
+                .isEmpty();
+    }
 
     @Test
     void noPresentationGlyphIsBakedIntoJavaSource() throws IOException {

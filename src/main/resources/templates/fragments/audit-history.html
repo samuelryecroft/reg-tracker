@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" lang="en">
 <body>
-<!--
+<!--/*
   T38 / audit-mockups.html §01. One component, used on the interview request/report page, the
   child page (as a "Case history" grouped by request) and the admin user-edit page. `sections` is a
   List<AuditHistorySection> - AuditHistoryService is the only place that builds one, and it is what
@@ -13,7 +13,7 @@
   affordance suggesting hidden content (Creed's note: the rows carry identifiers and status
   transitions only, and the UI must not imply a diff exists behind them). That is also what makes it
   printable without a redesign once feature 2.5's export reuses it.
--->
+*/-->
 <th:block th:fragment="provenance">
     <div class="provenance">
         <span aria-hidden="true">🗄</span>

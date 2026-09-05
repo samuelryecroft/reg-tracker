@@ -11,7 +11,7 @@
     <h1 th:text="${'Report: ' + childIdentity.label()}">Report</h1>
     <p class="muted" th:text="${'Home: ' + request.home.name}">Home</p>
 
-    <!--
+    <!--/*
       T173: this used to be a plain link to /interview-requests/{id} - it navigated the visitor
       away from an in-progress, unsaved report (T174 covers persistence separately; this fix only
       stops the navigation). VISITOR access to these exact fields is already established: a
@@ -19,7 +19,7 @@
       own allocatedVisitor, and that same check is what lets them open /interview-requests/{id}
       today - so showing the same fields in place grants no new access, it just stops throwing
       away their place in the form to see them.
-    -->
+    */-->
     <details class="card disclosure">
         <summary>
             <svg class="icon caret-closed" aria-hidden="true"><use th:href="${ico} + '#ph-caret-right'"></use></svg>

@@ -14,7 +14,9 @@ class AuditQueryCsvWriterTest {
     private final AuditQueryCsvWriter writer = new AuditQueryCsvWriter();
 
     private AuditHistoryEntry entry(String headline, String role, String detail) {
-        return new AuditHistoryEntry(headline, LocalDateTime.of(2026, 8, 3, 14, 30), "14:30", role, detail, "ok");
+        // id is 6c's citable handle and plays no part in the CSV, so a fixed value keeps these
+        // cases about the columns the writer actually emits.
+        return new AuditHistoryEntry(1L, headline, LocalDateTime.of(2026, 8, 3, 14, 30), "14:30", role, detail, "ok");
     }
 
     private String csv(List<AuditHistorySection> sections) {

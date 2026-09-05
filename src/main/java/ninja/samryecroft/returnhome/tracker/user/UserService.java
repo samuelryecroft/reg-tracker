@@ -65,9 +65,9 @@ public class UserService {
      * reaches this method with a role that is neither. So the deny is now stated, and the
      * repository is not asked at all.
      *
-     * <p>The account is not hypothetical. An ORG_ADMIN with no organisation is what a half-applied
-     * data repair leaves behind, and what a link-on-first-login Entra account (P4) looks like
-     * between the identity landing and the organisation being assigned.
+     * <p>The account is not hypothetical: an ORG_ADMIN with no organisation is what a half-applied
+     * data repair leaves behind. (It was also the shape of a half-provisioned Entra account, which
+     * is gone - but the data repair case never depended on that, so the deny still earns its keep.)
      */
     public List<User> listVisible(AppUserPrincipal principal) {
         if (principal == null) {
@@ -130,36 +130,6 @@ public class UserService {
         return user;
     }
 
-
-    /**
-     * The directory object id, normalised and checked for a clash - kept out of
-     * {@code applyProfile} deliberately: a first name is profile data, an identity key is not, and
-     * the two want different handling when they are wrong.
-     *
-     * <p><b>Lowercased on the way in.</b> Entra emits {@code oid} in lower case and the sign-in
-     * lookup is an exact string match, so an administrator who pastes the portal's value with any
-     * upper-case characters would create an account that silently never matches. That failure would
-     * surface as one person unable to sign in, with a refusal message that deliberately explains
-     * nothing.
-     *
-     * <p>The pre-check is not the guarantee - {@code uq_users_idp_subject} is, and two admins saving
-     * at once would still race past this. It exists so the ordinary case is a field error on the
-     * form rather than a constraint violation surfacing as a 500 with the rest of their input lost.
-     */
-    private void applyObjectId(User user, String objectId) {
-        String normalised = trimToNull(objectId);
-        if (normalised == null) {
-            user.setIdpSubject(null);
-            return;
-        }
-        normalised = normalised.toLowerCase(Locale.ROOT);
-        Long ownerId = userRepository.findByIdpSubject(normalised).map(User::getId).orElse(null);
-        if (ownerId != null && !ownerId.equals(user.getId())) {
-            throw new DuplicateObjectIdException();
-        }
-        user.setIdpSubject(normalised);
-    }
-
     @Transactional
     public User create(CreateUserForm form, AppUserPrincipal principal) {
         validateRoles(form.getRoles(), principal);
@@ -171,7 +141,6 @@ public class UserService {
         // submitting a blank password would authenticate as this account.
         user.setPassword(form.getPassword() == null ? null : passwordEncoder.encode(form.getPassword()));
         applyProfile(user, form.getFirstName(), form.getLastName(), form.getEmail(), form.getContactPhone());
-        applyObjectId(user, form.getIdpSubject());
         user.setRoles(form.getRoles());
         user.setOrganisation(needsOrganisation(form.getRoles()) ? resolveOrganisation(form.getOrganisationId(), principal) : null);
         user.setHomes(resolveHomes(form.getRoles(), form.getHomeIds(), principal));
@@ -190,13 +159,7 @@ public class UserService {
         // record the actual role/enabled transition rather than just the end state.
         Set<Role> rolesBefore = Set.copyOf(user.getRoles());
         boolean enabledBefore = user.isEnabled();
-        // Snapshotted with the other two privilege fields, and for the same reason: applyObjectId
-        // below mutates the managed entity, so the trail could otherwise only report where the
-        // account ended up, not that it was rebound from somewhere else.
-        String identityLinkBefore = user.getIdpSubject();
-
         applyProfile(user, form.getFirstName(), form.getLastName(), form.getEmail(), form.getContactPhone());
-        applyObjectId(user, form.getIdpSubject());
         user.setRoles(form.getRoles());
         user.setOrganisation(needsOrganisation(form.getRoles()) ? resolveOrganisation(form.getOrganisationId(), principal) : null);
         user.setHomes(resolveHomes(form.getRoles(), form.getHomeIds(), principal));
@@ -206,8 +169,7 @@ public class UserService {
             user.setPassword(passwordEncoder.encode(form.getNewPassword()));
         }
         User saved = userRepository.save(user);
-        auditEventPublisher.userUpdated(saved, rolesBefore, enabledBefore, identityLinkBefore,
-                passwordChanged, principal);
+        auditEventPublisher.userUpdated(saved, rolesBefore, enabledBefore, passwordChanged, principal);
         return saved;
     }
 

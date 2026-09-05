@@ -197,7 +197,23 @@ public class AuditHistoryService {
         return sections;
     }
 
-    private String dayLabel(LocalDate day, LocalDate today) {
+    /**
+     * Groups the org-wide feed (2g) into days, using the SAME {@link #dayLabel} the single record's
+     * timeline uses. Two implementations of "Today" is how one screen comes to disagree with
+     * another about which day an event happened on - and both would look right in isolation.
+     */
+    public List<AuditFeedDay> groupFeedByDay(List<AuditFeedRow> rows) {
+        Map<LocalDate, List<AuditFeedRow>> byDay = new LinkedHashMap<>();
+        for (AuditFeedRow row : rows) {
+            byDay.computeIfAbsent(row.entry().occurredAt().toLocalDate(), d -> new ArrayList<>()).add(row);
+        }
+        LocalDate today = LocalDate.now();
+        List<AuditFeedDay> days = new ArrayList<>();
+        byDay.forEach((day, dayRows) -> days.add(new AuditFeedDay(dayLabel(day, today), dayRows)));
+        return days;
+    }
+
+    static String dayLabel(LocalDate day, LocalDate today) {
         if (day.equals(today)) {
             return "Today — " + day.format(DATE);
         }
@@ -231,7 +247,7 @@ public class AuditHistoryService {
     }
 
     private AuditHistoryEntry entry(String headline, AuditEvent event, String when, String role, String detail, String tone) {
-        return new AuditHistoryEntry(headline, event.getOccurredAt(), when, role, detail, tone);
+        return new AuditHistoryEntry(event.getId(), headline, event.getOccurredAt(), when, role, detail, tone);
     }
 
     private String transition(Map<String, String> meta) {

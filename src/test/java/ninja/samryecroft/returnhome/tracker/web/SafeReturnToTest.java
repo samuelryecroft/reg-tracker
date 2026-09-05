@@ -14,7 +14,7 @@ import org.junit.jupiter.params.provider.ValueSource;
  * request could set directly, and a value like {@code //evil.example} or {@code
  * https://evil.example} would send a just-authenticated POST's redirect off this app entirely (an
  * open redirect). Fast unit coverage on the pure guard function, same pattern this codebase already
- * uses for {@code ThemeService.darken}/{@code readableForegroundOn}.
+ * uses for {@code ThemeService.readableForegroundOn}.
  */
 class SafeReturnToTest {
 

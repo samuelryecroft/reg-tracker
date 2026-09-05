@@ -6,11 +6,15 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import ninja.samryecroft.returnhome.tracker.audit.AuditEventPublisher;
 import ninja.samryecroft.returnhome.tracker.child.ChildIdentities;
 import ninja.samryecroft.returnhome.tracker.child.ChildIdentity;
 import ninja.samryecroft.returnhome.tracker.child.NameRevealService;
+import ninja.samryecroft.returnhome.tracker.interview.DeadlineTracker;
+import ninja.samryecroft.returnhome.tracker.interview.DueBadge;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewRequest;
+import ninja.samryecroft.returnhome.tracker.interview.InterviewStatus;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewRequestService;
 import ninja.samryecroft.returnhome.tracker.interview.dto.ConfirmScheduleForm;
 import ninja.samryecroft.returnhome.tracker.report.dto.SubmitReportForm;
@@ -48,20 +52,56 @@ public class VisitorController {
         this.auditEventPublisher = auditEventPublisher;
     }
 
+    /**
+     * Screen 2f. One card per state, each with only its own action.
+     *
+     * <p>{@code nothingOutstanding} is a separate fact from an empty list and gets separate words
+     * (R-Q13): a visitor who has finished everything allocated to them has an empty-of-WORK screen,
+     * not an empty screen, and telling them their coordinator will assign interviews here would
+     * read as a rebuke for work they have in fact done. Outstanding means "waiting on this visitor"
+     * - a submitted report is with the reviewer, so it is not outstanding for them either.
+     */
     @GetMapping("/interviews")
     public String list(@AuthenticationPrincipal AppUserPrincipal principal, Model model) {
         List<InterviewRequest> requests = interviewRequestService.listForVisitor(principal);
+        LocalDateTime now = LocalDateTime.now();
+
         model.addAttribute("requests", requests);
         model.addAttribute("childIdentities",
                 ChildIdentities.mapOf(requests, InterviewRequest::getChild, nameRevealService.isRevealed()));
+        model.addAttribute("reports", reportService.reportsByRequestId(requests));
+        model.addAttribute("dueBadges", requests.stream()
+                .filter(r -> DeadlineTracker.badgeFor(r, now).isPresent())
+                .collect(Collectors.toMap(InterviewRequest::getId, r -> DeadlineTracker.badgeFor(r, now).orElseThrow())));
+        model.addAttribute("nothingOutstanding",
+                !requests.isEmpty() && requests.stream().noneMatch(VisitorController::isOutstandingForVisitor));
         return "visitor/interview-list";
     }
 
+    /** HTML5 {@code datetime-local} min/value/max attributes require this exact ISO shape, not the display format. */
+    private static final DateTimeFormatter DATETIME_LOCAL_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm");
+    private static final DateTimeFormatter SCHEDULE_ERROR_DATE_FMT = DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm");
+
+    /**
+     * D-5b-6 (spec §7d follow-up, found reviewing #87): {@code getAuthorized} enforces
+     * AUTHORIZATION and says nothing about STATUS - {@link InterviewRequestService#confirmSchedule}
+     * carries its own precondition, so the POST was always safe, but the GET offered this form at
+     * every status, including ones {@code confirmSchedule} would refuse. Two consequences that made
+     * this worth fixing rather than leaving as a documented assumption: a status past SCHEDULED (or
+     * CANCELLED) makes {@code DeadlineTracker.badgeFor} return empty, rendering a labelled clock row
+     * with nothing in it; and the page offered a Confirm button the server would reject outright -
+     * the same shape already fixed once on {@code children/list.html} ("a supplier org-admin... was
+     * offered an action the server then refused"). Gating here means {@code populateScheduleModel}'s
+     * own claim that {@code badgeFor} never returns empty is now a property of the code, not an
+     * assumption about every caller, present and future.
+     */
     @GetMapping("/interviews/{id}/schedule")
     public String scheduleForm(@PathVariable Long id, @AuthenticationPrincipal AppUserPrincipal principal, Model model) {
         InterviewRequest request = interviewRequestService.getAuthorized(id, principal);
-        model.addAttribute("request", request);
-        model.addAttribute("childIdentity", ChildIdentity.of(request.getChild(), nameRevealService.isRevealed()));
+        if (!InterviewRequestService.isAwaitingSchedule(request)) {
+            return "redirect:/interview-requests/" + id;
+        }
+        populateScheduleModel(model, request);
         model.addAttribute("form", new ConfirmScheduleForm());
         return "visitor/schedule-form";
     }
@@ -69,14 +109,43 @@ public class VisitorController {
     @PostMapping("/interviews/{id}/schedule")
     public String confirmSchedule(@PathVariable Long id, @AuthenticationPrincipal AppUserPrincipal principal,
             @Valid @ModelAttribute("form") ConfirmScheduleForm form, BindingResult bindingResult, Model model) {
+        InterviewRequest request = interviewRequestService.getAuthorized(id, principal);
+        // D-5b-4 (spec §7d): the sibling of D-187-7 at the other end of the flow - the same
+        // impossible-sequence class that reached the compliance rate through heldAt. Caught here,
+        // the visitor is present and can fix a mistyped date in seconds; caught nowhere, a document
+        // reader meets it months later in a council's copy. Deliberately NOT @Future on the form
+        // field itself: a visit time in the past is legitimate (recording after the fact) - only
+        // *before the child's return* is impossible, so the check compares against returnedAt, not
+        // against now.
+        if (form.getScheduledAt() != null && form.getScheduledAt().isBefore(request.getReturnedAt())) {
+            bindingResult.rejectValue("scheduledAt", "beforeReturn", "Visit time cannot be before the "
+                    + "child returned, " + request.getReturnedAt().format(SCHEDULE_ERROR_DATE_FMT));
+        }
         if (bindingResult.hasErrors()) {
-            InterviewRequest request = interviewRequestService.getAuthorized(id, principal);
-            model.addAttribute("request", request);
-            model.addAttribute("childIdentity", ChildIdentity.of(request.getChild(), nameRevealService.isRevealed()));
+            populateScheduleModel(model, request);
             return "visitor/schedule-form";
         }
         interviewRequestService.confirmSchedule(id, form.getScheduledAt(), principal);
         return "redirect:/visitor/interviews";
+    }
+
+    /**
+     * D-5b-1 (spec §7d): the clock the visitor's choice is measured against, shown above the field
+     * on both the fresh form and an error redisplay. {@code deadline} reuses
+     * {@link DeadlineTracker#RETURN_WINDOW} rather than restating 72 hours as a literal;
+     * {@code timeRemaining} is taken through the same {@link DeadlineTracker#badgeFor} path the
+     * queue uses, so the two screens say the same words about the same request - never re-worded
+     * here. Always present: both callers reach this only after {@link InterviewRequestService#isAwaitingSchedule}
+     * has confirmed ALLOCATED (D-5b-6), which always tracks the deadline, so {@code badgeFor} never
+     * returns empty here - a property the GET handler enforces, not an assumption about its caller.
+     */
+    private void populateScheduleModel(Model model, InterviewRequest request) {
+        model.addAttribute("request", request);
+        model.addAttribute("childIdentity", ChildIdentity.of(request.getChild(), nameRevealService.isRevealed()));
+        model.addAttribute("scheduledAtMin", request.getReturnedAt().format(DATETIME_LOCAL_FMT));
+        model.addAttribute("deadline", request.getReturnedAt().plus(DeadlineTracker.RETURN_WINDOW));
+        model.addAttribute("timeRemaining", DeadlineTracker.badgeFor(request, LocalDateTime.now())
+                .map(DueBadge::text).orElse(null));
     }
 
     private static final DateTimeFormatter SAVED_AT_FMT = DateTimeFormatter.ofPattern("HH:mm");
@@ -168,6 +237,42 @@ public class VisitorController {
                 .body(Map.of("outcome", "terminal", "message", message));
     }
 
+    /**
+     * T192: an interview cannot have been held before the child came back.
+     *
+     * <p>The T187 predicate change stopped such a record corrupting the published compliance rate -
+     * it reads as "not measurable" rather than as a pass - but it did not stop the record existing.
+     * <b>A state you have to write display language for is usually a state nobody prevented</b>
+     * (Creed), and rendering it well is the floor rather than the fix.
+     *
+     * <p><b>On submit only, never on a draft save.</b> The same reasoning the required-field checks
+     * above already follow: a draft is work in progress and a visitor may be typing a date before
+     * they have typed the year. Refusing to save half-entered work would lose it, which is the
+     * opposite of what save-as-you-go is for. Submission is the point at which the record becomes a
+     * claim.
+     *
+     * <p>The message names both times rather than saying "invalid", because the visitor cannot act
+     * on a refusal that will not say what it is comparing - and one of the two is on a different
+     * screen, so they cannot simply look.
+     */
+    private void rejectInterviewBeforeReturn(Long id, AppUserPrincipal principal,
+            SubmitReportForm form, BindingResult bindingResult) {
+        if (form.getHeldAt() == null) {
+            return;
+        }
+        LocalDateTime returnedAt = interviewRequestService.getAuthorized(id, principal).getReturnedAt();
+        if (returnedAt == null || !form.getHeldAt().isBefore(returnedAt)) {
+            return;
+        }
+        bindingResult.rejectValue("heldAt", "beforeReturn",
+                "The interview cannot have been held before the child returned. This says the "
+                        + "interview was " + form.getHeldAt().format(HELD_AT_FMT) + " and the return "
+                        + "was " + returnedAt.format(HELD_AT_FMT) + " - please check which is wrong.");
+    }
+
+    private static final java.time.format.DateTimeFormatter HELD_AT_FMT =
+            java.time.format.DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm", java.util.Locale.UK);
+
     @GetMapping("/interviews/{id}/report")
     public String reportForm(@PathVariable Long id, @AuthenticationPrincipal AppUserPrincipal principal, Model model) {
         InterviewRequest request = interviewRequestService.getAuthorized(id, principal);
@@ -188,6 +293,7 @@ public class VisitorController {
             if (form.getInterviewLocation() == null || form.getInterviewLocation().isBlank()) {
                 bindingResult.rejectValue("interviewLocation", "required", "Location is required to submit for review");
             }
+            rejectInterviewBeforeReturn(id, principal, form, bindingResult);
         }
         if (bindingResult.hasErrors()) {
             InterviewRequest request = interviewRequestService.getAuthorized(id, principal);
@@ -201,5 +307,12 @@ public class VisitorController {
             reportService.saveDraft(id, form, principal);
         }
         return "redirect:/visitor/interviews";
+    }
+
+    /** Waiting on the VISITOR specifically - a submitted report is with the reviewer, not them. */
+    private static boolean isOutstandingForVisitor(InterviewRequest request) {
+        return request.getStatus() == InterviewStatus.ALLOCATED
+                || request.getStatus() == InterviewStatus.SCHEDULED
+                || request.getStatus() == InterviewStatus.REPORT_REJECTED;
     }
 }

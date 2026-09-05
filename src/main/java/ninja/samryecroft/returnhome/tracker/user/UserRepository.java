@@ -12,20 +12,26 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @EntityGraph(attributePaths = {"homes", "organisation", "roles"})
     Optional<User> findByUsername(String username);
 
-    /**
-     * The Entra sign-in lookup: the directory object id recorded on the account by an ORG_ADMIN.
-     *
-     * <p>Carries the same entity graph as {@link #findByUsername} because it is load-bearing, not
-     * decorative. {@code spring.jpa.open-in-view} is false, so the principal built from this row is
-     * dereferenced entirely outside a transaction - a bare derived finder would return a row whose
-     * roles, organisation and homes all throw on first touch, and it would be the only finder in
-     * this interface without the graph.
-     */
     @EntityGraph(attributePaths = {"homes", "organisation", "roles"})
-    Optional<User> findByIdpSubject(String idpSubject);
 
     @Query("select case when count(u) > 0 then true else false end from User u where :role member of u.roles")
     boolean existsByRole(@Param("role") Role role);
+
+    /**
+     * Per-organisation account counts for the 4e tree, in one query.
+     *
+     * <p>Returns {@code [organisationId, count]} pairs rather than a map, because JPQL cannot
+     * construct one; the caller collects it. Organisations with no users are simply absent, so the
+     * caller must default to zero rather than assume every organisation appears - a supplier that
+     * has just been created and has nobody in it yet is a normal state, and the row it is on has
+     * to render either way.
+     *
+     * <p>Users with no organisation (HOME_STAFF is tied to homes, and the platform ADMIN to
+     * neither) are excluded rather than grouped under a null key.
+     */
+    @Query("select u.organisation.id, count(u) from User u where u.organisation is not null "
+            + "group by u.organisation.id")
+    List<Object[]> countByOrganisation();
 
     @EntityGraph(attributePaths = {"roles"})
     @Query("select u from User u where :role member of u.roles order by u.lastName, u.firstName")

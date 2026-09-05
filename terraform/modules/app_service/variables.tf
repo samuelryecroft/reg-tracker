@@ -42,10 +42,3 @@ variable "health_check_path" {
   default = "/actuator/health/readiness"
 }
 
-# --- Entra sign-in (ENTRA-AUTH-DESIGN.md §6 P2). Empty map while disabled, so no app setting is
-# written and the running app keeps form login as its only authentication path. ---
-variable "entra_app_settings" {
-  description = "Entra-related app settings to merge in. Empty (the default) means Entra is not configured on this deployment."
-  type        = map(string)
-  default     = {}
-}

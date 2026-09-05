@@ -10,7 +10,6 @@ import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.security.authentication.event.AuthenticationSuccessEvent;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.stereotype.Component;
 
 /**
@@ -20,12 +19,11 @@ import org.springframework.stereotype.Component;
  * one person who could fix it (D2/D5). Its cost is an account that can sign in without the identity
  * provider, so the compensating control is that nobody can use it quietly.
  *
- * <p><b>Not gated on {@code app.auth.entra.enabled}, and that is the point rather than an
- * oversight.</b> The rollback in §5 is "disable Entra, go back to form login" - so the moment
- * break-glass becomes the primary way in is exactly the moment the Entra flag is off. A control
- * conditional on Entra being on would disappear when it matters most. The tests run in the flag-off
- * context for the same reason: it is both the honest scenario and a structural proof that no such
- * gate crept in.
+ * <p><b>Ungated, and that is the point rather than an oversight.</b> It was written ungated because
+ * the Entra rollback was "disable Entra, go back to form login" - so a control conditional on Entra
+ * being on would have disappeared at the moment break-glass became the primary way in. Entra is
+ * gone and form login is the only path now, which retires that specific argument but not the rule:
+ * an emergency-access alert conditional on anything is an alert that can be turned off.
  */
 @Component
 public class BreakGlassAuditListener {
@@ -105,13 +103,17 @@ public class BreakGlassAuditListener {
     }
 
     /**
-     * A local sign-in while the emergency path is open. An OAuth2 authentication is never
-     * break-glass however the flag is set - it went through the identity provider by definition -
-     * and a principal that is not ours cannot be attributed to an account.
+     * A local sign-in while the emergency path is open, attributable to one of our accounts.
+     *
+     * <p>There used to be a third clause excluding an {@code OAuth2AuthenticationToken}, because an
+     * authentication that went through the identity provider is never break-glass by definition.
+     * It went with the Entra removal: no OAuth2 authentication can be produced any more, so the
+     * clause could never be false and keeping it would have described a case that cannot occur.
+     * <b>Widening it is safe precisely because the excluded case no longer exists</b> - if an
+     * external identity path is ever reintroduced, this exclusion has to come back with it.
      */
     private boolean isBreakGlass(Authentication authentication) {
         return breakGlassEnabled
-                && !(authentication instanceof OAuth2AuthenticationToken)
                 && authentication.getPrincipal() instanceof AppUserPrincipal;
     }
 }

@@ -15,10 +15,12 @@ import org.springframework.stereotype.Service;
  * username is locked out for {@code app.security.login-throttle.lockout-duration}.
  *
  * <p>State is held in memory. That is a deliberate fit for the deployment in ARCHITECTURE.md - a
- * single App Service instance with no auto-scale, ~20 users - and keeps this free of infrastructure
- * that the planned Entra migration would only throw away. The tradeoffs are real and worth stating:
- * counters reset on restart, and a scaled-out deployment would need a shared store (Redis) or,
- * better, would let the IdP own throttling entirely.
+ * single App Service instance with no auto-scale, ~20 users. It also used to be justified by the
+ * planned Entra migration throwing any such infrastructure away; <b>that justification is gone with
+ * Entra, and the ARCHITECTURE.md fit is now the whole of the argument</b> - worth knowing, because
+ * one of its two supports was removed without the conclusion changing. The tradeoffs are real and
+ * worth stating: counters reset on restart, and a scaled-out deployment would need a shared store
+ * (Redis). Handing throttling to an identity provider is no longer an option on the table.
  *
  * <p>Lockout is keyed on username rather than IP. That protects an account against distributed
  * guessing, which username-keyed counting handles and IP-keyed counting does not. The cost is that

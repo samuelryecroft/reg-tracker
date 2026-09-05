@@ -39,16 +39,6 @@ public class DatabasePasswordGuard implements ApplicationListener<ApplicationEnv
      */
     static final Set<String> LOCAL_PROFILES = Set.of("dev", "demo");
 
-    /**
-     * Profiles that mean a real deployment, which no local profile alongside them can excuse. This
-     * exists so that {@code SPRING_PROFILES_ACTIVE=prod,dev} does not launder a deployment through
-     * the local exemption - the point of the guard is precisely that environment.
-     *
-     * <p>Overlaps with {@code DemoProfileGuard}'s own list, and stays separate on purpose: that one
-     * asks "may fictional records be seeded here", this one asks "must a password be injected here",
-     * and {@code azure} answers them differently.
-     */
-    private static final Set<String> DEPLOYED_PROFILES = Set.of("prod", "production", "staging", "azure");
 
     @Override
     public void onApplicationEvent(ApplicationEnvironmentPreparedEvent event) {
@@ -79,8 +69,18 @@ public class DatabasePasswordGuard implements ApplicationListener<ApplicationEnv
         Set<String> active = Arrays.stream(environment.getActiveProfiles())
                 .map(profile -> profile.trim().toLowerCase(Locale.ROOT))
                 .collect(Collectors.toSet());
+        // POSITIVELY LOCAL **AND** NOT DEPLOYED, and the two halves are not redundant.
+        //
+        // Collapsing this to !DeployedEnvironment.isDeployed(environment) - which is exactly what
+        // "point them all at the shared method" invites - would exempt a JVM with NO PROFILES AT
+        // ALL, so a bare `java -jar` would skip the database-password check entirely. That is a
+        // security control silently weakened by a refactor whose whole purpose was to arm security
+        // controls. Kevin named the shape before it was written; the test pins it.
+        //
+        // The deployed half now also consults app.env, which it did not before. That direction is
+        // fail-safe: a deployed app.env can only DEFEAT exemption, i.e. demand a password.
         return active.stream().anyMatch(LOCAL_PROFILES::contains)
-                && active.stream().noneMatch(DEPLOYED_PROFILES::contains);
+                && !DeployedEnvironment.isDeployed(environment);
     }
 
     /**

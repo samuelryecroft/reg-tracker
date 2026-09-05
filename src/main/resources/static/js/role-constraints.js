@@ -1,4 +1,11 @@
 (function () {
+    // Mirrors Role.getDisplayName() so this note and the role chips speak with one vocabulary.
+    // Duplicated rather than injected because this script is static and un-templated; the pair is
+    // asserted by RoleDisplayNameParityTest, so they cannot drift apart without a red build.
+    var LABELS = {
+        HOME_STAFF: 'Home Staff', ORG_ADMIN: 'Org Admin', COORDINATOR: 'Coordinator',
+        VISITOR: 'Visitor', REVIEWER: 'Reviewer', VIEWER: 'Viewer', ADMIN: 'Admin'
+    };
     var SOLO_ROLES = ['HOME_STAFF', 'ADMIN'];
     var CARE_PROVIDER_ROLES = ['VIEWER'];
     var SUPPLIER_ROLES = ['COORDINATOR', 'VISITOR', 'REVIEWER'];
@@ -31,7 +38,12 @@
             cb.closest('.checkbox-option').classList.toggle('disabled', blocked);
             if (blocked && !activeRule) {
                 activeRule = checkedSolo
-                    ? 'A ' + checkedSolo + ' account cannot also hold any other role.'
+                    // LABELS[...] not the raw value: the chips beside this note now read "Home
+                    // Staff" (Role.getDisplayName, T119 4d), and a note answering "why can I not
+                    // tick this" in a different vocabulary from the thing it is about makes the
+                    // reader do the mapping. Falls back to the value so a role added to the enum
+                    // without a label here still produces a sentence rather than "A undefined".
+                    ? 'A ' + (LABELS[checkedSolo] || checkedSolo) + ' account cannot also hold any other role.'
                     : hasSupplierRole
                         ? 'A Home Staff/Admin-style account cannot also hold a Viewer role alongside Coordinator, Visitor or Reviewer.'
                         : 'This role cannot be combined with the roles already selected.';
