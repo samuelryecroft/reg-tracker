@@ -2254,6 +2254,63 @@ quietly — but it belongs inside T187 rather than after it, because T187 exists
 compliance claim that cannot be checked, and this is that claim with a rarer trigger.
 
 
+### D-187-6 · The gap in my own spec: the document states the same three facts TWICE, and one copy is still truncated
+
+I specced §7a against `ReportService.interviewHeldLine()` and **never read the .docx template.** It carries a
+question-list echo of the same block, and unzipping `rhi-report-template.docx` shows it plainly:
+
+```
+Date of Interview                                            ${interviewDate}
+Was this interview offered and completed within 72 hours?     ${within72Hours}
+If not, why?                                                  ${ifNotWhyLate}
+```
+
+`${interviewDate}` is `report.getInterviewDate()` — **`heldAt.toLocalDate()`, the truncated value §7a opens by
+naming as the defect.** So T187 as built removes the truncation from the head block and **leaves it in force
+three rows away**. Two same-date reports with opposite verdicts still show an identical "Date of Interview",
+and a reader who reads the question list and stops sees the original paradox intact. **The fix is not wrong;
+it is incomplete, and the incompleteness is mine.**
+
+> **A defect specced against a Java method is specced against one of its callers. The template is a caller.**
+
+The other two echoes are the same shape with different symptoms:
+
+- **`${within72Hours}` goes through the generic `yesNo()`, which returns *"Not recorded"* for null.** Two
+  things wrong: it is now **false** for an interview recorded before the return — that time *is* recorded, it
+  is inconsistent — and *"Not recorded"* is **stored-answer vocabulary applied to a derived value.** Every
+  other `yesNo()` field is a question a person answered, where "Not recorded" is exactly right. This one is
+  computed. **A derived value needs its own words: Yes / No / Not measurable.**
+- **`${ifNotWhyLate}` goes through `orNotProvided()` → *"Not provided"***, sitting near `reasonLine`'s
+  considered *"Not applicable"* / *"No reason recorded"*. Same fact, two vocabularies, one document.
+
+**Ruling: point all three question-list placeholders at the reading** — `interviewDate` → `heldLine`,
+`within72Hours` → a short `verdict()` on `SeventyTwoHourReading` (Yes / No / Not measurable), `ifNotWhyLate` →
+`reasonLine`. One source, stated twice, **incapable of disagreeing.** Do not gut the question list: it is the
+statutory form's own shape and the block is the reading of it. **Check before changing the answers, though:**
+if that question list is a signed-off reproduction of the statutory form, the *labels* are the form and the
+*answers* are ours — but that is a check to make, not an assumption to act on.
+
+### D-187-7 · The impossible sequence should not be reachable in the first place
+
+The predicate fix stops a broken record corrupting a published statistic. It does not stop the record
+existing. Nothing on the submit-report path rejects a `heldAt` earlier than the request's `returnedAt`, and
+that is a validation a visitor would want at the moment they mistype it, not a footnote in a document read
+months later by a council.
+
+> **A state you have to write display language for is usually a state nobody prevented.** Rendering it well
+> is the floor, not the fix.
+
+Separate ticket, not in #77 — the reading must handle historical rows whatever validation lands.
+
+### D-187-8 · `interview/detail.html` stopped naming the cause it exists to name
+
+The screen's copy widened to *"Not measurable — the interview time is missing or precedes the return"*. That
+is true and it is a **disjunction**: it tells the reader one of two things happened without saying which,
+which is the property that made this surface worth keeping (D-1a-1). `SeventyTwoHourReading` keeps the two
+causes strictly apart; the screen mirroring it should too. Branch on `${report.heldAt == null}` — the data is
+right there. **The surface I called "the one that names the cause" is the one that stopped naming it.**
+
+
 ## 7b · 4a Allocate, and the remaining list screens (Creed, 5 Sep)
 
 Specced against **main @0149f38**. Both lanes are between screens and 2a now points its one action button at
