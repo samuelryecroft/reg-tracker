@@ -2974,3 +2974,87 @@ property of the code — the same move as holding the verdict in an enum rather 
 I checked the thing in front of me and not the frame around it. **Not a reason to hold #87**, which
 implements §7d faithfully; a follow-up ticket of its own.
 
+## 7g · 5d Add a child — the form where three different questions all got asked as "isAdmin" (Creed, 8 Sep)
+
+Specced against **main @bd298fc**: `children/form.html`, `ChildController.create` / `homePickerOptionsFor`,
+`CreateChildForm`.
+
+### D-5d-1 · `isAdmin` does not mean is-an-admin, on either screen that uses it
+
+`children/form.html` wraps the Home `<select>` in `th:if="${isAdmin}"`. **The controller sets that attribute
+to `homeOptions != null`** — *"this user has more than one home to choose from"*. It is correct code: home
+staff have been able to hold several homes since V16, and `homePickerOptionsFor` returns a picker for them,
+so multi-home staff **do** get the field. I checked before writing this; there is no bug.
+
+**The name is the defect.** Across two screens `isAdmin` currently means:
+
+| where | what it actually holds |
+|---|---|
+| `children/list.html` | `showHomeColumn` — the user has more than one home, so the column earns its place |
+| `children/form.html` | `homeOptions != null` — this user must be asked which home |
+| anywhere a reader assumes | the user is an administrator |
+
+**None of the three is "is an admin".** A template reading `th:if="${isAdmin}"` beside a Home field says
+*admins choose the home*, and the next person to add a role or touch the picker will reason from that
+sentence rather than from `homePickerOptionsFor`. This codebase has already been bitten by exactly this and
+left the comment on `children/list.html`: *"The matrix, not a role flag. This hid the button from VIEWER
+only, so a supplier org-admin — who can reach this page — was offered an action the server then refused."*
+
+> **This is Kevin's root cause in a variable name: a thing named after the mechanism it was discovered in
+> rather than the property it encodes.** `isAdmin` was true of the only user who needed a picker on the day
+> it was written. **Rename to what it decides — `needsHomePicker` on the form, `showHomeColumn` on the list**
+> — the names the controller already uses internally for both.
+
+### D-5d-2 · The birth date has no upper bound, and here `@Past` is the RIGHT annotation
+
+`CreateChildForm.dateOfBirth` carries `@NotNull` and nothing else, and the input has no `max`. **A birth date
+in the future is impossible** — the same impossible-sequence family as D-187-7 and D-5b-4. Add `max` (today,
+server-set, the cheap client-side half) **and** `@Past`.
+
+**Worth the contrast with D-5b-4, because the two look identical and are opposite.** On 5b I ruled `@Future`
+**wrong** — a visit time in the past is legitimate, since a visitor may record after the fact, and only
+*before the child's return* is impossible. Here `@Past` is **right**, because a birth date genuinely cannot
+be in the future.
+
+> **The annotation is not chosen by the field's type or by which direction looks tidier. It is chosen by
+> asking which values the world can actually produce.** Two date fields, two opposite answers, and the wrong
+> one on either would be invisible until a real record hit it.
+
+### D-5d-3 · The organisation-inactive error is attached to a field that may not be on the page
+
+`create()` rejects an inactive organisation with `new FieldError("form", "homeId", …)`. But `homeId` is only
+rendered inside `th:if="${isAdmin}"` — so **for a single-home user the field does not exist**, and:
+
+- the banner's `<li>` still renders, with `href="#homeId"` pointing at **nothing**;
+- `fragments/layout :: fieldError('homeId')` renders nothing, so there is no inline message;
+- there is no control to correct, because **the user cannot fix this at all** — the message itself says an
+  administrator must activate the organisation.
+
+**It is not a field error. It is a page-level condition**, and the right treatment is the banner alone,
+carrying the whole sentence, with no anchor offered. The guard's own comment says its job is *"to refuse
+EARLY with something actionable"* — **it refuses early and correctly, and then hands the refusal to a field
+that isn't there.**
+
+> **A field error promises the reader two things: which control is wrong, and that changing it will help.
+> When neither is true, attaching it to a field costs the reader a search for a control that does not exist.**
+
+### D-5d-4 · The case reference is optional, and nothing says what is lost without it
+
+`localCaseReference` has no constraint and is labelled *"Case reference (optional)"*. **Optional is correct**
+— `maskedLabel`'s own javadoc says *"a child can exist in this system before intake finishes assigning one"*.
+But **the masking design depends on this field**: without it the masked label degrades to bare initials, and
+`ChildIdentity`'s javadoc calls that out as *"a safety problem (acting on the wrong child's record), not just
+a UX one"*.
+
+So the person who leaves it blank is making a safeguarding trade-off and is told nothing about it. **Keep it
+optional; add the hint** — *"Used to tell children apart when names are masked. Can be added later."*
+**One sentence, and it is the difference between an omission and a decision.**
+
+### Raised, not ruled · nothing prevents two records for the same child
+
+`create()` performs no duplicate check. In a safeguarding system two records for one child means the
+interview history splits across both, and the 72-hour rate counts them separately. **I am not specifying a
+matching rule** — on encrypted names, with siblings and shared surnames as the ordinary case, that is a data
+question with real false-positive costs and it belongs with the product owner, not in a screen spec. Flagged
+so the absence is a decision rather than an oversight.
+
