@@ -113,12 +113,13 @@ public class DocumentStorageConfig {
     @ConditionalOnProperty(prefix = "app.documents.key-vault", name = "warm-keys-on-startup",
             havingValue = "true", matchIfMissing = true)
     ApplicationRunner keyWarmupRunner(DocumentStorageProperties properties, KeyProvider keyProvider,
-            OrganisationRepository organisationRepository) {
+            OrganisationRepository organisationRepository, TokenCredential credential) {
         if (properties.getKeys() != DocumentStorageProperties.KeyBackend.KEY_VAULT) {
             return args -> { };
         }
         return new KeyWarmupRunner(keyProvider, organisationRepository,
-                properties.getKeyVault().getWarmupTimeout());
+                properties.getKeyVault().getWarmupTimeout(), credential,
+                properties.getKeyVault().getTokenScope());
     }
 
     @Bean

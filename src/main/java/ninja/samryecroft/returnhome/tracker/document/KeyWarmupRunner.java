@@ -1,5 +1,7 @@
 package ninja.samryecroft.returnhome.tracker.document;
 
+import com.azure.core.credential.TokenCredential;
+import com.azure.core.credential.TokenRequestContext;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -48,18 +50,65 @@ public class KeyWarmupRunner implements ApplicationRunner {
     private final KeyProvider keyProvider;
     private final OrganisationRepository organisationRepository;
     private final Duration timeout;
+    private final TokenCredential credential;
+    private final String tokenScope;
 
     public KeyWarmupRunner(KeyProvider keyProvider, OrganisationRepository organisationRepository,
-            Duration timeout) {
+            Duration timeout, TokenCredential credential, String tokenScope) {
         this.keyProvider = keyProvider;
         this.organisationRepository = organisationRepository;
         this.timeout = timeout;
+        this.credential = credential;
+        this.tokenScope = tokenScope;
+    }
+
+    /**
+     * Fetches the Key Vault access token before anything asks the vault for a key.
+     *
+     * <p><b>Measured, and it is the dominant cold cost.</b> The first {@code getKey} on a fresh
+     * container took 32-42 seconds and came back 401. Pam traced the spans: the 401 is Key Vault's
+     * standard AAD <em>auth challenge</em>, not a refusal - the vault 401s the first unauthenticated
+     * call on purpose, with a {@code WWW-Authenticate} header naming the scope to get a token for.
+     * The SDK then acquires the token inline and retries, and the retry succeeds in ~200ms. So the
+     * 42 seconds is <b>the challenge leg's span held open while a cold managed-identity token is
+     * acquired</b>, at ~10 seconds each on a B1 - not the vault doing forty seconds of work.
+     *
+     * <p>Which makes the fix "have the token before the challenge arrives" rather than "allow more
+     * time for the challenge". A bigger warmup budget would only spend longer in the same dance -
+     * and it was that failing call which ate the budget and left the second organisation unwarmed.
+     *
+     * <p><b>A correction worth leaving here, because it was wrong in the T181 PR body.</b> The two
+     * token acquisitions per cold start were reported as duplication caused by two credential
+     * instances. They are not: Azure tokens are per audience, and Key Vault
+     * ({@code vault.azure.net}) and Blob Storage ({@code storage.azure.com}) are different
+     * audiences, so two acquisitions were always correct. Sharing one credential still mattered -
+     * two instances mean two caches, so each audience would be fetched afresh - but the count was
+     * never going to fall to one, and this pre-acquires only the vault's.
+     *
+     * <p>Non-fatal, like everything else here: if it fails, the first real call pays what it always
+     * paid.
+     */
+    private void preAcquireToken() {
+        if (credential == null || tokenScope == null || tokenScope.isBlank()) {
+            return;
+        }
+        try {
+            Instant started = Instant.now();
+            credential.getTokenSync(new TokenRequestContext().addScopes(tokenScope));
+            log.info("Key Vault token acquired at startup in {}ms, so the first key lookup does not "
+                            + "answer the vault's auth challenge with a cold token",
+                    Duration.between(started, Instant.now()).toMillis());
+        } catch (RuntimeException e) {
+            log.warn("Could not pre-acquire the Key Vault token ({}); the first key lookup will "
+                    + "acquire it inline as before", e.getClass().getSimpleName());
+        }
     }
 
     @Override
     public void run(ApplicationArguments args) {
         Instant deadline = Instant.now().plus(timeout);
         Instant started = Instant.now();
+        preAcquireToken();
         List<Organisation> organisations = organisationRepository.findByTypeOrderByName(OrgType.CARE_PROVIDER)
                 .stream()
                 // Only ACTIVE care providers hold records, so only they have a KEK to warm. A
