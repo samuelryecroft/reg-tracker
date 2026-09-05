@@ -18,9 +18,18 @@ import org.junit.jupiter.api.Test;
  *
  * <p><b>Why a guard and not just the deletion.</b> {@code outline: none} is the single most natural
  * thing to write when a designer dislikes the default ring, it reads as tidy, and its consequence -
- * a keyboard user losing the only compliant signal that tells them where they are - is invisible to
- * anyone testing with a mouse. It came back once already; the deletion alone does not stop it
- * returning.
+ * everyone losing the only signal that says where they are - is invisible in a static render,
+ * because nothing in one is focused. No test fails and no screenshot moves.
+ *
+ * <p><b>What the deletion actually bought, which is not what T188 originally claimed.</b> The ring
+ * was rendering: the element-qualified {@code input:focus-visible} rule is the same specificity as
+ * {@code input:focus} and later in source, so it won. Creed withdrew the "every input fails 2.4.11"
+ * claim once we had both walked the cascade. The real defect is that the correctness <em>depended on
+ * source order</em>: that {@code :focus-visible} block exists twice, and deleting the later copy -
+ * the obvious one, since the earlier reads as the original - would have left the survivor BEFORE the
+ * suppression, where equal specificity means earlier loses. <b>Code that is correct only because of
+ * the order two equal-specificity rules happen to appear in is invisible to the person tidying it,
+ * and "remove the duplicate" is the most likely edit there is.</b>
  *
  * <p><b>What this deliberately permits.</b> The bare {@code :focus \{ outline: none \}} at the top of
  * the stylesheet stays legal, and is the correct pattern: it suppresses the ring for pointer focus
@@ -64,13 +73,14 @@ class FocusIndicatorGuardTest {
                 .isGreaterThan(0);
 
         assertThat(offences)
-                .as("this rule removes the focus outline from a specific element, which outranks the "
-                        + "global :focus-visible ring and takes it away from KEYBOARD users, not just "
-                        + "pointer ones. The remaining signal is then the border colour alone, which "
-                        + "measures 1.47-1.79:1 focused-vs-unfocused at every brand hue in both "
-                        + "appearances - a WCAG 2.2 AA 2.4.11 failure needing 3:1. The bare "
-                        + "':focus { outline: none }' is the correct place for this; an "
-                        + "element-qualified one is not")
+                .as("this rule removes the focus outline from a specific element. Whether the ring "
+                        + "survives then depends on an element-qualified :focus-visible rule existing "
+                        + "LATER in the file at equal specificity - correctness resting on source "
+                        + "order, which the next person to tidy a duplicate will not see. If it does "
+                        + "not survive, the remaining signal is the border colour alone, measuring "
+                        + "1.47-1.79:1 focused-vs-unfocused at every brand hue in both appearances "
+                        + "against WCAG 2.2 AA 2.4.11's 3:1. The bare ':focus { outline: none }' is "
+                        + "the correct place for this; an element-qualified one is not")
                 .isEmpty();
     }
 

@@ -771,11 +771,22 @@ input, select, textarea {
 }
 textarea { min-height: 5.5rem; resize: vertical; }
 input[type="color"].swatch-input { padding: 0.25rem; height: 3rem; cursor: pointer; }
-/* T188 / WCAG 2.2 AA 2.4.11. `outline: none` was here and is deliberately gone: the border turning
-   accent-coloured measures 1.47-1.79:1 focused-vs-unfocused at every brand hue in both appearances,
-   so it must never be the ONLY focus signal. The border change stays as reinforcement.
-   Kept as a deletion rather than a rewrite because the ring that should show is already correct and
-   already on the non-themeable token - there was nothing to add, only something to stop removing. */
+/* T188. `outline: none` was here and is deliberately gone. Not because the ring was missing - it
+   renders today, and Creed withdrew that claim (spec 6h) after we both walked the cascade: the
+   element-qualified `input:focus-visible` block below is (0,1,1), the same as `input:focus`, and
+   later in source, so it wins.
+
+   THE DELETION CONVERTS A CORRECTNESS THAT DEPENDS ON SOURCE ORDER INTO ONE THAT DOES NOT.
+   That block exists TWICE - here and once earlier, identical selector lists, --ink aliasing
+   --color-text. Someone will dedupe them, and the obvious copy to delete is the later one, because
+   the earlier reads as the original. Do that while `outline: none` is still here and the survivor
+   sits BEFORE this rule: equal specificity, earlier loses, the outline is suppressed, and every text
+   input in the app silently loses its focus ring. No test fails and no screenshot moves, because
+   nothing in a static render is focused. With the suppression gone, either duplicate can go safely.
+
+   The border turning accent-coloured stays as reinforcement. It measures 1.47-1.79:1
+   focused-vs-unfocused at every brand hue in both appearances, which is why it must never become the
+   only signal - that ratio is the cost of the hazard above, not a description of today. */
 input:focus, select:focus, textarea:focus { border-color: var(--accent); }
 /* Non-themeable focus indicator (FE-04): the branded border above is decoration; this outline is
    the real signal and survives any supplier colour, including a pale one that fails contrast. */
