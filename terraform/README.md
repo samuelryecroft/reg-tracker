@@ -231,6 +231,51 @@ Kevin F1. AcrPull (job) + AcrPush (CD/deploy) live in `bootstrap-deployer-identi
 **One open item** (see `PREFLIGHT.md`): slot-swap needs App Service **S1** (B1 has no slots — ships a
 direct-deploy fallback with redeploy-previous-artifact rollback). ACR adds ~£4/mo.
 
+### Ephemeral migration env (T180) — the LIVE migration path
+
+**The GitHub Actions `deploy.yml` above has never completed a deploy** (no `prod` Environment, no
+OIDC identities/secrets provisioned; `deploy` job guarded to `main`). Go-live is a **manual** deploy,
+and this is the migration procedure it runs.
+
+**Why ephemeral.** The `modules/migrator_job` env (`cae-<prefix>`) is VNet-internal, so Container
+Apps stands up an internal load balancer for it in the platform-managed `ME_*` resource group. The
+**job scales to zero** (≈£0 at rest), but that **LB bills ~£6.5/mo idling 24/7** for a runner used a
+handful of minutes per deploy. So migrations run in a **per-run environment that is created, used and
+destroyed each deploy** — the LB then exists only for the ~minutes of a migration, not permanently.
+
+**What is standing vs ephemeral.** Standing (Terraform-owned, free/near-free): the CD managed
+identity (`rht-cd-prod`, with KV Secrets User + AcrPull), the digest-pinned DB-plane image in ACR,
+and a **dedicated `snet-ca-migrate` /23** (`module.network.migrate_subnet_id` — a bare delegated
+subnet carries no LB). Ephemeral (created out-of-band by the procedure via `az`, **never** in
+Terraform state): the Container Apps **environment + job**. Two envs cannot share one delegated
+subnet, which is why `snet-ca-migrate` is separate from `containerapps` (the latter holds the
+standing `modules/migrator_job` env, **kept as the fallback** until this path is proven in a real
+deploy, then removed).
+
+**Procedure (manual, per deploy), BEFORE the jar goes live:**
+1. `terraform apply` (idempotent) so `snet-ca-migrate` exists; read `migrate_subnet_id`.
+2. **Pre-create sweep** (required — a stale env from a failed prior run holds the subnet): if an env
+   named `cae-<prefix>-migrate` exists, `az containerapp env delete … --yes` and wait for its `ME_*`
+   RG to disappear.
+3. `az containerapp env create -n cae-<prefix>-migrate --internal-only true
+   --infrastructure-subnet-resource-id <migrate_subnet_id> --logs-workspace-id/-key <log-analytics>`.
+4. `az containerapp job create -n caj-<prefix>-migrate` in that env: **same** digest-pinned image,
+   `--mi-user-assigned rht-cd-prod`, `--registry-server <acr> --registry-identity rht-cd-prod`, and
+   the same env vars as `modules/migrator_job` (`KEY_VAULT_URI`, `AZURE_CLIENT_ID`, `DB_HOST`,
+   `DB_NAME`, `ADMIN_LOGIN`, `MIGRATOR_LOGIN`, `SQL_DIR=/payload/sql`,
+   `FLYWAY_LOCATIONS=/payload/migration`), `--replica-timeout 1800 --replica-retry-limit 0`.
+5. `az containerapp job start` → **poll the execution to `Succeeded`; abort the deploy on `Failed`**
+   (same WS-G ordering guarantee as the standing step: `01 → Flyway → 02` completes before the jar).
+6. **Always-teardown** (success or failure): `az containerapp job delete` then
+   `az containerapp env delete` (env refuses while the job exists; the subnet refuses deletion while
+   the env's managed LB holds its frontend IP — so the order is **job → env**, and the subnet is
+   PERMANENT precisely to avoid that 10–20 min delete-ordering trap). The next run's pre-create sweep
+   is the backstop if a teardown is interrupted.
+
+This preserves the Kevin-T89 guarantees exactly (managed identity **in the VNet** + KV read; **ACI is
+still ruled out** — it cannot do MI-in-VNet without a stored credential). It is proven end-to-end on
+a real migration before the standing `cae-<prefix>` env + its LB are deleted.
+
 ## Restoring the database and Key Vault is a COUPLED operation (field encryption)
 
 Since field-level encryption landed, the database and Key Vault are **one restore unit, not two**.
