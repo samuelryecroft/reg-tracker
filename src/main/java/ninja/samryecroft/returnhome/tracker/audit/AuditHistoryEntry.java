@@ -9,6 +9,11 @@ import java.time.LocalDateTime;
  * access-denied reason, a review comment). {@link AuditHistoryService} is the only place that
  * builds one of these, and it holds the per-event-type allow-list that keeps it that way.
  *
+ * @param id          the audit event's own id - the stable handle 6c cites and 6c's route
+ *                     resolves. An id, not free text, so it does not widen what this projection
+ *                     is allowed to carry. It replaces the canvas's "Event 4 of 6": a position
+ *                     inside a filtered view means different things depending on how the reader
+ *                     arrived, and on an append-only trail the denominator moves.
  * @param headline    a short sentence naming what happened, e.g. "Report approved"
  * @param occurredAt  when it happened - kept alongside {@code when} so day-grouping can bucket on
  *                     the real instant regardless of how that instant is displayed
@@ -25,6 +30,7 @@ import java.time.LocalDateTime;
  *                     text must never rely on colour alone to say what happened.
  */
 public record AuditHistoryEntry(
+        Long id,
         String headline,
         LocalDateTime occurredAt,
         String when,

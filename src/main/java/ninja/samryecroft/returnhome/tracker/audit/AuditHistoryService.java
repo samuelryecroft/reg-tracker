@@ -247,7 +247,7 @@ public class AuditHistoryService {
     }
 
     private AuditHistoryEntry entry(String headline, AuditEvent event, String when, String role, String detail, String tone) {
-        return new AuditHistoryEntry(headline, event.getOccurredAt(), when, role, detail, tone);
+        return new AuditHistoryEntry(event.getId(), headline, event.getOccurredAt(), when, role, detail, tone);
     }
 
     private String transition(Map<String, String> meta) {

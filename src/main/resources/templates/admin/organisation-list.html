@@ -35,52 +35,108 @@
 
     <a class="btn" href="/admin/organisations/new" th:if="${can.addOrganisation}">Add organisation</a>
 
-    <div class="table-wrap responsive">
-    <table>
-        <caption>All organisations on the platform.</caption>
-        <thead>
-        <tr>
-            <th scope="col">Name</th>
-            <th scope="col">Type</th>
-            <th scope="col">Supplier</th>
-            <th scope="col">Status</th>
-            <th scope="col">Action</th>
-        </tr>
-        </thead>
-        <tbody>
-        <tr th:each="o : ${organisations}">
-            <td th:text="${o.name}">Name</td>
-            <td th:text="${o.type}">Type</td>
-            <td th:text="${o.supplierOrganisation} ? ${o.supplierOrganisation.name} : '—'">Supplier</td>
-            <td><span class="status" th:classappend="${o.status}" th:text="${o.status}">STATUS</span></td>
-            <td>
-                <form th:if="${o.status.name() == 'PENDING'}" method="post"
-                      th:action="@{/admin/organisations/{id}/activate(id=${o.id})}">
-                    <button type="submit" class="btn">Activate</button>
-                </form>
-            </td>
-        </tr>
-        </tbody>
-    </table>
-    </div>
+    <!--/*
+      4e (spec §7b): organisations and homes as ONE TREE in creation order, because that is the
+      shape the data has - an organisation must exist before a home, and a home before a child.
+      Two flat lists on two screens could never show that, which is why this is a tree and not a
+      restyled table.
 
-    <div class="stack">
-        <div class="srow" th:each="o : ${organisations}">
-            <div class="top"><span class="name" th:text="${o.name}">Name</span></div>
-            <dl>
-                <dt>Type</dt><dd th:text="${o.type}">Type</dd>
-                <dt>Supplier</dt><dd th:text="${o.supplierOrganisation} ? ${o.supplierOrganisation.name} : '—'">Supplier</dd>
-                <dt>Status</dt><dd th:text="${o.status}">STATUS</dd>
-            </dl>
-            <div class="act" th:if="${o.status.name() == 'PENDING'}">
-                <form method="post" th:action="@{/admin/organisations/{id}/activate(id=${o.id})}">
-                    <button type="submit" class="btn">Activate</button>
-                </form>
+      This replaces a <table> AND a card stack rendering the same list - the R-Q12 duplication,
+      and here it had drifted the furthest of the three list screens I have touched: the table
+      rendered status through <span class="status"> (a styled chip) and the stack rendered it as
+      bare <dd> text. Same field, one screen, two treatments, and no viewport that shows both.
+
+      /admin/homes SURVIVES, scoped to management. The tree replaces the job of BROWSING homes,
+      not of adding and editing them - 6d needs home-form.html regardless. That is Pam's read,
+      with Creed confirming; it is recorded here rather than in a thread because the next person
+      to notice homes appearing in two places will ask exactly this question.
+    */-->
+    <div class="org-tree">
+        <div class="org-branch" th:each="s : ${tree.suppliers()}">
+            <div class="case org-supplier">
+                <span class="case-link">
+                    <span class="case-avatar" aria-hidden="true"
+                          th:text="${#strings.substring(s.organisation().name, 0, 1)}">B</span>
+                    <span class="case-ident">
+                        <span class="case-name" th:text="${s.organisation().name}">Beacon Return Home Services</span>
+                        <span class="case-meta" th:text="${s.meta()}">Supplier · 6 users · branding set</span>
+                    </span>
+                </span>
+                <span class="case-tags">
+                    <span class="tag tag-accent">Supplier</span>
+                    <!--/* "Empty" is the canvas's own tag for a supplier serving nobody. It is
+                         information, not a fault: the platform default starts this way. */-->
+                    <span class="tag tag-outline" th:if="${s.isEmpty()}">Empty</span>
+                    <span class="status" th:classappend="${s.organisation().status}"
+                          th:text="${s.organisation().status}">STATUS</span>
+                </span>
+            </div>
+
+            <div class="org-children">
+                <div class="case org-provider" th:each="p : ${s.careProviders()}">
+                    <span class="case-link">
+                        <svg class="icon org-icon" aria-hidden="true"><use th:href="@{/icons/phosphor.svg} + '#ph-buildings'"></use></svg>
+                        <span class="case-ident">
+                            <span class="case-name" th:text="${p.organisation().name}">Harbourside Children&#39;s Care</span>
+                            <span class="case-meta" th:text="${p.homeNames()}">Oakwood House · Marisco Lodge</span>
+                        </span>
+                    </span>
+                    <span class="case-tags">
+                        <span class="tag tag-neutral">Care provider</span>
+                        <span class="status" th:classappend="${p.organisation().status}"
+                              th:text="${p.organisation().status}">STATUS</span>
+                    </span>
+                    <span class="case-action" th:if="${p.organisation().status.name() == 'PENDING'}">
+                        <form method="post" th:action="@{/admin/organisations/{id}/activate(id=${p.organisation().id})}">
+                            <button type="submit" class="btn">Activate</button>
+                        </form>
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!--/* Care providers with no supplier. A tree grouped by supplier drops these silently,
+             and the column is nullable - so the natural implementation hides exactly the records
+             that are misconfigured, on the screen whose whole job is to show every organisation
+             on the platform. Rendered under a heading that says what the state is, because an
+             organisation nobody can reach through the tree is the one an admin must be told
+             about. Normally absent, which is why the block is conditional. */-->
+        <div class="org-branch" th:unless="${#lists.isEmpty(tree.unassigned())}">
+            <h2 class="org-orphan-head">Not linked to a supplier</h2>
+            <p class="hint">These care providers have no supplier organisation, so they do not
+                appear under one above. Each needs linking before it can be used.</p>
+            <div class="org-children">
+                <div class="case org-provider" th:each="p : ${tree.unassigned()}">
+                    <span class="case-link">
+                        <svg class="icon org-icon" aria-hidden="true"><use th:href="@{/icons/phosphor.svg} + '#ph-buildings'"></use></svg>
+                        <span class="case-ident">
+                            <span class="case-name" th:text="${p.organisation().name}">Care provider</span>
+                            <span class="case-meta" th:text="${p.homeNames()}">No homes yet</span>
+                        </span>
+                    </span>
+                    <span class="case-tags">
+                        <span class="tag tag-outline">No supplier</span>
+                    </span>
+                </div>
             </div>
         </div>
     </div>
 
-    <div class="empty" th:if="${#lists.isEmpty(organisations)}">No organisations yet.</div>
+    <!--/* Copy is Creed's ruling (§7n), not R-Q13's original row, which was impossible to
+         follow: it told a first-run admin to add a care provider first, and organisation-form
+         requires selecting an existing supplier from a dropdown - so on an empty system that
+         instruction cannot be carried out. The order the sentence gives is now the order the
+         forms actually permit, which is the same rule 4e's tree draws.
+
+         Tests the TREE, not the flat list it was built from. Those can disagree - a page that
+         renders the tree but decides its empty state from a different collection can show "No
+         organisations yet" above a populated tree, or a blank page with no explanation. The empty
+         state should be a statement about what is on the screen. Both branches, because an
+         organisation that reaches only the unassigned branch is still an organisation. */-->
+    <div class="empty" th:if="${#lists.isEmpty(tree.suppliers()) and #lists.isEmpty(tree.unassigned())}">
+        No organisations yet. Add a supplier first — a care provider must belong to one.
+        <a class="btn secondary" href="/admin/organisations/new" th:if="${can.addOrganisation}">Add an organisation</a>
+    </div>
 </main>
 </body>
 </html>

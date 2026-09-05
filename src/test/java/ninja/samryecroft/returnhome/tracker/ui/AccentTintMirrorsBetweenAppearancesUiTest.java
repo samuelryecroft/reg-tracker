@@ -24,8 +24,21 @@ import org.junit.jupiter.api.Test;
  * <b>It is no longer evidence about T186.</b> T188 moves that rule from {@code --accent} onto
  * {@code --color-accent}, a long ramp name the deleted block never touched - so after T188 it looks
  * correct whether or not this change was made, and a screenshot of it would prove nothing.
- * {@code thead tr { background: var(--tint) }} (app.css:1095) is still bound to one of the four
- * tokens, and {@code --tint} is the token whose cream-in-dark-mode behaviour started the thread.
+ * {@code --tint} is the right token either way: it is one of the four the deleted block pinned, and
+ * the one whose cream-in-dark-mode behaviour started the thread.
+ *
+ * <h2>Why the target moved off {@code thead tr}, which is the more useful lesson</h2>
+ *
+ * <p>This measured {@code thead tr { background: var(--tint) }} on {@code /admin/users}. That rule
+ * was chosen for being bound to {@code --tint}, which was the only property anyone checked - but it
+ * carried a second, unnoticed dependency: <b>it needed that page to still have a table.</b> T119 4d
+ * deleted it, because R-Q12 rules tables out for lists of people, and the redesign is deleting the
+ * others on the same grounds. The test would have gone red for a reason having nothing to do with
+ * what it asserts, in the non-blocking lane, where a red it cannot explain is a red nobody reads.
+ *
+ * <p>It now reads {@code .case-avatar}, which is {@code background: var(--tint)} on the same page
+ * and is <em>part of</em> the redesign rather than a thing the redesign removes. <b>A fixture
+ * chosen only for the property under test still depends on everything else about itself.</b>
  *
  * <h2>Why an assertion rather than a screenshot</h2>
  *
@@ -52,8 +65,8 @@ class AccentTintMirrorsBetweenAppearancesUiTest extends AbstractUiTest {
         page.emulateMedia(new Page.EmulateMediaOptions().setColorScheme(ColorScheme.DARK));
         login(ADMIN_USERNAME, ADMIN_PASSWORD);
 
-        String dark = theadBackground("dark");
-        String light = theadBackground("light");
+        String dark = avatarBackground("dark");
+        String light = avatarBackground("light");
 
         // The whole of the defect, in one assertion. With the inline block present these are the
         // same string, because it pinned --tint to one value regardless of appearance.
@@ -63,11 +76,11 @@ class AccentTintMirrorsBetweenAppearancesUiTest extends AbstractUiTest {
                 .isNotEqualTo(light);
     }
 
-    private String theadBackground(String appearance) {
+    private String avatarBackground(String appearance) {
         page.navigate(url("/admin/users"));
-        page.waitForSelector("thead tr");
+        page.waitForSelector(".case-avatar");
         page.evaluate("a => document.documentElement.setAttribute('data-appearance', a)", appearance);
-        return (String) page.evalOnSelector("thead tr",
+        return (String) page.evalOnSelector(".case-avatar",
                 "el => getComputedStyle(el).backgroundColor");
     }
 }

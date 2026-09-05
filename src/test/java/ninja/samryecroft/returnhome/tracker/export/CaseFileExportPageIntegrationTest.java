@@ -202,7 +202,10 @@ class CaseFileExportPageIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
 
-        assertThat(readyHtml).contains("Pack ready");
+        // 6e copy. Asserted on the banner heading, not on "Pack ready", which this used to check
+        // and which the <title> also contained - so the assertion would have gone on passing off
+        // the title alone after the visible heading changed underneath it.
+        assertThat(readyHtml).contains("Your export is ready");
         Matcher tokenMatch = Pattern.compile("/export/download/([^\"]+)").matcher(readyHtml);
         assertThat(tokenMatch.find()).as("download link present").isTrue();
         String token = tokenMatch.group(1);
