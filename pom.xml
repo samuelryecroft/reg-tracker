@@ -61,16 +61,6 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-security</artifactId>
         </dependency>
-        <!-- Entra External ID sign-in (ENTRA-AUTH-DESIGN.md §2, option B): oauth2Login, i.e. the
-             confidential-client authorization-code flow establishing the same server-side session
-             the app already uses. Deliberately NOT oauth2ResourceServer - this is a server-rendered
-             Thymeleaf app with no public API, so bearer-token validation would be inventing a
-             problem we do not have. Inert until app.auth.entra.enabled is set. -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-oauth2-client</artifactId>
-        </dependency>
-
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-jpa</artifactId>

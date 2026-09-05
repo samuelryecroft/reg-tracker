@@ -55,14 +55,25 @@ class AdminUserFormUiTest extends AbstractUiTest {
         login(ADMIN_USERNAME, ADMIN_PASSWORD);
         page.navigate(url("/admin/users/new"));
 
-        // Everything valid except the Directory object ID, so the browser's own required-field
-        // handling lets the form reach the server and the server sends back one field error.
+        // Everything valid except the contact phone, which is deliberately over its 30-character
+        // server-side limit.
+        //
+        // THE FIELD CHOICE IS THE TEST. This case needs input the browser will happily submit and
+        // the SERVER then rejects - otherwise HTML5 validation blocks the submit, the request never
+        // arrives, and no server-rendered .field-error is ever painted. contactPhone qualifies
+        // because it is type="tel" (no format validation), not required, and carries no maxlength
+        // attribute, so its @Size(max = 30) is enforced only server-side.
+        //
+        // This used to be the Directory object ID, for exactly the same reason. When that field was
+        // removed with Entra, substituting the email field looked equivalent and was not: type=email
+        // is validated in the browser, so the form never posted and this test timed out waiting for
+        // an error that could not appear.
         page.fill("#username", "t165ui");
         page.fill("#password", "correct-horse-battery");
         page.fill("#firstName", "Val");
         page.fill("#lastName", "Idation");
+        page.fill("#contactPhone", "0770090000007700900000077009000000");
         page.fill("#email", "t165ui@example.test");
-        page.fill("#idpSubject", "6f0a1c9e-3c2b-4c1a-9f77");
         // Scoped to <main>: the shell sidebar's sign-out control is also a submit button, and it
         // comes first in the DOM - an unscoped selector signs the admin out instead.
         page.click("main button[type=submit]");

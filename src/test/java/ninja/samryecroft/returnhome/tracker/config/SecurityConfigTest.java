@@ -93,17 +93,4 @@ class SecurityConfigTest {
         mockMvc.perform(get("/admin/users"))
                 .andExpect(status().isNotFound());
     }
-
-    @Test
-    void entraEnabledWithoutAClientRegistrationRefusesToStart() {
-        // Deliberately not a silent fall back to form login. A deployment that asked for Entra and
-        // did not get it would otherwise start and look healthy, so the misconfiguration would be
-        // reported by whoever could not sign in - the worst possible channel for a front door.
-        // Asserted on the guard directly: booting a knowingly broken application proves the same
-        // thing far more slowly.
-        assertThatThrownBy(() -> SecurityConfig.requireClientRegistrations(null))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("app.auth.entra.enabled is true")
-                .hasMessageContaining("'entra' profile");
-    }
 }

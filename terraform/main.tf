@@ -175,16 +175,6 @@ module "app_service" {
 
   # VNet path: regional VNet integration so outbound DB/Blob traffic uses the private endpoints.
   vnet_integration_subnet_id = var.enable_vnet ? module.network[0].app_subnet_id : null
-
-  # Entra sign-in. Note SPRING_PROFILES_ACTIVE above stays "azure" - the `entra` profile is what
-  # actually activates OIDC, and adding it is a deliberate cutover step (P7), not a side effect of
-  # provisioning the configuration. So even with entra_enabled = true the app still serves form
-  # login until that profile is added, which is exactly the order the §8 checklist requires.
-  entra_app_settings = var.entra_enabled ? {
-    "ENTRA_CLIENT_ID"     = var.entra_client_id
-    "ENTRA_ISSUER_URI"    = var.entra_issuer_uri
-    "ENTRA_CLIENT_SECRET" = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.entra_client_secret[0].versionless_id})"
-  } : {}
 }
 
 # ACR (Basic, ~£4/mo - the only new WS-E line item) holding the custom DB-plane image. Admin account
@@ -237,27 +227,3 @@ module "identity_rbac" {
   storage_account_id = module.storage.storage_account_id
 }
 
-# The Entra client secret's CONTAINER, not its value.
-#
-# Only the human can produce the value: it is displayed exactly once, in the portal, when the client
-# secret is created on the app registration (design §7(b) item 5). Terraform therefore creates the
-# secret with an obviously-inert placeholder and then never looks at it again - `ignore_changes` on
-# value is what makes the human's out-of-band update stick instead of being reverted on the next
-# apply. Without it, every apply would silently break sign-in.
-#
-# The target state is no secret at all: a federated identity credential against the app's managed
-# identity, consistent with WS-E having removed every other long-lived credential. This resource is
-# the interim, and it is recorded as such so it does not quietly become permanent (design §4).
-#
-# Record the expiry date when the real value is set. An unnoticed client-secret expiry is a total
-# sign-in outage with no warning, which is why the design calls for a calendar reminder.
-resource "azurerm_key_vault_secret" "entra_client_secret" {
-  count        = var.entra_enabled ? 1 : 0
-  name         = "ENTRA-CLIENT-SECRET"
-  value        = "placeholder-replace-in-portal"
-  key_vault_id = module.keyvault.vault_id
-
-  lifecycle {
-    ignore_changes = [value]
-  }
-}

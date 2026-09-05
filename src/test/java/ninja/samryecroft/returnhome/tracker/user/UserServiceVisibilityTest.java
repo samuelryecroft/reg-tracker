@@ -60,8 +60,7 @@ class UserServiceVisibilityTest {
     void anOrgAdminWithNoOrganisationIsDeniedRatherThanQueried() {
         // The one state that reaches listVisible and is neither side. ROLE_ORG_ADMIN gets it past
         // SecurityConfig's /admin/** rule, but with no organisation it is neither a care provider
-        // nor a supplier - what a half-applied data repair leaves behind, and what a
-        // link-on-first-login Entra account looks like before its organisation is assigned.
+        // nor a supplier - what a half-applied data repair leaves behind.
         AppUserPrincipal principal = principal(Set.of(Role.ORG_ADMIN), null);
 
         assertThat(service().listVisible(principal)).isEmpty();
