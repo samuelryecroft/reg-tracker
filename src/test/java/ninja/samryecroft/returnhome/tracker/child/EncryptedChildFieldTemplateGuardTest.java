@@ -60,9 +60,11 @@ import org.junit.jupiter.api.Test;
  * assumption goes quiet exactly when someone departs from it.
  *
  * <p><b>What this does not cover</b>, stated so its silence is not mistaken for assurance. Template
- * expressions are untyped, so the scan matches on FIELD NAME: if another entity ever gains a field
- * named {@code firstName} and a template renders it, this guard will name that line too. There are
- * none today. The alternative - an allow-list of variable names known to hold a {@code Child} - is
+ * expressions are untyped, so the scan matches on FIELD NAME: if another entity ever gains a
+ * PROPERTY named {@code firstName} and a template renders it, this guard will name that line too.
+ * There are none today. The near miss that shape actually produced was a projection whose accessors
+ * carried Child's own field names - that one is now separated structurally rather than by
+ * exception, because an accessor CALL cannot reach a bean's field (see {@link #entityReadOf}). The alternative - an allow-list of variable names known to hold a {@code Child} - is
  * the hand-maintained list this guard was built to avoid, and it would fail in the more dangerous
  * direction. It also cannot see a value that reaches the template already extracted into a model
  * attribute by a controller ({@code model.addAttribute("dob", child.getDateOfBirth())}); that is a
@@ -73,19 +75,64 @@ class EncryptedChildFieldTemplateGuardTest {
     private static final Path TEMPLATES = Path.of("src/main/resources/templates");
 
     /**
-     * A property read off some object in the template - {@code ${c.dateOfBirth}},
-     * {@code ${#temporals.format(c.dateOfBirth, ...)}}, {@code ${c['dateOfBirth']}}.
+     * Every notation that reads an encrypted field OFF THE ENTITY, and none that merely names it.
      *
-     * <p>The leading {@code .} or {@code ['} is what separates a READ of the value from the many
-     * legitimate places a field's NAME appears as a string: {@code th:field="*{dateOfBirth}"},
+     * <p>Three shapes disclose: the bean property read {@code ${c.dateOfBirth}} (Thymeleaf resolves
+     * it through {@code getDateOfBirth()}), the explicit getter call {@code ${c.getDateOfBirth()}},
+     * and the bracket read {@code ${c['dateOfBirth']}}. <b>The getter form was a live hole in the
+     * first version of this guard</b> - it renders identically to the property form, and the T193
+     * defect rewritten that way passed silently. It was found the first time somebody used the
+     * guard, which is the argument for the synthetic detector test below carrying every notation
+     * rather than only the one the original defect happened to use.
+     *
+     * <p>What is deliberately NOT flagged is {@code .dateOfBirth()} - a bare accessor CALL. That is
+     * the shape of a record accessor, and {@code Child} is a bean: {@code c.dateOfBirth()} resolves
+     * to no method on it and would fail at render, so it cannot be a disclosure path. Letting it
+     * through is not a concession, it is what allows a PROJECTION to keep the honest field name.
+     * The first version flagged it, and the first author to build a projection had to rename their
+     * accessors to {@code dob()}/{@code caseReference()} to get past this guard - <b>a guard that
+     * makes the correct path harder to name is pushing people off the route it exists to
+     * enforce.</b> The exemption is checked against {@code Child} rather than assumed: see
+     * {@link #accessorStyleMethodNames()}.
+     *
+     * <p>The leading {@code .} or {@code ['} is what separates a READ from the many legitimate
+     * places a field's NAME appears as a string: {@code th:field="*{dateOfBirth}"},
      * {@code #fields.hasErrors('dateOfBirth')}, {@code id="dateOfBirth"},
      * {@code aria-describedby="dateOfBirth-error"}. None of those disclose anything, and a guard
      * that flagged them would be teaching people to add exclusions - which is how a guard stops
      * guarding. The trailing {@code \b} also keeps {@code .dateOfBirthCiphertext} out: that is the
      * persisted ciphertext, not the plaintext face.
      */
-    private static Pattern propertyReadOf(String field) {
-        return Pattern.compile("(?:\\.|\\['|\\[\")" + Pattern.quote(field) + "\\b");
+    private static Pattern entityReadOf(String field, boolean childHasAccessorStyleMethod) {
+        String name = Pattern.quote(field);
+        String getter = "get" + Character.toUpperCase(field.charAt(0)) + field.substring(1);
+        String propertyRead = childHasAccessorStyleMethod
+                ? "\\." + name + "\\b"
+                : "\\." + name + "\\b(?!\\s*\\()";
+        return Pattern.compile(
+                propertyRead
+                + "|\\." + Pattern.quote(getter) + "\\s*\\("
+                + "|(?:\\['|\\[\")" + name + "\\b");
+    }
+
+    /**
+     * Record-style accessors {@code Child} actually declares - {@code dateOfBirth()} rather than
+     * {@code getDateOfBirth()}.
+     *
+     * <p>Empty today, and the exemption above depends on it staying that way. Reflected rather than
+     * assumed because "the entity is a bean, so a bare accessor call cannot reach it" is exactly the
+     * kind of convention a guard should not rest on silently: give {@code Child} a
+     * {@code dateOfBirth()} method and the exemption would hide a real read. Deriving it means the
+     * guard tightens itself the moment that stops being true.
+     */
+    private static Set<String> accessorStyleMethodNames() {
+        Set<String> names = new TreeSet<>();
+        for (java.lang.reflect.Method method : Child.class.getMethods()) {
+            if (method.getParameterCount() == 0) {
+                names.add(method.getName());
+            }
+        }
+        return names;
     }
 
     private static Set<String> encryptedFieldsOfChild() {
@@ -100,11 +147,12 @@ class EncryptedChildFieldTemplateGuardTest {
 
     /** Every {@code file:line -> field} in {@code template} that reads an encrypted field. */
     private static List<String> encryptedFieldReads(String name, String template, Set<String> fields) {
+        Set<String> accessorStyle = accessorStyleMethodNames();
         List<String> offences = new ArrayList<>();
         String[] lines = template.split("\n", -1);
         for (int i = 0; i < lines.length; i++) {
             for (String field : fields) {
-                if (propertyReadOf(field).matcher(lines[i]).find()) {
+                if (entityReadOf(field, accessorStyle.contains(field)).matcher(lines[i]).find()) {
                     offences.add(name + ":" + (i + 1) + " renders Child." + field
                             + " -> " + lines[i].trim());
                 }
@@ -226,6 +274,21 @@ class EncryptedChildFieldTemplateGuardTest {
                 "<td th:text=\"${c.dateOfBirthCiphertext}\">?</td>", fields))
                 .as("the ciphertext sibling is not the plaintext face this guard protects, and "
                         + "matching it would be a false positive on a different field entirely")
+                .isEmpty();
+
+        assertThat(encryptedFieldReads("getter.html",
+                "<td th:text=\"${c.getDateOfBirth()}\">DOB</td>", fields))
+                .as("the explicit getter renders identically to the property form and was a live "
+                        + "hole in the first version of this guard - the T193 defect written this "
+                        + "way passed silently, so its green was a false assurance")
+                .hasSize(1);
+
+        assertThat(encryptedFieldReads("projection.html",
+                "<td th:text=\"${childRows[c.id].dateOfBirth()}\">DOB</td>", fields))
+                .as("a bare accessor CALL is a record accessor - Child is a bean and has no such "
+                        + "method, so this cannot reach the entity. Flagging it forced the first "
+                        + "author of a projection to rename their accessors, which is the guard "
+                        + "pushing people off the route it exists to enforce")
                 .isEmpty();
 
         assertThat(encryptedFieldReads("masked.html",
