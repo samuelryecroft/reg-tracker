@@ -51,6 +51,15 @@ class DeployedEnvironmentConsolidationGuardTest {
      * {@code DemoProperties} legitimately says {@code "demo"}. A guard that flagged it would be
      * asking "does this file mention an environment" rather than "does this file decide whether we
      * are deployed", and the first question has no useful answer.
+     *
+     * <p><b>This is a trade, not a free win, and it should not be read as "clean by construction".</b>
+     * A duplicated {@code Set.of("dev", "demo")} would have been caught by the old heuristic and is
+     * now invisible - a second answer to "is this a developer's machine" can be introduced silently.
+     * What makes that cheap is a property of the consolidation itself rather than of this narrowing:
+     * {@code isExempt} is {@code anyMatch(LOCAL) && !isDeployed()}, and {@code isDeployed} is now
+     * canonical and correct, so a drifted local list can only ever widen exemption on a machine that
+     * is <em>genuinely not deployed</em>. <b>Consolidating the deployed answer is what makes
+     * duplicating the local answer low-severity</b> - the blast radius is bounded by the fix. (Kevin.)
      */
     private static final Set<String> MARKERS = Set.copyOf(DeployedEnvironment.DEPLOYED_MARKERS);
 
@@ -97,10 +106,13 @@ class DeployedEnvironmentConsolidationGuardTest {
         assertThat(offences)
                 .as("this file names a deployed environment, so it is a second answer to 'is this a "
                         + "deployed environment'. Call DeployedEnvironment.isDeployed instead - or, "
-                        + "if it genuinely asks a different question, express it in terms of that "
-                        + "one, as DatabasePasswordGuard's LOCAL_PROFILES does. Four copies of this "
-                        + "answer existed before T189 and two had never fired in production, because "
-                        + "each reads as correct in the file it lives in")
+                        + "if this is an annotation such as @Profile(\"azure\") where you cannot "
+                        + "call anything, use a @Conditional that does: the diagnosis is the same, "
+                        + "because @Profile(\"azure\") drifts exactly as the lists did by silently "
+                        + "missing 'prod'. If it genuinely asks a different question, express it in "
+                        + "terms of that one, as DatabasePasswordGuard's LOCAL_PROFILES does. Four "
+                        + "copies of this answer existed before T189 and two had never fired in "
+                        + "production, because each reads as correct in the file it lives in")
                 .isEmpty();
     }
 
