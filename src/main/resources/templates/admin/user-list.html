@@ -82,12 +82,14 @@
         </div>
     </div>
 
-    <!--/* Structure matches 6a's empty state; the copy is NOT R-Q13's, because R-Q13 specifies
-         children, requests, reviews and search results and says nothing about users. Left as a
-         plain sentence with the CTA rather than inventing a fifth entry - 5e is the sweep that
-         settles empty-state copy across every list, and it runs after this batch. */-->
+    <!--/* R-Q13's signed-off copy, and my first version was a paraphrase of it - "No users yet."
+         I had written that R-Q13 said nothing about users; Pam audited it for 5e and it does,
+         with a Users row reading "No accounts yet." A builder's near-miss quietly winning is how
+         signed-off copy stops being a source of truth, which matters most for the sweep that
+         comes after this. It is also the more accurate word ahead of T206, which separates a
+         person from their account. (Creed, spec §7n / D-5e-1..3.) */-->
     <div class="empty" th:if="${#lists.isEmpty(users)}">
-        No users yet.
+        No accounts yet.
         <a class="btn secondary" href="/admin/users/new" th:if="${can.addUser}">Add a user</a>
     </div>
 </main>

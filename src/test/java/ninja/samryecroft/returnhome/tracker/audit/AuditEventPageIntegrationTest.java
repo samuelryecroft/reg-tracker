@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import java.util.HashSet;
 import java.util.Set;
 import ninja.samryecroft.returnhome.tracker.AbstractIntegrationTest;
+import ninja.samryecroft.returnhome.tracker.export.ExportCapability;
 import ninja.samryecroft.returnhome.tracker.user.AppUserDetailsService;
 import ninja.samryecroft.returnhome.tracker.user.Role;
 import ninja.samryecroft.returnhome.tracker.user.User;
@@ -27,7 +28,9 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
  * T119 6c: {@code /audit/{id}} - the two properties that would be expensive to get wrong.
  *
  * <p><b>1. An event outside the caller's scope answers 404, not 403</b>, and answers it
- * identically to an event that does not exist. A 403 confirms the row is there and turns the id
+ * identically to an event that does not exist. (A caller who lacks the audit capability
+ * altogether still gets a 403 from {@link ExportCapability} - that is correct and is a different
+ * thing: it does not vary with the id, so it discloses nothing about what exists.) A 403 confirms the row is there and turns the id
  * into an enumeration oracle - "you may not see this" tells the asker there is something to see.
  * The two cases leave the controller through one branch precisely so they cannot be told apart,
  * and this asserts they cannot.
@@ -60,6 +63,12 @@ class AuditEventPageIntegrationTest extends AbstractIntegrationTest {
             user.setLastName("Itor");
             user.setRoles(new HashSet<>(Set.of(Role.ADMIN)));
             user.setEnabled(true);
+            // canExport is a PER-USER flag on top of the role, and ExportCapability.canExport
+            // requires both. Without it this fixture got a 403 from the feed's own capability
+            // gate before the id was ever looked at - my fixture, not the route. Worth naming
+            // because that 403 is correct and is NOT the enumeration hazard: it does not vary
+            // with the id, so it tells the caller nothing about whether an event exists.
+            user.setCanExport(true);
             userRepository.save(user);
         }
         return admin;

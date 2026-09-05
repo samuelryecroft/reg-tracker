@@ -122,13 +122,19 @@
         </div>
     </div>
 
-    <!--/* Tests the TREE, not the flat list it was built from. Those can disagree - a page that
+    <!--/* Copy is Creed's ruling (§7n), not R-Q13's original row, which was impossible to
+         follow: it told a first-run admin to add a care provider first, and organisation-form
+         requires selecting an existing supplier from a dropdown - so on an empty system that
+         instruction cannot be carried out. The order the sentence gives is now the order the
+         forms actually permit, which is the same rule 4e's tree draws.
+
+         Tests the TREE, not the flat list it was built from. Those can disagree - a page that
          renders the tree but decides its empty state from a different collection can show "No
          organisations yet" above a populated tree, or a blank page with no explanation. The empty
          state should be a statement about what is on the screen. Both branches, because an
          organisation that reaches only the unassigned branch is still an organisation. */-->
     <div class="empty" th:if="${#lists.isEmpty(tree.suppliers()) and #lists.isEmpty(tree.unassigned())}">
-        No organisations yet.
+        No organisations yet. Add a supplier first — a care provider must belong to one.
         <a class="btn secondary" href="/admin/organisations/new" th:if="${can.addOrganisation}">Add an organisation</a>
     </div>
 </main>
