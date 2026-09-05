@@ -76,12 +76,12 @@
             <tr th:each="row : ${view.rankedHomes()}">
                 <td><a class="rowlink" th:href="${row.href()}" th:text="${row.name()}">Home</a></td>
                 <td th:text="${row.stat().validCompleted()}">0</td>
-                <!--
+                <!--/*
                   D-2c-1 (spec §7b, applied to 6b - same rulings as 2c): no chart library, no SVG,
                   no ARIA. The value is in the row AS TEXT and the bar is a CSS width on top of it,
                   so the bar is a visual encoding of a number that is already readable and the row
                   is already the accessible content.
-                -->
+                */-->
                 <td>
                     <span class="rate" th:text="${row.stat().within72() + ' of ' + row.stat().validCompleted()
                             + ' · ' + row.stat().percent().getAsInt() + '%'}">41 of 50 · 82%</span>
@@ -158,7 +158,7 @@
                 </td>
                 <td th:text="${entry.latestSummary()}">Status</td>
             </tr>
-            <!-- R-Q13 (spec §5d), final copy - was a shorter, pre-final line on both dashboards. -->
+            <!--/* R-Q13 (spec §5d), final copy - was a shorter, pre-final line on both dashboards. */-->
             <tr th:if="${#lists.isEmpty(view.recurrence())}"><td colspan="4" class="muted">No recurring missing episodes have been flagged on open or recent requests. These are flagged by the home on the request form, so this does not rule out recurrence.</td></tr>
             </tbody>
         </table>
