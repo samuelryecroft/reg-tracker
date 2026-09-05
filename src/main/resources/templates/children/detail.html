@@ -66,8 +66,9 @@
         <tr th:each="r : ${requests}">
             <td><span class="status" th:classappend="${r.status}" th:text="${r.status.displayName}">STATUS</span></td>
             <td th:text="${#temporals.format(r.createdAt, 'dd MMM yyyy HH:mm')}">Raised</td>
-            <!-- D-4b-1: was '—' here and 'Not yet scheduled' in the card stack below - the same
-                 absence, two words, on one page nobody reads both halves of at once. -->
+            <!-- D-4b-1: this cell and the card stack below used to word the same absence two
+                 different ways - nobody reads both renderings at once, so nobody noticed. Now the
+                 same copy in both (see the stack's own cell for the literal). -->
             <td th:text="${r.scheduledAt} != null ? ${#temporals.format(r.scheduledAt, 'dd MMM yyyy HH:mm')} : 'Not yet scheduled'">Scheduled</td>
             <!-- D-4b-7: a badge only where DeadlineTracker.badgeFor returns one - a completed or
                  cancelled request has no live clock and shows none, meaningfully rather than as a gap. -->
