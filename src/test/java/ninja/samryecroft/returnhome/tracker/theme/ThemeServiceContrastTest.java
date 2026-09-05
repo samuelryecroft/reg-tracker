@@ -18,20 +18,6 @@ class ThemeServiceContrastTest {
 
     @ParameterizedTest
     @CsvSource({
-            "#F36E2A, #FFF0DD", // shipped default
-            "#FFD400, #FFF9D6", // pale yellow - Ryan's worst case (was 2.01:1 on tint)
-            "#7ED321, #EAF9DD", // pale green
-            "#00B8D9, #DEF7FB", // cyan
-    })
-    void darkenedAccentClearsAaAgainstSurfaceAndTint(String accent, String tint) {
-        String darkened = ThemeService.darken(accent, tint);
-
-        assertThat(contrast(darkened, SURFACE)).isGreaterThanOrEqualTo(4.5);
-        assertThat(contrast(darkened, tint)).isGreaterThanOrEqualTo(4.5);
-    }
-
-    @ParameterizedTest
-    @CsvSource({
             "#F36E2A, #1F2328", // default brand orange -> ink wins (mockup: 5.32:1)
             "#FFD400, #1F2328", // pale yellow -> ink
             "#7ED321, #1F2328", // pale green -> ink
@@ -49,9 +35,14 @@ class ThemeServiceContrastTest {
             "#1D4ED8, #FFFFFF", // Creed's docx-review check: 6.70:1 -> white
     })
     void matchesCreedsDocxReviewCheckValues(String accent, String expectedForeground) {
-        // readableForegroundOn is the shared helper DocxReportGenerator's header-bar-text fix will
-        // also call (Creed's docx-format-review.md finding 1) - confirming it here, with and without
-        // the leading '#', since the docx side's own token convention drops it.
+        // readableForegroundOn is the shared helper DocxReportGenerator calls for its header-bar
+        // text (Creed's docx-format-review.md finding 1) - confirmed here with and without the
+        // leading '#', since the docx side's own token convention drops it.
+        //
+        // T186 removed this file's darken() cases along with the method. These cases matter MORE
+        // after that, not less: readableForegroundOn's only remaining caller is the docx generator,
+        // so this class is now the whole of the evidence that a shipped report's header text is
+        // readable on a supplier's brand colour.
         assertThat(ThemeService.readableForegroundOn(accent)).isEqualToIgnoringCase(expectedForeground);
         assertThat(ThemeService.readableForegroundOn(accent.substring(1))).isEqualToIgnoringCase(expectedForeground);
     }

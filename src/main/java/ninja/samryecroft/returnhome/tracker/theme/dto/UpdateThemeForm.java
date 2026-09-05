@@ -9,8 +9,6 @@ public class UpdateThemeForm {
     @Pattern(regexp = HEX_COLOR, message = "Must be a hex colour, e.g. #F36E2A")
     private String primaryColor;
 
-    @Pattern(regexp = HEX_COLOR, message = "Must be a hex colour, e.g. #FFF0DD")
-    private String secondaryColor;
 
     public String getPrimaryColor() {
         return primaryColor;
@@ -20,11 +18,4 @@ public class UpdateThemeForm {
         this.primaryColor = primaryColor;
     }
 
-    public String getSecondaryColor() {
-        return secondaryColor;
-    }
-
-    public void setSecondaryColor(String secondaryColor) {
-        this.secondaryColor = secondaryColor;
-    }
 }

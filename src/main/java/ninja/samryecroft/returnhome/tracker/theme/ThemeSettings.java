@@ -29,6 +29,16 @@ public class ThemeSettings {
     private String primaryColor;
 
     @Column(name = "secondary_color", nullable = false)
+    /**
+     * <b>T186: written, never read.</b> Nothing derives anything from this any more - the inline
+     * per-org {@code <style>} block that consumed it is gone and branding travels as a hue.
+     *
+     * <p>It is still SET on insert because the column is {@code VARCHAR(7) NOT NULL} (V4), so an
+     * insert that omits it fails - including demo seeding and platform-default creation, i.e.
+     * startup on a fresh database. <b>Do not remove the setter calls without the migration.</b>
+     * Dropping the column is a separate card on purpose: an accessibility fix should not carry
+     * irreversible data loss on its critical path.
+     */
     private String secondaryColor;
 
     @Column(name = "updated_at", nullable = false)
