@@ -10,6 +10,8 @@ import ninja.samryecroft.returnhome.tracker.audit.AuditEventPublisher;
 import ninja.samryecroft.returnhome.tracker.child.ChildIdentities;
 import ninja.samryecroft.returnhome.tracker.child.ChildIdentity;
 import ninja.samryecroft.returnhome.tracker.child.NameRevealService;
+import ninja.samryecroft.returnhome.tracker.interview.DeadlineTracker;
+import ninja.samryecroft.returnhome.tracker.interview.DueBadge;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewRequest;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewRequestService;
 import ninja.samryecroft.returnhome.tracker.interview.dto.ConfirmScheduleForm;
@@ -57,11 +59,14 @@ public class VisitorController {
         return "visitor/interview-list";
     }
 
+    /** HTML5 {@code datetime-local} min/value/max attributes require this exact ISO shape, not the display format. */
+    private static final DateTimeFormatter DATETIME_LOCAL_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm");
+    private static final DateTimeFormatter SCHEDULE_ERROR_DATE_FMT = DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm");
+
     @GetMapping("/interviews/{id}/schedule")
     public String scheduleForm(@PathVariable Long id, @AuthenticationPrincipal AppUserPrincipal principal, Model model) {
         InterviewRequest request = interviewRequestService.getAuthorized(id, principal);
-        model.addAttribute("request", request);
-        model.addAttribute("childIdentity", ChildIdentity.of(request.getChild(), nameRevealService.isRevealed()));
+        populateScheduleModel(model, request);
         model.addAttribute("form", new ConfirmScheduleForm());
         return "visitor/schedule-form";
     }
@@ -69,14 +74,42 @@ public class VisitorController {
     @PostMapping("/interviews/{id}/schedule")
     public String confirmSchedule(@PathVariable Long id, @AuthenticationPrincipal AppUserPrincipal principal,
             @Valid @ModelAttribute("form") ConfirmScheduleForm form, BindingResult bindingResult, Model model) {
+        InterviewRequest request = interviewRequestService.getAuthorized(id, principal);
+        // D-5b-4 (spec §7d): the sibling of D-187-7 at the other end of the flow - the same
+        // impossible-sequence class that reached the compliance rate through heldAt. Caught here,
+        // the visitor is present and can fix a mistyped date in seconds; caught nowhere, a document
+        // reader meets it months later in a council's copy. Deliberately NOT @Future on the form
+        // field itself: a visit time in the past is legitimate (recording after the fact) - only
+        // *before the child's return* is impossible, so the check compares against returnedAt, not
+        // against now.
+        if (form.getScheduledAt() != null && form.getScheduledAt().isBefore(request.getReturnedAt())) {
+            bindingResult.rejectValue("scheduledAt", "beforeReturn", "Visit time cannot be before the "
+                    + "child returned, " + request.getReturnedAt().format(SCHEDULE_ERROR_DATE_FMT));
+        }
         if (bindingResult.hasErrors()) {
-            InterviewRequest request = interviewRequestService.getAuthorized(id, principal);
-            model.addAttribute("request", request);
-            model.addAttribute("childIdentity", ChildIdentity.of(request.getChild(), nameRevealService.isRevealed()));
+            populateScheduleModel(model, request);
             return "visitor/schedule-form";
         }
         interviewRequestService.confirmSchedule(id, form.getScheduledAt(), principal);
         return "redirect:/visitor/interviews";
+    }
+
+    /**
+     * D-5b-1 (spec §7d): the clock the visitor's choice is measured against, shown above the field
+     * on both the fresh form and an error redisplay. {@code deadline} reuses
+     * {@link DeadlineTracker#RETURN_WINDOW} rather than restating 72 hours as a literal;
+     * {@code timeRemaining} is taken through the same {@link DeadlineTracker#badgeFor} path the
+     * queue uses, so the two screens say the same words about the same request - never re-worded
+     * here. Always present: this screen is reachable only at ALLOCATED, which always tracks the
+     * deadline, so {@code badgeFor} never returns empty for it.
+     */
+    private void populateScheduleModel(Model model, InterviewRequest request) {
+        model.addAttribute("request", request);
+        model.addAttribute("childIdentity", ChildIdentity.of(request.getChild(), nameRevealService.isRevealed()));
+        model.addAttribute("scheduledAtMin", request.getReturnedAt().format(DATETIME_LOCAL_FMT));
+        model.addAttribute("deadline", request.getReturnedAt().plus(DeadlineTracker.RETURN_WINDOW));
+        model.addAttribute("timeRemaining", DeadlineTracker.badgeFor(request, LocalDateTime.now())
+                .map(DueBadge::text).orElse(null));
     }
 
     private static final DateTimeFormatter SAVED_AT_FMT = DateTimeFormatter.ofPattern("HH:mm");
