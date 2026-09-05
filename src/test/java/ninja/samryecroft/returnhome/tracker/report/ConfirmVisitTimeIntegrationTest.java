@@ -95,7 +95,7 @@ class ConfirmVisitTimeIntegrationTest extends AbstractIntegrationTest {
 
         // Truncated to the minute: a datetime-local input can never carry seconds, and the POST
         // params below round-trip through the same ISO-minute string a real picker would send.
-        returnedAt = LocalDateTime.now().minusHours(10).withSecond(0).withNano(0); // 62h remaining: ON_TRACK
+        returnedAt = LocalDateTime.now().minusHours(10).withSecond(0).withNano(0); // ~62h remaining: ON_TRACK
         InterviewRequest request = InterviewRequestTestFixtures.requestAt(InterviewStatus.ALLOCATED);
         request.setChild(savedChild);
         request.setHome(home);
@@ -112,9 +112,12 @@ class ConfirmVisitTimeIntegrationTest extends AbstractIntegrationTest {
         assertThat(html).contains(returnedAt.format(DISPLAY_FMT));
         // D-5b-1: the deadline is returnedAt + DeadlineTracker.RETURN_WINDOW (72h), never a literal.
         assertThat(html).contains(returnedAt.plusHours(72).format(DISPLAY_FMT));
-        // The exact words DueStateCopy/DeadlineTracker produce for ON_TRACK at 62h remaining -
-        // quoted verbatim, not re-worded on this screen.
-        assertThat(html).contains("On track — 62h left");
+        // The exact words DueStateCopy/DeadlineTracker produce for ON_TRACK, quoted verbatim, not
+        // re-worded on this screen. 61h 59m rather than a clean 62h: returnedAt is truncated to the
+        // minute above, but the controller's own "now" is real wall-clock time with its own
+        // (non-zero) seconds, so the computed remaining duration is always a hair under the round
+        // hour, never exactly on it - confirmed against a live run rather than assumed.
+        assertThat(html).contains("On track — 61h 59m left");
     }
 
     @Test
