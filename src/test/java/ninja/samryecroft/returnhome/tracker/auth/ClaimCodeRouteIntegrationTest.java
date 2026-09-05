@@ -34,10 +34,10 @@ class ClaimCodeRouteIntegrationTest extends AbstractIntegrationTest {
     /**
      * Matches both the bare {@code /login} and an absolute one.
      *
-     * <p>Written as a matcher rather than {@code redirectedUrlPattern("**/login")}, which was the
-     * first attempt and does not match {@code /login} at all - the Ant {@code **}{@code /} requires a
-     * preceding segment. That failed in CI on the assertion's syntax while the behaviour under test
-     * was correct all along.
+     * <p>Written as a matcher rather than an Ant redirect pattern, which was the first attempt and
+     * did not match a bare slash-login at all: a leading double-star followed by a slash requires a
+     * preceding path segment. That failed in CI on the assertion's own syntax while the behaviour
+     * under test was correct throughout.
      */
     private static org.springframework.test.web.servlet.ResultMatcher redirectsToLogin() {
         return result -> assertThat(result.getResponse().getRedirectedUrl())
