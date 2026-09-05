@@ -49,6 +49,10 @@ import org.springframework.boot.context.event.ApplicationReadyEvent;
  *
  * <p><b>On {@link ApplicationReadyEvent} rather than an {@code ApplicationRunner}</b>, which is the
  * opposite of the choice made for the key warmup in the same codebase, and for the opposite reason.
+ * <b>This shape is correct only because this class REPORTS rather than ENFORCES.</b> After-readiness
+ * plus swallow-every-failure applied to a control would mean the application serves traffic while
+ * the control is unproven - the same pattern inverted into a hole. Nobody should copy this hook to
+ * something that has to hold, having seen it blessed here.
  * Warmup must finish <em>before</em> readiness, because its whole purpose is that no request pays
  * the cold start. A diagnostic must run <em>after</em>, because its purpose is to report - and a
  * diagnostic that can delay or block readiness has become a dependency of starting up, which is
@@ -71,32 +75,59 @@ public class FederatedCredentialDiagnostic {
     private static final Pattern AADSTS = Pattern.compile("AADSTS\\d+");
 
     /**
-     * OAuth errors that mean Entra refused on PERMISSIONS - which is this test's success, because it
-     * could only reach that judgement after validating the assertion.
+     * Outcomes that Entra could only have reached <em>after</em> validating our assertion.
      *
-     * <p>A whitelist rather than a blacklist, and that is the whole design of this classification. An
-     * error nobody anticipated is reported INCONCLUSIVE, not PASS: T184 exists to stop a broken
-     * federation reaching cutover, so an unrecognised outcome must never be recordable as proof.
-     * Erring towards "we do not know" costs a follow-up question; erring towards PASS costs an
-     * outage for every user at once.
+     * <p><b>The name is the whole design.</b> This was called {@code PERMISSION_SHAPED} and
+     * described as "permission-shaped errors", and that is the wrong question - it asks what an
+     * error <em>sounds</em> like. {@code unauthorized_client} sounds like a permissions refusal and
+     * is how Entra reports <b>AADSTS700016, "application not found in the directory"</b>: an
+     * application that was never found never had its assertion validated against anything, so it is
+     * the federation being wrong, and it was classified PASS. T184 would have been recorded as
+     * proven for the single most likely way this is misconfigured on cutover day - a client id
+     * pointing at the wrong tenant, or at a registration that was recreated. Kevin caught it.
+     *
+     * <p>The question that keeps this correct is narrower and admits no judgement:
+     * <b>which outcomes can Entra only produce once it has already accepted our assertion?</b>
+     * Re-derived from that, the set is small, and it is keyed on the <b>AADSTS code</b> rather than
+     * the OAuth error, because the code is the field that says which stage failed - the OAuth error
+     * is a category that spans stages, which is exactly how {@code unauthorized_client} got in.
+     *
+     * <p>Anything not listed is INCONCLUSIVE, never PASS. Erring towards "we do not know" costs a
+     * follow-up question; erring towards PASS costs sign-in for every user at once.
      */
-    private static final java.util.Set<String> PERMISSION_SHAPED = java.util.Set.of(
-            "invalid_scope", "insufficient_scope", "invalid_grant", "unauthorized_client",
-            "consent_required", "interaction_required", "access_denied");
+    private static final java.util.Set<String> PROVES_ASSERTION_ACCEPTED = java.util.Set.of(
+            "AADSTS65001",   // admin consent not granted - the expected result for a registration
+                             // that deliberately holds no API permissions, and the most likely PASS
+            "AADSTS70011",   // the scope value is not valid
+            "AADSTS1002012", // the scope value is not valid
+            "AADSTS500011"   // the resource principal was not found in the tenant
+    );
+
+    /** Scope validation follows client authentication, so this cannot precede it. */
+    private static final String SCOPE_REFUSED = "invalid_scope";
 
     /**
-     * OAuth's error for a client that failed to authenticate - which on this path means the
-     * assertion itself was rejected.
+     * Outcomes that mean the assertion, or the client presenting it, was rejected.
      *
-     * <p>The first version of this class treated only a <em>bare</em> {@code invalid_client} (one
-     * carrying no AADSTS code) as a failure, reading Kevin's shorthand too literally. Entra almost
-     * always attaches a code - AADSTS700027 for a signature that did not validate, AADSTS700024 for
-     * an expired assertion - so every realistic assertion failure carried one and was classified
-     * PASS. <b>That is a false pass in the one direction that matters</b>: it would have let a
-     * broken federation be recorded as proven and reach cutover, which is the exact outage this
-     * diagnostic exists to prevent.
+     * <p>{@code invalid_client} is OAuth's error for a client that failed to authenticate, which on
+     * this path <em>is</em> the assertion being rejected - it fails regardless of the AADSTS code
+     * attached, because reading "a generic invalid_client" as "one carrying no code" made every
+     * realistic assertion failure (AADSTS700027, a signature that did not validate; AADSTS700024, an
+     * expired assertion) report PASS.
+     *
+     * <p>The codes are listed as failures rather than merely left out of the PASS set, and that goes
+     * one step further than the review asked for: an application that does not exist or is disabled
+     * cannot be a "we do not know", it is a definite statement that this federation cannot work. A
+     * wrong FAIL costs an investigation; leaving it INCONCLUSIVE costs somebody deciding it was
+     * probably fine.
      */
     private static final String ASSERTION_REJECTED = "invalid_client";
+
+    private static final java.util.Set<String> ASSERTION_REJECTED_CODES = java.util.Set.of(
+            "AADSTS700211",  // no matching federated identity record for the presented assertion
+            "AADSTS700016",  // the application was not found in the directory
+            "AADSTS7000112"  // the application is disabled
+    );
 
     private final FederatedCredentialDiagnosticProperties properties;
     private final HttpClient httpClient;
@@ -230,10 +261,12 @@ public class FederatedCredentialDiagnostic {
         if (status == 200) {
             return Outcome.PASS;
         }
-        if (ASSERTION_REJECTED.equals(error) || "AADSTS700211".equals(code)) {
+        // Rejection is tested BEFORE acceptance, deliberately: a response carrying both an
+        // assertion failure and a scope complaint is an assertion failure.
+        if (ASSERTION_REJECTED.equals(error) || ASSERTION_REJECTED_CODES.contains(code)) {
             return Outcome.FAIL;
         }
-        if (PERMISSION_SHAPED.contains(error)) {
+        if (PROVES_ASSERTION_ACCEPTED.contains(code) || SCOPE_REFUSED.equals(error)) {
             return Outcome.PASS;
         }
         return Outcome.INCONCLUSIVE;
