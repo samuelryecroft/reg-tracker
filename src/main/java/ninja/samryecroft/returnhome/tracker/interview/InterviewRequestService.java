@@ -66,6 +66,17 @@ public class InterviewRequestService {
     }
 
     /**
+     * The same query as {@link #listForVisitor}, but for a coordinator looking up ANY visitor's
+     * own allocations rather than a visitor looking up their own - D-4a-2's "current load" figure
+     * needs this for every candidate visitor, not just the signed-in principal. Deliberately no
+     * authorization check here: the caller already decided which visitors it's entitled to show
+     * (visitorsFor's own org-scoping), and this just counts what one of them is carrying.
+     */
+    public List<InterviewRequest> listAllocatedTo(Long visitorId) {
+        return interviewRequestRepository.findByAllocatedVisitorId(visitorId);
+    }
+
+    /**
      * Requests visible to a Supplier-side principal (COORDINATOR, or ORG_ADMIN of either org type):
      * every request across the Care Provider organisation(s) they can see. Platform ADMIN sees all.
      * A VIEWER sees only their specific assigned homes, not their whole Care Provider org (roadmap
