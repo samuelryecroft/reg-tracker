@@ -30,8 +30,12 @@ class KeyWarmupRunnerTest {
     private final KeyProvider keyProvider = mock(KeyProvider.class);
     private final OrganisationRepository organisationRepository = mock(OrganisationRepository.class);
 
+    private final com.azure.core.credential.TokenCredential credential =
+            mock(com.azure.core.credential.TokenCredential.class);
+
     private KeyWarmupRunner runner() {
-        return new KeyWarmupRunner(keyProvider, organisationRepository, Duration.ofSeconds(30));
+        return new KeyWarmupRunner(keyProvider, organisationRepository, Duration.ofSeconds(30),
+                credential, "https://vault.azure.net/.default");
     }
 
     private Organisation careProvider(long id, boolean active) {
@@ -61,6 +65,46 @@ class KeyWarmupRunnerTest {
 
         verify(keyProvider).keyExists(7L);
         verify(keyProvider).currentKeyFor(7L);
+    }
+
+    /**
+     * The token is fetched BEFORE anything asks the vault for a key, and that ordering is the fix.
+     *
+     * <p>Measured on the live deployment: the first {@code getKey} took 32-42 seconds and returned
+     * 401 - Key Vault's standard auth challenge, not a refusal - while the SDK acquired a cold
+     * managed-identity token inline at ~10 seconds and then retried in ~200ms. So the ordering is
+     * the whole behaviour: asserted with an {@code InOrder} rather than by checking the token was
+     * fetched at all, because fetching it afterwards would satisfy a call-count assertion and change
+     * nothing about the cold start.
+     */
+    @Test
+    void theVaultTokenIsAcquiredBeforeTheFirstKeyLookup() {
+        when(organisationRepository.findByTypeOrderByName(OrgType.CARE_PROVIDER))
+                .thenReturn(List.of(careProvider(20L, true)));
+        when(keyProvider.keyExists(20L)).thenReturn(true);
+
+        runner().run(null);
+
+        org.mockito.InOrder inOrder = org.mockito.Mockito.inOrder(credential, keyProvider);
+        inOrder.verify(credential).getTokenSync(org.mockito.ArgumentMatchers.any());
+        inOrder.verify(keyProvider).keyExists(20L);
+    }
+
+    /**
+     * Pre-acquisition is an optimisation inside an optimisation, so a failure to get the token must
+     * leave the behaviour exactly as it was: the first real call acquires it inline, as it always
+     * did. It must never be able to stop the warmup, let alone the application.
+     */
+    @Test
+    void aFailedTokenPreAcquisitionDoesNotStopTheWarmup() {
+        when(organisationRepository.findByTypeOrderByName(OrgType.CARE_PROVIDER))
+                .thenReturn(List.of(careProvider(21L, true)));
+        when(keyProvider.keyExists(21L)).thenReturn(true);
+        when(credential.getTokenSync(org.mockito.ArgumentMatchers.any()))
+                .thenThrow(new IllegalStateException("no managed identity here"));
+
+        assertThatCode(() -> runner().run(null)).doesNotThrowAnyException();
+        verify(keyProvider).currentKeyFor(21L);
     }
 
     /**
@@ -132,7 +176,8 @@ class KeyWarmupRunnerTest {
         when(organisationRepository.findByTypeOrderByName(OrgType.CARE_PROVIDER))
                 .thenReturn(List.of(careProvider(12L, true)));
 
-        new KeyWarmupRunner(keyProvider, organisationRepository, Duration.ZERO).run(null);
+        new KeyWarmupRunner(keyProvider, organisationRepository, Duration.ZERO, credential,
+                "https://vault.azure.net/.default").run(null);
 
         verify(keyProvider, never()).keyExists(anyLong());
     }

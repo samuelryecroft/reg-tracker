@@ -189,6 +189,21 @@ public class DocumentStorageProperties {
          * recorded in its own envelope, so re-wrapping is catch-up work rather than a migration.
          */
         private java.time.Duration keyHandleTtl = java.time.Duration.ofMinutes(10);
+        /**
+         * The audience the startup warmup fetches a token for, before anything asks the vault for a
+         * key. A property rather than a constant because it is cloud-specific - sovereign and
+         * government clouds use different vault hostnames - and getting it wrong should be a config
+         * change, not a redeploy.
+         */
+        private String tokenScope = "https://vault.azure.net/.default";
+
+        public String getTokenScope() {
+            return tokenScope;
+        }
+
+        public void setTokenScope(String tokenScope) {
+            this.tokenScope = tokenScope;
+        }
 
         /** @see #credential */
         public enum CredentialSource { AUTO, MANAGED_IDENTITY, DEFAULT_CHAIN }
