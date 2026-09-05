@@ -1114,6 +1114,11 @@ table caption { text-align: left; font-size: var(--t-xs); color: var(--muted); p
 
 /* stacked-card table - the mobile alternative to <table>, shown/hidden by the breakpoint below */
 .stack { display: none; flex-direction: column; gap: var(--s3); margin-top: var(--s5); }
+/* 6a (spec §7b): a page with no table at all (R-Q12 - cards for people, not a second table copy)
+   needs its card list visible at every width, not just below the breakpoint that used to reveal
+   it beside a hidden table. A distinct modifier rather than changing .stack itself, which every
+   still-paired table+stack screen still depends on staying breakpoint-gated. */
+.stack.solo { display: flex; }
 .srow { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: var(--s4); }
 .srow .top { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--s3); margin-bottom: var(--s2); }
 .srow .name { font-weight: 700; font-size: var(--t-md); }
