@@ -32,18 +32,19 @@ variable "recipient_emails" {
   type        = list(string)
 }
 
-# Escalating cadence (Kevin, T201): notify at these day-marks, then daily inside `daily_within_days`.
-# NOT daily-while-<60 - that produces ~60 consecutive emails and becomes a worked-around control.
+# Escalating cadence (Kevin, T201): fire ONCE on each isolated rung. NOT daily-while-<60 (that is ~60
+# consecutive emails = a worked-around control) and NOT a daily tail inside N days (consecutive days
+# are one continuous breach = one notification). Every rung must be >=1 non-fire day from the next, so
+# the toggle returns to 0 between rungs and each rung re-fires. Default gaps: 15,15,16,7,4,2 (verified).
 variable "escalation_days" {
-  description = "Days-remaining marks at which to fire once each."
+  description = "Isolated days-remaining marks at which to fire once each. No two may be adjacent."
   type        = list(number)
-  default     = [60, 45, 30, 14, 7]
-}
+  default     = [60, 45, 30, 14, 7, 3, 1]
 
-variable "daily_within_days" {
-  description = "Inside this many days of expiry, fire every day (the escalation tightens as the deadline nears)."
-  type        = number
-  default     = 3
+  validation {
+    condition     = length([for i in range(length(var.escalation_days) - 1) : true if var.escalation_days[i] - var.escalation_days[i + 1] < 2]) == 0
+    error_message = "escalation_days must be strictly descending with gaps of at least 2 (no two rungs adjacent), so each rung re-fires."
+  }
 }
 
 # The alerter is off by default so a full apply never stands it up prematurely (the real secret does

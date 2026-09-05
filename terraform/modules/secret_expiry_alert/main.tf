@@ -1,34 +1,39 @@
 # T201 - near-expiry alert for the STANDING Entra client secret (ENTRA-CLIENT-SECRET in kv-rht-*).
 #
-# Why this shape, since it is not the obvious one:
-#  - Key Vault exposes NO Azure Monitor near-expiry metric, and its only near-expiry signal (the Event
-#    Grid SecretNearExpiry event) fires ONCE at a fixed ~30-day mark - it cannot do "60 days, escalating".
-#    So a scheduled Logic App computes days-to-expiry itself.
-#  - A Logic App cannot send email without a mailbox-authenticated connector (none available
-#    non-interactively here), and it cannot fire an action group directly. So it emits a custom metric
-#    and a trivial metric alert fires the action group, whose NATIVE email_receiver sends the mail
-#    (and is what makes "a human confirms it landed" testable).
-#  - "Repeating" is an ESCALATING cadence (60/45/30/14/7, then daily inside `daily_within_days`), NOT
-#    daily-while-<60 (that becomes ~60 emails and a worked-around control). The Logic App puts the fire
-#    DECISION in the metric (1 on escalation days, 0 otherwise); the alert stays dumb (>=1). The metric
-#    returning to 0 between marks lets the alert auto-mitigate and RE-FIRE on the next mark.
-#  - The alerter reads METADATA ONLY: it LISTs secrets (ids + attributes, no values) and holds Key Vault
-#    READER, never Secrets User - the value must never leave the vault, and Logic App run history is
-#    plaintext-forever (T179 class). This is enforced by the ROLE, not by a toggle.
-#  - DEAD-MAN'S SWITCH: the alerter's own failure mode is silence, identical to "secret is fine". Two
-#    alerts on the Logic App guard it - a run-failure alert and, load-bearing, a LIVENESS alert that
-#    fires when no run has SUCCEEDED (a disabled/stopped app raises no failures, it raises nothing).
+# FINAL design (B), per ENTRA-CUTOVER-RUNBOOK.md T201 table:
+#  - A scheduled Logic App EVALUATES (reads expiry metadata, decides fire/expired); an Azure Monitor
+#    alert rule + action group SENDS (native Azure Monitor email = the one good, Microsoft-reputation
+#    sender). ACS was rejected (new service + shared-reputation domain that can rot silently).
+#  - WARNING LADDER via an escalation TOGGLE: emit 1 only on the isolated rungs {60,45,30,14,7,3,1},
+#    0 otherwise. Every rung is >=1 non-fire day from the next (gaps 15,15,16,7,4,2), so the signal
+#    returns to 0 between rungs, the alert auto-resolves, and each rung RE-FIRES. Rungs must never be
+#    adjacent (adjacent = one continuous breach = one notification).
+#  - SEPARATE EXPIRED alarm at daysToExpiry<=0: fires once, INCIDENT message (not a warning). Day 0
+#    can't join the ladder (adjacent to day 1); its value is diagnosis - the first thing in the inbox
+#    when sign-in breaks names the cause.
+#  - Reads METADATA ONLY (LIST, not get-secret; Key Vault READER, not Secrets User) - the value must
+#    never leave the vault, and Logic App run history is plaintext-forever (T179 class).
+#  - NOT-FOUND / NO-EXPIRY MUST THROW: a filter matching nothing, or a secret with no expiry, must
+#    FAIL the run (RunsFailed), never succeed-with-nothing-to-do - otherwise a renamed/deleted secret
+#    reads as all-fine forever. A check that finds nothing to check must not report PASS.
+#  - DEAD-MAN'S SWITCH: the checker's own failure mode is silence. RunsFailed>0 and, load-bearing, a
+#    liveness alert (RunsSucceeded<1 over 24h) that catches a disabled/stopped checker.
+#
+# TELEMETRY SINK IS STUBBED pending Kevin's carrier ruling (custom-metric-on-KV was PROVEN dead at the
+# fire-test: KV returns 200 and silently stores nothing). Candidates: (A1, god-endorsed) App Insights
+# custom telemetry + scheduled-query alert v2; (A2) Log Analytics Logs-Ingestion + scheduled-query
+# alert. The evaluator emits fire/expired decisions; the sink resource(s) that carry them to the
+# action group drop in once the carrier is named. Everything below the "SINK STUB" marker is the only
+# carrier-dependent part; the rest is proven/ruled and final.
 
 locals {
-  create              = var.enabled ? 1 : 0
-  metric_namespace    = "KeyVaultSecretExpiry"
-  metric_name         = "SecretExpiryFire"
-  escalation_array    = join(", ", [for d in var.escalation_days : tostring(d)])
-  monitoring_endpoint = "https://${var.location}.monitoring.azure.com${var.key_vault_id}/metrics"
+  create           = var.enabled ? 1 : 0
+  escalation_array = join(", ", [for d in var.escalation_days : tostring(d)])
 }
 
-# Action group - the notification sink. Native email_receiver = real mail with no connector auth.
-# >=2 recipients required before go-live; the list makes the 2nd a one-line add.
+# Action group - the notification sink. Native email_receiver = real mail with no connector auth, and
+# Microsoft-reputation delivery. >=2 recipients required before go-live; the list makes the 2nd a
+# one-line add. Shared by the warning ladder, the EXPIRED alarm, and the dead-man's switch.
 resource "azurerm_monitor_action_group" "secret_expiry" {
   count               = local.create
   name                = "ag-${var.name_prefix}-secret-expiry"
@@ -59,19 +64,11 @@ resource "azurerm_logic_app_workflow" "checker" {
   }
 }
 
-# METADATA read only (LIST returns ids + attributes, never values).
+# METADATA read only (LIST returns ids + attributes, never values). NOT Secrets User.
 resource "azurerm_role_assignment" "kv_reader" {
   count                = local.create
   scope                = var.key_vault_id
   role_definition_name = "Key Vault Reader"
-  principal_id         = azurerm_logic_app_workflow.checker[0].identity[0].principal_id
-}
-
-# Required to publish the custom metric onto the Key Vault resource.
-resource "azurerm_role_assignment" "metrics_publisher" {
-  count                = local.create
-  scope                = var.key_vault_id
-  role_definition_name = "Monitoring Metrics Publisher"
   principal_id         = azurerm_logic_app_workflow.checker[0].identity[0].principal_id
 }
 
@@ -113,121 +110,106 @@ resource "azurerm_logic_app_action_custom" "filter_target" {
     }
     runAfter = { List_secrets = ["Succeeded"] }
   })
+  depends_on = [azurerm_logic_app_action_custom.list_secrets]
 }
 
-# 3) Expiry epoch (0 if the secret is absent - then it never fires; a missing secret is caught by the
-#    liveness alert and by go-live's dated obligation, not silently treated as "expiring").
-resource "azurerm_logic_app_action_custom" "compose_exp" {
+# 3) NOT-FOUND / NO-EXPIRY MUST THROW. If the filter matched nothing, or the matched secret has no
+#    expiry set, FAIL the run - never continue and emit 0 silently (that would read as all-fine while
+#    the monitored thing isn't being monitored). RunsFailed + the dead-man's switch catch it.
+resource "azurerm_logic_app_action_custom" "guard_found" {
   count        = local.create
-  name         = "Compose_exp"
+  name         = "Guard_found_with_expiry"
   logic_app_id = azurerm_logic_app_workflow.checker[0].id
   body = jsonencode({
-    type     = "Compose"
-    inputs   = "@if(empty(body('Filter_target')), 0, first(body('Filter_target'))?['attributes']?['exp'])"
+    type = "If"
+    expression = {
+      or = [
+        { equals = ["@length(body('Filter_target'))", 0] },
+        { equals = ["@first(body('Filter_target'))?['attributes']?['exp']", null] }
+      ]
+    }
+    actions = {
+      Fail_not_found = {
+        type = "Terminate"
+        inputs = {
+          runStatus = "Failed"
+          runError = {
+            code    = "SecretNotFoundOrNoExpiry"
+            message = "T201: '${var.secret_name}' was not found in the vault, or has no expiry set. A check that finds nothing to check must fail, not report success."
+          }
+        }
+      }
+    }
     runAfter = { Filter_target = ["Succeeded"] }
   })
+  depends_on = [azurerm_logic_app_action_custom.filter_target]
 }
 
-# 4) Whole days remaining (99999 sentinel when absent).
+# 4) Whole days remaining (guaranteed a real value - guard above failed the run otherwise).
 resource "azurerm_logic_app_action_custom" "compose_days" {
   count        = local.create
   name         = "Compose_days"
   logic_app_id = azurerm_logic_app_workflow.checker[0].id
   body = jsonencode({
     type     = "Compose"
-    inputs   = "@if(equals(outputs('Compose_exp'), 0), 99999, div(sub(outputs('Compose_exp'), div(sub(ticks(utcNow()), ticks('1970-01-01T00:00:00Z')), 10000000)), 86400))"
-    runAfter = { Compose_exp = ["Succeeded"] }
+    inputs   = "@div(sub(first(body('Filter_target'))?['attributes']?['exp'], div(sub(ticks(utcNow()), ticks('1970-01-01T00:00:00Z')), 10000000)), 86400)"
+    runAfter = { Guard_found_with_expiry = ["Succeeded"] }
   })
+  depends_on = [azurerm_logic_app_action_custom.guard_found]
 }
 
-# 5) Fire decision: 1 on an escalation mark or inside the daily window, else 0.
+# 5) Warning-ladder fire decision: 1 ONLY on an isolated rung, else 0. Exact membership - no daily
+#    tail (consecutive days would be one continuous breach = one notification).
 resource "azurerm_logic_app_action_custom" "compose_fire" {
   count        = local.create
   name         = "Compose_fire"
   logic_app_id = azurerm_logic_app_workflow.checker[0].id
   body = jsonencode({
     type     = "Compose"
-    inputs   = "@if(or(contains(createArray(${local.escalation_array}), outputs('Compose_days')), lessOrEquals(outputs('Compose_days'), ${var.daily_within_days})), 1, 0)"
+    inputs   = "@if(contains(createArray(${local.escalation_array}), outputs('Compose_days')), 1, 0)"
     runAfter = { Compose_days = ["Succeeded"] }
   })
+  depends_on = [azurerm_logic_app_action_custom.compose_days]
 }
 
-# 6) Publish the fire decision as a custom metric on the Key Vault. Single-expression numeric fields
-#    so Logic App emits real numbers, not strings.
-resource "azurerm_logic_app_action_custom" "emit_metric" {
+# 6) EXPIRED decision: 1 once expiry has passed (days <= 0). Separate from the ladder - a distinct
+#    incident signal, fires once, different message downstream.
+resource "azurerm_logic_app_action_custom" "compose_expired" {
   count        = local.create
-  name         = "Emit_metric"
+  name         = "Compose_expired"
   logic_app_id = azurerm_logic_app_workflow.checker[0].id
   body = jsonencode({
-    type = "Http"
-    inputs = {
-      method  = "POST"
-      uri     = local.monitoring_endpoint
-      headers = { "Content-Type" = "application/json" }
-      body = {
-        time = "@{utcNow()}"
-        data = {
-          baseData = {
-            metric    = local.metric_name
-            namespace = local.metric_namespace
-            dimNames  = ["SecretName"]
-            series = [{
-              dimValues = [var.secret_name]
-              min       = "@outputs('Compose_fire')"
-              max       = "@outputs('Compose_fire')"
-              sum       = "@outputs('Compose_fire')"
-              count     = 1
-            }]
-          }
-        }
-      }
-      authentication = { type = "ManagedServiceIdentity", audience = "https://monitoring.azure.com" }
-    }
-    runAfter = { Compose_fire = ["Succeeded"] }
+    type     = "Compose"
+    inputs   = "@if(lessOrEquals(outputs('Compose_days'), 0), 1, 0)"
+    runAfter = { Compose_days = ["Succeeded"] }
   })
+  depends_on = [azurerm_logic_app_action_custom.compose_days]
 }
 
-# The dumb alert: fire the action group whenever the decision metric is >=1. Auto-mitigate lets it
-# re-fire on the next escalation mark (the metric returns to 0 between marks).
-# NOTE (live-tune at fire-test): window_size must comfortably span the daily emission cadence so a
-# once-a-day data point is always seen; PT6H with PT1H frequency is the starting point.
-resource "azurerm_monitor_metric_alert" "fire" {
-  count               = local.create
-  name                = "alert-${var.name_prefix}-secret-expiry"
-  resource_group_name = var.resource_group_name
-  scopes              = [var.key_vault_id]
-  description         = "ENTRA-CLIENT-SECRET is approaching expiry (escalating: ${local.escalation_array} days, then daily inside ${var.daily_within_days})."
-  severity            = 1
-  frequency           = "PT1H"
-  window_size         = "PT6H"
-  auto_mitigate       = true
+# ============================ SINK STUB (carrier-dependent) ============================
+# Everything above is proven/ruled and final. The part below - how the fire/expired DECISIONS reach
+# the action group - is the ONLY carrier-dependent piece, held pending Kevin's A1(App Insights) /
+# A2(Log Analytics) ruling. custom-metric-on-KV was PROVEN dead at the fire-test (KV 200s then drops).
+#
+# When the carrier lands, this stub is replaced by:
+#   - an emit action in the Logic App (runAfter Compose_fire + Compose_expired): POST the WARNING
+#     signal (value = outputs('Compose_fire')) and the EXPIRED signal (value = outputs('Compose_expired'))
+#     to the chosen telemetry store [A1: App Insights track endpoint; A2: Log Analytics ingestion];
+#   - the identity/role that emit needs [A1/A2 auth];
+#   - a WARNING alert rule (signal>=1 -> action group) and a separate EXPIRED alert rule
+#     (expired>=1 -> same action group, DISTINCT incident subject/body), replacing the dead
+#     azurerm_monitor_metric_alert on the KV custom metric.
+# Until then the checker runs, guards, and computes, but does not yet notify on the ladder; the
+# dead-man's switch below is live and carrier-independent.
+# =======================================================================================
 
-  criteria {
-    metric_namespace = local.metric_namespace
-    metric_name      = local.metric_name
-    aggregation      = "Maximum"
-    operator         = "GreaterThanOrEqual"
-    threshold        = 1
-
-    dimension {
-      name     = "SecretName"
-      operator = "Include"
-      values   = [var.secret_name]
-    }
-  }
-
-  action {
-    action_group_id = azurerm_monitor_action_group.secret_expiry[0].id
-  }
-}
-
-# DEAD-MAN'S SWITCH (a): a run threw. Catches a failing checker.
+# DEAD-MAN'S SWITCH (a): a run threw. Catches a failing checker (incl. the not-found/no-expiry throw).
 resource "azurerm_monitor_metric_alert" "runs_failed" {
   count               = local.create
   name                = "alert-${var.name_prefix}-secret-expiry-runsfailed"
   resource_group_name = var.resource_group_name
   scopes              = [azurerm_logic_app_workflow.checker[0].id]
-  description         = "The secret-expiry checker had a failed run - it may not be evaluating expiry."
+  description         = "The secret-expiry checker had a failed run - it may not be evaluating expiry (or the watched secret is missing/has no expiry, which it fails the run to surface)."
   severity            = 1
   frequency           = "PT1H"
   window_size         = "PT6H"
