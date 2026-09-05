@@ -24,7 +24,7 @@ import org.junit.jupiter.api.Test;
  */
 class ClaimCodeServiceTest {
 
-    private final Map<String, User> byHash = new HashMap<>();
+    private final Map<String, User> bySelector = new HashMap<>();
     private final UserRepository userRepository = mock(UserRepository.class);
     private ClaimCodeService service;
 
@@ -34,15 +34,18 @@ class ClaimCodeServiceTest {
         // test has to exercise that lookup for the hashing to be under test at all.
         when(userRepository.save(any(User.class))).thenAnswer(invocation -> {
             User saved = invocation.getArgument(0);
-            byHash.values().removeIf(existing -> existing == saved);
-            if (saved.getClaimCodeHash() != null) {
-                byHash.put(saved.getClaimCodeHash(), saved);
+            bySelector.values().removeIf(existing -> existing == saved);
+            if (saved.getClaimCodeSelector() != null) {
+                bySelector.put(saved.getClaimCodeSelector(), saved);
             }
             return saved;
         });
-        when(userRepository.findByClaimCodeHash(anyString()))
-                .thenAnswer(invocation -> Optional.ofNullable(byHash.get(invocation.getArgument(0))));
-        service = new ClaimCodeService(userRepository);
+        when(userRepository.findByClaimCodeSelector(anyString()))
+                .thenAnswer(invocation -> Optional.ofNullable(bySelector.get(invocation.getArgument(0))));
+        // The real encoder, not a stub: the slow hash is part of what is under test, and a fake one
+        // would let a bug in how the verifier is encoded or matched pass unnoticed.
+        service = new ClaimCodeService(userRepository,
+                new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder(4));
     }
 
     private User enabledUser() {
@@ -58,21 +61,27 @@ class ClaimCodeServiceTest {
         User user = enabledUser();
         String code = service.issue(user);
 
-        assertThat(service.findRedeemable(code)).containsSame(user);
+        assertThat(service.redeemable(code)).containsSame(user);
     }
 
     /**
      * <b>The plaintext exists once.</b> Only a hash is stored, which is what makes "an administrator
      * can reissue, never reveal" a property of the storage rather than a rule someone remembers.
      */
+    /**
+     * <b>Only the SECRET half is hashed, and the plaintext exists once.</b> The selector is stored in
+     * clear on purpose - it is the lookup, not the secret - and a slow salted hash cannot be looked
+     * up, which is why the split exists at all.
+     */
     @Test
-    void onlyAHashIsStoredAndItIsNotTheCode() {
+    void onlyTheVerifierIsHashedAndTheCodeItselfIsNotStored() {
         User user = enabledUser();
         String code = service.issue(user);
 
-        assertThat(user.getClaimCodeHash()).isNotNull().isNotEqualTo(code);
-        assertThat(user.getClaimCodeHash()).doesNotContain(ClaimCodeService.normalise(code));
-        assertThat(user.getClaimCodeHash()).hasSize(64);
+        assertThat(user.getClaimCodeVerifierHash()).isNotNull().isNotEqualTo(code);
+        assertThat(user.getClaimCodeVerifierHash()).doesNotContain(ClaimCodeService.normalise(code));
+        assertThat(user.getClaimCodeVerifierHash()).startsWith("$2");
+        assertThat(code).startsWith(user.getClaimCodeSelector() + "-");
     }
 
     /** Read down a phone and typed back in any casing, with or without the grouping dashes. */
@@ -81,21 +90,84 @@ class ClaimCodeServiceTest {
         User user = enabledUser();
         String code = service.issue(user);
 
-        assertThat(service.findRedeemable(code.toLowerCase())).containsSame(user);
-        assertThat(service.findRedeemable(code.replace("-", ""))).containsSame(user);
-        assertThat(service.findRedeemable(" " + code + " ")).containsSame(user);
+        assertThat(service.redeemable(code.toLowerCase())).containsSame(user);
+        assertThat(service.redeemable(code.replace("-", ""))).containsSame(user);
+        assertThat(service.redeemable(" " + code + " ")).containsSame(user);
     }
 
-    /** 128 bits, so the rate limiter is a courtesy rather than the control. */
     @Test
-    void theCodeCarriesTheEntropyTheDesignChose() {
-        String code = ClaimCodeService.normalise(service.issue(enabledUser()));
+    void aCodeOfTheWrongShapeIsRefusedWithoutTouchingAnything() {
+        User user = enabledUser();
+        service.issue(user);
 
-        // 26 characters of a 32-symbol alphabet is 130 bits.
-        assertThat(code).hasSize(26);
-        assertThat(code).matches("[0123456789ABCDEFGHJKMNPQRSTVWXYZ]+");
-        // No I, L, O or U: nothing in a code can be misread as a digit or misheard aloud.
+        assertThat(service.redeemable("SHORT")).isEmpty();
+        assertThat(service.redeemable(user.getClaimCodeSelector())).isEmpty();
+        assertThat(user.getClaimCodeAttempts()).isZero();
+    }
+
+    /** Ten Crockford characters, rendered XXXXX-XXXXX, as the design fixes. */
+    @Test
+    void theCodeHasTheShapeTheDesignFixed() {
+        String code = service.issue(enabledUser());
+
+        assertThat(code).matches("[0-9A-HJKMNP-TV-Z]{5}-[0-9A-HJKMNP-TV-Z]{5}");
+        // No I, L, O or U - Crockford's own exclusions, so nothing is misread as a digit.
         assertThat(code).doesNotContain("I").doesNotContain("L").doesNotContain("O").doesNotContain("U");
+    }
+
+    /**
+     * Crockford's <em>defined</em> aliases, which is the reason for using a published alphabet rather
+     * than inventing one: a code read down a phone and typed back with an O for a zero still works,
+     * instead of failing in a way neither party can diagnose.
+     */
+    @Test
+    void crockfordsAliasesAreHonouredOnEntry() {
+        User user = enabledUser();
+        String code = service.issue(user);
+        String typedBadly = code.replace('0', 'O').replace('1', 'I').toLowerCase().replace("-", " ");
+
+        assertThat(service.redeemable(typedBadly)).containsSame(user);
+    }
+
+    /**
+     * <b>The lockout is the control, not the entropy</b> - about fifty bits is defensible only
+     * because this screen sits behind a successful sign-in in a tenant with self-service sign-up
+     * off, and because the code dies after five wrong guesses.
+     */
+    @Test
+    void fiveWrongAttemptsKillTheCodeEvenIfTheRightOneArrivesAfterwards() {
+        User user = enabledUser();
+        String code = service.issue(user);
+        String wrong = user.getClaimCodeSelector() + "-ZZZZZ";
+
+        for (int attempt = 0; attempt < ClaimCodeService.MAX_ATTEMPTS; attempt++) {
+            assertThat(service.redeemable(wrong)).isEmpty();
+        }
+
+        assertThat(user.getClaimCodeAttempts()).isEqualTo(ClaimCodeService.MAX_ATTEMPTS);
+        assertThat(service.redeemable(code))
+                .as("the correct code must not work once the attempts are spent")
+                .isEmpty();
+    }
+
+    /** A correct code must not be burning attempts - otherwise a slow typist locks themselves out. */
+    @Test
+    void aCorrectCodeDoesNotConsumeAnAttempt() {
+        User user = enabledUser();
+        String code = service.issue(user);
+
+        assertThat(service.redeemable(code)).containsSame(user);
+        assertThat(user.getClaimCodeAttempts()).isZero();
+    }
+
+    /** A guess at a selector nobody holds cannot burn anyone else's attempts. */
+    @Test
+    void anUnknownSelectorDoesNotTouchAnyExistingCode() {
+        User user = enabledUser();
+        service.issue(user);
+
+        assertThat(service.redeemable("ZZZZZ-ZZZZZ")).isEmpty();
+        assertThat(user.getClaimCodeAttempts()).isZero();
     }
 
     @Test
@@ -106,9 +178,9 @@ class ClaimCodeServiceTest {
     @Test
     void aWrongCodeIsRefused() {
         service.issue(enabledUser());
-        assertThat(service.findRedeemable("ZZZZ-ZZZZ-ZZZZ-ZZZZ-ZZZZ-ZZZZ-ZZ")).isEmpty();
-        assertThat(service.findRedeemable("")).isEmpty();
-        assertThat(service.findRedeemable(null)).isEmpty();
+        assertThat(service.redeemable("ZZZZ-ZZZZ-ZZZZ-ZZZZ-ZZZZ-ZZZZ-ZZ")).isEmpty();
+        assertThat(service.redeemable("")).isEmpty();
+        assertThat(service.redeemable(null)).isEmpty();
     }
 
     @Test
@@ -117,7 +189,7 @@ class ClaimCodeServiceTest {
         String code = service.issue(user);
         user.setClaimCodeExpiresAt(LocalDateTime.now().minusMinutes(1));
 
-        assertThat(service.findRedeemable(code)).isEmpty();
+        assertThat(service.redeemable(code)).isEmpty();
     }
 
     @Test
@@ -126,7 +198,7 @@ class ClaimCodeServiceTest {
         String code = service.issue(user);
         user.setClaimCodeConsumedAt(LocalDateTime.now());
 
-        assertThat(service.findRedeemable(code)).isEmpty();
+        assertThat(service.redeemable(code)).isEmpty();
     }
 
     /**
@@ -140,7 +212,7 @@ class ClaimCodeServiceTest {
         String code = service.issue(user);
         user.setIdpSubject("00000000-1111-2222-3333-444444444444");
 
-        assertThat(service.findRedeemable(code)).isEmpty();
+        assertThat(service.redeemable(code)).isEmpty();
     }
 
     @Test
@@ -149,7 +221,7 @@ class ClaimCodeServiceTest {
         String code = service.issue(user);
         user.setEnabled(false);
 
-        assertThat(service.findRedeemable(code)).isEmpty();
+        assertThat(service.redeemable(code)).isEmpty();
     }
 
     /** Reissuing is the remedy for a lost code, and it must stop the previous one working. */
@@ -159,8 +231,8 @@ class ClaimCodeServiceTest {
         String first = service.issue(user);
         String second = service.issue(user);
 
-        assertThat(service.findRedeemable(first)).isEmpty();
-        assertThat(service.findRedeemable(second)).containsSame(user);
+        assertThat(service.redeemable(first)).isEmpty();
+        assertThat(service.redeemable(second)).containsSame(user);
     }
 
     /**
@@ -179,8 +251,8 @@ class ClaimCodeServiceTest {
         String code1 = service.issue(duty1);
         String code2 = service.issue(duty2);
 
-        assertThat(service.findRedeemable(code1)).containsSame(duty1);
-        assertThat(service.findRedeemable(code2)).containsSame(duty2);
+        assertThat(service.redeemable(code1)).containsSame(duty1);
+        assertThat(service.redeemable(code2)).containsSame(duty2);
     }
 
     /**
@@ -195,7 +267,7 @@ class ClaimCodeServiceTest {
         String code = service.issue(leaver);
         leaver.setEmail("someone.else@oakfield.gov.uk");
 
-        assertThat(service.findRedeemable(code))
+        assertThat(service.redeemable(code))
                 .as("the code identifies the person; the address is a delivery channel")
                 .containsSame(leaver);
     }
@@ -209,7 +281,8 @@ class ClaimCodeServiceTest {
 
         assertThat(user.getIdpSubject()).isEqualTo("aabbccdd-1111-2222-3333-444444444444");
         assertThat(user.getClaimCodeConsumedAt()).isNotNull();
-        assertThat(user.getClaimCodeHash()).isNull();
-        assertThat(service.findRedeemable(code)).isEmpty();
+        assertThat(user.getClaimCodeSelector()).isNull();
+        assertThat(user.getClaimCodeVerifierHash()).isNull();
+        assertThat(service.redeemable(code)).isEmpty();
     }
 }

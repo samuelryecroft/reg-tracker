@@ -2,6 +2,7 @@ package ninja.samryecroft.returnhome.tracker.auth;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
+import java.util.Optional;
 import ninja.samryecroft.returnhome.tracker.audit.AuditEventPublisher;
 import ninja.samryecroft.returnhome.tracker.user.User;
 import org.springframework.stereotype.Controller;
@@ -41,6 +42,17 @@ public class ClaimCodeController {
     /** Where the failure handler leaves the oid, and the only thing the exchange carries. */
     static final String OBJECT_ID_ATTRIBUTE = "t197.claimCode.objectId";
 
+    private static final String ATTEMPTS_ATTRIBUTE = "t197.claimCode.attempts";
+
+    /**
+     * The screen-level cap, distinct from the per-code one.
+     *
+     * <p>The per-code counter cannot fire until a real selector is hit, so on its own it would let a
+     * script walk selectors indefinitely without ever burning an attempt against anything. This is
+     * what stops that, and it is why the design asks for both rather than either.
+     */
+    private static final int MAX_SESSION_ATTEMPTS = 10;
+
     private static final String REFUSED =
             "That code is not valid. Codes expire and can only be used once - ask an administrator to issue a new one.";
 
@@ -71,7 +83,18 @@ public class ClaimCodeController {
             return "redirect:/login";
         }
 
-        User user = claimCodeService.findRedeemable(code).orElse(null);
+        // A per-session cap on top of the per-code one, so the screen cannot be scripted by
+        // walking selectors: the per-code counter only bites once a real selector is hit, and a
+        // script that guesses selectors would never reach it. Design §6b names both.
+        int used = (int) Optional.ofNullable(session.getAttribute(ATTEMPTS_ATTRIBUTE)).orElse(0);
+        if (used >= MAX_SESSION_ATTEMPTS) {
+            auditEventPublisher.identityLinkRefused(objectId, request.getRequestURI());
+            model.addAttribute("refused", true);
+            return "auth/claim-code";
+        }
+        session.setAttribute(ATTEMPTS_ATTRIBUTE, used + 1);
+
+        User user = claimCodeService.redeemable(code).orElse(null);
         if (user == null) {
             // The code is NEVER echoed, logged or audited - it is a credential, and this is the
             // path where a wrong one is most tempting to include "for diagnosis".

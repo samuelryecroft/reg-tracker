@@ -65,8 +65,9 @@ public class UserAdminController {
             addPickerAttributes(principal, model);
             return "admin/user-form";
         }
+        User created;
         try {
-            userService.create(form, principal);
+            created = userService.create(form, principal);
         } catch (DuplicateObjectIdException | DataIntegrityViolationException clash) {
             // Both arms are the same defect seen at different moments: the service's pre-check
             // catches the ordinary case, and uq_users_idp_subject catches two admins saving the same
@@ -76,28 +77,40 @@ public class UserAdminController {
             addPickerAttributes(principal, model);
             return "admin/user-form";
         }
-        return "redirect:/admin/users";
+        // T197 §6f: the code is issued ON CREATE and the confirmation shows it once. Issuing here
+        // rather than as a separate later step is what makes it one action for the admin - and a
+        // seven-day expiry is only generous if renewing it is trivial, otherwise admins ask for a
+        // longer window and the bound stops meaning anything.
+        model.addAttribute("user", created);
+        model.addAttribute("claimCode", claimCodeService.issue(created));
+        auditEventPublisher.claimCodeIssued(created, principal);
+        return "admin/claim-code-issued";
     }
 
     /**
-     * Issues a fresh claim code and shows it to the administrator once (T197).
+     * Reissues a claim code and shows it to the administrator once (T197 §6f).
      *
-     * <p><b>Shown once and never again.</b> Only a hash is stored, so this response is the sole
-     * moment the code exists outside the administrator's hands - which is what makes "reissue, never
-     * reveal" a property of the storage rather than a rule someone has to remember. Reissuing
-     * invalidates the previous code, and that is the remedy when one is lost or was given to the
-     * wrong person.
+     * <p><b>Shown once and never again.</b> Only a hash of the secret half is stored, so this
+     * response is the sole moment the code exists outside the administrator's hands - which makes
+     * "reissue, never reveal" a property of the storage rather than a rule someone remembers. The
+     * design says plainly that a future build must not "fix" this: making a code retrievable means
+     * storing it recoverably, which is a security regression wearing a usability costume.
      *
-     * <p>POST rather than GET, because it mints a credential and invalidates the previous one. A GET
-     * would be pre-fetched by a browser, followed by a link checker, and replayed from history.
+     * <p><b>Reissue is the whole of revocation.</b> There is no cancel verb: a new code invalidates
+     * the previous one, and disabling the user - already a field on the same edit form - invalidates
+     * any outstanding one. Those two cover both real cases, wrong person and person never joined,
+     * using admin concepts that already exist.
+     *
+     * <p>POST, because it mints a credential and invalidates the previous one. A GET would be
+     * pre-fetched by a browser, followed by a link checker and replayed from history.
      */
-    @PostMapping("/{id}/claim-code")
-    public String issueClaimCode(@PathVariable Long id, @AuthenticationPrincipal AppUserPrincipal principal,
+    @PostMapping("/{id}/reissue-code")
+    public String reissueClaimCode(@PathVariable Long id, @AuthenticationPrincipal AppUserPrincipal principal,
             Model model) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("No such user: " + id));
         model.addAttribute("user", user);
-        // The one place the plaintext travels. It is not logged, not audited, and not persisted.
+        // The one place the plaintext travels. Not logged, not audited, not persisted.
         model.addAttribute("claimCode", claimCodeService.issue(user));
         auditEventPublisher.claimCodeIssued(user, principal);
         return "admin/claim-code-issued";

@@ -179,23 +179,35 @@ public class User {
     }
 
     /**
-     * SHA-256 of the one-time claim code, hex. <b>Never the code itself.</b>
+     * The public half of the claim code - the first group of {@code XXXXX-XXXXX}.
      *
-     * <p>The code is a credential and is shown once, to the admin who issues it, then unrecoverable -
-     * an administrator can reissue, never reveal. A fast hash is correct here <em>because</em> the
-     * code carries 128 bits of {@code SecureRandom}: there is nothing to brute-force, so the slow
-     * hash a short human-friendly code would have needed buys nothing. See {@code ClaimCodeService}
-     * for the entropy decision, which is the load-bearing half of that trade.
+     * <p><b>Not a secret, and it is what makes the rest work.</b> The design fixes a short code
+     * protected by a strict attempt lockout and a slow hash, and a slow hash is salted, so it cannot
+     * be looked up. The selector is the lookup; only the verifier is hashed. It is also what makes
+     * "five attempts per code" countable - without it there is no identified code to count attempts
+     * against until after you have already found it.
      */
-    @Column(name = "claim_code_hash", length = 64)
-    private String claimCodeHash;
+    @Column(name = "claim_code_selector", length = 16)
+    private String claimCodeSelector;
+
+    /**
+     * The slow hash of the secret half. <b>Never the code.</b>
+     *
+     * <p>The code is shown once, to the admin who issues it, then unrecoverable - an administrator
+     * can reissue, never reveal. The design says plainly that a future build must not "fix" that:
+     * making a code retrievable means storing it recoverably, <b>which is a security regression
+     * wearing a usability costume.</b>
+     */
+    @Column(name = "claim_code_verifier_hash", length = 100)
+    private String claimCodeVerifierHash;
 
     @Column(name = "claim_code_issued_at")
     private LocalDateTime claimCodeIssuedAt;
 
     /**
-     * Short - days, not months. <b>An unredeemed code is a standing claim on an account</b>, and the
-     * account it claims is one with an organisation, a role, and access to children's records.
+     * Seven days - long enough to cover a shift rotation so somebody off for a few days is not
+     * locked out, short enough to bound how long <b>a standing claim on an account with a role and
+     * an organisation</b> can sit unredeemed in a mailbox.
      */
     @Column(name = "claim_code_expires_at")
     private LocalDateTime claimCodeExpiresAt;
@@ -204,12 +216,32 @@ public class User {
     @Column(name = "claim_code_consumed_at")
     private LocalDateTime claimCodeConsumedAt;
 
-    public String getClaimCodeHash() {
-        return claimCodeHash;
+    /**
+     * Failed attempts against the current code. At the cap the code is dead and must be reissued.
+     *
+     * <p><b>Load-bearing rather than telemetry.</b> At around fifty bits the lockout is the control,
+     * not the entropy - which is the trade the design made deliberately, on the grounds that the
+     * claim screen is reachable only after a successful sign-in in a tenant with self-service
+     * sign-up disabled. The attacker population is people an administrator deliberately created an
+     * account for, so this is insider escalation rather than enumeration.
+     */
+    @Column(name = "claim_code_attempts", nullable = false)
+    private int claimCodeAttempts;
+
+    public String getClaimCodeSelector() {
+        return claimCodeSelector;
     }
 
-    public void setClaimCodeHash(String claimCodeHash) {
-        this.claimCodeHash = claimCodeHash;
+    public void setClaimCodeSelector(String claimCodeSelector) {
+        this.claimCodeSelector = claimCodeSelector;
+    }
+
+    public String getClaimCodeVerifierHash() {
+        return claimCodeVerifierHash;
+    }
+
+    public void setClaimCodeVerifierHash(String claimCodeVerifierHash) {
+        this.claimCodeVerifierHash = claimCodeVerifierHash;
     }
 
     public LocalDateTime getClaimCodeIssuedAt() {
@@ -234,6 +266,14 @@ public class User {
 
     public void setClaimCodeConsumedAt(LocalDateTime claimCodeConsumedAt) {
         this.claimCodeConsumedAt = claimCodeConsumedAt;
+    }
+
+    public int getClaimCodeAttempts() {
+        return claimCodeAttempts;
+    }
+
+    public void setClaimCodeAttempts(int claimCodeAttempts) {
+        this.claimCodeAttempts = claimCodeAttempts;
     }
 
     public String getIdpSubject() {

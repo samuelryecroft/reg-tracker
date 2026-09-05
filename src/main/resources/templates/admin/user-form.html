@@ -107,22 +107,41 @@
             </div>
         </form>
 
-        <!-- T197. Only on an existing user, and outside the edit form: issuing a code is its own
-             action with its own audit record, not a side effect of saving other changes. A code
-             minted because someone corrected a surname would be a standing claim on an account that
-             nobody decided to create. -->
-        <form th:if="${user != null and user.id != null}" method="post"
-              th:action="@{/admin/users/{id}/claim-code(id=${user.id})}" style="margin-top: var(--s5);">
-            <h2>Sign-in claim code</h2>
-            <p class="muted" th:if="${user.idpSubject == null}">This account is not linked to a
-                sign-in identity yet. Issue a one-time code and give it to the person; they enter it
-                once, the first time they sign in.</p>
-            <p class="muted" th:unless="${user.idpSubject == null}">This account is already linked to
-                a sign-in identity, so a claim code cannot be redeemed against it.</p>
-            <div class="btn-row" th:if="${user.idpSubject == null}">
-                <button type="submit" class="btn secondary">Issue a claim code</button>
-            </div>
-        </form>
+        <!-- T197 §6f. Link state, and it is not decoration: it is the only way an admin can answer
+             "why can't this person sign in?", which is the actual support call. Without it the
+             reissue button is guesswork and the admin's only diagnostic is asking the user to try
+             again. Three states, and each names its own remedy.
+
+             The oid is deliberately NOT shown. It is an identifier an admin has no use for, and
+             putting it on screen recreates the GUID ceremony this feature removed. -->
+        <section th:if="${user != null and user.id != null}" style="margin-top: var(--s5);">
+            <h2>Sign-in</h2>
+
+            <p th:if="${user.idpSubject != null}" class="muted">
+                <strong>Linked.</strong> This person has signed in and their account is tied to their
+                directory identity. A claim code cannot be redeemed against it.
+            </p>
+
+            <p th:if="${user.idpSubject == null and user.claimCodeSelector != null}" class="muted">
+                <strong>Code outstanding.</strong>
+                Issued <span th:text="${#temporals.format(user.claimCodeIssuedAt, 'dd MMM yyyy HH:mm')}">-</span>,
+                expires <span th:text="${#temporals.format(user.claimCodeExpiresAt, 'dd MMM yyyy HH:mm')}">-</span>.
+                <span th:text="${user.claimCodeAttempts} + ' of 5 attempts used'">0 of 5 attempts used</span>.
+                Reissuing stops the current code working.
+            </p>
+
+            <p th:if="${user.idpSubject == null and user.claimCodeSelector == null}" class="muted">
+                <strong>Not linked, and no code outstanding.</strong> This person cannot sign in.
+                Issue a code and give it to them.
+            </p>
+
+            <form method="post" th:action="@{/admin/users/{id}/reissue-code(id=${user.id})}">
+                <div class="btn-row" th:if="${user.idpSubject == null}">
+                    <button type="submit" class="btn secondary"
+                            th:text="${user.claimCodeSelector == null} ? 'Issue a claim code' : 'Issue a new code'">Issue a claim code</button>
+                </div>
+            </form>
+        </section>
     </div>
 </main>
 <script th:src="@{/js/role-constraints.js}"></script>
