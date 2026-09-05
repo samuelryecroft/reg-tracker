@@ -795,7 +795,7 @@ reader needs certainty which; never let an empty state read as a rebuke; and whe
 | Children list, no search results | "No children match \"&lt;term&gt;\". Check the spelling, or clear the search to see all." + [Clear search] |
 | Child record, no interviews | "No return home interviews for this child yet. They'll appear here once one is raised." |
 | Users | "No accounts yet." + [Add a user] |
-| Organisations and homes | "No care providers yet. Add one, then add its homes." + [Add a care provider] |
+| Organisations and homes | ~~"No care providers yet. Add one, then add its homes." + [Add a care provider]~~ **CORRECTED — see D-5e-1 (§7n).** It instructs an impossible order on the screen that was actually built. |
 | Audit | "No recorded activity matches these filters. Try widening the date range." + [Clear filters] |
 | Dashboard, no recurrence flags | "No recurring missing episodes have been flagged on open or recent requests. These are flagged by the home on the request form, so this doesn't rule out recurrence." |
 | Dashboard, too few to report | shipped wording stands |
@@ -3589,3 +3589,76 @@ Confirmed: same gate, same organisation scoping, resolved through the feed's own
 **And an out-of-scope event must 404, not 403.** A 403 confirms the event exists — the same enumeration-oracle
 shape as D-4c-1's lockout message, and worth naming as a pattern: **"you may not see this" tells the asker
 there is something to see.**
+## 7n · 5e — three rulings from Pam's pre-sweep audit (Creed, 7 Sep)
+
+Pam audited every screen's empty state against R-Q13 **against current source rather than assuming the
+batches matched**, and found four things. Two were hers to fix and she has. Two are rulings.
+
+### D-5e-1 · R-Q13's "Organisations and homes" row is WRONG, and the spec moves — but not to what shipped
+
+R-Q13 says *"No care providers yet. Add one, then add its homes."* + **[Add a care provider]**. Pam spotted
+that it reads as though written against a single-supplier *"care providers under me"* screen, while 4e was
+built platform-wide. **She is right, and the reason is stronger than a shape mismatch — the copy instructs an
+impossible order.**
+
+Verified in the code rather than inferred: `organisation-form.html` requires a **Type**, and when it is
+`CARE_PROVIDER` the **Supplier field is required** — `OrganisationAdminController` raises *"Please select a
+supplier"* if it is absent, and the dropdown is populated from existing suppliers. **On an empty system that
+dropdown is empty, so a care provider cannot be created first.** R-Q13's copy tells a first-run administrator
+to do the one thing the form will refuse.
+
+**But the shipped copy is not the answer either.** *"No organisations yet."* satisfies none of R-Q13's own
+three principles: it does not resolve the ambiguity between *nothing to do* and *the system is not showing me
+things*, and it does not carry the ordering the reader needs next.
+
+> **Copy: "No organisations yet. Add a supplier first — a care provider must belong to one."**
+> **+ [Add an organisation]** *(the button matches the form, which creates either type.)*
+
+**Why the spec moves rather than the build:** the empty state's job is to describe the screen the reader is
+looking at. **A copy line cannot be more correct than the screen it sits on.**
+
+**One thing this exposes, named not chased:** §7b left *"whether the second route survives"* as a build
+decision, and `admin/home-list.html` and `admin/organisation-list.html` both still exist as flat lists.
+**So 4e's one-tree question was answered by default, by nobody, which is the shape god and I have been
+chasing all week.** If the tree lands later this row changes with it — **writing empty-state copy for a
+screen whose shape is unruled is how you write it twice.**
+
+### D-5e-2 · R-Q13's Users row stands: "No accounts yet." — the builder's paraphrase does not win
+
+Pam found Jim's `admin/user-list.html` comment claiming *"R-Q13 … says nothing about users"*. **It does** —
+the table's Users row reads **"No accounts yet." + [Add a user]**, and the shipped copy says *"No users yet."*
+
+**R-Q13's wording stands**, and this is not pedantry about one word:
+
+- **R-Q13 is signed-off copy.** D-2a-1 was reversed on exactly this ground — *the badge copy is human-signed-
+  off and pinned character-for-character* — and **if a builder's paraphrase silently wins, R-Q13 stops being
+  a source of truth for the sweep that is about to use it as one.**
+- **"Accounts" is also the more accurate word**, and about to be more so: a person and their account are
+  being separated by T206's provisioning work. *"No users yet"*, read on a screen by a user, is faintly
+  absurd besides.
+
+### D-5e-3 · "Export expired" is NOT 5e's job. Its own ticket — and it is not a copy change.
+
+Pam asked whether building this belongs in 5e. **It does not, and her instinct is exactly right:** 5e is the
+mechanical sweep of copy across lists, cheap because the components already exist. **`ExportController.
+download` returning a bare `ResponseEntity.notFound()` has no view to sweep** — the work is a response path,
+not a string.
+
+**And there is a design decision inside it that must not be made by accident:** that one `notFound()`
+currently collapses **three** states — expired, already used, and unknown token. **They must stay
+collapsed**, and the ticket should say so, because the obvious "improvement" is to distinguish them:
+
+> **A distinct message for an unknown token tells the holder of a guessed token that some other token is
+> real.** Same enumeration-oracle shape as D-4c-1's lockout copy and D-6c-6's 404-not-403 — **"that one is
+> wrong, this one is merely expired" is a probing signal.**
+
+So: one response, R-Q13's existing copy, for all three. **Expired is the honest description of the common
+case and a harmless one for the others.** The copy already coheres with what `case-file-ready.html` says —
+regenerating writes a second row, and every extraction being separately recorded is the feature.
+
+### Not defects, recorded so they are not re-found
+
+- **Children list, no search results** — `children/list.html` has no search. **Dormant, not missing**; do not
+  invent copy for a control that does not exist (§5f). It activates if T152's shell search reaches this list.
+- Pam checked coordinator queue, reviewer queue, visitor's interviews and the audit feed **against source**
+  and all four match R-Q13 word for word. `children/detail.html` did not and she has fixed it (#110).
