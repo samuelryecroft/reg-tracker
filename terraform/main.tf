@@ -155,8 +155,9 @@ module "app_service" {
   # WS-B fail-fast boot vars: the app refuses to start in prod without these.
   # Profile is variable-driven so the T200 Entra cutover flip ("azure" -> "azure,entra") is a single
   # gated tfvars change, not a code edit. Default is "azure"; setting "azure,entra" is the cutover and
-  # MUST come after entra_enabled=true and after the human has minted ENTRA-CLIENT-SECRET into Key
-  # Vault (otherwise the entra profile activates with no secret and the app fails closed at boot).
+  # MUST come after entra_enabled=true AND after a client credential exists (the federated credential
+  # proven via T184/#73, or a secret in Key Vault only if that fails). The entra profile with no client
+  # registration is a deliberate boot failure - SecurityConfig throws. See ENTRA-CUTOVER-RUNBOOK.md.
   spring_profiles_active = var.spring_profiles_active
   blob_endpoint          = module.storage.primary_blob_endpoint
   key_vault_uri          = module.keyvault.vault_uri

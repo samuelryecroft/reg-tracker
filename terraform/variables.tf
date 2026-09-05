@@ -140,10 +140,12 @@ variable "entra_issuer_uri" {
 # The active Spring profile string written to SPRING_PROFILES_ACTIVE. Variable-driven so the T200
 # Entra sign-in cutover is a gated tfvars flip rather than a code edit. The allowlist here mirrors
 # deploy.yml's 5.1 gate exactly {azure, "azure,entra"}; there is no 'prod' profile and 'demo' is never
-# permitted on a real deployment. ORDERING: only set "azure,entra" AFTER entra_enabled=true and after
-# ENTRA-CLIENT-SECRET exists in Key Vault - the entra profile has no secret fallback and fails closed.
+# permitted on a real deployment. ORDERING: only set "azure,entra" AFTER entra_enabled=true AND after a
+# client credential exists (federated credential proven via T184/#73, or a secret in KV only if that
+# fails) - the entra profile with no client registration is a deliberate boot failure (SecurityConfig
+# throws). Also ship #86/V20 first. Full go-order: ENTRA-CUTOVER-RUNBOOK.md Part 2.
 variable "spring_profiles_active" {
-  description = "SPRING_PROFILES_ACTIVE for the App Service. 'azure' (default, current state) or 'azure,entra' (Entra cutover). Flipping to 'azure,entra' is the P7 cutover step; gate it on entra_enabled and the minted client secret."
+  description = "SPRING_PROFILES_ACTIVE for the App Service. 'azure' (default, current state) or 'azure,entra' (Entra cutover). Flipping to 'azure,entra' is the P7 cutover step; gate it on entra_enabled, a client credential (FIC or secret), and V20 having shipped."
   type        = string
   default     = "azure"
 

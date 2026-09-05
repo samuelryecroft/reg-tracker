@@ -29,20 +29,26 @@ enable_vnet = true
 # deliberately - the human's is justsam33@gmail.com. Set it here (this file's real copy is git-ignored).
 budget_alert_email = "you@example.org"
 
-# --- T200 Entra External ID sign-in cutover (PREPARED, gated - see ENTRA-CUTOVER-READINESS.md §4-5).
-# All three values below are NON-secret (recorded from the app registration, ENTRA-TENANT-PROVISIONED.md).
-# The client SECRET is never here and never in Terraform state as a value: it is minted by the human
-# straight into Key Vault as ENTRA-CLIENT-SECRET, and Terraform holds only a @Microsoft.KeyVault(...)
-# reference. Leave this whole block commented until cutover.
+# --- T200 Entra External ID sign-in cutover (PREPARED, gated - see ENTRA-CUTOVER-RUNBOOK.md, which
+# supersedes ENTRA-CUTOVER-READINESS.md §4 for the go-order). All three values below are NON-secret
+# (from the app registration, ENTRA-TENANT-PROVISIONED.md). No client secret is minted on the current
+# plan: the federated credential (T184/#73) is proven first, and only if that proof fails is a secret
+# minted into Key Vault. Terraform holds only the @Microsoft.KeyVault(...) reference either way, never
+# a value. Leave this whole block commented until cutover.
 #
-# ORDER (do not skip):
-#   1. Human mints ENTRA-CLIENT-SECRET into kv-rht-fq58t (portal) + creates the sign-in user flow.
-#   2. entra_enabled = true  (provisions the KV secret container + writes ENTRA_* app settings;
-#      app still serves form login because the profile is still "azure").  -> apply
-#   3. deploy.yml allowlist widened to accept "azure,entra" (PR #91) is merged.
-#   4. spring_profiles_active = "azure,entra"  -> apply  = the cutover. Form login + break-glass stay.
+# GO-ORDER (ENTRA-CUTOVER-RUNBOOK.md Part 2; the allowlist MUST precede the flip):
+#   1. Human (portal, ~30min, NO secret): sign-in user flow (sign-up OFF), email-OTP MFA (no SMS), SSPR.
+#   2. Merge the deploy.yml allowlist PR (#91). Anywhere before the flip; earliest is safest.
+#   3. Ship #86/V20 as an ordinary deploy while Entra is still OFF - claim-code code is inert until
+#      app.auth.entra.enabled, so the columns land unused and the flip carries no schema dependency.
+#   4. Client credential exists: FIC proven (T184/#73), or a secret minted into KV only if it fails.
+#   5. entra_enabled = true  -> apply (writes ENTRA_* app settings + the KV secret-ref; profile still
+#      "azure" so still inert - form login served, no OIDC bean). Expect an app restart (settings change).
+#   6. spring_profiles_active = "azure,entra"  -> apply = the cutover. NOTE: the entra profile with no
+#      client registration is a DELIBERATE boot failure (SecurityConfig throws) - that is the guard
+#      working, not a broken build. Form login + break-glass remain (coexistence is structural).
 #
 # entra_enabled          = true
 # entra_client_id        = "726d965d-e292-4e29-b6e3-0170ebcc853d"
 # entra_issuer_uri       = "https://1d7a3706-4101-4620-a57d-426e95f41971.ciamlogin.com/1d7a3706-4101-4620-a57d-426e95f41971/v2.0"
-# spring_profiles_active = "azure,entra"   # step 4 ONLY - leave "azure" (the default) until then
+# spring_profiles_active = "azure,entra"   # step 6 ONLY - leave "azure" (the default) until then
