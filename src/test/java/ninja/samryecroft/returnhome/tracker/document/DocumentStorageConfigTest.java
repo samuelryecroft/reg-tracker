@@ -62,11 +62,30 @@ class DocumentStorageConfigTest {
                         .hasMessageContaining("app.documents.keys=local is not permitted in production"));
     }
 
+    /**
+     * Split from a single {@code azure,prod} case, and the reason is worth more than the coverage.
+     *
+     * <p>That test was named {@code aProductionSpringProfileTripsTheSameGuard} and commented "both
+     * markers are honoured". <b>It passed because of {@code prod}. The {@code azure} contributed
+     * nothing</b> - the guard's set did not contain it - so anyone auditing "is the azure profile
+     * guarded?" would have found this test, read the name and the comment, and stopped.
+     *
+     * <p>That is why nobody caught this for months: not because nobody looked, but because
+     * <b>something that looked like proof was in the way</b>. An unpinned claim in a comment tells
+     * the next reader the question is settled; an unpinned claim in a TEST NAME tells them it is
+     * settled <em>and verified</em>, and it survives exactly the review that would otherwise catch
+     * it. {@code azure,prod} is also the combination {@code application-azure.properties} describes
+     * and {@code deploy.yml} forbids - the same false belief, transcribed into a test. (Kevin, §9a.)
+     */
     @Test
-    void aProductionSpringProfileTripsTheSameGuard() {
-        // Both markers are honoured, because a deployment may set one and not the other and the
-        // guard is worthless if it can be sidestepped by the one that was forgotten.
-        runner().withPropertyValues("spring.profiles.active=azure,prod")
+    void theProfileProductionActuallyRunsOnTripsTheGuardOnItsOwn() {
+        runner().withPropertyValues("spring.profiles.active=azure")
+                .run(context -> assertThat(context).hasFailed());
+    }
+
+    @Test
+    void aTierNamedProfileTripsTheGuardOnItsOwn() {
+        runner().withPropertyValues("spring.profiles.active=prod")
                 .run(context -> assertThat(context).hasFailed());
     }
 
