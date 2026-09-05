@@ -12,71 +12,64 @@
     <a class="btn" href="/requests/new">Raise new request</a>
     <p class="muted">Sorted by statutory deadline: most urgent first. Deadline is 72 hours from the child's recorded return.</p>
 
-    <div class="table-wrap responsive">
-    <table>
-        <caption>Requests raised by your home, most urgent first.</caption>
-        <thead>
-        <tr>
-            <th scope="col">Child</th>
-            <th scope="col">Deadline</th>
-            <th scope="col">Status</th>
-            <th scope="col">Visitor</th>
-            <th scope="col">Raised</th>
-            <th scope="col">Action</th>
-        </tr>
-        </thead>
-        <tbody th:each="group : ${dueGroups}">
-        <tr class="group"><th colspan="6" scope="colgroup"><span class="due-group-head">
-            <th:block th:replace="~{fragments/layout :: dueIcon(${group.state()})}"></th:block>
-            <span th:text="${group.label()}">Group</span>
-        </span></th></tr>
-        <tr th:each="row : ${group.rows()}" th:with="r=${row.request()}">
-            <td><a class="rowlink" th:href="@{/interview-requests/{id}(id=${r.id})}" th:text="${childIdentities[r.child.id].label()}">Child Name</a></td>
-            <td>
-                <span th:if="${row.badge()} != null" class="due" th:classappend="${row.badge().cssClass()}">
-                    <th:block th:replace="~{fragments/layout :: dueIcon(${row.badge().state()})}"></th:block>
-                    <span th:text="${row.badge().text()}">Deadline</span>
-                </span>
-                <span th:if="${row.badge()} == null" class="muted">—</span>
-            </td>
-            <td><span class="status" th:classappend="${r.status}" th:text="${r.status.displayName}">STATUS</span></td>
-            <td th:text="${r.allocatedVisitor} ? ${r.allocatedVisitor.fullName} : '—'">Visitor</td>
-            <td th:text="${#temporals.format(r.createdAt, 'dd MMM yyyy HH:mm')}">Created</td>
-            <td>
-            </td>
-        </tr>
-        </tbody>
-    </table>
-    </div>
+    <!--/*
+      5a (spec §7b's remaining-list-screens delta): cards for cases, not a table AND a duplicated
+      .stack copy of the same rows (R-Q12) - the exact class of drift the redesign has been
+      deleting screen by screen. Reuses fragments/case-card, the same component 2a/2d/2f already
+      consume, rather than a fifth hand-built card.
 
-    <div class="stack">
-        <th:block th:each="group : ${dueGroups}">
-        <h2 style="font-size:15px;margin:20px 0 10px"><span class="due-group-head">
-            <th:block th:replace="~{fragments/layout :: dueIcon(${group.state()})}"></th:block>
-            <span th:text="${group.label()}">Group</span>
-        </span></h2>
-        <div class="srow" th:each="row : ${group.rows()}" th:with="r=${row.request()}">
-            <div class="top">
-                <span class="name" th:text="${childIdentities[r.child.id].label()}">Child Name</span>
-                <span th:if="${row.badge()} != null" class="due" th:classappend="${row.badge().cssClass()}">
-                    <th:block th:replace="~{fragments/layout :: dueIcon(${row.badge().state()})}"></th:block>
-                    <span th:text="${row.badge().text()}">Deadline</span>
+      meta omits the home name (D-2f-1): this list is already scoped to the reader's own home(s),
+      so repeating it on every row would be the scope this page already states, said again. No
+      action: home staff raised the request and track it, they don't allocate, schedule or review
+      it - "View details" is what the child's name link already does, not a second control.
+    */-->
+    <th:block th:each="group : ${dueGroups}">
+        <section class="case-group">
+            <h2 class="case-group-head">
+                <span class="due-group-head">
+                    <th:block th:replace="~{fragments/layout :: dueIcon(${group.state()})}"></th:block>
+                    <span th:text="${group.label()}">Overdue</span>
                 </span>
+            </h2>
+            <div class="case-list">
+                <th:block th:each="row : ${group.rows()}" th:with="r=${row.request()}">
+                    <div th:replace="~{fragments/case-card :: caseCard(
+                            identity=${childIdentities[r.child.id]},
+                            href=@{/interview-requests/{id}(id=${r.id})},
+                            meta=${r.returnedAt != null
+                                    ? 'Returned ' + #temporals.format(r.returnedAt, 'dd MMM yyyy, HH:mm')
+                                    : 'Return time not recorded'},
+                            asideLabel='Visitor',
+                            aside=${r.allocatedVisitor != null ? r.allocatedVisitor.fullName : 'Not yet allocated'},
+                            badge=${row.badge()},
+                            status=${r.status},
+                            actionLabel=null,
+                            actionHref=null,
+                            noAction=null,
+                            noteLabel=null,
+                            note=null)}"></div>
+                </th:block>
             </div>
-            <span class="status" th:classappend="${r.status}" th:text="${r.status.displayName}">STATUS</span>
-            <dl>
-                <dt>Visitor</dt><dd th:text="${r.allocatedVisitor} ? ${r.allocatedVisitor.fullName} : 'Not yet allocated'">Visitor</dd>
-                <dt>Scheduled</dt><dd th:text="${r.scheduledAt} != null ? ${#temporals.format(r.scheduledAt, 'dd MMM yyyy HH:mm')} : 'Not yet scheduled'">Scheduled</dd>
-                <dt>Raised</dt><dd th:text="${#temporals.format(r.createdAt, 'dd MMM yyyy HH:mm')}">Raised</dd>
-            </dl>
-            <div class="act">
-                <a class="btn ghost" th:href="@{/interview-requests/{id}(id=${r.id})}">View details</a>
-            </div>
-        </div>
-        </th:block>
-    </div>
+        </section>
+    </th:block>
 
-    <div class="empty" th:if="${#lists.isEmpty(requests)}">No requests yet.</div>
+    <!--/*
+      R-Q13 (spec §5d), two states rather than one rewrite (D-5e-4, spec §7q): the signed-off
+      sentence below ("...raise a request now") is only followable when a child exists to select
+      on the form it links to. Rewriting it to cover the childless case would make the common case
+      (a home WITH children and no open requests) worse to make the rare one survivable - so the
+      rare case gets its own state instead, reusing the children-list sentence rather than
+      inventing new copy (D-5e-2's own principle: R-Q13 stays the one source of truth).
+    */-->
+    <div class="empty" th:if="${#lists.isEmpty(requests) and !hasAnyChildren}">
+        <th:block th:if="${can.addChild}">No children are recorded for this home yet. Add a child before you can raise an interview request.</th:block>
+        <th:block th:unless="${can.addChild}">No children are recorded for this home yet. A request can be raised once one is added.</th:block>
+        <a class="btn secondary" href="/children/new" th:if="${can.addChild}">Add a child</a>
+    </div>
+    <div class="empty" th:if="${#lists.isEmpty(requests) and hasAnyChildren}">
+        No open requests for this home. If a child has returned from being missing, raise a request now.
+        <a class="btn secondary" href="/requests/new">Raise a request</a>
+    </div>
 </main>
 </body>
 </html>

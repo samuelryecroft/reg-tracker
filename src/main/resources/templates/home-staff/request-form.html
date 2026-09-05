@@ -29,6 +29,22 @@
             <div th:replace="~{fragments/layout :: errorSummary('Before this request can be raised')}"></div>
 
             <h3 id="young-person" tabindex="-1">Young person</h3>
+            <!--/*
+              D-5e-5 (spec §7q): the same empty-collection case the request list warns about, on
+              the form the list actually links to - "a required dropdown containing only its
+              placeholder, with no explanation and no way forward" is the real dead end, and a
+              list that declines to send you here is only a courtesy. Reusing the list's own two
+              branches, not new copy (D-5e-2). Suppresses the "+ Add a child not in this list"
+              line below, which would otherwise duplicate this banner's own CTA.
+            */-->
+            <div class="banner warn" th:if="${#lists.isEmpty(children)}">
+                <svg class="icon" aria-hidden="true"><use th:href="@{/icons/phosphor.svg} + '#ph-warning-circle'"></use></svg>
+                <div>
+                    <strong>No children are recorded for this home yet</strong>
+                    <p th:if="${can.addChild}">Add a child before you can raise an interview request. <a href="/children/new">Add a child</a></p>
+                    <p th:unless="${can.addChild}">A request can be raised once one is added.</p>
+                </div>
+            </div>
             <label for="childId">Child <span class="req" aria-hidden="true">*</span></label>
             <select id="childId" th:field="*{childId}" required
                     th:errorclass="is-invalid" th:aria-invalid="${#fields.hasErrors('childId')}" aria-describedby="childId-error">
@@ -43,7 +59,7 @@
                  a broken one. Exempting it silently would read as a bug and as an unannounced
                  privacy behaviour, so it's stated here rather than left for someone to notice. */-->
             <p class="hint">Full names are shown here so you pick the right child, even when names are masked elsewhere.</p>
-            <p class="muted" th:if="${can.addChild}"><a href="/children/new">+ Add a child</a> not in this list</p>
+            <p class="muted" th:if="${can.addChild and !#lists.isEmpty(children)}"><a href="/children/new">+ Add a child</a> not in this list</p>
 
             <label for="legalStatus">Legal status</label>
             <input type="text" id="legalStatus" th:field="*{legalStatus}"/>
