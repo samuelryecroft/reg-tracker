@@ -99,13 +99,77 @@ class FederatedCredentialDiagnosticTest {
      * diagnostic is asking about. The app registration deliberately has no API permissions.
      */
     @Test
-    void aPermissionsRefusalIsTheExpectedShapeOfSuccess() {
+    void anOutcomeEntraCouldOnlyReachAfterAcceptingTheAssertionIsASuccess() {
+        // The most likely real PASS: a registration that deliberately holds no API permissions gets
+        // "admin consent has not been granted", which Entra can only decide after authenticating us.
+        assertThat(FederatedCredentialDiagnostic.classify(400, "invalid_grant", "AADSTS65001"))
+                .isEqualTo(FederatedCredentialDiagnostic.Outcome.PASS);
         assertThat(FederatedCredentialDiagnostic.classify(400, "invalid_scope", "AADSTS70011"))
                 .isEqualTo(FederatedCredentialDiagnostic.Outcome.PASS);
-        assertThat(FederatedCredentialDiagnostic.classify(403, "insufficient_scope", "(no AADSTS code)"))
+        assertThat(FederatedCredentialDiagnostic.classify(400, "invalid_request", "AADSTS500011"))
                 .isEqualTo(FederatedCredentialDiagnostic.Outcome.PASS);
         assertThat(FederatedCredentialDiagnostic.classify(200, "(no error field)", "(no AADSTS code)"))
                 .isEqualTo(FederatedCredentialDiagnostic.Outcome.PASS);
+    }
+
+    /**
+     * Kevin's finding on #73, and it is the same defect I had just fixed one layer up - a broken
+     * federation reported as a pass, this time sitting in the SET the fixed code reads rather than
+     * in the matching.
+     *
+     * <p>Entra returns <b>AADSTS700016, "application not found in the directory"</b>, as
+     * {@code unauthorized_client}. An application that was never found never had its assertion
+     * validated against anything, so this is not a permissions refusal - it is precisely the
+     * federation being wrong, and it is the most likely way this is misconfigured on cutover day: a
+     * client id pointing at the wrong tenant, or at a registration that was recreated.
+     *
+     * <p>The review asked for INCONCLUSIVE. These go further, to FAIL, because "the application does
+     * not exist" is not a "we do not know" - a wrong FAIL costs an investigation, while INCONCLUSIVE
+     * invites somebody to decide it was probably fine.
+     */
+    @Test
+    void anApplicationThatWasNeverFoundIsAFailureNotAPermissionsRefusal() {
+        assertThat(FederatedCredentialDiagnostic.classify(400, "unauthorized_client", "AADSTS700016"))
+                .isEqualTo(FederatedCredentialDiagnostic.Outcome.FAIL);
+        assertThat(FederatedCredentialDiagnostic.classify(400, "unauthorized_client", "AADSTS7000112"))
+                .isEqualTo(FederatedCredentialDiagnostic.Outcome.FAIL);
+    }
+
+    /**
+     * When a response carries both signals, rejection wins - which is what makes the ordering in
+     * {@code classify} a decision rather than an accident.
+     *
+     * <p>It is reachable: {@code firstAadstsCode} takes the first code in the body, and an Entra
+     * error description can name more than one. Without this, swapping the two branches leaves every
+     * other test in this file passing, and the comment saying the order is deliberate would be an
+     * unpinned claim - the same shape as a guard nobody has run a failing control against.
+     */
+    @Test
+    void aResponseCarryingBothSignalsIsReadAsARejection() {
+        assertThat(FederatedCredentialDiagnostic.classify(400, "invalid_scope", "AADSTS700016"))
+                .isEqualTo(FederatedCredentialDiagnostic.Outcome.FAIL);
+        assertThat(FederatedCredentialDiagnostic.classify(401, "invalid_client", "AADSTS65001"))
+                .isEqualTo(FederatedCredentialDiagnostic.Outcome.FAIL);
+    }
+
+    /**
+     * The entries that were in the set because they SOUNDED like permissions errors. Re-derived from
+     * "which outcomes can Entra only produce after accepting our assertion?", none of them survives:
+     * {@code insufficient_scope} is an RFC 6750 resource-server response that cannot appear at a
+     * token endpoint at all, {@code consent_required} and {@code interaction_required} are
+     * interactive-flow errors impossible on client_credentials, and a bare {@code unauthorized_client}
+     * or {@code invalid_grant} spans both stages - under RFC 7521/7523 an assertion used for client
+     * authentication fails as {@code invalid_client}, so {@code invalid_grant} here is ambiguous, and
+     * ambiguous is what INCONCLUSIVE is for.
+     */
+    @Test
+    void errorsThatMerelySoundLikePermissionsProveNothing() {
+        for (String error : java.util.List.of("insufficient_scope", "consent_required",
+                "interaction_required", "access_denied", "unauthorized_client", "invalid_grant")) {
+            assertThat(FederatedCredentialDiagnostic.classify(400, error, "(no AADSTS code)"))
+                    .as("%s must not be read as proof the assertion was accepted", error)
+                    .isEqualTo(FederatedCredentialDiagnostic.Outcome.INCONCLUSIVE);
+        }
     }
 
     /**
