@@ -490,7 +490,11 @@ class FrontendSourceGuardTest {
     }
 
     /**
-     * T211 (Creed): no template may assign a colour custom property.
+     * T211 (Creed): a template may assign an appearance-neutral INPUT, and never a resolved OUTPUT.
+     *
+     * <p>A hue means the same thing in both appearances. A colour is an ANSWER that is only right in
+     * one of them. That is the whole rule, and it is stated as a reason rather than as a list of
+     * token names so that it stays correct as new tokens appear.
      *
      * <p>A custom property set from a template - in a {@code <style>} block or a {@code style=}
      * attribute - is ONE server-rendered value. An appearance-varying token needs two: app.css
@@ -505,23 +509,36 @@ class FrontendSourceGuardTest {
      * that defect still disagreed about which branch executed, because under either account the
      * assignment was there.
      *
-     * <p><strong>Why an allowlist and not a list of colour names.</strong> The brief named
-     * {@code --accent} / {@code --color-*} / {@code --tint}, which are today's colour tokens. Written
-     * that way the rule would be scoped by the NAMING of the instances it was built from - which is
-     * the exact amendment this floor already adopted after the T163 sweep, where a guard matched
-     * only backgrounds whose token ended in {@code -bg} and was therefore structurally unable to see
-     * the accent family. The hazard is not the word "colour" in a token's name; it is that a single
-     * server-rendered value cannot carry two appearance variants. So every custom-property
-     * assignment in a template is a violation unless the property is on a short, justified list of
-     * appearance-INVARIANT scalars, and a newly-invented colour token is caught without anyone
-     * remembering to add it here.
+     * <p><strong>Why an allowlist of inputs, and not a list of colour names.</strong> Named as
+     * colour families - {@code --accent} / {@code --color-*} / {@code --tint} - the rule would be
+     * scoped by the NAMING of the instances it was built from, which is the exact amendment this
+     * floor adopted after the T163 sweep: a guard that matched only backgrounds whose token ended in
+     * {@code -bg} was structurally unable to see the accent family. So the default is that every
+     * custom-property assignment in a template is an OUTPUT and therefore a violation, and only a
+     * property demonstrably on the INPUT side of that line is permitted. A newly-invented colour
+     * token is then caught with nobody remembering to add it here.
      *
-     * <p>The list holds one entry, and it is checked rather than asserted:
-     * {@code --brand-hue} is a hue ANGLE, declared once in app.css ({@code --brand-hue: 289}) and
-     * consumed as {@code oklch(L C var(--brand-hue))} at every step of the accent ramp. The ramp
-     * mirrors LIGHTNESS and chroma between appearances; the hue is the same number in both. One
-     * server-rendered value is therefore correct for it, which is precisely what T186 relies on when
-     * it replaces the colour block with a hue-only one.
+     * <p>The allowlist holds one entry, and it is checked rather than asserted. {@code --brand-hue}
+     * is a hue ANGLE: declared once in app.css ({@code --brand-hue: 289}) and consumed as
+     * {@code oklch(L C var(--brand-hue))} at every step of the accent ramp. The ramp mirrors
+     * LIGHTNESS and chroma between appearances; the hue is the same number in both. It is an input
+     * the ramp resolves per appearance, not an answer, so one server-rendered value is correct.
+     *
+     * <p><strong>This must not condemn the fix.</strong> {@code fragments/layout.html} assigns
+     * {@code --brand-hue} five lines below the block that caused all this, and that hue-only
+     * assignment is exactly what T186 LEAVES BEHIND. A guard that caught the defect and also failed
+     * the remedy would be worse than no guard, so "does not fire on the hue block" is pinned as a
+     * test against the real template tree below, not left to the allowlist's good intentions.
+     *
+     * <p><strong>Complements {@code AccentTintMirrorsBetweenAppearancesUiTest}, and does not
+     * replace it - do not delete either as a duplicate of the other.</strong> Kevin's test asserts
+     * the SYMPTOM at render: that a branded org's {@code --accent}/{@code --tint} actually differ
+     * between light and dark in a real browser. It is a {@code *UiTest}, so it inherits
+     * {@code @Tag("flaky-infra")} and runs in the non-blocking lane - it can observe the defect
+     * returning but cannot fail a merge. This one reads source, needs no browser, and runs in the
+     * blocking gate: it catches the CAUSE and can stop it landing. Symptom-at-render and
+     * cause-in-source are different evidence, and the one that can block is not the one that can
+     * prove the pixels.
      */
     @Test
     void noTemplateAssignsAnAppearanceVaryingCustomProperty() throws IOException {
@@ -532,7 +549,7 @@ class FrontendSourceGuardTest {
                 Matcher m = CUSTOM_PROPERTY_ASSIGNMENT.matcher(lines.get(i));
                 while (m.find()) {
                     String property = m.group(1);
-                    if (!APPEARANCE_INVARIANT_PROPERTIES.contains(property)) {
+                    if (!APPEARANCE_NEUTRAL_INPUTS.contains(property)) {
                         violations.add(file.getFileName() + ":" + (i + 1) + "  " + property);
                     }
                 }
@@ -543,7 +560,7 @@ class FrontendSourceGuardTest {
                 .describedAs("A template renders ONE value; an appearance-varying custom property "
                         + "needs two. Declare it in app.css beside its light counterpart instead - "
                         + "or, if it genuinely cannot vary by appearance, add it to "
-                        + "APPEARANCE_INVARIANT_PROPERTIES with the reason.")
+                        + "APPEARANCE_NEUTRAL_INPUTS with the reason.")
                 .isEmpty();
     }
 
@@ -556,11 +573,12 @@ class FrontendSourceGuardTest {
             Pattern.compile("(?<![-\\w])(--[a-zA-Z][a-zA-Z0-9-]*)\\s*:");
 
     /**
-     * Custom properties a template MAY set, because one value is correct in every appearance. Each
-     * entry needs a reason that can be checked against app.css, not merely asserted - see the
-     * javadoc above for {@code --brand-hue}'s.
+     * Custom properties a template MAY set: appearance-neutral INPUTS, where one value is correct
+     * in every appearance. Each entry needs a reason checkable against app.css rather than merely
+     * asserted - see the javadoc above for {@code --brand-hue}'s. Anything that is a resolved
+     * OUTPUT belongs in app.css beside its light counterpart.
      */
-    private static final Set<String> APPEARANCE_INVARIANT_PROPERTIES = Set.of("--brand-hue");
+    private static final Set<String> APPEARANCE_NEUTRAL_INPUTS = Set.of("--brand-hue");
 
     /**
      * The detector's own negative control. A check that matched every {@code --} it saw would flag
@@ -598,6 +616,47 @@ class FrontendSourceGuardTest {
     }
 
     private static boolean allowed(String line) {
-        return assignedProperties(line).stream().allMatch(APPEARANCE_INVARIANT_PROPERTIES::contains);
+        return assignedProperties(line).stream().allMatch(APPEARANCE_NEUTRAL_INPUTS::contains);
+    }
+
+    /**
+     * The half that matters more than catching the defect: this guard must not condemn the remedy.
+     *
+     * <p>{@code fragments/layout.html} assigns {@code --brand-hue} from the server, five lines below
+     * the block that caused T186 - and that hue-only assignment is what T186 leaves behind. Asserted
+     * against the REAL template tree rather than a synthetic line, because the thing worth pinning
+     * is that the shipped remedy passes, not that a string I wrote passes.
+     *
+     * <p>The floor is deliberate too: if the tree ever stops assigning {@code --brand-hue} at all,
+     * this fails rather than passing vacuously, and someone has to notice that the allowlist entry
+     * no longer corresponds to anything real.
+     */
+    @Test
+    void theHueOnlyBlockThatT186LeavesBehindStaysLegal() throws IOException {
+        List<String> hueAssignments = new ArrayList<>();
+        List<String> flagged = new ArrayList<>();
+        for (Path file : sourceFilesUnder(TEMPLATES_DIR)) {
+            List<String> lines = Files.readAllLines(file, StandardCharsets.UTF_8);
+            for (int i = 0; i < lines.size(); i++) {
+                for (String property : assignedProperties(lines.get(i))) {
+                    String where = file.getFileName() + ":" + (i + 1) + "  " + property;
+                    if (property.equals("--brand-hue")) {
+                        hueAssignments.add(where);
+                        if (!APPEARANCE_NEUTRAL_INPUTS.contains(property)) {
+                            flagged.add(where);
+                        }
+                    }
+                }
+            }
+        }
+
+        assertThat(hueAssignments)
+                .describedAs("no template assigns --brand-hue any more - either the remedy changed "
+                        + "shape, or this allowlist entry is now dead and should go")
+                .isNotEmpty();
+        assertThat(flagged)
+                .describedAs("the server-rendered hue is an appearance-neutral INPUT and must stay "
+                        + "legal - a guard that fails the fix is worse than no guard")
+                .isEmpty();
     }
 }
