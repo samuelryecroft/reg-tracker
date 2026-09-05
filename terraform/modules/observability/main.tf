@@ -62,9 +62,12 @@ resource "azurerm_monitor_metric_alert" "latency" {
 # Analytics without any new plumbing. This is NOT the R5 phase-3 audit stream and does not wait on
 # it: that is every audit event reaching aggregation; this is one event reaching one rule.
 #
-# DELIBERATELY NOT GATED ON var.entra_enabled. The rollback in ENTRA-AUTH-DESIGN.md §5 is "disable
-# Entra, go back to form login" - so the moment break-glass becomes the primary way in is exactly
-# the moment the Entra flag is off. Gating this would destroy the alert at the point it matters
+# DELIBERATELY UNGATED - it fires whenever break-glass is used, on every deployment.
+#
+# It was written ungated because the Entra rollback was "disable Entra, go back to form login", so
+# the alert would have been destroyed at the moment break-glass became the primary way in. Entra is
+# gone and form login is now the only path, which removes that particular argument but not the
+# conclusion: an emergency-access alert conditional on anything is an alert that can be switched off
 # most, with a trigger we have already written down as something we might deliberately do.
 #
 # THE MARKER IS DUPLICATED IN JAVA AND HERE, AND THE DUPLICATION FAILS OPEN. Reword either side and

@@ -92,29 +92,27 @@ public class AuditEventPublisher {
                 .meta("enabled", created.isEnabled())
                 // Creation is the primary place a directory identity is bound to an account (T113
                 // Inc 2), so which identity it was bound to is part of what was created.
-                .meta("identityLink", created.getIdpSubject())
                 .build());
     }
 
     /**
      * Records the privilege transition, not the account's contents (and never the password).
      *
-     * <p>{@code idpSubject} is on the privilege side of that line, and it is the sharpest of the
-     * three. Roles say what an account may do and {@code enabled} says whether it may be used at
-     * all; the directory link decides <em>which human being can sign in as it</em>. Rebinding it
-     * hands an existing account - with its roles, its organisation and its home scope already in
-     * place - to a different person, which is precisely the move someone would make to acquire an
-     * existing scope quietly. Without it here, that is indistinguishable in the trail from
-     * correcting a typo in a contact number.
+     * <p>Roles say what an account may do and {@code enabled} says whether it may be used at all,
+     * and both are recorded before-and-after rather than as a flag: during an incident the question
+     * is "what changed, and from what", which a boolean answers only half of.
      *
-     * <p><b>Before and after, not a boolean</b> - and the file's own reasoning settles the format.
-     * {@code passwordChanged} is a bare flag because the value is a secret and recording it would
-     * be the disclosure. A directory object id is not a secret: it is an opaque identifier no more
-     * sensitive than the user and organisation ids already on every row. During an incident the
-     * question is "was this account rebound, and to what", and a boolean answers only half of it.
+     * <p>{@code passwordChanged} stays a bare flag for the opposite reason - the value is a secret,
+     * so recording it would be the disclosure.
+     *
+     * <p>A third field used to sit here: the Entra directory link, which decided <em>which human
+     * being could sign in as this account</em> and was the sharpest of the three. It went with the
+     * rest of the Entra removal. Historical audit rows still carry their {@code identityLink}
+     * metadata and are unaffected - nothing reads it back through a fixed schema, so removing the
+     * writer leaves the trail intact rather than orphaning it.
      */
     public void userUpdated(User updated, Set<Role> rolesBefore, boolean enabledBefore,
-            String identityLinkBefore, boolean passwordChanged, AppUserPrincipal principal) {
+            boolean passwordChanged, AppUserPrincipal principal) {
         publish(actor(AuditEventRecord.of(AuditEventType.USER_UPDATED), principal)
                 .target("User", updated.getId())
                 .scope(organisationIdOf(updated), homeIdOf(updated))
@@ -122,8 +120,6 @@ public class AuditEventPublisher {
                 .meta("rolesAfter", roleNames(updated.getRoles()))
                 .meta("enabledBefore", enabledBefore)
                 .meta("enabledAfter", updated.isEnabled())
-                .meta("identityLinkBefore", identityLinkBefore)
-                .meta("identityLinkAfter", updated.getIdpSubject())
                 .meta("passwordChanged", passwordChanged)
                 .build());
     }

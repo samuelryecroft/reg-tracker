@@ -55,14 +55,13 @@ class AdminUserFormUiTest extends AbstractUiTest {
         login(ADMIN_USERNAME, ADMIN_PASSWORD);
         page.navigate(url("/admin/users/new"));
 
-        // Everything valid except the Directory object ID, so the browser's own required-field
-        // handling lets the form reach the server and the server sends back one field error.
+        // Everything valid except the email, so the browser's own required-field handling lets the
+        // form reach the server and the server sends back one field error.
         page.fill("#username", "t165ui");
         page.fill("#password", "correct-horse-battery");
         page.fill("#firstName", "Val");
         page.fill("#lastName", "Idation");
-        page.fill("#email", "t165ui@example.test");
-        page.fill("#idpSubject", "6f0a1c9e-3c2b-4c1a-9f77");
+        page.fill("#email", "not-an-email-address");
         // Scoped to <main>: the shell sidebar's sign-out control is also a submit button, and it
         // comes first in the DOM - an unscoped selector signs the admin out instead.
         page.click("main button[type=submit]");

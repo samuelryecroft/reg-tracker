@@ -156,11 +156,13 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       # --- 5.1: assert the app is pinned to an allowed profile and NEVER 'demo' (fail closed). ---
-      # The allowlist is the EXPLICIT set {azure, "azure,entra"} - "azure" is the current state and
-      # "azure,entra" is the Entra sign-in cutover (T200; Terraform passes one literal or the other,
-      # gated on entra_enabled). It is deliberately NOT a prefix/substring match: this is the pipeline
-      # half of the two-layer demo guard (DemoProfileGuard is the in-app half), so the 'demo' refusal
-      # below must survive any widening. There is no 'prod' profile.
+      # The allowlist is the EXPLICIT single value {azure}. It was {azure, "azure,entra"} while the
+      # Entra sign-in cutover was planned; Entra has been removed, so the second member is gone with
+      # it rather than left as a permanently-unreachable widening. The history is recorded here on
+      # purpose: it is what stops the set being widened back to a value nothing can now produce.
+      # It is deliberately NOT a prefix/substring match - this is the pipeline half of the two-layer
+      # demo guard (DemoProfileGuard is the in-app half), so the 'demo' refusal below must survive
+      # any widening. There is no 'prod' profile.
       - name: Assert SPRING_PROFILES_ACTIVE
         run: |
           profiles="$(az webapp config appsettings list \
@@ -171,9 +173,9 @@ jobs:
             *,demo,*) echo "FATAL: 'demo' profile present on a real deployment - refusing." >&2; exit 1 ;;
           esac
           case "${profiles}" in
-            azure|azure,entra) ;;  # explicit allowlist - keep exact, not a prefix match
+            azure) ;;  # explicit allowlist - keep exact, not a prefix match
             *)
-              echo "FATAL: SPRING_PROFILES_ACTIVE='${profiles}', expected 'azure' or 'azure,entra' (allowlist)." >&2
+              echo "FATAL: SPRING_PROFILES_ACTIVE='${profiles}', expected 'azure' (allowlist)." >&2
               exit 1
               ;;
           esac

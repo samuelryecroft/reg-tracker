@@ -46,33 +46,6 @@ public class User {
      */
     private String password;
 
-    /**
-     * The directory <b>object id</b> ({@code oid}) of the Entra identity this account belongs to,
-     * null for an account with no directory identity. Unique when present.
-     *
-     * <p>This is the persistent identity key and the only value a login may link on. Email is
-     * display only and is never consulted at sign-in: it is mutable and addresses get recycled, so
-     * binding identity to it would let a new starter inherit a leaver's access
-     * (ENTRA-AUTH-DESIGN.md §3). D4 additionally withdrew the first-login email-match ceremony this
-     * javadoc used to describe, because matching a verified email <em>binds</em> an Entra identity
-     * to an existing enabled account.
-     *
-     * <p><b>{@code oid}, not {@code sub}, and the difference is not cosmetic.</b> {@code sub} is
-     * pairwise - Entra derives it per (user, application), so it differs between app registrations
-     * and cannot be looked up in the portal at all. Under D4 an {@code ORG_ADMIN} records this value
-     * <em>before</em> the person has ever signed in, so {@code sub} is not a worse key, it is an
-     * unavailable one. See {@code EntraOidcUserService.objectIdOf}.
-     *
-     * <p><b>V14 still hedges as "{@code sub} (or {@code oid})" and must be left alone.</b> That
-     * migration has already run, {@code validate-on-migrate} is on by default, and a comment is
-     * content - editing it changes the checksum and fails startup where V14 is applied. This javadoc
-     * is the resolution of that hedge; the migration cannot be.
-     *
-     * <p>Written by an {@code ORG_ADMIN} at account creation, and read at sign-in by
-     * {@code UserRepository.findByIdpSubject}.
-     */
-    @Column(name = "idp_subject", unique = true)
-    private String idpSubject;
 
     @Column(name = "first_name")
     private String firstName;
@@ -90,8 +63,7 @@ public class User {
      *
      * <p>Deliberately not {@code username}, and deliberately not unique. {@code username} stays the
      * login key, and shared mailboxes are ordinary in this sector. This is also the field a future
-     * Entra link will sync its {@code email} claim into and look up on for the one-time link, so it
-     * is one field rather than a profile copy beside an identity copy - see {@link #idpSubject}.
+     * contact address for this person, and the only address the application uses.
      *
      * <p>Not encrypted; V17 records why, and it is a property of the per-organisation key model
      * rather than a view about how sensitive this is.
@@ -178,13 +150,6 @@ public class User {
         this.password = password;
     }
 
-    public String getIdpSubject() {
-        return idpSubject;
-    }
-
-    public void setIdpSubject(String idpSubject) {
-        this.idpSubject = idpSubject;
-    }
 
     public String getFirstName() {
         return firstName;
