@@ -39,8 +39,23 @@ import org.springframework.stereotype.Component;
  * cases above that stored value <em>differs</em> - {@code LockedException} against a real account,
  * {@code BadCredentialsException} against an unknown one. Nothing reads it today, and storing it
  * would leave the distinction sitting in the session for the first page that ever does.
- * <b>The oracle is not in the wording; it is in which states can be told apart</b>, and a value
- * nobody currently renders is still a difference between two states that must be indistinguishable.
+ * <b>The oracle is not in the wording; it is in which states can be told apart.</b>
+ *
+ * <p><b>SCOPED, because the general form of that sentence is wrong.</b> It applies to a value on a
+ * path to an <em>unauthenticated</em> response - a session attribute on the login page reaches
+ * whoever is guessing, so "nobody renders it yet" is one edit away from "everybody sees it". It
+ * does <b>not</b> mean that recording the distinction anywhere is a defect.
+ *
+ * <p>The case that proves the difference, and that this must not be read as condemning:
+ * {@code AuthenticationAuditListener} stores {@code getException().getClass().getSimpleName()} as
+ * the {@code reason} on a {@code LOGIN_FAILURE} audit row - <em>the same distinction</em>,
+ * persisted. <b>That is correct.</b> Recording what actually happened is what an audit trail is
+ * for, and the exposure is different in kind: {@code LOGIN_FAILURE} is absent from
+ * {@code AuditHistoryService.CASE_ACTIVITY_TYPES} (an allow-list) and named in
+ * {@code EXCLUDED_FROM_USER_HISTORY}, so it sits behind a feed that excludes it structurally rather
+ * than in front of an anonymous visitor. Dwight's finding on #115; written down here because
+ * without it the sentence above reads as general, and the next person either "fixes" the audit row
+ * or cites this comment to justify rendering it.
  *
  * <h2>What identical means</h2>
  *
