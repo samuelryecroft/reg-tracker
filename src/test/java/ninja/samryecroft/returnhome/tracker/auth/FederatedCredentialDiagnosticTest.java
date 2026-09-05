@@ -194,6 +194,31 @@ class FederatedCredentialDiagnosticTest {
     }
 
     /**
+     * Kevin's finding on #73: this class holds its own copy of the client id and token endpoint,
+     * while production reads {@code ENTRA_CLIENT_ID} and derives the endpoint from OIDC discovery.
+     * <b>A PASS therefore proves the diagnostic's copy, not production's</b> - and if the two differ,
+     * this check passes while cutover still fails, for an application it would never name.
+     *
+     * <p>It compares rather than depends: reading the production value as the source would stop the
+     * diagnostic running where the app setting does not exist yet, and this gets one shot on one
+     * deploy. So the unset case is its own verdict and says plainly that the run proves nothing,
+     * rather than quietly reading as agreement.
+     */
+    @Test
+    void theRunSaysWhetherItIsEvenTestingProductionsConfiguration() {
+        assertThat(FederatedCredentialDiagnostic.configVerdict("abc", "abc"))
+                .isEqualTo(FederatedCredentialDiagnostic.ConfigVerdict.MATCHES_PRODUCTION);
+        assertThat(FederatedCredentialDiagnostic.configVerdict("abc", "def"))
+                .isEqualTo(FederatedCredentialDiagnostic.ConfigVerdict.DIFFERS_FROM_PRODUCTION);
+        // The case that must never read as agreement, and the one nobody currently knows the answer
+        // to - whether ENTRA_CLIENT_ID is set on that App Service at all.
+        assertThat(FederatedCredentialDiagnostic.configVerdict("abc", null))
+                .isEqualTo(FederatedCredentialDiagnostic.ConfigVerdict.PRODUCTION_VALUE_NOT_SET);
+        assertThat(FederatedCredentialDiagnostic.configVerdict("abc", "   "))
+                .isEqualTo(FederatedCredentialDiagnostic.ConfigVerdict.PRODUCTION_VALUE_NOT_SET);
+    }
+
+    /**
      * The constraint that outlives this ticket. The step-one token is a bearer credential, and
      * Application Insights captures INFO and above into a Log Analytics workspace shared across the
      * platform with no field-level encryption - so a token in a log line is the same class of

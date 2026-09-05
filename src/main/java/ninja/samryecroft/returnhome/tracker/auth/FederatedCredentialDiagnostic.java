@@ -161,6 +161,8 @@ public class FederatedCredentialDiagnostic {
                 return;
             }
 
+            reportConfigurationAgreement();
+
             String assertion = requestManagedIdentityToken(identityEndpoint, identityHeader);
             if (assertion == null) {
                 log.warn("T184 step 1 FAILED: could not obtain a managed-identity token for {}",
@@ -174,6 +176,78 @@ public class FederatedCredentialDiagnostic {
             // be logged on this path.
             log.warn("T184 federated-credential diagnostic did not complete: {}",
                     e.getClass().getSimpleName());
+        }
+    }
+
+    /**
+     * Says whether this check is even asking about the configuration production will use.
+     *
+     * <p><b>Kevin's finding on #73, and it undercuts what a PASS means.</b> This class holds its own
+     * copy of the client id and the token endpoint, while {@code application-entra.properties} reads
+     * {@code ENTRA_CLIENT_ID} and derives the token endpoint from OIDC discovery - with a comment
+     * there saying why: so the endpoints come from the tenant's own metadata rather than being
+     * hand-copied into config. <b>This diagnostic hand-copies them.</b> Two independent copies of the
+     * same two facts, with nothing pinning them together.
+     *
+     * <p>So a PASS proves that <em>the diagnostic's</em> client id federates against <em>the
+     * diagnostic's</em> endpoint. If {@code ENTRA_CLIENT_ID} is unset, stale, or names a
+     * registration that was recreated, this passes and cutover still fails - in exactly the way the
+     * classification above now correctly calls a FAIL, for an application this check would never
+     * name. And the reverse is worse to act on: a typo in this class's own property would report
+     * "the federation does not work" while production is fine, and somebody could reasonably go and
+     * change production to match a broken test.
+     *
+     * <p><b>It compares rather than depends.</b> Reading {@code ENTRA_CLIENT_ID} as the source would
+     * stop the diagnostic running at all where the app setting does not exist yet - the entra
+     * profile is not active - and this check gets one shot on one deploy. So it does what step 1
+     * does with {@code iss} and {@code sub}: reads both and states the comparison either way. The
+     * fix is also the measurement - nobody currently knows whether {@code ENTRA_CLIENT_ID} is set on
+     * that App Service, and this answers it on the same run.
+     */
+    private void reportConfigurationAgreement() {
+        compare("clientId", properties.getClientId(), environment.apply("ENTRA_CLIENT_ID"));
+        compare("token endpoint tenant", hostOf(properties.getTokenEndpoint()),
+                hostOf(environment.apply("ENTRA_ISSUER_URI")));
+    }
+
+    /** What this run can claim about production, separated from the logging so it can be tested. */
+    enum ConfigVerdict { PRODUCTION_VALUE_NOT_SET, MATCHES_PRODUCTION, DIFFERS_FROM_PRODUCTION }
+
+    static ConfigVerdict configVerdict(String diagnosticValue, String productionValue) {
+        if (productionValue == null || productionValue.isBlank()) {
+            return ConfigVerdict.PRODUCTION_VALUE_NOT_SET;
+        }
+        return productionValue.equals(diagnosticValue)
+                ? ConfigVerdict.MATCHES_PRODUCTION : ConfigVerdict.DIFFERS_FROM_PRODUCTION;
+    }
+
+    private void compare(String what, String diagnosticValue, String productionValue) {
+        if (configVerdict(diagnosticValue, productionValue) == ConfigVerdict.PRODUCTION_VALUE_NOT_SET) {
+            log.warn("T184 config: {} - the production setting is NOT SET, so whatever this run "
+                    + "reports proves nothing about the value production will use", what);
+            return;
+        }
+        if (configVerdict(diagnosticValue, productionValue) == ConfigVerdict.MATCHES_PRODUCTION) {
+            log.info("T184 config: {} matches production", what);
+            return;
+        }
+        // Both values are identifiers rather than secrets - the same class of thing as the iss and
+        // sub logged below - and a mismatch is useless without them.
+        log.error("T184 config: {} DOES NOT MATCH production. This check would test '{}' while "
+                + "production uses '{}', so a PASS below would prove nothing about production",
+                what, diagnosticValue, productionValue);
+    }
+
+    /** The host of a URL, or the value itself if it will not parse - a comparison is still better than nothing. */
+    private static String hostOf(String url) {
+        if (url == null || url.isBlank()) {
+            return url;
+        }
+        try {
+            String host = URI.create(url).getHost();
+            return host == null ? url : host;
+        } catch (IllegalArgumentException e) {
+            return url;
         }
     }
 
