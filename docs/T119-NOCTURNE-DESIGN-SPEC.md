@@ -1910,3 +1910,49 @@ problem somewhere less visible* — was right, and the same trap was waiting for
 to make `--tint` mirror, which would have added a second definition of a token that should not exist at all.
 **The measurement that discriminated was the hue.** A diagnosis that explains *which* value appeared, and not
 merely that the wrong one did, is the one worth acting on.
+
+
+## 6h · A live 2.4.11 failure on every text input — and a correction to my own T186 severity claim (Creed, 5 Sep)
+
+**Correcting myself first:** I told god that T186's legacy override makes "the focus ring the raw brand hex,
+on every keyboard user on every focusable element." **That is wrong.** The app-wide focus ring is
+`:focus-visible { outline: 2px solid var(--color-accent) }` — the **long** name, which the legacy block never
+touches. Only **two** rules use the overridden `--accent` for focus, not all of them.
+
+But checking that turned up something worse, and unconditional:
+
+```css
+input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); }
+```
+
+`input:focus` is specificity (0,1,1) and beats `:focus-visible` at (0,1,0), so **`outline: none` wins and the
+global ring never renders on a text field.** The only remaining focus signal is the border changing from
+`--color-control-border` to the accent. Measured, focused-vs-unfocused, which is what **WCAG 2.2 AA 2.4.11**
+requires at 3:1:
+
+| | worst | best | fails 3:1 |
+|---|---|---|---|
+| dark | 1.48:1 | 1.70:1 | **360/360 hues** |
+| light | 1.47:1 | 1.79:1 | **360/360 hues** |
+
+**Every text input, select and textarea in the app has a focus indicator that fails 2.4.11, at every brand
+hue, in both appearances — for default-brand organisations too.** It is not a branding bug; branding only
+makes the same rule's colour additionally unguaranteed. Every form is affected: raising a request, the
+send-back comment, adding a child, sign-in.
+
+**The fix is a deletion:** drop `outline: none` from that rule and let the global `:focus-visible` ring apply.
+It is already correct and already on the safe token. Keep the border-colour change as reinforcement — it just
+must not be the *only* signal.
+
+### This decouples the pilot gate from T186
+
+With that one deletion, `:740` no longer depends on `--accent` at all, leaving `:1199`
+(`.section-index a:focus-visible`) as the single remaining focus rule on the overridden token — and switching
+it to `--color-accent` is a one-word change. **So the whole pre-pilot accessibility exposure can be closed by
+two lines, independently of Kevin's `secondaryColor` data question.** T186 remains right and necessary for
+the other 24 rules; it simply stops being what the pilot waits on.
+
+**The general point, which is why I nearly missed this:** I went looking for what *branding* broke and found
+a rule that was already broken for everyone. **A conditional defect and an unconditional one can live in the
+same declaration, and the conditional one is the more interesting story — which is exactly why it gets found
+first and the plain one underneath it does not.**
