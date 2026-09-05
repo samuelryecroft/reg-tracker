@@ -4,6 +4,9 @@
 <th:block th:fragment="styles">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" th:href="@{/css/app.css}">
+<!-- ARMING T186 GUARD - TEMPORARY, DO NOT MERGE -->
+<style th:if="${theme != null}"
+       th:text="${':root { --accent: ' + theme.primaryColor + '; --accent-dark: ' + theme.primaryColor + '; --accent-ink: ' + theme.primaryColor + '; --tint: ' + theme.primaryColor + '; }'}"></style>
 <!-- T186: a per-org inline <style> used to sit here overriding four bridge tokens - --accent,
      --accent-dark, --accent-ink and --tint - with values computed from the supplier's brand hex.
      It is gone, and its removal IS the fix: those four now fall back to app.css's ramp definitions,
