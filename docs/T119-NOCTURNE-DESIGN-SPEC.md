@@ -796,7 +796,7 @@ reader needs certainty which; never let an empty state read as a rebuke; and whe
 | Reviewer queue, all self-submitted | "The reports waiting were all submitted by you, so you can't review them yourself. Another reviewer will pick them up." |
 | Visitor's interviews | "No interviews have been allocated to you yet. Your coordinator will assign them here." |
 | **Visitor's interviews, all complete** *(new)* | "Nothing outstanding. Interviews you've completed stay on each child's record." |
-| Home staff's requests | "No open requests for this home. If a child has returned from being missing, raise a request now." + [Raise a request] |
+| Home staff's requests | "No open requests for this home. If a child has returned from being missing, raise a request now." + [Raise a request] — **correct as written, but it is only ONE of two states. See D-5e-4 (§7q).** |
 | Home staff's requests, all closed | "No open requests. Approved reports stay on the child's record, where you can still read them." |
 | Children list | "No children added yet. Add a child before you can raise an interview request." + [Add a child] |
 | Children list, no search results | "No children match \"&lt;term&gt;\". Check the spelling, or clear the search to see all." + [Clear search] |
@@ -3814,3 +3814,60 @@ impossible sequence should not be reachable in the first place.**
 for `CARE_PROVIDER` rows? If it should, the branch is a workaround for a missing constraint and should say so
 in a comment; if genuine orphans are possible (a soft-deleted supplier under T170), the branch is correct and
 the copy needs to survive that case too.
+## 7q · The same trap on 5a — and this time the fix is a second state, not new copy (Creed, 7 Sep)
+
+Jim suggested sweeping R-Q13 for the shape D-5e-1 exposed: **an empty-state instruction that assumes a
+precondition the form cannot satisfy.** Pam applied it **before** building 5a and found one. **Two instances
+means the class is real, and the rule that found the second one came from a builder, not from me.**
+
+### D-5e-4 · "Raise a request now" is correct — and it is only one of two states
+
+R-Q13 says *"No open requests for this home. If a child has returned from being missing, raise a request
+now."* + **[Raise a request]**. `home-staff/request-form.html` requires a child from a `<select required>`
+populated from `${children}`, so **on a home with no children recorded the form cannot be completed.**
+
+**But the remedy is not the org row's remedy, and the difference is the ruling:**
+
+| | D-5e-1 (organisations) | D-5e-4 (home staff's requests) |
+|---|---|---|
+| When is the instruction wrong? | **Always**, on an empty system — a care provider can never be created first | **Only when a second collection is also empty** — it is correct whenever the home has children |
+| Fix | **Change the copy** | **Add a second empty state.** The existing copy stays exactly as signed off |
+
+> **An instruction that is sometimes right does not want a rewrite that makes it vaguely right in both cases.
+> It wants the second case to have its own state.** Rewriting the signed-off sentence to cover a
+> conditional would make it worse in the common case to make it survivable in the rare one.
+
+**The second state, and it needs no new copy either** — R-Q13 already contains the sentence, on the Children
+list row: *"Add a child before you can raise an interview request."* **The same thought in a second place is
+reuse, not invention**, and it keeps R-Q13 the source of truth (D-5e-2).
+
+**It must branch on whether the reader can act**, per D-5d-3 — *never attach an instruction to a control the
+reader does not have:*
+
+- **`can.addChild` true** → *"No children are recorded for this home yet. Add a child before you can raise an
+  interview request."* + **[Add a child]**
+- **`can.addChild` false** → name who can, and drop the button: *"No children are recorded for this home yet.
+  A request can be raised once one is added."* **No action the reader cannot take.**
+
+### D-5e-5 · The dead end is one layer further in, on the form itself
+
+Checking the form rather than only the copy turned up the more important half. `request-form.html:46`
+already carries an escape hatch — *"+ Add a child not in this list"* — **but it is gated on `can.addChild`,
+and nothing explains the empty select to anyone else.** So a reader who follows *"raise a request now"*
+without that permission lands on **a required dropdown containing only its placeholder, with no explanation
+and no way forward.**
+
+**The empty-collection case belongs on the form too, not only on the list that links to it.** Same two
+branches, same reuse.
+
+> **An empty state on a list is a courtesy; the same empty state on the form it links to is the actual fix.**
+> A list that declines to send you somewhere useless is good. **A form that cannot say why it is useless is
+> the dead end** — and the list is not always how the reader arrived.
+
+### On the sweep itself
+
+**Two rows have now failed this check, so the remaining rows deserve the same pass.** If Pam's check already
+covered every row and found exactly one more, that is the sweep complete and worth recording as such;
+if it covered only 5a's row, the rest are worth the same question. **Either way the question is Jim's, and it
+is the schema-shaped one:** *what must already exist for this instruction to be followable, and can the
+system be in a state where it does not?*
