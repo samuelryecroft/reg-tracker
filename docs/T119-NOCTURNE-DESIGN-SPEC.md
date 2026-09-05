@@ -806,7 +806,7 @@ reader needs certainty which; never let an empty state read as a rebuke; and whe
 | Audit | "No recorded activity matches these filters. Try widening the date range." + [Clear filters] |
 | Dashboard, no recurrence flags | "No recurring missing episodes have been flagged on open or recent requests. These are flagged by the home on the request form, so this doesn't rule out recurrence." |
 | Dashboard, too few to report | shipped wording stands |
-| Export expired | "This export has expired. You can generate it again from the child's record — each export is recorded separately." + [Back to record] |
+| Export expired | "This export has expired. You can generate it again from the child's record — each export is recorded separately." + ~~[Back to record]~~ **[Go to children]** — **sentence unchanged; CTA corrected, see D-5e-3a (§7r).** |
 
 **The 18th is not needed.** Oscar asked whether a brand-new org with no completed interviews is covered.
 It is, in code: `RateStat.percent()` returns empty whenever `validCompleted < 5`, zero included, and
@@ -3871,3 +3871,44 @@ covered every row and found exactly one more, that is the sweep complete and wor
 if it covered only 5a's row, the rest are worth the same question. **Either way the question is Jim's, and it
 is the schema-shaped one:** *what must already exist for this instruction to be followable, and can the
 system be in a state where it does not?*
+## 7r · The "Export expired" CTA is unbuildable — and that is evidence FOR the design, not against it (Creed, 8 Sep)
+
+Jim took T218 and asked for R-Q13's exact string rather than writing something close, **explicitly because
+he had paraphrased the Users row that morning and been caught.** Applying a correction twice, unprompted, is
+the behaviour that keeps R-Q13 a source of truth.
+
+**Building it surfaced a conflict in my own signed-off copy.**
+
+### D-5e-3a · The sentence stands verbatim. The CTA cannot, and changes to [Go to children].
+
+`ExportLinkService.redeem(token, requestingUserId)` returns `Optional<ExportPack>`, **empty for all four
+failure cases — expired, already spent, unknown, and wrong-owner.** That collapse is the property D-5e-3
+required and Jim has held it structurally rather than by convention.
+
+**Its consequence is that the controller has no pack, and therefore no child id.** So **[Back to record] names
+a destination the page cannot know.** I specified a link that the security design I endorsed makes
+impossible.
+
+> **This is D-5e-1's rule arriving at a CTA instead of a sentence: a copy line cannot be more correct than
+> the screen it sits on.** And it is not a reason to weaken the collapse — **a CTA that could resolve to the
+> right record would, by existing, distinguish an expired token from an unknown one.** The dead link is the
+> guarantee working, seen from the inside.
+
+**The sentence needs no change, and the reason is worth keeping: the PAGE does not know which child, but the
+READER does.** They just generated that export. *"…from the child's record"* remains true and actionable as
+orientation; only the link was ever impossible.
+
+**CTA: [Go to children].** `/export/download/**` is not in `SecurityConfig`'s permitAll list, so every reader
+of this page is signed in and has the shell — the button is a shortcut, not the only way out. **If a reader's
+role cannot reach the children list, omit the button rather than render a broken one** (§5f); the shell's own
+navigation is then the answer.
+
+### The exact string, since it lives only here
+
+```
+This export has expired. You can generate it again from the child's record — each export is recorded separately.
+```
+
+**`child's` uses an ASCII apostrophe (0x27). The dash is a real em dash (U+2014) with a space either side.**
+Recorded because this string exists in no other artefact — not the handoff README, not the canvas — which
+is itself a small argument for the copy set living somewhere a builder can reach without asking.
