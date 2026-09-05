@@ -218,6 +218,42 @@ public class VisitorController {
                 .body(Map.of("outcome", "terminal", "message", message));
     }
 
+    /**
+     * T192: an interview cannot have been held before the child came back.
+     *
+     * <p>The T187 predicate change stopped such a record corrupting the published compliance rate -
+     * it reads as "not measurable" rather than as a pass - but it did not stop the record existing.
+     * <b>A state you have to write display language for is usually a state nobody prevented</b>
+     * (Creed), and rendering it well is the floor rather than the fix.
+     *
+     * <p><b>On submit only, never on a draft save.</b> The same reasoning the required-field checks
+     * above already follow: a draft is work in progress and a visitor may be typing a date before
+     * they have typed the year. Refusing to save half-entered work would lose it, which is the
+     * opposite of what save-as-you-go is for. Submission is the point at which the record becomes a
+     * claim.
+     *
+     * <p>The message names both times rather than saying "invalid", because the visitor cannot act
+     * on a refusal that will not say what it is comparing - and one of the two is on a different
+     * screen, so they cannot simply look.
+     */
+    private void rejectInterviewBeforeReturn(Long id, AppUserPrincipal principal,
+            SubmitReportForm form, BindingResult bindingResult) {
+        if (form.getHeldAt() == null) {
+            return;
+        }
+        LocalDateTime returnedAt = interviewRequestService.getAuthorized(id, principal).getReturnedAt();
+        if (returnedAt == null || !form.getHeldAt().isBefore(returnedAt)) {
+            return;
+        }
+        bindingResult.rejectValue("heldAt", "beforeReturn",
+                "The interview cannot have been held before the child returned. This says the "
+                        + "interview was " + form.getHeldAt().format(HELD_AT_FMT) + " and the return "
+                        + "was " + returnedAt.format(HELD_AT_FMT) + " - please check which is wrong.");
+    }
+
+    private static final java.time.format.DateTimeFormatter HELD_AT_FMT =
+            java.time.format.DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm", java.util.Locale.UK);
+
     @GetMapping("/interviews/{id}/report")
     public String reportForm(@PathVariable Long id, @AuthenticationPrincipal AppUserPrincipal principal, Model model) {
         InterviewRequest request = interviewRequestService.getAuthorized(id, principal);
@@ -238,6 +274,7 @@ public class VisitorController {
             if (form.getInterviewLocation() == null || form.getInterviewLocation().isBlank()) {
                 bindingResult.rejectValue("interviewLocation", "required", "Location is required to submit for review");
             }
+            rejectInterviewBeforeReturn(id, principal, form, bindingResult);
         }
         if (bindingResult.hasErrors()) {
             InterviewRequest request = interviewRequestService.getAuthorized(id, principal);
