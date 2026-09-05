@@ -1028,9 +1028,6 @@ fieldset.checkbox-fieldset > legend {
    the rail marker, the status tag and the visitor's own banner already share; the tokens
    themselves were already locked (D-1a-2a). */
 .banner.sent-back { background: var(--sent-back-bg); color: var(--sent-back); border: 1px solid transparent; border-color: color-mix(in srgb, var(--sent-back) 25%, transparent); }
-/* .banner-warning kept as an alias so nothing already using it silently loses its styling. */
-.banner-warning { background: var(--warn-bg); color: var(--warn); border: 1px solid #EBCF8A; border-radius: var(--radius); padding: var(--s4); margin-bottom: var(--s4); }
-.banner-warning p { margin: 0.35rem 0 0; white-space: pre-wrap; }
 
 .muted { color: var(--muted); }
 dl.detail dt { font-weight: 650; margin-top: var(--s3); font-size: var(--t-xs); color: var(--muted); }
