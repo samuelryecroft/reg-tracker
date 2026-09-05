@@ -155,8 +155,22 @@ class SelfReviewSeparationOfDutiesIntegrationTest extends AbstractIntegrationTes
         assertThat(selfReviewerHtml).doesNotContain("Send back with comments");
         assertThat(selfReviewerHtml).contains("You can't decide this report");
 
+        // Creed's second #71 review, spec §6f: this used to render at the very bottom, replacing
+        // the action bar - meaning a blocked reviewer read the ENTIRE safeguarding report before
+        // ever learning they were never permitted to act on it. "Anything that changes whether or
+        // how a reader should engage with a document belongs before the document" - so this must
+        // now appear before the numbered sections, the same placement rule D-1b-8's own note
+        // follows for a different reason.
+        int banIndex = selfReviewerHtml.indexOf("You can't decide this report");
+        int selfFirstSectionIndex = selfReviewerHtml.indexOf("1. Details");
+        assertThat(banIndex).isGreaterThan(-1);
+        assertThat(selfFirstSectionIndex).isGreaterThan(-1);
+        assertThat(banIndex).as("a blocked reviewer must learn this before reading the report, not after")
+                .isLessThan(selfFirstSectionIndex);
+
         // The paired positive: an independent reviewer sees the real action bar plus the
-        // attestation naming the separation-of-duties rule the system just confirmed for them.
+        // attestation naming the separation-of-duties rule the system just confirmed for them -
+        // also now at the top, per the same superseded-D-1b-7 placement rule.
         String independentReviewerHtml = mockMvc.perform(get("/reviewer/reports/{id}/review", requestId)
                         .with(asUser("t143-other-reviewer" + suffix)))
                 .andExpect(status().isOk())
@@ -165,6 +179,13 @@ class SelfReviewSeparationOfDutiesIntegrationTest extends AbstractIntegrationTes
         assertThat(independentReviewerHtml).contains("Send back with comments");
         assertThat(independentReviewerHtml).contains("You did not submit this report.");
         assertThat(independentReviewerHtml).doesNotContain("You can't decide this report");
+
+        int attestationIndex = independentReviewerHtml.indexOf("You did not submit this report.");
+        int independentFirstSectionIndex = independentReviewerHtml.indexOf("1. Details");
+        assertThat(attestationIndex).isGreaterThan(-1);
+        assertThat(independentFirstSectionIndex).isGreaterThan(-1);
+        assertThat(attestationIndex).as("the satisfied attestation moved to the top alongside the blocked case, no longer beside the actions")
+                .isLessThan(independentFirstSectionIndex);
     }
 
     @Test

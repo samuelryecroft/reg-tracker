@@ -51,6 +51,30 @@
     </p>
 
     <!--
+      D-1b-7 CLOSED, corrected (Creed's second #71 review, spec §6f): originally the attestation
+      sat beside the actions and the not-satisfied banner replaced the bar in the same spot - but
+      that means a BLOCKED reviewer reads the entire safeguarding report before ever learning they
+      were never permitted to act on it, the same shape of defect D-1b-8 exists to prevent, just
+      applied to permission instead of history. Creed's general rule, stated for reuse: "anything
+      that changes whether or how a reader should engage with a document belongs BEFORE the
+      document; only things that qualify the ACT - the approve consequence panel - belong at the
+      point of acting." So both branches move here, and only the consequence panel + the actual
+      controls remain beside the actions below. canReview already enforces this server-side
+      (getReviewable's own conflict-of-interest check) - this is still only saying so, never a
+      disabled button (permanent, not provisional - there is nothing that could later enable one).
+    -->
+    <p class="muted" th:if="${canDecide}">You did not submit this report.</p>
+    <div class="banner warn" th:unless="${canDecide}">
+        <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-warning-circle'"></use></svg>
+        <div>
+            <strong>You can't decide this report</strong>
+            <p>A reviewer cannot approve or send back a report they submitted themselves - this
+                is a separation-of-duties rule and it can't be overridden here. Another reviewer
+                needs to take this one.</p>
+        </div>
+    </div>
+
+    <!--
       D-1b-8 (rail limitation, unchanged from the original §6a note): kept for orientation, same
       component as 1a. A report sent back once and resubmitted is back at REPORT_SUBMITTED - the
       rail shows CURRENT and the earlier send-back is invisible there, which is exactly why the
@@ -180,16 +204,11 @@
 
         <!--
           D-1b-7: canReview already enforces this server-side (getReviewable's own conflict-of-
-          interest check) - the screen's only job is to SAY so. Satisfied gets this small muted
-          attestation beside the actions (its own job - THE DECISION - unlike D-1b-8's note above,
-          which is about how to read the report and stands alone at the top); not satisfied gets
-          NO ACTION BAR AT ALL, replaced by a banner stating the rule and the way forward. Never a
-          disabled button: a disabled control isn't focusable, so a keyboard user meets a dead end
-          that can't explain itself, and this rule is permanent - there is nothing that could later
-          enable it.
+          interest check). The "SAY so" half of this rule now lives entirely at the top of the
+          page (Creed's second #71 review, spec §6f - see that comment there for why); only the
+          controls a satisfied reviewer actually needs remain here, gated the same way.
         -->
         <div th:if="${canDecide}">
-            <p class="muted">You did not submit this report.</p>
             <div class="consequence">
                 <p>Approving generates the final Word document, releases it to the child's home, and can't be undone.</p>
             </div>
@@ -236,15 +255,6 @@
                     <button type="submit" name="action" value="reject" class="btn sent-back">Send back</button>
                 </div>
             </dialog>
-        </div>
-        <div class="banner warn" th:unless="${canDecide}">
-            <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-warning-circle'"></use></svg>
-            <div>
-                <strong>You can't decide this report</strong>
-                <p>A reviewer cannot approve or send back a report they submitted themselves - this
-                    is a separation-of-duties rule and it can't be overridden here. Another reviewer
-                    needs to take this one.</p>
-            </div>
         </div>
     </form>
 </main>
