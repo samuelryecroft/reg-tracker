@@ -12,10 +12,10 @@
     <p class="muted" th:if="${platformWide}">These colours are the platform default, used for the platform admin view and as a fallback for any supplier org without its own branding.</p>
     <p class="muted" th:unless="${platformWide}">These colours apply across the app for your organisation, and appear on the return home interview reports you generate.</p>
 
-    <!-- D-3a-5 (spec §7j): "and for every Care Provider org you serve" was a vague plural for a
+    <!--/* D-3a-5 (spec §7j): "and for every Care Provider org you serve" was a vague plural for a
          countable fact - the consequence of this action, stated at its real magnitude (same shape
          as D-4a-2). No panel at all when the count is genuinely zero: there is no consequence to
-         a supplier with no Care Provider orgs yet, so there is nothing here to warn about. -->
+         a supplier with no Care Provider orgs yet, so there is nothing here to warn about. */-->
     <div class="consequence" th:if="${!platformWide and careProviderCount > 0}">
         <strong style="font-size:16px" th:text="${'Changing this colour changes what ' + careProviderCount
                 + ' other organisation' + (careProviderCount == 1 ? '' : 's') + ' see'}">Consequence</strong>
@@ -39,7 +39,7 @@
                    th:errorclass="is-invalid" th:aria-invalid="${#fields.hasErrors('primaryColor')}" aria-describedby="primaryColor-error"/>
             <div th:replace="~{fragments/layout :: fieldError('primaryColor')}"></div>
 
-            <!--
+            <!--/*
               D-3a-3/D-3a-4 (spec §7k): both panes are forced to their own appearance regardless of
               the viewer's own preference, because the person picking a colour is choosing for both
               at once - this screen gets no appearance control of its own, and the preview must not
@@ -47,7 +47,7 @@
               theme (D-3a-1's one sanctioned template-emitted value, never a resolved colour) and
               kept live by theme-preview.js on every colour-picker input - no JS, no live update,
               but never a broken or misleading preview (the panes still show the stored state).
-            -->
+            */-->
             <div class="theme-preview-row">
                 <div class="theme-preview" data-appearance="light" th:style="'--brand-hue:' + ${previewBrandHue}">
                     <p class="theme-preview-label">Light</p>
