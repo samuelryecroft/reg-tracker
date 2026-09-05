@@ -11,51 +11,76 @@
     <h1>Users</h1>
     <a class="btn" href="/admin/users/new" th:if="${can.addUser}">Add user</a>
 
-    <div class="table-wrap responsive">
-    <table>
-        <caption>All user accounts.</caption>
-        <thead>
-        <tr>
-            <th scope="col">Username</th>
-            <th scope="col">Full name</th>
-            <th scope="col">Roles</th>
-            <th scope="col">Homes</th>
-            <th scope="col">Organisation</th>
-            <th scope="col">Enabled</th>
-            <th scope="col" class="visually-hidden">Action</th>
-        </tr>
-        </thead>
-        <tbody>
-        <tr th:each="u : ${users}">
-            <td th:text="${u.username}">username</td>
-            <td th:text="${u.fullName}">Full Name</td>
-            <td th:text="${#strings.setJoin(u.roles, ', ')}">ROLES</td>
-            <td th:text="${#lists.isEmpty(u.homes)} ? '—' : ${#strings.listJoin(u.homes.![name], ', ')}">Homes</td>
-            <td th:text="${u.organisation} ? ${u.organisation.name} : '—'">Organisation</td>
-            <td th:text="${u.enabled} ? 'Yes' : 'No'">Enabled</td>
-            <td><a class="rowlink" th:href="@{/admin/users/{id}/edit(id=${u.id})}">Edit</a></td>
-        </tr>
-        </tbody>
-    </table>
-    </div>
+    <!--/*
+      4d (spec §7b): users are people, so R-Q12 rules the table out and cards stay - the same
+      delta 6a applied to children. This page rendered BOTH a <table> and a card stack over the
+      same list, the table visible above 720px and the stack below it. That is the duplication
+      R-Q12 exists to remove, and it had already started to drift here exactly as it did on 6a:
+      the table wrote an absent organisation as an em dash and the stack omitted the row
+      entirely, so the two renderings disagreed about what "no organisation" looks like and
+      nobody saw it, because no viewport shows both at once.
 
-    <div class="stack">
-        <div class="srow" th:each="u : ${users}">
-            <div class="top"><span class="name" th:text="${u.username}">username</span></div>
-            <dl>
-                <dt>Full name</dt><dd th:text="${u.fullName}">Full Name</dd>
-                <dt>Email</dt><dd th:text="${u.email} ?: 'Not recorded'">Email</dd>
-                <dt>Phone</dt><dd th:text="${u.contactPhone} ?: 'Not recorded'">Phone</dd>
-                <dt>Roles</dt><dd th:text="${#strings.setJoin(u.roles, ', ')}">ROLES</dd>
-                <dt th:unless="${#lists.isEmpty(u.homes)}">Homes</dt><dd th:unless="${#lists.isEmpty(u.homes)}" th:text="${#strings.listJoin(u.homes.![name], ', ')}">Homes</dd>
-                <dt th:if="${u.organisation}">Organisation</dt><dd th:if="${u.organisation}" th:text="${u.organisation.name}">Organisation</dd>
-                <dt>Enabled</dt><dd th:text="${u.enabled} ? 'Yes' : 'No'">Enabled</dd>
-            </dl>
-            <div class="act"><a class="btn ghost" th:href="@{/admin/users/{id}/edit(id=${u.id})}">Edit</a></div>
+      Built on the .case row rather than .stack/.srow because 4d's canvas is the horizontal
+      identity row - avatar, name, chips, organisation - not the label/value list 6a uses. The
+      component's own header comment said "every list of interview requests"; that scope clause
+      was true when written and is not any more, and it is corrected there rather than quietly
+      contradicted here.
+
+      COLUMN ORDER FOLLOWS THE CANVAS, NOT case-card.html: 4d puts the role chips in the second
+      column and the organisation third, where the interview lists put their second fact second
+      and their tags third. Faithful to the canvas as the handoff asks, but it does mean the two
+      list families no longer scan down identical edges - flagged for Creed rather than settled
+      here, since which of the two wins is a design call and not a build one.
+    */-->
+    <div class="case-list">
+        <div class="case" th:each="u : ${users}" th:classappend="${!u.enabled} ? 'case-inactive'">
+            <a class="case-link rowlink" th:href="@{/admin/users/{id}/edit(id=${u.id})}">
+                <span class="case-avatar" aria-hidden="true" th:text="${u.initials}">NC</span>
+                <span class="case-ident">
+                    <span class="case-name" th:text="${u.fullName}">Naomi Clarke</span>
+                    <span class="case-meta case-username" th:text="${u.username}">username</span>
+                </span>
+            </a>
+
+            <!--/* Roles carry no colour meaning beyond which side of the account model they sit on:
+                 accent for the org-scoped supplier roles that stack, neutral for the ones that do
+                 not. isOrgScoped() is the same predicate UserService.validateRoles enforces, so the
+                 chip cannot say one thing while the rule does another. */-->
+            <span class="case-tags role-chips">
+                <span class="tag" th:each="r : ${u.roles}"
+                      th:classappend="${r.orgScoped} ? 'tag-accent' : 'tag-neutral'"
+                      th:text="${r.displayName}">Visitor</span>
+                <!--/* A disabled account is dimmed on the canvas. Dimming alone is a colour-only
+                     signal and 1.4.1 does not accept one, so the chip carries the word too. */-->
+                <span class="tag tag-outline" th:unless="${u.enabled}">Disabled</span>
+            </span>
+
+            <span class="case-aside">
+                <span class="lbl" th:text="${#lists.isEmpty(u.homes)} ? 'Organisation' : 'Homes'">Organisation</span>
+                <span th:if="${!#lists.isEmpty(u.homes)}"
+                      th:text="${#strings.listJoin(u.homes.![name], ', ')}">Oakwood House</span>
+                <span th:if="${#lists.isEmpty(u.homes)}"
+                      th:text="${u.organisation} ? ${u.organisation.name} : 'None'">Beacon RHS</span>
+            </span>
+
+            <!--/* A real link, not the canvas's bare <i>: it sits where a control sits and a
+                 decorative icon there is the dead control Creed removed from the shell org
+                 switcher. .rowlink carries the 44px D-Q3 floor. */-->
+            <a class="case-edit rowlink" th:href="@{/admin/users/{id}/edit(id=${u.id})}">
+                <svg class="icon" aria-hidden="true"><use th:href="@{/icons/phosphor.svg} + '#ph-pencil-simple'"></use></svg>
+                <span class="visually-hidden" th:text="'Edit ' + ${u.fullName}">Edit</span>
+            </a>
         </div>
     </div>
 
-    <div class="empty" th:if="${#lists.isEmpty(users)}">No users yet.</div>
+    <!--/* Structure matches 6a's empty state; the copy is NOT R-Q13's, because R-Q13 specifies
+         children, requests, reviews and search results and says nothing about users. Left as a
+         plain sentence with the CTA rather than inventing a fifth entry - 5e is the sweep that
+         settles empty-state copy across every list, and it runs after this batch. */-->
+    <div class="empty" th:if="${#lists.isEmpty(users)}">
+        No users yet.
+        <a class="btn secondary" href="/admin/users/new" th:if="${can.addUser}">Add a user</a>
+    </div>
 </main>
 </body>
 </html>

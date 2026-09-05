@@ -53,7 +53,7 @@
                 <div class="checkbox-group">
                     <label class="checkbox-option" th:each="r : ${roles}">
                         <input type="checkbox" th:field="*{roles}" th:value="${r}"/>
-                        <span th:text="${r}">ROLE</span>
+                        <span th:text="${r.displayName}">Role</span>
                     </label>
                 </div>
                 <p class="constraint-note" id="roleConstraintNote" aria-live="polite"></p>
