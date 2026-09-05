@@ -37,6 +37,8 @@ reasoning that produced it is often still useful. It is simply not the answer.**
 | **D-1b-7's placement** | **SUPERSEDED** (§6f) | Both branches of the guard sit **above the content**, not beside the actions. |
 | **D-1b-8** (§6a) | **CLOSED** (§6c) | Show the prior send-back, at the **top**, in the `--sent-back` family. |
 | **D-1b-2's selector** | **CORRECTED** (§6a) | `.readonly-val`, not `dl.detail dd`. |
+| **D-4b-9's bed-count caveat** | **WITHDRAWN** (T195) | The human declined to make protection contingent on home size: *"protect all PII regardless of home size"*. **No home size returns age to the screen.** Kevin's reasoning is unaffected. |
+| **D-4b-8's reserved decision** | **CLOSED** | It reads as open ("ask Kevin before building it"). It was ruled twice — by Kevin (D-4b-9) and then by the human (T195). **Age is off the screen.** |
 | **R-Q8**, **R-Q13** | **CLOSED** (§5d) | Take the closed versions; R-Q8 is further amended in §5e. |
 
 ### The rules that generalise past their own screen
@@ -2734,6 +2736,10 @@ value: *"Hidden — reveal names to show"*. Naming what is withheld beats droppi
 the layout stable across the toggle, and it tells a user the control exists. **Server-side branch: the masked
 render must contain no date of birth at all, not a hidden one.**
 
+**[CLOSED — see D-4b-9, then T195. The paragraph below is preserved for its reasoning, but it is not an
+open question: Kevin ruled against putting age outside the reveal, and the human has since ruled age off the
+screen entirely. Do not act on the instruction to "ask him before building it".]**
+
 **One decision I am NOT taking, because it is a disclosure line and I have just been shown I got one wrong.**
 *Age* is the operationally relevant fact — under-16 versus 16+ changes the process, and a repeatedly missing
 12-year-old reads differently from a 17-year-old — and **age is a coarsening of the datum, not the datum**,
@@ -2796,10 +2802,19 @@ to everyone: a neighbour, another child's relative, someone in reception.** So t
 *different populations*, and **age is identifying to precisely the population the mask exists to defeat.**
 It carries less information than the case reference and is worse for this threat model.
 
-**Flagged as unmeasured, by Kevin, and worth checking:** his acuteness argument rests on children's homes in
-England commonly being three to six beds, over which an integer age is close to a unique key. That is sector
-knowledge, not a measurement of this system. **If the pilot's homes are materially larger the calculus
-softens** — someone should check it against the real homes rather than take it from either of us.
+**~~Flagged as unmeasured, by Kevin, and worth checking:~~ WITHDRAWN (T195, human, 6 Sep).** Kevin's
+acuteness argument rested on children's homes in England commonly being three to six beds, over which an
+integer age is close to a unique key — sector knowledge, not a measurement of this system — and I wrote that
+**"if the pilot's homes are materially larger the calculus softens"**. **That escape hatch is closed.** Asked
+for the bed count, the human declined the premise rather than supplying the number:
+
+> *"Number of beds should not matter lets protect all PII regardless of home size"*
+
+**Read it as a policy ruling, not a missing data point.** The decision does not change — Kevin's reasoning
+above stands on its own axis (*who can read it*), and never needed the bed count. What changes is that **the
+protection is no longer contingent on a measurement nobody was going to take**, which makes it more robust,
+not less. A future reader must not reopen this on home-size evidence: **there is no home size at which age
+returns to the screen.**
 
 ### D-4b-10 · Show the consequence, not the attribute
 
@@ -2817,10 +2832,16 @@ two rather than into one**, so it is far less of a quasi-identifier; and **it is
 screen is not.**
 
 This is the same shape as D-4a-2 (*"No open allocations"* rather than *"0"* — the answer, not the
-measurement) and §7a's elapsed row. **Position: ship DOB-behind-reveal only. If a real statutory threshold
-exists, model it and show its consequence outside the reveal; if there is no crisp rule, age goes inside the
-reveal with the DOB and nothing is lost, because the reveal is one click.** Nobody on this floor should
-invent the statutory detail — that is a question for the product owner.
+measurement) and §7a's elapsed row. **Position, as ruled: ship DOB-behind-reveal only, and NO age anywhere.**
+T195 settled the stronger form — age is not displayed, not inside the reveal and not outside it — and
+**verified against the code on 6 Sep: there is no age on any screen, no `getAge` / `Period.between` /
+`ChronoUnit.YEARS` in the domain, and no age or date-of-birth placeholder in the statutory .docx.** So this
+is a rule with nothing to remove; it is a rule about what must not be *added*.
+
+**The one conditional that survives, and stays conditional:** if a real statutory threshold turns out to
+exist, model it and show its **consequence** outside the reveal — never the age. **The second half of T195
+(is there such a threshold?) is still unanswered.** Nobody on this floor should invent the statutory detail;
+if a screen needs the concept, raise it rather than assume one.
 
 ### D-4b-11 · `children/list.html` already defeats the mask, on main, today
 
