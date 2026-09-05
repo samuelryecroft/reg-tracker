@@ -14,6 +14,74 @@ Target: `src/main/resources/templates/**` + `src/main/resources/static/css/app.c
 
 ---
 
+
+---
+
+## 0 · Decision index — what is current, and what is not
+
+**2,100 lines, 67 numbered decisions, appended chronologically over a week.** A reader working front-to-back
+meets several decisions *hundreds of lines before the correction that reversed them*, and that has now caused
+three real errors: I re-derived D-Q2 instead of citing it; a builder read "through §6a" and stopped; and
+D-1b-2 sat with the wrong selector in it until today. **Read this section first. If a decision below is
+marked superseded, the original text is still in the document — it has not been deleted, because the
+reasoning that produced it is often still useful. It is simply not the answer.**
+
+### SUPERSEDED — do not build to these
+
+| Decision | Status | The current answer |
+|---|---|---|
+| **F3** (§5e) | **RETRACTED** | The checked chip never failed contrast. My conversion had a double gamma decode; real value 4.51:1. The change was kept on design grounds only. |
+| **D-Q2's 2b row** (§4) | **SUPERSEDED** | 2b is **dropped entirely** (§6d), not a `?view=feed` toggle. Urgency is 2a's only view. |
+| **§6b's "don't build 2b"** | **WITHDRAWN** | It was withdrawn as wrong (D-Q2 had already ruled), *then* god dropped 2b on separate grounds. Same outcome, different reason — the duplication argument does not apply to a same-route toggle. |
+| **D-2a-1** (§6b) | **REVERSED** (§6d) | Keep **both** the group heading's tier word and the card badge's. The badge copy is human-signed-off statutory copy, and a heading is announced once per *group*, not per card. |
+| **D-1b-7's placement** | **SUPERSEDED** (§6f) | Both branches of the guard sit **above the content**, not beside the actions. |
+| **D-1b-8** (§6a) | **CLOSED** (§6c) | Show the prior send-back, at the **top**, in the `--sent-back` family. |
+| **D-1b-2's selector** | **CORRECTED** (§6a) | `.readonly-val`, not `dl.detail dd`. |
+| **R-Q8**, **R-Q13** | **CLOSED** (§5d) | Take the closed versions; R-Q8 is further amended in §5e. |
+
+### The rules that generalise past their own screen
+
+These came out of specific decisions but apply everywhere, and are the ones most worth knowing before
+building anything:
+
+- **Guards** — *pin the shape of the bug, not the instances you found* (§5j); a guard inherits its instances'
+  **incidental** properties — token naming, file location, the assumption that a defect is something
+  *written* rather than *missing* (§6e). **A mis-scoped guard passes quietly**, and green from it is
+  indistinguishable from a clean codebase.
+- **Fallbacks** — *must degrade to absence, never to the value being replaced* (§5h/#49). Where an
+  enhancement is missing you get the plain version, never a broken one, and never a dead end (§6a D-1b-5).
+- **State and assistive technology** — *a state must reach a non-visual reader **as the state**: not as
+  silence, and not as the name of a character* (§5j). Both failure modes pass a naive "never colour alone"
+  check. **Converse:** once the state is in visible text, a hidden word is duplication (§5i) — but that
+  governs *hidden vs visible*, **not two visible texts at different scopes** (§6d).
+- **Colour** — an accent-**tinted** fill under accent ink is not theme-safe; it behaves oppositely in the two
+  appearances (D-Q6a). **Prefer inverting an already-swept pair over deriving a new one** — contrast is
+  symmetric, so it inherits the guarantee free.
+- **Placement** — *anything that changes whether or how a reader should engage with a document belongs
+  before the document* (§6f). Only what qualifies the **act** sits at the point of acting.
+- **Duplication** — one dataset, one rendering. Applied to the case lists (§6b), and the same shape underlies
+  1a/1b's two report markup paths and the missing question model (D-2d-2).
+- **Labels and precision** — *a label that is true in both states beats one that is right in one and wrong in
+  the other* (D-4a-3); *display precision must never be able to contradict the verdict it sits beside*
+  (D-187-3).
+- **Dialogs** — right when the content belongs to the page you are on; wrong when it belongs to **one row of
+  a list** (D-4a-1 vs D-1b-5).
+- **Scope** — *a list scoped to one person, home or child does not spend a column repeating that scope*
+  (D-2f-1).
+- **Canvas authority** — R-Q14 makes the canvas authoritative, **but a later explicit decision supersedes it
+  within its own domain** (§6d).
+
+### Known-unsafe ground
+
+- **Until T186 lands**, `--accent`, `--accent-dark`, `--tint` and `--accent-ink` are overridden by a legacy
+  per-org inline `<style>` and are **unguaranteed for a branded organisation** (§6g). The `--color-*` and
+  semantic families are unaffected — **every contrast number in this document assumes the ramp, so the four
+  bridge tokens are the only ones it does not cover for a branded org.**
+- **A1 is still held** with the human: offline report capture caching Article 9 data on visitor phones.
+  1c/1d's offline behaviour is blocked on it.
+
+---
+
 ## 1 · Screen → template map
 
 27 screens in scope (4c skipped — Entra owns sign-in, T113).
@@ -1388,9 +1456,15 @@ irreversible decision should not have to leave the decision to check the intake 
 Single column, `max-width: 920px`. No `.detail-layout` grid: 1b has no second column.
 
 **920px is a container width, not a measure.** A free-text answer set to 920px runs to ~123ch, roughly double
-comfortable reading. Cap the *value* slot — `dl.detail dd { max-width: min(100%, 66ch) }` — and nothing else
+comfortable reading. Cap the *value* slot — **`.readonly-val { max-width: min(100%, 66ch) }`** — and nothing else
 needs classifying: dates, names and yes/no answers are already shorter than the cap, so one rule handles the
 whole report and only the long prose answers are affected.
+
+**Corrected 5 Sep:** this originally named `dl.detail dd`. That is 1a's markup; **1b renders the report
+through `fragments/report-fields.html`, whose readonly branch uses `.readonly-val`** — I specced 1b's
+selector from 1a's template without checking. The cap is identical, the class was wrong. That the two
+screens render one report through two different markup paths is itself the finding behind the shared
+question-model ticket (D-2d-2).
 
 ### D-1b-3 · History is a section, not a tab — the same answer as D-1a-3, and for a stronger reason
 
