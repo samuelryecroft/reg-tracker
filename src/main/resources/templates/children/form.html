@@ -12,9 +12,9 @@
 
     <div class="card">
         <form method="post" th:action="@{/children}" th:object="${form}">
-            <!-- D-5d-3 (spec §7g): a page-level condition, not a field error - homeId may not even
+            <!--/* D-5d-3 (spec §7g): a page-level condition, not a field error - homeId may not even
                  be on the page (single-home users never render it), there is no control this user
-                 can fix, and the message already says so. No anchor offered. -->
+                 can fix, and the message already says so. No anchor offered. */-->
             <div class="banner err" role="alert" th:if="${orgInactiveError != null}">
                 <span class="ic" aria-hidden="true">▲</span>
                 <div><strong>This child cannot be added yet</strong><p th:text="${orgInactiveError}">Error</p></div>
@@ -43,17 +43,17 @@
                    th:errorclass="is-invalid" th:aria-invalid="${#fields.hasErrors('lastName')}" aria-describedby="lastName-error"/>
             <div th:replace="~{fragments/layout :: fieldError('lastName')}"></div>
 
-            <!-- D-5d-2 (spec §7g): max is the cheap client-side half - a birth date genuinely
-                 cannot be in the future, the opposite ruling from 5b's scheduledAt (D-5b-3). -->
+            <!--/* D-5d-2 (spec §7g): max is the cheap client-side half - a birth date genuinely
+                 cannot be in the future, the opposite ruling from 5b's scheduledAt (D-5b-3). */-->
             <label for="dateOfBirth">Date of birth <span class="req" aria-hidden="true">*</span></label>
             <input type="date" id="dateOfBirth" th:field="*{dateOfBirth}" required th:max="${dobMax}"
                    th:errorclass="is-invalid" th:aria-invalid="${#fields.hasErrors('dateOfBirth')}" aria-describedby="dateOfBirth-error"/>
             <div th:replace="~{fragments/layout :: fieldError('dateOfBirth')}"></div>
 
             <label for="localCaseReference">Case reference (optional)</label>
-            <!-- D-5d-4: optional is correct - a child can exist here before intake assigns one -
+            <!--/* D-5d-4: optional is correct - a child can exist here before intake assigns one -
                  but leaving it blank is a safeguarding trade-off (ChildIdentity's masked label
-                 degrades to bare initials), and the person leaving it blank was told nothing. -->
+                 degrades to bare initials), and the person leaving it blank was told nothing. */-->
             <p class="hint">Used to tell children apart when names are masked. Can be added later.</p>
             <input type="text" id="localCaseReference" th:field="*{localCaseReference}"/>
 

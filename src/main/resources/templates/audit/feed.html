@@ -11,12 +11,12 @@
     <h1>Case activity</h1>
     <p class="sub">Every interview request/report event you're authorized to see — never sign-in or account activity.</p>
 
-    <!--
+    <!--/*
       S-3: the home filter is single-choice, so it is chips - links with query parameters, active
       marked with aria-current, and .seg-opt's inset ring so the active one is never distinguished
       by colour alone. The date range stays a form because a range is not a choice from a menu;
       chips that pretended otherwise would offer narrowing the parameter cannot express.
-    -->
+    */-->
     <nav class="seg" aria-label="Filter by home">
         <a class="seg-opt" th:href="@{/audit(from=${from}, to=${to})}"
            th:attr="aria-current=${homeId == null} ? 'true'">All homes</a>
@@ -31,7 +31,7 @@
         <button type="submit" class="btn secondary" style="margin-left:auto">Apply dates</button>
     </form>
 
-    <!--
+    <!--/*
       The export's consequences, stated BEFORE the button rather than after the download. The
       .consequence / .manifest pair is already shipped for exactly this (the case-file export).
 
@@ -41,7 +41,7 @@
       will answer a question it structurally cannot - and both halves are named IN TEXT, because
       "included" reaching a screen reader as the absence of the word "excluded" is not a state
       arriving; the markers are aria-hidden decoration on top.
-    -->
+    */-->
     <div class="consequence">
         <h2 style="margin-top:0">Export this view</h2>
         <p class="hint" th:text="${#lists.size(rows) + ' event' + (#lists.size(rows) == 1 ? '' : 's') + ' match these filters. The CSV contains exactly these rows — the same columns you can see, for the same records you can already open.'}">Count</p>
@@ -84,7 +84,7 @@
         </form>
     </div>
 
-    <!--
+    <!--/*
       S-5: the dated feed is .daysep + .tl, the component the record's own history already uses -
       reused as-is rather than restyled, and day-grouped by the SAME dayLabel, so "Today" cannot
       come to mean two different things on two screens showing the same events. This replaces a
@@ -93,10 +93,10 @@
       The dot is decoration: its tone reinforces wording the headline already carries, which is what
       S-5's floor rule requires of a state-bearing mark - the state is in the entry text, so the dot
       is aria-hidden rather than carrying a second, hidden copy of it.
-    -->
-    <!-- Named container so a test can scope an assertion to the RESULTS: the home chips above
+    */-->
+    <!--/* Named container so a test can scope an assertion to the RESULTS: the home chips above
          legitimately name every home in scope, so "this page does not mention the other home" is
-         not a check that can be made against the whole page. -->
+         not a check that can be made against the whole page. */-->
     <div class="feed">
     <th:block th:each="day : ${days}">
         <p class="daysep" th:text="${day.label()}">Today — 14 March 2026</p>

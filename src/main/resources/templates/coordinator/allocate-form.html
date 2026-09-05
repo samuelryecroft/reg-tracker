@@ -7,15 +7,15 @@
 </head>
 <body>
 <div th:replace="~{fragments/layout :: nav}"></div>
-<!--
+<!--/*
   T173(4a) / spec §7b: 2a's queue points its one action at this route, so it's the live seam
   between the redesigned and unredesigned halves of the app.
--->
+*/-->
 <main id="main" th:with="ico=@{/icons/phosphor.svg}">
     <h1 th:text="${'Allocate: ' + childIdentity.label()}">Allocate</h1>
     <p class="muted" th:text="${'Home: ' + request.home.name}">Home</p>
 
-    <!--
+    <!--/*
       D-4a-1: stays a route, deliberately not a dialog over the queue - the rule that separates
       this from D-1b-5's dialog: "a dialog is right when its content belongs to the page you are
       already on; it is wrong when its content belongs to one row of a list." 5c's send-back is
@@ -25,7 +25,7 @@
       JS-dependent would be #71's send-back failure again, with more at stake. The thing a dialog
       was reaching for - not losing your place - comes free from returning to the queue with its
       filter preserved (Cancel below, and the redirect after a successful POST).
-    -->
+    */-->
     <div class="card">
         <form method="post" th:action="@{/coordinator/requests/{id}/allocate(id=${request.id})}" th:object="${form}">
             <div class="banner err" role="alert" th:if="${#fields.hasErrors('*')}">
@@ -36,7 +36,7 @@
                 </div>
             </div>
 
-            <!--
+            <!--/*
               D-4a-2: "a coordinator allocating blind cannot load-balance, and an overloaded
               visitor is how a 72-hour deadline gets missed." A radio list, not the old dropdown -
               a dropdown option can't carry a second field, and the canvas already says list.
@@ -51,7 +51,7 @@
               ladder applies. D-4a-4a: deliberately one plain-muted span for the whole figure
               regardless of tier - no --error here, because on a person's row the same fact reads
               as "this visitor is already carrying pressure", not "this visitor is failing".
-            -->
+            */-->
             <fieldset id="visitorId" aria-describedby="visitorId-error">
                 <legend>Visitor <span class="req" aria-hidden="true">*</span></legend>
                 <div class="radio-list">
@@ -67,7 +67,7 @@
 
             <label for="scheduledAt">Scheduled visit date/time</label>
             <input type="datetime-local" id="scheduledAt" th:field="*{scheduledAt}"/>
-            <!--
+            <!--/*
               D-4a-3: the button used to read "Allocate & schedule" in both cases, but the real
               rule is no time -> Allocated (visitor confirms), time -> Scheduled - so with the
               time blank the old label named an effect that didn't happen. "A label that is true
@@ -75,7 +75,7 @@
               button just says "Allocate" (true either way, since scheduling is an ADDITIONAL
               effect), and this line names both actual outcomes instead of describing the
               mechanism the old hint did ("leave blank for the visitor to arrange").
-            -->
+            */-->
             <p class="hint">Leave blank and this becomes <strong>Allocated</strong>, for the visitor to
                 arrange with the home. Set a time and it becomes <strong>Scheduled</strong>.</p>
 

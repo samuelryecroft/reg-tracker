@@ -2,9 +2,9 @@
 <html xmlns:th="http://www.thymeleaf.org" lang="en" th:attr="data-appearance=${#strings.toLowerCase(appearancePreference)}">
 <head>
     <meta charset="UTF-8"/>
-    <!-- T138 1c: the title tag is easy to miss when masking a page - it goes in the browser tab,
+    <!--/* T138 1c: the title tag is easy to miss when masking a page - it goes in the browser tab,
          history and bookmarks, and every screenshot of the window, none of which respect an h1's
-         own masking (Kevin's review). -->
+         own masking (Kevin's review). */-->
     <title th:text="${childIdentity.label() + ' — Return Home Tracker'}">Child</title>
     <th:block th:replace="~{fragments/layout :: styles}"></th:block>
 </head>
@@ -14,10 +14,10 @@
     <h1 th:text="${childIdentity.label()}">Child Name</h1>
     <p class="muted" th:text="${'Home: ' + child.home.name}">Home</p>
 
-    <!-- D-4b-8 (spec §7e): date of birth sits INSIDE the reveal - @Encrypted Article-9 data, so the
+    <!--/* D-4b-8 (spec §7e): date of birth sits INSIDE the reveal - @Encrypted Article-9 data, so the
          masked branch (ChildController's ChildIdentityDetail) contains no date of birth at all, not
          a hidden one. Case reference is never gated - childIdentity.label() already carries it above
-         whenever one is recorded (D-4b-12/D-4b-14's rule, same page). No age anywhere (T195). -->
+         whenever one is recorded (D-4b-12/D-4b-14's rule, same page). No age anywhere (T195). */-->
     <dl class="detail">
         <dt>Date of birth</dt>
         <dd th:text="${identityDetail.dob()}">DOB</dd>
@@ -25,9 +25,9 @@
         <dd th:text="${identityDetail.caseReference()}">Case reference</dd>
     </dl>
 
-    <!-- D-4b-5 (spec §7e): the split-card shape - description beside an action, wrapping under a
+    <!--/* D-4b-5 (spec §7e): the split-card shape - description beside an action, wrapping under a
          narrow viewport - given a class instead of four inline style attributes, because 4a's own
-         summary wants this exact shape too. -->
+         summary wants this exact shape too. */-->
     <div class="card split-card" th:if="${canExport}">
         <div class="split-card-info">
             <h3>Case file</h3>
@@ -35,21 +35,21 @@
                 approved report — assembled into one dated evidence pack.</p>
             <p class="hint" th:text="${#lists.size(requests) + ' interview' + (#lists.size(requests) == 1 ? '' : 's') + ' · ' + approvedReportCount + ' approved report' + (approvedReportCount == 1 ? '' : 's')}">Summary</p>
         </div>
-        <!-- D-4b-4: the only sentence telling a user this action is recorded belongs above the
+        <!--/* D-4b-4: the only sentence telling a user this action is recorded belongs above the
              button and at body weight, not below it in the page's smallest muted type reading like
-             the button's own caption. A neutral fact about an authorised action, not a warning. -->
+             the button's own caption. A neutral fact about an authorised action, not a warning. */-->
         <div class="split-card-actions">
             <p class="muted">Exports are recorded</p>
             <a class="btn" th:href="@{/children/{id}/export(id=${child.id})}">Export case file</a>
         </div>
     </div>
 
-    <!-- D-4b-6: renamed from "Return Home Interview History" - "Case history" below is a different
-         history (the audit trail), and a reader scanning headings needs the two words to differ. -->
+    <!--/* D-4b-6: renamed from "Return Home Interview History" - "Case history" below is a different
+         history (the audit trail), and a reader scanning headings needs the two words to differ. */-->
     <h2>Return home interviews</h2>
-    <!-- D-4b-2: an empty case file must not render a table promising columns over nothing - the
+    <!--/* D-4b-2: an empty case file must not render a table promising columns over nothing - the
          caption names what the table contains, so both renderings share the same guard as the
-         .empty message below, not just the message. -->
+         .empty message below, not just the message. */-->
     <div class="table-wrap responsive" th:if="${!#lists.isEmpty(requests)}">
     <table>
         <caption>Every interview request raised for this child.</caption>
@@ -66,12 +66,12 @@
         <tr th:each="r : ${requests}">
             <td><span class="status" th:classappend="${r.status}" th:text="${r.status.displayName}">STATUS</span></td>
             <td th:text="${#temporals.format(r.createdAt, 'dd MMM yyyy HH:mm')}">Raised</td>
-            <!-- D-4b-1: this cell and the card stack below used to word the same absence two
+            <!--/* D-4b-1: this cell and the card stack below used to word the same absence two
                  different ways - nobody reads both renderings at once, so nobody noticed. Now the
-                 same copy in both (see the stack's own cell for the literal). -->
+                 same copy in both (see the stack's own cell for the literal). */-->
             <td th:text="${r.scheduledAt} != null ? ${#temporals.format(r.scheduledAt, 'dd MMM yyyy HH:mm')} : 'Not yet scheduled'">Scheduled</td>
-            <!-- D-4b-7: a badge only where DeadlineTracker.badgeFor returns one - a completed or
-                 cancelled request has no live clock and shows none, meaningfully rather than as a gap. -->
+            <!--/* D-4b-7: a badge only where DeadlineTracker.badgeFor returns one - a completed or
+                 cancelled request has no live clock and shows none, meaningfully rather than as a gap. */-->
             <td>
                 <span th:if="${dueBadges.get(r.id)} != null" class="due" th:classappend="${dueBadges.get(r.id).cssClass()}">
                     <th:block th:replace="~{fragments/layout :: dueIcon(${dueBadges.get(r.id).state()})}"></th:block>

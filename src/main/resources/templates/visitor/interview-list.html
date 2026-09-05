@@ -10,7 +10,7 @@
 <main id="main">
     <h1>My Allocated Interviews</h1>
 
-    <!--
+    <!--/*
       Screen 2f, on the shared case card (S-1). The table and its duplicate .stack list are gone.
 
       "One card per state, with only its own action" is what this screen already did - what changes
@@ -23,14 +23,14 @@
       magnitude. DueBadge's text already does exactly that ("Due soon — 6h 10m left"), which is why
       this screen needs no variant of the tag - only the absence of the grouping that would make
       the word redundant.
-    -->
+    */-->
     <div class="case-list">
-        <!--
+        <!--/*
           The action decision is resolved in th:with rather than inline, because a link expression
           (@{...}) cannot be nested inside a ${...} - so the three destinations are built first and
           then chosen between. It also keeps one card call readable instead of four nested ternaries
           inside the fragment arguments.
-        -->
+        */-->
         <th:block th:each="r : ${requests}" th:with="
                 report=${reports[r.id]},
                 st=${r.status.name()},
@@ -60,12 +60,12 @@
         </th:block>
     </div>
 
-    <!--
+    <!--/*
       R-Q13, both cases. Oscar added the second one for exactly this screen: a visitor who has
       finished everything allocated to them sees an empty list, and "your coordinator will assign
       them here" would read as a rebuke for work they have in fact done. The two states are
       different facts and get different words.
-    -->
+    */-->
     <div class="empty" th:if="${#lists.isEmpty(requests)}">
         No interviews have been allocated to you yet. Your coordinator will assign them here.
     </div>
