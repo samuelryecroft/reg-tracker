@@ -771,7 +771,12 @@ input, select, textarea {
 }
 textarea { min-height: 5.5rem; resize: vertical; }
 input[type="color"].swatch-input { padding: 0.25rem; height: 3rem; cursor: pointer; }
-input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); }
+/* T188 / WCAG 2.2 AA 2.4.11. `outline: none` was here and is deliberately gone: the border turning
+   accent-coloured measures 1.47-1.79:1 focused-vs-unfocused at every brand hue in both appearances,
+   so it must never be the ONLY focus signal. The border change stays as reinforcement.
+   Kept as a deletion rather than a rewrite because the ring that should show is already correct and
+   already on the non-themeable token - there was nothing to add, only something to stop removing. */
+input:focus, select:focus, textarea:focus { border-color: var(--accent); }
 /* Non-themeable focus indicator (FE-04): the branded border above is decoration; this outline is
    the real signal and survives any supplier colour, including a pale one that fails contrast. */
 a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible,
@@ -1267,7 +1272,11 @@ fieldset.step[hidden] { display: none; }
     color: var(--muted); text-decoration: none; background: transparent;
 }
 .section-index a:hover { background: var(--surface); color: var(--color-text); }
-.section-index a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* T188: --color-accent, not the legacy --accent alias. They resolve to the same colour today, so
+   this changes nothing visually - it is here because this was the last focus rule still reading the
+   token T186 overrides, and leaving one behind is how the next person concludes the migration was
+   finished. The ring being brand-derived at all is the separate FE-04 question, flagged to Creed. */
+.section-index a:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
 body:has(#request:target) .section-index a[href="#request"],
 body:has(#young-person:target) .section-index a[href="#young-person"],
 body:has(#professionals:target) .section-index a[href="#professionals"],
