@@ -136,8 +136,9 @@ public class CoordinatorController {
      *
      * <p>Of that open work, only ALLOCATED/SCHEDULED rows are still subject to the pre-interview
      * 72-hour clock ({@link DeadlineTracker#tracksDeadline}) - a REPORT_REJECTED row's interview
-     * already happened, so {@link DeadlineTracker#stateOf} returns empty for it and it counts
-     * toward the total without being able to contribute a tier, same as a NO_CLOCK row.
+     * already happened, so {@link DeadlineTracker#stateOf} returns empty for it. D-4a-4b: it still
+     * contributes its OWN rung ("sent back") rather than falling out of the tier entirely - the
+     * status itself, not a due-state, is what makes a rejected row count as pressure.
      */
     private VisitorOption visitorOption(User visitor, LocalDateTime now) {
         List<InterviewRequest> open = interviewRequestService.listAllocatedTo(visitor.getId()).stream()
@@ -151,24 +152,29 @@ public class CoordinatorController {
         long dueSoonCount = open.stream()
                 .filter(r -> DeadlineTracker.stateOf(r, now).filter(s -> s == DueState.DUE_SOON).isPresent())
                 .count();
-        return new VisitorOption(visitor.getId(), visitor.getFullName(), open.size(), overdueCount, dueSoonCount);
+        long sentBackCount = open.stream().filter(r -> r.getStatus() == InterviewStatus.REPORT_REJECTED).count();
+        return new VisitorOption(visitor.getId(), visitor.getFullName(), open.size(), overdueCount, dueSoonCount, sentBackCount);
     }
 
     /**
-     * One row of the D-4a-2/D-4a-4 visitor list: a stable id/name/load quadruple, sorted before
-     * rendering. {@code overdueCount}/{@code dueSoonCount} are counts WITHIN {@code openAllocations},
-     * not additional totals.
+     * One row of the D-4a-2/D-4a-4/D-4a-4b visitor list: a stable id/name/load quintuple, sorted
+     * before rendering. {@code overdueCount}/{@code dueSoonCount}/{@code sentBackCount} are counts
+     * WITHIN {@code openAllocations}, not additional totals.
      */
-    public record VisitorOption(Long id, String fullName, long openAllocations, long overdueCount, long dueSoonCount) {
+    public record VisitorOption(Long id, String fullName, long openAllocations, long overdueCount, long dueSoonCount,
+            long sentBackCount) {
 
         /**
-         * D-4a-4: the worst tier only, with its own count - not a three-way breakdown, because a
-         * list row isn't a table and the tier that constrains a visitor is the one that decides
-         * whether they can take another case. {@code null} when there's nothing urgent to name.
+         * D-4a-4/D-4a-4b: the single most constraining fact only, with its own count - not a
+         * breakdown, because a list row isn't a table and the tier that constrains a visitor is
+         * the one that decides whether they can take another case. The ladder, most to least
+         * constraining: overdue -> due soon -> sent back -> nothing. {@code null} when there's
+         * nothing to name.
          *
-         * <p>Reuses {@link DueStateCopy}'s bare OVERDUE word (lower-cased into the count phrase,
-         * never its full statutory-surface sentence - this is a workload figure, not a compliance
-         * one) and {@link DeadlineTracker#DUE_SOON_THRESHOLD} rather than restating either.
+         * <p>Reuses {@link DueStateCopy}'s bare OVERDUE word and {@link InterviewStatus#REPORT_REJECTED}'s
+         * own display word (both lower-cased into the count phrase, never a full statutory-surface
+         * sentence - this is a workload figure, not a compliance one) and
+         * {@link DeadlineTracker#DUE_SOON_THRESHOLD} rather than restating any of them.
          */
         public String urgencyNote() {
             if (overdueCount > 0) {
@@ -176,6 +182,9 @@ public class CoordinatorController {
             }
             if (dueSoonCount > 0) {
                 return dueSoonCount + " due within " + DeadlineTracker.DUE_SOON_THRESHOLD.toHours() + " hours";
+            }
+            if (sentBackCount > 0) {
+                return sentBackCount + " " + InterviewStatus.REPORT_REJECTED.getDisplayName().toLowerCase(Locale.ROOT);
             }
             return null;
         }
@@ -202,9 +211,12 @@ public class CoordinatorController {
         /** Ascending = least urgent first, used only as the equal-count tiebreak in {@link #visitorsFor}. */
         private int urgencyRank() {
             if (overdueCount > 0) {
-                return 2;
+                return 3;
             }
             if (dueSoonCount > 0) {
+                return 2;
+            }
+            if (sentBackCount > 0) {
                 return 1;
             }
             return 0;

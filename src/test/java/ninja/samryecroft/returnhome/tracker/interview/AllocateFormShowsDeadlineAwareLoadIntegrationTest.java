@@ -32,10 +32,10 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 /**
- * D-4a-4 (T119 spec §7c): a bare open-allocation count is blunt on a 72-hour clock, so the load
- * figure also names the worst due-state tier among a visitor's open work - "N overdue" or "N due
- * within {@link DeadlineTracker#DUE_SOON_THRESHOLD} hours" - with its own count, never a
- * three-way breakdown, and nothing when there's nothing urgent. Zero reads "No open allocations".
+ * D-4a-4/D-4a-4b (T119 spec §7c): a bare open-allocation count is blunt on a 72-hour clock, so the
+ * load figure also names the single most constraining fact among a visitor's open work - the
+ * ladder, most to least constraining, is overdue -> due soon -> sent back -> nothing - with its
+ * own count, never a breakdown of more than one rung. Zero reads "No open allocations".
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -114,21 +114,36 @@ class AllocateFormShowsDeadlineAwareLoadIntegrationTest extends AbstractIntegrat
     // itself enforces it), so a freshly-seeded row can never reach that state - it can only exist
     // as historical pre-V15 data, per §7c's own note. DeadlineTrackerTest already covers the
     // classification; visitorOption's overdueCount/dueSoonCount only ever count OVERDUE/DUE_SOON
-    // explicitly, so a NO_CLOCK (or REPORT_REJECTED, covered below) row is excluded by construction
-    // rather than by a special case that a schema change could silently make untested.
+    // explicitly, so a NO_CLOCK row is excluded by construction rather than by a special case that
+    // a schema change could silently make untested.
 
     @Test
-    void aReportSentBackForRewriteCountsButHasAlreadyPassedTheClockItDoesNotContribute() throws Exception {
+    void aDueSoonAllocationOutranksASentBackOneEvenThoughTheSentBackReturnedAtIsFurtherPast() throws Exception {
         User visitor = saveUser("t4a4-rejected-visitor" + suffix, Set.of(Role.VISITOR), null, null);
         // REPORT_REJECTED: the interview already happened, so it no longer tracks the pre-interview
         // clock (DeadlineTracker.tracksDeadline is false for it) even though this returnedAt is
-        // long past - it must not be able to read as "overdue" here.
+        // long past - it must not be able to read as "overdue", and due-soon (a live deadline)
+        // still outranks it on D-4a-4b's ladder even though it's a single row against this one.
         seedAllocation(visitor, InterviewStatus.REPORT_REJECTED, now.minusHours(200));
         seedAllocation(visitor, InterviewStatus.ALLOCATED, now.minusHours(60)); // due soon
 
         String html = renderAllocateForm();
 
         assertThat(html).contains("2 open allocations · 1 due within " + DeadlineTracker.DUE_SOON_THRESHOLD.toHours() + " hours");
+    }
+
+    @Test
+    void sentBackIsTheWorstTierWhenNothingElseIsLiveAndReusesInterviewStatussOwnWord() throws Exception {
+        User visitor = saveUser("t4a4-sentback-visitor" + suffix, Set.of(Role.VISITOR), null, null);
+        seedAllocation(visitor, InterviewStatus.REPORT_REJECTED, now.minusHours(10));
+        seedAllocation(visitor, InterviewStatus.REPORT_REJECTED, now.minusHours(5));
+
+        String html = renderAllocateForm();
+
+        // Reuses InterviewStatus.REPORT_REJECTED's own display word ("Sent back") rather than a
+        // second hardcoded string for the same status - one vocabulary, one place it's spelled.
+        String word = InterviewStatus.REPORT_REJECTED.getDisplayName().toLowerCase(java.util.Locale.ROOT);
+        assertThat(html).contains("2 open allocations · 2 " + word);
     }
 
     @Test
@@ -146,6 +161,31 @@ class AllocateFormShowsDeadlineAwareLoadIntegrationTest extends AbstractIntegrat
         assertThat(onTrackIndex).isGreaterThan(-1);
         assertThat(overdueIndex).isGreaterThan(-1);
         assertThat(onTrackIndex).as("equal counts: the least urgent visitor renders first").isLessThan(overdueIndex);
+    }
+
+    @Test
+    void atEqualCountsASentBackVisitorSortsAfterOnTrackButBeforeDueSoon() throws Exception {
+        // D-4a-4b: sent-back is its own rung between due-soon and nothing, so the tiebreak order
+        // must reflect it too - on-track < sent-back < due-soon at equal counts of one.
+        User onTrackVisitor = saveUser("t4a4-rank-ontrack" + suffix, Set.of(Role.VISITOR), null, null);
+        seedAllocation(onTrackVisitor, InterviewStatus.ALLOCATED, now.minusHours(1));
+
+        User sentBackVisitor = saveUser("t4a4-rank-sentback" + suffix, Set.of(Role.VISITOR), null, null);
+        seedAllocation(sentBackVisitor, InterviewStatus.REPORT_REJECTED, now.minusHours(50));
+
+        User dueSoonVisitor = saveUser("t4a4-rank-duesoon" + suffix, Set.of(Role.VISITOR), null, null);
+        seedAllocation(dueSoonVisitor, InterviewStatus.ALLOCATED, now.minusHours(60));
+
+        String html = renderAllocateForm();
+
+        int onTrackIndex = html.indexOf("t4a4-rank-ontrack");
+        int sentBackIndex = html.indexOf("t4a4-rank-sentback");
+        int dueSoonIndex = html.indexOf("t4a4-rank-duesoon");
+        assertThat(onTrackIndex).isGreaterThan(-1);
+        assertThat(sentBackIndex).isGreaterThan(-1);
+        assertThat(dueSoonIndex).isGreaterThan(-1);
+        assertThat(onTrackIndex).as("on-track is least urgent").isLessThan(sentBackIndex);
+        assertThat(sentBackIndex).as("sent-back ranks between on-track and due-soon").isLessThan(dueSoonIndex);
     }
 
     private String renderAllocateForm() throws Exception {

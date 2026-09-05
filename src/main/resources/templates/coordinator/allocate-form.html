@@ -44,12 +44,13 @@
               for. Continuity (a returning child may be better served by the same visitor) is
               deliberately not designed here - flagged to Creed as a product question, not built.
 
-              D-4a-4 (spec §7c): a bare count is blunt on a 72-hour clock, so the load figure
-              (VisitorOption.loadSummary) also names the worst due-state tier among that visitor's
-              open work - "3 open allocations · 1 overdue" - and nothing when there's nothing
-              urgent. D-4a-4a: deliberately one plain-muted span for the whole figure regardless of
-              tier - no --error here, because on a person's row the same fact reads as "this
-              visitor is already carrying pressure", not "this visitor is failing".
+              D-4a-4/D-4a-4b (spec §7c): a bare count is blunt on a 72-hour clock, so the load
+              figure (VisitorOption.loadSummary) also names the single most constraining fact
+              among that visitor's open work - the ladder is overdue -> due soon -> sent back ->
+              nothing, e.g. "3 open allocations · 1 overdue" - and nothing when nothing on the
+              ladder applies. D-4a-4a: deliberately one plain-muted span for the whole figure
+              regardless of tier - no --error here, because on a person's row the same fact reads
+              as "this visitor is already carrying pressure", not "this visitor is failing".
             -->
             <fieldset id="visitorId" aria-describedby="visitorId-error">
                 <legend>Visitor <span class="req" aria-hidden="true">*</span></legend>
