@@ -122,7 +122,15 @@
         </div>
     </div>
 
-    <div class="empty" th:if="${#lists.isEmpty(organisations)}">No organisations yet.</div>
+    <!--/* Tests the TREE, not the flat list it was built from. Those can disagree - a page that
+         renders the tree but decides its empty state from a different collection can show "No
+         organisations yet" above a populated tree, or a blank page with no explanation. The empty
+         state should be a statement about what is on the screen. Both branches, because an
+         organisation that reaches only the unassigned branch is still an organisation. */-->
+    <div class="empty" th:if="${#lists.isEmpty(tree.suppliers()) and #lists.isEmpty(tree.unassigned())}">
+        No organisations yet.
+        <a class="btn secondary" href="/admin/organisations/new" th:if="${can.addOrganisation}">Add an organisation</a>
+    </div>
 </main>
 </body>
 </html>

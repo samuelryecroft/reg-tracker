@@ -58,9 +58,17 @@ public class OrganisationAdminController {
      * organisation on the platform. The assembly itself lives in {@link OrganisationTree#from} as a
      * pure function so it can be unit-tested without a database.
      *
-     * <p>{@code organisations} is still published to the model. The list screen no longer reads it,
-     * but the activation banners and any future flat consumer might, and removing an attribute is a
-     * separate change from adding one.
+     * <p>The flat list is NOT published to the model. It was, with a note saying the activation
+     * banners might read it - which Dwight questioned, correctly: those banners read
+     * {@code kekWarning}, {@code activationMessage} and {@code activationError}, so the reason I
+     * gave was never true. The attribute itself was genuinely consumed, though, by the empty-state
+     * check - which is the part the review missed, because the usage is
+     * {@code ${#lists.isEmpty(organisations)}} rather than a bare {@code ${organisations}}.
+     *
+     * <p>So the fix is neither "keep it" nor "drop it": the empty state now tests the TREE, which
+     * is what the page actually renders. A page that decides its empty state from a different
+     * collection than the one it draws can say "No organisations yet" above a populated tree. With
+     * that gone the attribute has no consumer at all, so it goes too.
      */
     @GetMapping
     public String list(Model model) {
@@ -82,7 +90,6 @@ public class OrganisationAdminController {
             }
         });
 
-        model.addAttribute("organisations", organisations);
         model.addAttribute("tree", OrganisationTree.from(organisations,
                 homeRepository.findAllWithOrganisation(), userCounts, branded));
         return "admin/organisation-list";
