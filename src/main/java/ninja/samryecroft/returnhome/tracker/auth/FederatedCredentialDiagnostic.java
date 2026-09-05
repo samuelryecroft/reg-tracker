@@ -36,10 +36,16 @@ import org.springframework.boot.context.event.ApplicationReadyEvent;
  * registration has no API permissions, so step two is <em>expected</em> to be refused - and a
  * refusal about scopes or consent is a PASS, because Entra had to validate the assertion before it
  * could get as far as complaining about permissions. The question is not "did we get a token", it is
- * "did Entra get past the assertion". Only {@code AADSTS700211} (no matching federated identity
- * record) or a bare {@code invalid_client} mean the federation itself is wrong. This class therefore
- * classifies the outcome rather than logging a status and leaving the next reader to interpret it -
- * the obvious reading sends someone off to mint a certificate we deliberately did not create.
+ * "did Entra get past the assertion". {@code invalid_client} - OAuth's error for a client that
+ * failed to authenticate - or {@code AADSTS700211} mean the federation itself is wrong. This class
+ * classifies rather than logging a status and leaving the next reader to interpret it: the obvious
+ * reading sends someone off to mint a certificate we deliberately did not create.
+ *
+ * <p><b>And it recognises a third outcome, which is the important one.</b> PASS is a whitelist of
+ * permission-shaped refusals; anything unrecognised is INCONCLUSIVE rather than PASS. T184 exists to
+ * stop a broken federation reaching cutover, so an outcome nobody anticipated must never be
+ * recordable as proof - erring towards "we do not know" costs a follow-up question, erring towards
+ * PASS costs sign-in for every user at once.
  *
  * <p><b>On {@link ApplicationReadyEvent} rather than an {@code ApplicationRunner}</b>, which is the
  * opposite of the choice made for the key warmup in the same codebase, and for the opposite reason.
@@ -63,6 +69,34 @@ public class FederatedCredentialDiagnostic {
 
     private static final Logger log = LoggerFactory.getLogger(FederatedCredentialDiagnostic.class);
     private static final Pattern AADSTS = Pattern.compile("AADSTS\\d+");
+
+    /**
+     * OAuth errors that mean Entra refused on PERMISSIONS - which is this test's success, because it
+     * could only reach that judgement after validating the assertion.
+     *
+     * <p>A whitelist rather than a blacklist, and that is the whole design of this classification. An
+     * error nobody anticipated is reported INCONCLUSIVE, not PASS: T184 exists to stop a broken
+     * federation reaching cutover, so an unrecognised outcome must never be recordable as proof.
+     * Erring towards "we do not know" costs a follow-up question; erring towards PASS costs an
+     * outage for every user at once.
+     */
+    private static final java.util.Set<String> PERMISSION_SHAPED = java.util.Set.of(
+            "invalid_scope", "insufficient_scope", "invalid_grant", "unauthorized_client",
+            "consent_required", "interaction_required", "access_denied");
+
+    /**
+     * OAuth's error for a client that failed to authenticate - which on this path means the
+     * assertion itself was rejected.
+     *
+     * <p>The first version of this class treated only a <em>bare</em> {@code invalid_client} (one
+     * carrying no AADSTS code) as a failure, reading Kevin's shorthand too literally. Entra almost
+     * always attaches a code - AADSTS700027 for a signature that did not validate, AADSTS700024 for
+     * an expired assertion - so every realistic assertion failure carried one and was classified
+     * PASS. <b>That is a false pass in the one direction that matters</b>: it would have let a
+     * broken federation be recorded as proven and reach cutover, which is the exact outage this
+     * diagnostic exists to prevent.
+     */
+    private static final String ASSERTION_REJECTED = "invalid_client";
 
     private final FederatedCredentialDiagnosticProperties properties;
     private final HttpClient httpClient;
@@ -170,16 +204,39 @@ public class FederatedCredentialDiagnostic {
         }
         String code = firstAadstsCode(response.body()).orElse("(no AADSTS code)");
         String error = field(response.body(), "error").orElse("(no error field)");
-        if ("AADSTS700211".equals(code) || ("invalid_client".equals(error) && "(no AADSTS code)".equals(code))) {
-            log.error("T184 FAIL: the federation itself was rejected. error={}, code={}. Entra found "
-                    + "no federated identity record matching the token's issuer and subject logged "
-                    + "above - compare them with the credential", error, code);
-            return;
+        switch (classify(response.statusCode(), error, code)) {
+            case FAIL -> log.error("T184 FAIL: the ASSERTION was rejected, so the federation itself "
+                    + "is wrong. error={}, code={}. Compare the iss and sub logged above with the "
+                    + "credential - an issuer in the v1 sts.windows.net form is the likely cause and "
+                    + "is a one-field fix", error, code);
+            case PASS -> log.info("T184 PASS: the assertion was ACCEPTED - Entra refused on "
+                    + "permissions rather than on the assertion (error={}, code={}), which it could "
+                    + "only do after validating it. The app registration deliberately has no API "
+                    + "permissions, so this is the expected shape of success", error, code);
+            case INCONCLUSIVE -> log.warn("T184 INCONCLUSIVE: status={}, error={}, code={} - this is "
+                    + "neither a recognised permissions refusal nor a recognised assertion rejection, "
+                    + "so it does NOT prove the federation either way. Report the code rather than "
+                    + "reading it as a pass", response.statusCode(), error, code);
         }
-        log.info("T184 PASS: the assertion was ACCEPTED - Entra rejected the request on permissions "
-                + "rather than on the assertion (error={}, code={}), which it could only do after "
-                + "validating it. The app registration deliberately has no API permissions, so this "
-                + "is the expected shape of success", error, code);
+    }
+
+    enum Outcome { PASS, FAIL, INCONCLUSIVE }
+
+    /**
+     * The judgement this class exists to make, separated from the logging so it can be tested
+     * against the responses Entra actually returns.
+     */
+    static Outcome classify(int status, String error, String code) {
+        if (status == 200) {
+            return Outcome.PASS;
+        }
+        if (ASSERTION_REJECTED.equals(error) || "AADSTS700211".equals(code)) {
+            return Outcome.FAIL;
+        }
+        if (PERMISSION_SHAPED.contains(error)) {
+            return Outcome.PASS;
+        }
+        return Outcome.INCONCLUSIVE;
     }
 
     private HttpResponse<String> send(HttpRequest request) {

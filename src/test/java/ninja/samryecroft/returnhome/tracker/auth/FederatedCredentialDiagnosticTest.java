@@ -68,6 +68,60 @@ class FederatedCredentialDiagnosticTest {
         assertThat(FederatedCredentialDiagnostic.field(body, "error")).contains("invalid_request");
     }
 
+    /**
+     * The defect this classification was written with, found by asking what input would make it
+     * report PASS when it should say FAIL.
+     *
+     * <p>The first version treated only a <em>bare</em> {@code invalid_client} - one carrying no
+     * AADSTS code - as a failure. Entra almost always attaches a code, so every realistic assertion
+     * failure carried one and came back PASS. {@code AADSTS700027} is a signature that did not
+     * validate; {@code AADSTS700024} is an expired assertion. Both are the federation being wrong,
+     * and both would have been recorded as proof that it works.
+     *
+     * <p>A false PASS is the one direction that matters here: it lets a broken federation reach
+     * cutover, which is the outage T184 exists to prevent. A false FAIL costs a conversation.
+     */
+    @Test
+    void anAssertionRejectionCarryingAnAadstsCodeIsStillAFailure() {
+        assertThat(FederatedCredentialDiagnostic.classify(401, "invalid_client", "AADSTS700027"))
+                .isEqualTo(FederatedCredentialDiagnostic.Outcome.FAIL);
+        assertThat(FederatedCredentialDiagnostic.classify(401, "invalid_client", "AADSTS700024"))
+                .isEqualTo(FederatedCredentialDiagnostic.Outcome.FAIL);
+        assertThat(FederatedCredentialDiagnostic.classify(401, "invalid_client", "(no AADSTS code)"))
+                .isEqualTo(FederatedCredentialDiagnostic.Outcome.FAIL);
+        assertThat(FederatedCredentialDiagnostic.classify(400, "invalid_request", "AADSTS700211"))
+                .isEqualTo(FederatedCredentialDiagnostic.Outcome.FAIL);
+    }
+
+    /**
+     * The paired positive, and the reason the test above is not simply "everything fails": a refusal
+     * about permissions means Entra validated the assertion first, which is exactly what this
+     * diagnostic is asking about. The app registration deliberately has no API permissions.
+     */
+    @Test
+    void aPermissionsRefusalIsTheExpectedShapeOfSuccess() {
+        assertThat(FederatedCredentialDiagnostic.classify(400, "invalid_scope", "AADSTS70011"))
+                .isEqualTo(FederatedCredentialDiagnostic.Outcome.PASS);
+        assertThat(FederatedCredentialDiagnostic.classify(403, "insufficient_scope", "(no AADSTS code)"))
+                .isEqualTo(FederatedCredentialDiagnostic.Outcome.PASS);
+        assertThat(FederatedCredentialDiagnostic.classify(200, "(no error field)", "(no AADSTS code)"))
+                .isEqualTo(FederatedCredentialDiagnostic.Outcome.PASS);
+    }
+
+    /**
+     * PASS is a whitelist, so anything unrecognised is INCONCLUSIVE rather than PASS. This is the
+     * assertion that keeps the whole check honest: T184 must never be recorded as proven on an
+     * outcome nobody anticipated. Erring towards "we do not know" costs a follow-up question;
+     * erring towards PASS costs sign-in for every user at once at cutover.
+     */
+    @Test
+    void anUnrecognisedRefusalProvesNothingRatherThanPassing() {
+        assertThat(FederatedCredentialDiagnostic.classify(500, "temporarily_unavailable", "AADSTS90033"))
+                .isEqualTo(FederatedCredentialDiagnostic.Outcome.INCONCLUSIVE);
+        assertThat(FederatedCredentialDiagnostic.classify(400, "(no error field)", "(no AADSTS code)"))
+                .isEqualTo(FederatedCredentialDiagnostic.Outcome.INCONCLUSIVE);
+    }
+
     @Test
     void anAbsentFieldIsAbsentRatherThanEmpty() {
         assertThat(FederatedCredentialDiagnostic.field("{}", "iss")).isEmpty();
