@@ -165,11 +165,38 @@ public class CoordinatorController {
             long sentBackCount) {
 
         /**
-         * D-4a-4/D-4a-4b: the single most constraining fact only, with its own count - not a
-         * breakdown, because a list row isn't a table and the tier that constrains a visitor is
-         * the one that decides whether they can take another case. The ladder, most to least
-         * constraining: overdue -> due soon -> sent back -> nothing. {@code null} when there's
-         * nothing to name.
+         * D-4a-4/D-4a-4b: the ladder, most to least constraining - overdue -> due soon -> sent
+         * back -> nothing - as ONE ordering, not two. {@link #urgencyRank()} (the sort tiebreak)
+         * and {@link #urgencyNote()} (the displayed suffix) both derive from this single method
+         * rather than each re-deriving the precedence in its own if-chain: two independent
+         * if-ladders encoding the same decision agree only because they were written together, and
+         * a later rung added to one but not the other would let the shown suffix and the sort
+         * order silently disagree (a visitor reading "1 overdue" while sorting as though on
+         * track) - Creed's review of #76 (spec §7c), the same one-dataset-one-rendering shape
+         * behind the table/card duplication and the 1a/1b markup split.
+         */
+        private Rung rung() {
+            if (overdueCount > 0) {
+                return Rung.OVERDUE;
+            }
+            if (dueSoonCount > 0) {
+                return Rung.DUE_SOON;
+            }
+            if (sentBackCount > 0) {
+                return Rung.SENT_BACK;
+            }
+            return Rung.NOTHING;
+        }
+
+        /** Ascending = least urgent first, used only as the equal-count tiebreak in {@link #visitorsFor}. */
+        private int urgencyRank() {
+            return rung().ordinal();
+        }
+
+        /**
+         * The single most constraining fact only, with its own count - not a breakdown, because a
+         * list row isn't a table and the tier that constrains a visitor is the one that decides
+         * whether they can take another case. {@code null} when there's nothing to name.
          *
          * <p>Reuses {@link DueStateCopy}'s bare OVERDUE word and {@link InterviewStatus#REPORT_REJECTED}'s
          * own display word (both lower-cased into the count phrase, never a full statutory-surface
@@ -177,16 +204,12 @@ public class CoordinatorController {
          * {@link DeadlineTracker#DUE_SOON_THRESHOLD} rather than restating any of them.
          */
         public String urgencyNote() {
-            if (overdueCount > 0) {
-                return overdueCount + " " + DueStateCopy.stateWord(DueState.OVERDUE).toLowerCase(Locale.ROOT);
-            }
-            if (dueSoonCount > 0) {
-                return dueSoonCount + " due within " + DeadlineTracker.DUE_SOON_THRESHOLD.toHours() + " hours";
-            }
-            if (sentBackCount > 0) {
-                return sentBackCount + " " + InterviewStatus.REPORT_REJECTED.getDisplayName().toLowerCase(Locale.ROOT);
-            }
-            return null;
+            return switch (rung()) {
+                case OVERDUE -> overdueCount + " " + DueStateCopy.stateWord(DueState.OVERDUE).toLowerCase(Locale.ROOT);
+                case DUE_SOON -> dueSoonCount + " due within " + DeadlineTracker.DUE_SOON_THRESHOLD.toHours() + " hours";
+                case SENT_BACK -> sentBackCount + " " + InterviewStatus.REPORT_REJECTED.getDisplayName().toLowerCase(Locale.ROOT);
+                case NOTHING -> null;
+            };
         }
 
         /**
@@ -208,18 +231,9 @@ public class CoordinatorController {
             return note == null ? base : base + " · " + note;
         }
 
-        /** Ascending = least urgent first, used only as the equal-count tiebreak in {@link #visitorsFor}. */
-        private int urgencyRank() {
-            if (overdueCount > 0) {
-                return 3;
-            }
-            if (dueSoonCount > 0) {
-                return 2;
-            }
-            if (sentBackCount > 0) {
-                return 1;
-            }
-            return 0;
+        /** Ordinal order IS the ladder - least constraining first, so {@link #urgencyRank} is free. */
+        private enum Rung {
+            NOTHING, SENT_BACK, DUE_SOON, OVERDUE
         }
     }
 }
