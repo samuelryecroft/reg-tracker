@@ -94,6 +94,16 @@ public class FederatedCredentialDiagnostic {
      *
      * <p>Anything not listed is INCONCLUSIVE, never PASS. Erring towards "we do not know" costs a
      * follow-up question; erring towards PASS costs sign-in for every user at once.
+     *
+     * <p><b>Delete this set the day a positive signal becomes available.</b> A token that exists is
+     * stronger evidence than the shape of a refusal, and an error taxonomy drifts with the identity
+     * provider's release notes while a token does not. There is no positive signal today for a
+     * deliberate reason: {@code client_credentials} with {@code .default} needs at least one
+     * application permission granted, this registration has none, and the sign-in it exists for uses
+     * delegated permissions which yield no client-credentials token. Granting a real privilege to
+     * make a test easier to read is the wrong trade. But if this registration ever gains an
+     * application permission for a reason of its own, change the proof to "we are holding a token"
+     * and this set stops being needed.
      */
     private static final java.util.Set<String> PROVES_ASSERTION_ACCEPTED = java.util.Set.of(
             "AADSTS65001",   // admin consent not granted - the expected result for a registration
