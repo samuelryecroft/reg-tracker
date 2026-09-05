@@ -2311,6 +2311,68 @@ causes strictly apart; the screen mirroring it should too. Branch on `${report.h
 right there. **The surface I called "the one that names the cause" is the one that stopped naming it.**
 
 
+### D-187-9 · `verdict()` parses a display string back into a state — my instruction named the wrong source
+
+I told Jim to derive the short answer from `verdictLine()` rather than re-deciding from the report. He did
+exactly that:
+
+```java
+if (verdictLine.startsWith("Not measurable")) return "Not measurable";
+return verdictLine.startsWith("NOT within") ? "No" : "Yes";
+```
+
+**That avoids a second ladder by introducing a second representation, which is the same defect wearing
+different clothes.** The display sentence is now load-bearing state: reword `verdictLine` — "NOT within" to
+"Not within", say, or a softer "Not measurable" — and `verdict()` silently returns a different answer. **And
+the fallback is `"Yes"`, so any wording drift defaults to asserting compliance.** That is the third time in
+this ticket that the failure direction is *compliant*, after the impossible sequence counted as a pass.
+
+> **A state must reach a second renderer AS THE STATE, not as a substring of the first rendering.** Deriving
+> one *rendering* from another is not the same as deriving two renderings from one decision, and only the
+> second is what "one source" means.
+
+The coupling is currently protected only by a content test that exists for another reason — a test pinning
+`verdictLine`'s exact wording would fail on a rename, but nothing tests the *pairing*, and the guard would
+disappear the moment someone loosened that assertion.
+
+**Fix:** put the decision in the record. A three-valued `Verdict` (`MET` / `MISSED` / `NOT_MEASURABLE`) chosen
+once in `of()`; `verdictLine` and the short answer both **rendered from it**. One decision, two renderings.
+**My instruction was the problem — I named `verdictLine()` when I meant the state behind it.**
+
+### D-187-10 · The WCAG correction, corrected: Jim verified it and it was half right
+
+I told Jim 2.4.11 was wrong and 1.4.11 was the AA hook, and to verify rather than take my word. **Verifying
+changed the answer.**
+
+- **2.4.11 is wrong** — in the published Recommendation it is *Focus Not Obscured (Minimum)*, AA, about a
+  focused component being hidden. Not contrast. That much stands.
+- **But 1.4.11 is not a drop-in replacement for that sentence.** 1.4.11 Non-text Contrast requires 3:1
+  against **adjacent** colours, and explicitly does not require any contrast between the focused and
+  unfocused *states*. **The 1.47–1.79:1 figure is a focused-vs-unfocused measurement — that is 2.4.13 Focus
+  Appearance, AAA.**
+
+Swapping the criterion while keeping the number would have been **the right criterion attached to the wrong
+measurement** — the withdrawn table's exact shape, one week later, inside the correction to it.
+
+**Stated properly.** The AA obligation under 1.4.11 is that the indicator holds 3:1 against adjacent colours,
+which the 2px `--color-text` ring meets at every brand hue. The 1.47–1.79:1 ratio is the **AAA (2.4.13)** cost
+of the source-order hazard — not the AA obligation, and not a description of today.
+**What is deliberately NOT claimed:** if the ring were suppressed and the accent border became the only
+indicator, 1.4.11 would then ask whether that border holds 3:1 against the input fill and the surrounding
+surface. **Nobody has measured that**, and `--accent` under the legacy block is a raw org hex, so it cannot be
+guaranteed. That question belongs to **T186's scope**, and the comment should make no AA claim rather than
+attach a number that does not answer it.
+
+> **Three errors this week, one unit: §6h was right arithmetic over a wrong adjacency premise; the citation
+> was a right concern with a wrong criterion number; the proposed fix was a right criterion with the wrong
+> measurement attached. THE FAILING UNIT IS THE PAIRING OF A NUMBER TO THE RULE IT IS JUDGED AGAINST — and I
+> validate each half separately, so nothing in my process ever checks the join.**
+>
+> **Standing rule for anyone quoting my tables: a ratio from this spec is only usable together with the
+> sentence saying which two things it compares. Take the number without the sentence and you will attach it
+> to the wrong criterion, exactly as I did.**
+
+
 ## 7b · 4a Allocate, and the remaining list screens (Creed, 5 Sep)
 
 Specced against **main @0149f38**. Both lanes are between screens and 2a now points its one action button at
