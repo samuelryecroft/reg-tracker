@@ -25,11 +25,17 @@
         </tr>
         </thead>
         <tbody>
+        <!--
+          T193 (PILOT-GATE, spec §7f D-4b-11): the birth date and case reference are both
+          Article-9 encrypted, so this row reads them only through childRows (built server-side in
+          ChildController, same shape as childIdentities above) - never straight off the entity, or
+          the mask is defeated on this masked page.
+        -->
         <tr th:each="c : ${children}">
             <td th:text="${childIdentities[c.id].label()}">Child Name</td>
-            <td th:text="${#temporals.format(c.dateOfBirth, 'dd MMM yyyy')}">DOB</td>
+            <td th:text="${childRows[c.id].dob()}">DOB</td>
             <td th:if="${isAdmin}" th:text="${c.home.name}">Home</td>
-            <td th:text="${c.localCaseReference} ?: '—'">Case reference</td>
+            <td th:text="${childRows[c.id].caseReference()}">Case reference</td>
         </tr>
         </tbody>
     </table>
@@ -39,9 +45,9 @@
         <div class="srow" th:each="c : ${children}">
             <div class="top"><span class="name" th:text="${childIdentities[c.id].label()}">Child Name</span></div>
             <dl>
-                <dt>Date of birth</dt><dd th:text="${#temporals.format(c.dateOfBirth, 'dd MMM yyyy')}">DOB</dd>
+                <dt>Date of birth</dt><dd th:text="${childRows[c.id].dob()}">DOB</dd>
                 <dt th:if="${isAdmin}">Home</dt><dd th:if="${isAdmin}" th:text="${c.home.name}">Home</dd>
-                <dt>Case reference</dt><dd th:text="${c.localCaseReference} ?: '—'">Case reference</dd>
+                <dt>Case reference</dt><dd th:text="${childRows[c.id].caseReference()}">Case reference</dd>
             </dl>
         </div>
     </div>
