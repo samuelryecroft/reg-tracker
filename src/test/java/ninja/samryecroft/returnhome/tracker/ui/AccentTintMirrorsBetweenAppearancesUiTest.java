@@ -31,40 +31,36 @@ import org.junit.jupiter.api.Test;
  *
  * <p>A screenshot records what happened once and nothing checks it again. This fails if the block
  * comes back, and it was armed by restoring the block and watching it fail before being trusted.
+ *
+ * <h2>Why it does not set a brand colour, though the defect is described as a branded-org one</h2>
+ *
+ * <p><b>It must not mutate the shared theme, and it does not need to.</b> The first version signed
+ * in as the platform admin and POSTed a brand colour to {@code /admin/theme} - which edits the
+ * PLATFORM DEFAULT every other test in this context reads, and duly broke
+ * {@code NocturneFoundationUiTest.brandHueIsReadFromTheEffectiveThemeNotTheCssDefault}, which
+ * asserts the hue derived from the shipped default. It reported as a non-blocking quarantine
+ * failure, which is exactly how a test that corrupts shared state gets waved through.
+ *
+ * <p>It is also unnecessary: the deleted block rendered on {@code th:if="${theme != null}"}, and a
+ * theme is always present, so it pinned these tokens for <em>every</em> organisation. Branding was
+ * never what triggered the defect - having a theme at all was.
  */
-class BrandedOrgMirrorsBetweenAppearancesUiTest extends AbstractUiTest {
-
-    /** Deliberately not the default: the bug only ever appeared for an org with its own colour. */
-    private static final String BRAND_COLOUR = "#1d4ed8";
+class AccentTintMirrorsBetweenAppearancesUiTest extends AbstractUiTest {
 
     @Test
-    void aBrandedOrgsAccentTintDiffersBetweenLightAndDark() {
+    void theAccentTintDiffersBetweenLightAndDark() {
         page.emulateMedia(new Page.EmulateMediaOptions().setColorScheme(ColorScheme.DARK));
         login(ADMIN_USERNAME, ADMIN_PASSWORD);
-        brandTheOrganisation();
 
         String dark = theadBackground("dark");
         String light = theadBackground("light");
 
         // The whole of the defect, in one assertion. With the inline block present these are the
-        // same string, because it pinned --tint to one hex regardless of appearance.
+        // same string, because it pinned --tint to one value regardless of appearance.
         assertThat(dark)
-                .as("a branded org's --tint must resolve per appearance, not to one fixed value "
-                        + "(dark=%s light=%s)", dark, light)
+                .as("--tint must resolve per appearance, not to one fixed value (dark=%s light=%s)",
+                        dark, light)
                 .isNotEqualTo(light);
-    }
-
-    /**
-     * Sets a brand colour through the real form, so the test exercises the same path a supplier
-     * does. The form carries only a primary colour now - T186 removed the secondary picker, because
-     * nothing read it and a control that appears to work and does nothing is worse than no control.
-     */
-    private void brandTheOrganisation() {
-        page.navigate(url("/admin/theme"));
-        page.waitForSelector("#primaryColor");
-        page.fill("#primaryColor", BRAND_COLOUR);
-        page.click("main button[type=submit]");
-        page.waitForLoadState();
     }
 
     private String theadBackground(String appearance) {
