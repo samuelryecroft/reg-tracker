@@ -480,16 +480,24 @@ textarea.input { min-height: 90px; resize: vertical; }
 }
 .radio input:focus-visible + .dot { outline: 2px solid var(--color-accent); outline-offset: 2px; }
 /* D-4a-2 (spec §7b): a coordinator allocating blind can't load-balance, so the visitor picker is a
-   list of rows (name + current load), not a bare <select> - an <option> can't carry a second
-   field. .radio itself is inline-flex (one pill, sized to its label); stacking it into full-width,
-   selectable rows is the only thing this adds - the dot/checked/focus states are unchanged. */
+   list of rows (name + current load), not a bare dropdown - a dropdown option can't carry a
+   second field. .radio itself is inline-flex (one pill, sized to its label); stacking it into
+   full-width, selectable rows is the only thing this adds - the dot/checked/focus states are
+   unchanged. */
 .radio-list { display: flex; flex-direction: column; gap: var(--s2); margin: var(--s2) 0 var(--s4); }
 .radio-list .radio {
     display: flex; justify-content: space-between; width: 100%; min-height: 44px;
     padding: var(--s3) var(--s4); border: 1px solid var(--control-border); border-radius: 8px;
 }
-.radio-list .radio:hover { border-color: var(--accent-dark); }
-.radio-list .radio:has(input:checked) { border-color: var(--accent-dark); background: var(--tint); }
+/* Creed's #75 review: --accent-dark/--tint are two of the four bridge tokens a legacy per-org
+   inline <style> overrides for a branded organisation (T186, §0's known-unsafe ground) - and
+   --tint is the specific token whose cream-in-dark-mode behaviour started that whole thread, so on
+   a branded org in dark mode the selected row would get a cream fill on the exact screen recording
+   the allocation decision. Fixed to the long ramp names T186 doesn't touch: --color-accent (border,
+   4.58:1 dark / 5.68:1 light on --color-surface) and --color-accent-900 (background - mirrors
+   properly, deep in dark/pale in light, which --tint currently can't do). */
+.radio-list .radio:hover { border-color: var(--color-accent); }
+.radio-list .radio:has(input:checked) { border-color: var(--color-accent); background: var(--color-accent-900); }
 .radio-list .load { color: var(--muted); font-variant-numeric: tabular-nums; }
 .seg {
     display: inline-flex; overflow: hidden;
