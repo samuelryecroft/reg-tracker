@@ -2574,8 +2574,19 @@ they are human-signed-off statutory-surface copy** — the trap named in D-4a-4.
 failing; T187's rule applies unchanged — *the verdict is about the process, not the person*, and a warning
 treatment here would read as an accusation at the moment someone is trying to comply.
 
-Match `SeventyTwoHourReading`'s datetime format (`dd MMM yyyy HH:mm`, `Locale.UK`) rather than inventing a
-third — see D-187-5(a).
+Match the datetime format `interview/detail.html:123` already uses for **this same field**:
+`#temporals.format(request.returnedAt, 'dd MMM yyyy HH:mm')`. See D-187-5(a).
+
+> **Correction (8 Sep).** This originally cited `SeventyTwoHourReading`'s format. **That class does not exist
+> on main** — it arrives with PR #77, still unmerged — while the section's own header says *specced against
+> main @2eb514a*. Pam grepped for it rather than assuming, found nothing, and substituted the nearest real
+> convention. **She applied D-187-5(a) correctly to a case where my spec was the thing that was wrong**: the
+> surface wins, and `detail.html` formatting `request.returnedAt` is as close a neighbour as exists.
+>
+> **A spec that declares the commit it was written against must not cite a symbol that only exists on an
+> unmerged branch.** I had both open and did not notice which one I was reading from — the same failure as
+> §6h and the .docx, in a third disguise: **an artefact I had looked at, credited to a place I had not
+> checked it was in.**
 
 ### D-5b-2 · `min` on the input, set server-side to the return datetime
 
@@ -2890,4 +2901,43 @@ suppressed rather than fixed.**
 > rendered."** Those are indistinguishable in both known instances and come apart on the third. This is the
 > guard-shape rule again (§5j, §6e): **a guard inherits the incidental properties of the instances that
 > motivated it**, and the tempting generalisation is usually one of those properties rather than the defect.
+
+### D-4b-14 · The masked "Case reference" cell says Hidden about a value it is displaying (follow-up on main)
+
+Raised in review of PR #88; **#88 merged as `bd298fc` before the review landed, so this is a follow-up on main
+rather than a change to that PR.** The disclosure fix itself is complete and correct — verified across every
+template, not just this page.
+
+A masked row now renders:
+
+```
+Name             A.B. · CH-0041      <- the masked label, carrying the reference BY DESIGN
+Case reference   Hidden              <- says it is hidden. It is two columns to the left.
+```
+
+**This is not cosmetic.** A user who wants the case reference reads *"Hidden"*, and the only control on offer
+is the reveal toggle — **so they reveal every child's full name on the page to obtain a value already on
+screen.**
+
+> **A false "Hidden" induces an unnecessary reveal, which is the exact opposite of what the masking feature
+> exists to do.** A control that misreports its own state does not merely mislead; it makes the user act.
+
+Wrong in the other branch too: with no reference recorded, `maskedLabel` degrades to initials alone and the
+column still says *"Hidden"* — **inventing a hidden value that does not exist.**
+
+**Fix:** `ChildListRow.caseReference()` returns the real value in **both** states (blank → `—`). Routing
+through the record still removes the raw entity read and still satisfies T194's guard; the de-duplication
+simply does not happen, which was never the point. The column drop rides the additive change as ruled.
+
+**This corrects my own instruction.** D-4b-12 said *"gate it now if you like"* — I judged the disclosure
+question and never asked what the masked cell would **say**. Pam built exactly what I wrote.
+
+> **Deciding that a value may be withheld is not the same as deciding what to put in its place, and the
+> second decision is the one the user actually reads.**
+
+Two smaller follow-ups from the same review, both non-blocking: `ChildListRow.DOB_FMT` carries no `Locale`
+(the defect fixed in `ReportService` days earlier — D-187-5(b) — reappearing in new code), and the revealed
+test's `occurrencesOf(html, caseReference) == 2` becomes `4` once `ChildIdentity` is additive. **That
+assertion is the tripwire that forces the column drop to be noticed — but only if it is labelled as one.**
+Unlabelled, whoever lands the additive change bumps the number and the redundancy becomes permanent.
 
