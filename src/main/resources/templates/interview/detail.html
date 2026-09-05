@@ -269,7 +269,10 @@
             <dd th:classappend="${report.interviewLocation == null} ? 'unanswered'" th:text="${report.interviewLocation} ?: 'Not answered'">Location</dd>
 
             <dt>Was this interview offered and completed within 72 hours of return?</dt>
-            <dd class="unanswered" th:if="${report.within72Hours == null}">Not measurable — interview time not recorded</dd>
+            <!-- T187: null widened from "no heldAt" to "the clock cannot be read", which now also
+                 covers an interview recorded before the return. This is the one surface that names
+                 the CAUSE, so naming only the old one would start lying about which half is missing. -->
+            <dd class="unanswered" th:if="${report.within72Hours == null}">Not measurable — the interview time is missing or precedes the return</dd>
             <dd th:unless="${report.within72Hours == null}" th:text="${report.within72Hours} ? 'Yes' : 'No'">—</dd>
 
             <dt>If not, why?</dt>

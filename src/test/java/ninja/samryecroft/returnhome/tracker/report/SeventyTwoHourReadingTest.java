@@ -143,11 +143,68 @@ class SeventyTwoHourReadingTest {
      * display contradicting the verdict, which is the one thing this reading exists to prevent.
      * Flagged to Creed as a case the spec did not cover.
      */
+    /**
+     * Creed's ruling (D-187-5), and it was not the display question I raised it as. An interview
+     * recorded before the return <em>satisfies</em> {@code !heldAt.isAfter(returnedAt + 72h)}, so it
+     * was not merely shown as compliant - it was counted in the NUMERATOR of the published
+     * compliance rate. The fix is the predicate; this asserts the reading that follows from it.
+     *
+     * <p>One verdict with more than one cause, and the cause in the elapsed row - which is what that
+     * row is for. <b>Both timestamps stay printed</b>, because they are the evidence a reader needs
+     * to correct the record.
+     */
     @Test
-    void anInterviewRecordedBeforeTheReturnIsCalledOutRatherThanShownAsNegativeTime() {
+    void anInterviewRecordedBeforeTheReturnIsNotMeasurableAndKeepsBothTimestamps() {
         SeventyTwoHourReading reading = SeventyTwoHourReading.of(
                 report(RETURNED, RETURNED.minusHours(3), null));
 
-        assertThat(reading.elapsedLine()).doesNotStartWith("-").contains("before the return");
+        assertThat(reading.verdictLine())
+                .isEqualTo("Not measurable - excluded from the 72-hour rate, not counted as a breach");
+        assertThat(reading.elapsedLine())
+                .isEqualTo("Interview recorded before the return - times need checking");
+        assertThat(reading.returnedLine()).isEqualTo("02 Sept 2026 14:20");
+        assertThat(reading.heldLine()).isEqualTo("02 Sept 2026 11:20");
+    }
+
+    /**
+     * The two not-measurable causes are never collapsed: "cannot be calculated without both times"
+     * is false when both times are present and merely inconsistent.
+     */
+    @Test
+    void theTwoNotMeasurableCausesAreDistinguished() {
+        assertThat(SeventyTwoHourReading.of(report(RETURNED, null, null)).elapsedLine())
+                .isEqualTo("Cannot be calculated without both times");
+        assertThat(SeventyTwoHourReading.of(report(RETURNED, RETURNED.minusMinutes(1), null)).elapsedLine())
+                .isEqualTo("Interview recorded before the return - times need checking");
+    }
+
+    /**
+     * Creed's fourth point, live in the null branch I had already shipped: the reason row fell
+     * through to the missed-window text, so a not-measurable report printed "No reason recorded" -
+     * reading as an accusation of a missing explanation for a breach that did not happen.
+     *
+     * <p><b>A reason is only owed when the window was measured and missed.</b> And a reason that was
+     * actually recorded is printed whatever the verdict, because nothing a visitor took the trouble
+     * to write should be hidden.
+     */
+    @Test
+    void aReasonIsOnlyOwedWhenTheWindowWasMeasuredAndMissed() {
+        assertThat(SeventyTwoHourReading.of(report(RETURNED, null, null)).reasonLine())
+                .isEqualTo("Not applicable");
+        assertThat(SeventyTwoHourReading.of(report(RETURNED, RETURNED.minusHours(3), null)).reasonLine())
+                .isEqualTo("Not applicable");
+        assertThat(SeventyTwoHourReading.of(report(RETURNED, null, "Written before anyone noticed"))
+                .reasonLine()).isEqualTo("Written before anyone noticed");
+    }
+
+    /**
+     * The rate itself, which is what this ruling was actually about. Equality stays measurable - a
+     * held time equal to the return is odd, not impossible - so the exclusion is exactly one case
+     * wide rather than swallowing a legitimate reading.
+     */
+    @Test
+    void anImpossibleSequenceIsExcludedFromTheRateAndZeroElapsedIsNot() {
+        assertThat(report(RETURNED, RETURNED.minusMinutes(1), null).getWithin72Hours()).isNull();
+        assertThat(report(RETURNED, RETURNED, null).getWithin72Hours()).isTrue();
     }
 }

@@ -58,49 +58,71 @@ public record SeventyTwoHourReading(String returnedLine, String heldLine, String
         // it cannot see, and a document that silently omits a row is worse than one that says the
         // value is missing.
         String returnedLine = returnedAt == null ? NOT_RECORDED : returnedAt.format(DATETIME);
-
-        if (heldAt == null || returnedAt == null) {
-            // Name what is missing rather than hiding the row. A reader who can see the return time
-            // and the words "not recorded" beside the interview knows which half is absent; a
-            // collapsed "not recorded" tells them only that something is.
-            return new SeventyTwoHourReading(returnedLine,
-                    heldAt == null ? "Interview time not recorded" : heldAt.format(DATETIME),
-                    "Cannot be calculated without both times",
-                    "Not measurable - excluded from the 72-hour rate, not counted as a breach",
-                    reasonOrNotApplicable(report, false));
-        }
+        String heldLine = heldAt == null ? "Interview time not recorded" : heldAt.format(DATETIME);
 
         Boolean within = report.getWithin72Hours();
-        boolean met = Boolean.TRUE.equals(within);
-        return new SeventyTwoHourReading(returnedLine, heldAt.format(DATETIME),
-                elapsed(returnedAt, heldAt),
+        if (within == null) {
+            // ONE not-measurable verdict with more than one cause, and the cause belongs in the
+            // elapsed row - that is what that row is for. Inventing a fourth verdict state would
+            // split a reading the rate does not split.
+            return new SeventyTwoHourReading(returnedLine, heldLine,
+                    notMeasurableCause(returnedAt, heldAt),
+                    "Not measurable - excluded from the 72-hour rate, not counted as a breach",
+                    reason(report, false));
+        }
+        boolean met = within;
+        return new SeventyTwoHourReading(returnedLine, heldLine, elapsed(returnedAt, heldAt),
                 met ? "Within 72 hours of return" : "NOT within 72 hours of return",
-                reasonOrNotApplicable(report, met));
+                reason(report, !met));
+    }
+
+    /**
+     * Why the clock could not be read - and the two causes are never collapsed, because "cannot be
+     * calculated without both times" is <em>false</em> when both times are present and merely
+     * inconsistent. Both timestamps stay printed in that case: they are the evidence a reader needs
+     * to correct the record.
+     */
+    private static String notMeasurableCause(LocalDateTime returnedAt, LocalDateTime heldAt) {
+        if (returnedAt == null || heldAt == null) {
+            return "Cannot be calculated without both times";
+        }
+        return "Interview recorded before the return - times need checking";
     }
 
     /**
      * Hours and minutes, always both, whatever the size.
      *
-     * <p>An interview recorded <em>before</em> the return is a data-entry error rather than a
-     * negative duration, and it gets said in words: a signed figure beside "Within 72 hours" would
-     * be the display contradicting the verdict, which is the one thing this reading exists to stop.
+     * <p>It is never asked about an impossible sequence: {@code getWithin72Hours()} returns null for
+     * one, so that case never reaches here. Answering it in words was the tempting fix, and Creed's
+     * ruling on why it was the wrong layer is the part worth keeping: <b>when the presentation layer
+     * has to invent language for a state, ask first whether the state should exist.</b> A display
+     * rule can stop a document contradicting itself; it cannot stop a broken record inflating a
+     * statistic.
      */
     private static String elapsed(LocalDateTime returnedAt, LocalDateTime heldAt) {
         Duration duration = Duration.between(returnedAt, heldAt);
-        if (duration.isNegative()) {
-            return "Interview recorded before the return - times need checking";
-        }
         long hours = duration.toHours();
         long minutes = duration.toMinutesPart();
         return hours + (hours == 1 ? " hour " : " hours ") + minutes
                 + (minutes == 1 ? " minute" : " minutes");
     }
 
-    private static String reasonOrNotApplicable(InterviewReport report, boolean met) {
-        if (met) {
-            return "Not applicable";
+    /**
+     * The reason row, keyed on whether an explanation was <b>owed</b> rather than on whether the
+     * verdict was true.
+     *
+     * <p>Those came apart on the not-measurable cases: falling through to the missed-window branch
+     * printed "No reason recorded" - reading as an accusation of a missing explanation for a breach
+     * that did not happen. <b>A reason is only owed when the window was measured and missed.</b>
+     *
+     * <p>A reason that was actually recorded is always printed, whatever the verdict: never hide
+     * something a visitor took the trouble to write.
+     */
+    private static String reason(InterviewReport report, boolean owed) {
+        String recorded = report.getIfNotWhyLate();
+        if (recorded != null && !recorded.isBlank()) {
+            return recorded;
         }
-        String reason = report.getIfNotWhyLate();
-        return (reason == null || reason.isBlank()) ? "No reason recorded" : reason;
+        return owed ? "No reason recorded" : "Not applicable";
     }
 }
