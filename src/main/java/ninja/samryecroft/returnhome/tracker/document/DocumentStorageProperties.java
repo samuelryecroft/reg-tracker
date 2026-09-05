@@ -138,6 +138,100 @@ public class DocumentStorageProperties {
          * Crypto Officer; turn it off to run as Crypto User with keys provisioned from IaC.
          */
         private boolean autoCreateKeys = true;
+        /**
+         * How the app authenticates to Key Vault and Blob Storage.
+         *
+         * <p>{@code auto} (the default) means a scoped {@link
+         * com.azure.identity.ManagedIdentityCredential} in production and the full
+         * {@code DefaultAzureCredential} chain everywhere else. That split is the T181 fix, and it
+         * is a split rather than a global switch because the two environments genuinely differ: in
+         * production the managed identity is the only source that will ever succeed, while a
+         * developer running against a real vault authenticates with the Azure CLI, which only the
+         * chain finds.
+         *
+         * <p>Why it matters: {@code DefaultAzureCredential} walks its sources in order and each
+         * unreachable one has to time out before the next is tried. On App Service that cost 6-7
+         * seconds per token acquisition, and the first {@code getKey} on a fresh container took
+         * 22-33 seconds and then FAILED - measured in App Insights, T181. A scoped credential goes
+         * straight to the instance metadata endpoint.
+         */
+        private CredentialSource credential = CredentialSource.AUTO;
+        /**
+         * The user-assigned managed identity to authenticate as, when there is one. Left null the
+         * system-assigned identity is used. {@code AZURE_CLIENT_ID} is the conventional environment
+         * variable and binds to this.
+         */
+        private String managedIdentityClientId;
+        /**
+         * Fetch a token and the KEK handle for every active organisation during startup, so the
+         * first real request does not pay for it.
+         *
+         * <p>Runs as an {@code ApplicationRunner}, which completes <em>before</em> readiness is
+         * published - so the platform does not route traffic here until it is done, and "no user
+         * request pays the cold start" is enforced rather than hoped for.
+         */
+        private boolean warmKeysOnStartup = true;
+        /**
+         * How long startup may spend warming before giving up and starting anyway.
+         *
+         * <p>Bounded because warmup is an optimisation and must never be able to keep the
+         * application from becoming ready. Exceeding it is logged and startup continues; the only
+         * consequence is that somebody pays the cold start after all, which is the behaviour we had
+         * before this existed.
+         */
+        private java.time.Duration warmupTimeout = java.time.Duration.ofSeconds(30);
+        /**
+         * How long a fetched KEK handle stays usable before it is looked up again.
+         *
+         * <p>{@code currentKeyFor} previously called Key Vault on every single encrypted write.
+         * Caching it costs at most this much delay in picking up a rotated key version, which is
+         * already how this class describes rotation: old data keeps unwrapping with the version
+         * recorded in its own envelope, so re-wrapping is catch-up work rather than a migration.
+         */
+        private java.time.Duration keyHandleTtl = java.time.Duration.ofMinutes(10);
+
+        /** @see #credential */
+        public enum CredentialSource { AUTO, MANAGED_IDENTITY, DEFAULT_CHAIN }
+
+        public CredentialSource getCredential() {
+            return credential;
+        }
+
+        public void setCredential(CredentialSource credential) {
+            this.credential = credential;
+        }
+
+        public String getManagedIdentityClientId() {
+            return managedIdentityClientId;
+        }
+
+        public void setManagedIdentityClientId(String managedIdentityClientId) {
+            this.managedIdentityClientId = managedIdentityClientId;
+        }
+
+        public boolean isWarmKeysOnStartup() {
+            return warmKeysOnStartup;
+        }
+
+        public void setWarmKeysOnStartup(boolean warmKeysOnStartup) {
+            this.warmKeysOnStartup = warmKeysOnStartup;
+        }
+
+        public java.time.Duration getWarmupTimeout() {
+            return warmupTimeout;
+        }
+
+        public void setWarmupTimeout(java.time.Duration warmupTimeout) {
+            this.warmupTimeout = warmupTimeout;
+        }
+
+        public java.time.Duration getKeyHandleTtl() {
+            return keyHandleTtl;
+        }
+
+        public void setKeyHandleTtl(java.time.Duration keyHandleTtl) {
+            this.keyHandleTtl = keyHandleTtl;
+        }
 
         public String getUri() {
             return uri;

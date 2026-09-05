@@ -19,6 +19,14 @@ class DocumentStorageConfigTest {
         return new ApplicationContextRunner()
                 .withConfiguration(AutoConfigurations.of())
                 .withUserConfiguration(DocumentStorageConfig.class)
+                // T181's key warmup needs the organisation repository to know what to warm. Supplied
+                // as a mock rather than relaxed to an ObjectProvider in the configuration: this
+                // slice deliberately excludes JPA, and a bean that quietly does nothing when its
+                // dependency is missing would hide a real wiring mistake in production to keep a
+                // test slice convenient.
+                .withBean(ninja.samryecroft.returnhome.tracker.organisation.OrganisationRepository.class,
+                        () -> org.mockito.Mockito.mock(
+                                ninja.samryecroft.returnhome.tracker.organisation.OrganisationRepository.class))
                 .withPropertyValues(
                         "app.documents.local.directory=target/test-documents",
                         "app.documents.local-keys.master-secret=a-master-secret-for-tests");
