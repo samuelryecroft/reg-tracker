@@ -489,13 +489,16 @@ textarea.input { min-height: 90px; resize: vertical; }
     display: flex; justify-content: space-between; width: 100%; min-height: 44px;
     padding: var(--s3) var(--s4); border: 1px solid var(--control-border); border-radius: 8px;
 }
-/* Creed's #75 review: --accent-dark/--tint are two of the four bridge tokens a legacy per-org
-   inline <style> overrides for a branded organisation (T186, §0's known-unsafe ground) - and
-   --tint is the specific token whose cream-in-dark-mode behaviour started that whole thread, so on
-   a branded org in dark mode the selected row would get a cream fill on the exact screen recording
-   the allocation decision. Fixed to the long ramp names T186 doesn't touch: --color-accent (border,
-   4.58:1 dark / 5.68:1 light on --color-surface) and --color-accent-900 (background - mirrors
-   properly, deep in dark/pale in light, which --tint currently can't do). */
+/* Creed's #75 review moved these off --accent-dark/--tint, which a legacy per-org inline <style>
+   then overrode with fixed values for a branded organisation - so on a branded org in dark mode the
+   selected row got a cream fill on the exact screen recording the allocation decision.
+
+   T186 DELETED THAT BLOCK. The short tokens are no longer overridden and now mirror between
+   appearances like everything else, so the reason this rule was moved has gone. The long names stay
+   because they are equivalent here and churn is worse than nothing - NOT because --accent-dark or
+   --tint are unsafe. Do not read this as a reason to avoid them, and do not spread the pattern:
+   --color-accent (border, 4.58:1 dark / 5.68:1 light on --color-surface) and --color-accent-900
+   (background) are simply the explicit ramp names. */
 .radio-list .radio:hover { border-color: var(--color-accent); }
 .radio-list .radio:has(input:checked) { border-color: var(--color-accent); background: var(--color-accent-900); }
 .radio-list .load { color: var(--muted); font-variant-numeric: tabular-nums; }
