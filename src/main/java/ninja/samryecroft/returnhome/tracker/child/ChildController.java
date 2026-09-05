@@ -1,6 +1,7 @@
 package ninja.samryecroft.returnhome.tracker.child;
 
 import jakarta.validation.Valid;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -86,7 +87,7 @@ public class ChildController {
                 .toList();
         boolean revealed = nameRevealService.isRevealed();
         model.addAttribute("children", sorted);
-        model.addAttribute("isAdmin", showHomeColumn);
+        model.addAttribute("showHomeColumn", showHomeColumn);
         model.addAttribute("childIdentities", ChildIdentities.mapOf(sorted, c -> c, revealed));
         model.addAttribute("childRows",
                 sorted.stream().collect(Collectors.toMap(Child::getId, c -> ChildListRow.of(c, revealed))));
@@ -233,10 +234,14 @@ public class ChildController {
         }
         model.addAttribute("form", new CreateChildForm());
         List<Home> homeOptions = homePickerOptionsFor(principal);
-        model.addAttribute("isAdmin", homeOptions != null);
+        // D-5d-1 (spec §7g): this decides "does this user need to be asked which home", not
+        // "is this user an administrator" - a multi-home HOME_STAFF gets the picker too. Named for
+        // what it decides, matching what homePickerOptionsFor already returns.
+        model.addAttribute("needsHomePicker", homeOptions != null);
         if (homeOptions != null) {
             model.addAttribute("homes", homeOptions);
         }
+        model.addAttribute("dobMax", LocalDate.now());
         return "children/form";
     }
 
@@ -284,17 +289,24 @@ public class ChildController {
         // person cannot act on. That late, opaque refusal is the failure this ticket exists to move
         // earlier. The guard's job is to refuse EARLY with something actionable, not to refuse
         // twice.
-        if (home != null && !home.getOrganisation().isActive()) {
-            bindingResult.addError(new FieldError("form", "homeId",
-                    "This organisation is not yet active, so records cannot be added for it. "
-                            + "An administrator needs to activate it first."));
-        }
+        //
+        // D-5d-3 (spec §7g): NOT a FieldError on homeId - for a single-home user that field is not
+        // even rendered (th:if="${needsHomePicker}"), so the banner's own link pointed at nothing
+        // and there was no control to correct anyway (the message says an administrator must act,
+        // not this user). This is a page-level condition, so it gets a page-level banner instead,
+        // with no anchor offered.
+        String orgInactiveError = home != null && !home.getOrganisation().isActive()
+                ? "This organisation is not yet active, so records cannot be added for it. "
+                        + "An administrator needs to activate it first."
+                : null;
 
-        if (bindingResult.hasErrors()) {
-            model.addAttribute("isAdmin", needsHomePicker);
+        if (bindingResult.hasErrors() || orgInactiveError != null) {
+            model.addAttribute("needsHomePicker", needsHomePicker);
             if (needsHomePicker) {
                 model.addAttribute("homes", homeOptions);
             }
+            model.addAttribute("dobMax", LocalDate.now());
+            model.addAttribute("orgInactiveError", orgInactiveError);
             return "children/form";
         }
 
