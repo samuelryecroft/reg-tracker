@@ -264,7 +264,11 @@ deploy, then removed).
    `rht-cd-prod` managed identity, same env as `modules/migrator_job`) → **start + poll to
    `Succeeded`**, exit non-zero on `Failed` (same WS-G ordering guarantee: `01 → Flyway → 02` before
    the jar) → **always-teardown**.
-3. Deploy the jar only if the script returned success.
+3. Deploy the jar on **exit 0** (migration succeeded, teardown confirmed). On **exit 1** the migration
+   failed — do not deploy. **Exit 3** is distinct on purpose: the migration succeeded but teardown
+   could not be confirmed — you may deploy the jar, but you MUST then check the platform-managed
+   `ME_*` group for a stranded env/load balancer (the invisible-cost failure). The distinct code keeps
+   that signal out of the tail of the poll log and lets a future pipeline decide.
 
 **Teardown is verified, not fired-and-forgotten** (an env that fails to tear down is the same idle-LB
 cost, only invisible): teardown runs on *every* exit path via a `trap` and the script does not return
