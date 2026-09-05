@@ -1660,3 +1660,26 @@ nav.seg .seg-opt { color: inherit; text-decoration: none; }
 .theme-preview h3 { margin: 0 0 var(--s2); }
 .theme-preview p { margin: 0 0 var(--s3); }
 .theme-preview .btn-row { margin-top: 0; }
+
+/* ============================== 6e · the error page ==============================
+   Centred, one card, no shell. The no-shell part is INHERITED, not decided here: error.html
+   has never included fragments/layout's nav, and no note says why. It is left that way
+   because the reason that suggests itself is a good one - a 403 is precisely the case where
+   the sidebar's own links may be what the person cannot reach - but that is this author's
+   reading of an existing choice, not a recorded one, and it should not harden into a rule
+   by being written down confidently. Either way the page has to stand alone at every width. */
+.error-page {
+    min-height: 70vh; display: grid; place-items: center;
+    padding: var(--s5); text-align: center;
+}
+.error-card {
+    max-width: 46ch; display: flex; flex-direction: column;
+    align-items: center; gap: var(--s3);
+}
+.error-icon { width: 2.5rem; height: 2.5rem; color: var(--muted); }
+.error-card h1 { margin: 0; }
+.error-body { margin: 0; color: var(--muted); line-height: 1.55; }
+.error-actions { display: flex; gap: var(--s3); flex-wrap: wrap; justify-content: center; }
+/* The status, demoted from the <h1> it used to be (FE-19). Small and muted because it is
+   for quoting to someone else, not for reading first. */
+.error-status { margin: var(--s2) 0 0; font-size: var(--t-xs); color: var(--muted); }
