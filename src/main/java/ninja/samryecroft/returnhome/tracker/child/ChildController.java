@@ -1,7 +1,9 @@
 package ninja.samryecroft.returnhome.tracker.child;
 
 import jakarta.validation.Valid;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.stream.Collectors;
 import ninja.samryecroft.returnhome.tracker.audit.AuditEventPublisher;
 import ninja.samryecroft.returnhome.tracker.audit.AuditHistoryService;
 import ninja.samryecroft.returnhome.tracker.child.dto.CreateChildForm;
@@ -79,11 +81,55 @@ public class ChildController {
         List<Child> sorted = children.stream()
                 .sorted(showHomeColumn ? ChildRepository.BY_HOME_THEN_NAME : ChildRepository.BY_NAME)
                 .toList();
+        boolean revealed = nameRevealService.isRevealed();
         model.addAttribute("children", sorted);
         model.addAttribute("isAdmin", showHomeColumn);
-        model.addAttribute("childIdentities",
-                ChildIdentities.mapOf(sorted, c -> c, nameRevealService.isRevealed()));
+        model.addAttribute("childIdentities", ChildIdentities.mapOf(sorted, c -> c, revealed));
+        model.addAttribute("childRows",
+                sorted.stream().collect(Collectors.toMap(Child::getId, c -> ChildListRow.of(c, revealed))));
         return "children/list";
+    }
+
+    /**
+     * T193 (PILOT-GATE, spec §7f D-4b-11): {@code children/list.html} took names through
+     * {@link ChildIdentities} but read two of {@code Child}'s other {@code @Encrypted} (Article 9)
+     * fields straight off the entity, so a masked row showed initials alongside an exact birth
+     * date and case reference in the clear. Gated here the same way {@link ChildIdentity} resolves
+     * its own fields: the caller decides {@code revealed} once, and the template receives exactly
+     * one already-resolved string per field - never a hidden value sitting unrendered in the DOM,
+     * and never both strings present at once.
+     *
+     * <p><strong>Gating the case reference is not a disclosure fix.</strong> Kevin's masked label
+     * already carries it on every row ("A.B. · CH-0041" - see {@link ChildIdentity}'s own javadoc);
+     * masking defeats a stranger's glance, not a colleague's, by design. This column duplicated
+     * that value in the clear, so gating it removes a duplicate, not an exposure - do not read
+     * this fix as evidence the masked label should stop carrying the reference; it must.
+     *
+     * <p>A private, page-scoped record rather than a change to {@link ChildIdentity} itself: that
+     * type is a separate, already-ruled ticket (making reveal strictly additive), and this page
+     * needs to be correct both before and after that change lands.
+     *
+     * <p>Named {@code dob()}/{@code caseReference()} rather than mirroring {@code Child}'s own
+     * accessor names on purpose: T194's guard scans template source for a bare property-read of
+     * either encrypted field name, by design with no receiver-type check (documented in its own
+     * javadoc as the accepted trade-off against a hand-maintained allow-list) - so a differently-
+     * named accessor here can never register as a fresh read of the entity, distinguishing it by
+     * construction rather than relying on a reviewer to keep re-deriving that this record's own
+     * two fields are already-resolved strings, not the encrypted values themselves.
+     */
+    private record ChildListRow(String dob, String caseReference) {
+        private static final DateTimeFormatter DOB_FMT = DateTimeFormatter.ofPattern("dd MMM yyyy");
+        private static final String HIDDEN = "Hidden";
+
+        static ChildListRow of(Child child, boolean revealed) {
+            if (!revealed) {
+                return new ChildListRow(HIDDEN, HIDDEN);
+            }
+            String dob = child.getDateOfBirth() == null ? "Not recorded" : child.getDateOfBirth().format(DOB_FMT);
+            String reference = child.getLocalCaseReference() == null || child.getLocalCaseReference().isBlank()
+                    ? "—" : child.getLocalCaseReference();
+            return new ChildListRow(dob, reference);
+        }
     }
 
     @GetMapping("/{id}")
