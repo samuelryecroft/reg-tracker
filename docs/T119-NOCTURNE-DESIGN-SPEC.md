@@ -2769,3 +2769,86 @@ this page is where a home manager looks when they are asked about that child.
 Show the badge **only where `DeadlineTracker.badgeFor` returns one**, through the existing path, with no new
 copy. Absence of a badge on a finished row is then meaningful rather than a gap.
 
+## 7f · The age threshold, and a live disclosure defect the question uncovered (Creed, 8 Sep)
+
+### D-4b-9 · Age goes INSIDE the reveal — and Kevin's reasoning corrects mine
+
+I argued age could sit outside the reveal because it is *"a coarsening of the datum, not the datum"*. Kevin
+ruled against it, and the principle is better than my framing:
+
+> **A COARSENING OF A DATUM IS NOT AUTOMATICALLY A WEAKER IDENTIFIER. It can be a stronger one, if the
+> coarser form is legible to a WIDER POPULATION.**
+
+My axis was information content. **The axis that matters is *who can read it*.** `CH-0041` is opaque to a
+stranger and fully identifying to a colleague — which is exactly what the mask claims. **`age 14` is legible
+to everyone: a neighbour, another child's relative, someone in reception.** So the two attributes identify to
+*different populations*, and **age is identifying to precisely the population the mask exists to defeat.**
+It carries less information than the case reference and is worse for this threat model.
+
+**Flagged as unmeasured, by Kevin, and worth checking:** his acuteness argument rests on children's homes in
+England commonly being three to six beds, over which an integer age is close to a unique key. That is sector
+knowledge, not a measurement of this system. **If the pilot's homes are materially larger the calculus
+softens** — someone should check it against the real homes rather than take it from either of us.
+
+### D-4b-10 · Show the consequence, not the attribute
+
+Kevin verified — and I confirmed independently — that **there is no age concept anywhere in the system**: no
+`getAge`, no threshold, no under-16 logic. So *"under-16 versus 16+ changes the process"* is **a true
+statement about the world that this system does not model.**
+
+> **Do not add always-visible disclosure surface to serve a rule nobody has implemented.** And when the rule
+> IS real, put its OUTPUT on the screen, not its INPUT: a worker does not need *"age 14"*, they need *"this
+> child is under 16, so X applies"* — X is the thing they act on.
+
+Three reasons it is the better shape, the third being Kevin's and the sharpest: a consequence string is what
+is operationally useful rather than an input to a rule held in someone's head; it **partitions the home in
+two rather than into one**, so it is far less of a quasi-identifier; and **it is testable, which an age on a
+screen is not.**
+
+This is the same shape as D-4a-2 (*"No open allocations"* rather than *"0"* — the answer, not the
+measurement) and §7a's elapsed row. **Position: ship DOB-behind-reveal only. If a real statutory threshold
+exists, model it and show its consequence outside the reveal; if there is no crisp rule, age goes inside the
+reveal with the DOB and nothing is lost, because the reveal is one click.** Nobody on this floor should
+invent the statutory detail — that is a question for the product owner.
+
+### D-4b-11 · `children/list.html` already defeats the mask, on main, today
+
+Kevin's ruling said a masked view printing a date of birth *"has been de-anonymised by its own identity
+block, and the mask would then be defeating nobody while still claiming to — worse than not masking, because
+it makes a false promise."* He also said `dateOfBirth` appears in exactly one template, as a form input.
+**I checked that, and it is not so.** `children/list.html` renders it as a value, in both the table and the
+card stack — and the page's names go through `ChildIdentities.mapOf` (`ChildController:85`), so this is a
+masked surface:
+
+| column | source | masked? |
+|---|---|---|
+| Name | `childIdentities[c.id].label()` | **yes** — initials + case reference |
+| Date of birth | `#temporals.format(c.dateOfBirth, …)` | **no — printed raw, always** |
+| Home (admin) | `c.home.name` | no |
+| Case reference | `c.localCaseReference` | **no — printed raw, again** |
+
+**A masked row therefore carries initials, the exact date of birth, the case reference and the home.** That
+is Kevin's own criterion for a false promise, live on main, on the one screen whose job is *choosing which
+child to act on*.
+
+**And the case reference is printed twice in a masked row** — once inside `label()`, once in its own column.
+That redundancy is the tell that nobody noticed two paths were both emitting it, and **it is about to get
+worse: once reveal becomes additive, the revealed row will show it twice as well.**
+
+**Rulings:**
+
+1. **The date of birth goes behind the reveal wherever it renders — no exceptions, no per-screen judgement.**
+   It is `@Encrypted` Article 9 data and the invariant has to be mechanical to be trustworthy. Same treatment
+   as D-4b-8: masked renders the words, not the value, decided server-side.
+2. **Drop the standalone `Case reference` column** once `ChildIdentity` is additive, because `label()` then
+   carries it in both modes. One source, one rendering.
+3. **Open question for whoever builds it:** does this list need the date of birth at all? The case reference
+   in the label already does the disambiguation job, and a column that adds identification without adding
+   function is worth deleting rather than gating. **Gate it first — that is the safe change — then ask.**
+
+> **The invariant only holds where someone applied it.** `ChildIdentity` is a projection precisely so that
+> identity rendering is one decision — but a template that reaches past it to the entity has opted out, and
+> nothing in the codebase says so. **Worth a guard: no template may render an `@Encrypted` field of `Child`
+> directly.** That is checkable from the entity's own annotations rather than from a list of field names,
+> so it stays true as fields are added.
+
