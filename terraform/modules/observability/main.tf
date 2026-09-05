@@ -62,9 +62,12 @@ resource "azurerm_monitor_metric_alert" "latency" {
 # Analytics without any new plumbing. This is NOT the R5 phase-3 audit stream and does not wait on
 # it: that is every audit event reaching aggregation; this is one event reaching one rule.
 #
-# DELIBERATELY NOT GATED ON var.entra_enabled. The rollback in ENTRA-AUTH-DESIGN.md §5 is "disable
-# Entra, go back to form login" - so the moment break-glass becomes the primary way in is exactly
-# the moment the Entra flag is off. Gating this would destroy the alert at the point it matters
+# DELIBERATELY UNGATED - it fires whenever break-glass is used, on every deployment.
+#
+# It was written ungated because the Entra rollback was "disable Entra, go back to form login", so
+# the alert would have been destroyed at the moment break-glass became the primary way in. Entra is
+# gone and form login is now the only path, which removes that particular argument but not the
+# conclusion: an emergency-access alert conditional on anything is an alert that can be switched off
 # most, with a trigger we have already written down as something we might deliberately do.
 #
 # THE MARKER IS DUPLICATED IN JAVA AND HERE, AND THE DUPLICATION FAILS OPEN. Reword either side and
@@ -74,9 +77,20 @@ resource "azurerm_monitor_metric_alert" "latency" {
 # a red build.
 # COMPLETE BUT UNPROVEN until someone with apply rights fires it once. Nothing here can demonstrate
 # that a notification actually arrives - that needs a real apply and a real break-glass sign-in, and
-# it is already a cutover gate in ENTRA-AUTH-DESIGN.md §8 ("break-glass verified: enabling it works,
-# using it raises the audit event, and the alert actually arrives"). Deliberately not repeated as a
-# second procedure: two checklists for one action is how they start disagreeing.
+# it stays unproven until then. The proof lives in GO-LIVE-READINESS.md P20: Pam-devops fires it,
+# the human confirms receipt, and per T113 it counts as verified only by seeing the alert ARRIVE -
+# not by failing to see a problem.
+#
+# It used to be carried by the Entra cutover checklist, and deliberately recorded in only one place
+# on the reasoning that two checklists for one action is how they start disagreeing. That reasoning
+# was right, and it is also how the check nearly vanished: Entra was dropped, the document holding
+# it is being retired, and a single-home policy fails silently when the home is demolished - the
+# whole point was that there was nowhere else to look. Kevin re-homed it as P20. The single-home
+# principle stands; it now points somewhere that is not being deleted.
+#
+# The stakes moved the wrong way in the meantime: with Entra gone, form login is the only way in, so
+# break-glass is THE emergency path and this alert is more load-bearing than when the note was
+# written - while nobody has yet seen it fire.
 resource "azurerm_monitor_scheduled_query_rules_alert_v2" "break_glass_login" {
   name                = "alert-${var.name_prefix}-break-glass-login"
   resource_group_name = var.resource_group_name

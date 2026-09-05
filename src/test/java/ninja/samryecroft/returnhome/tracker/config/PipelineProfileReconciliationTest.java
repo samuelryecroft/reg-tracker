@@ -26,11 +26,12 @@ import org.junit.jupiter.api.Test;
  * and adding {@code prod} to the app setting would have <b>failed the deploy</b>. The gate protecting
  * the profile value was enforcing the value that disarmed two security controls.
  *
- * <p><b>The pipeline now permits a SET, not a single value.</b> deploy.yml's 5.1 gate was widened for
- * the Entra cutover from "exactly {@code azure}" to an explicit allowlist {@code {azure, "azure,entra"}}.
- * The reconciliation therefore changes shape: it is no longer "the one enforced value is a marker" but
- * "every permitted profile string carries AT LEAST ONE deployed marker". Not every token - {@code
- * entra} is a feature profile and correctly is not a marker - but at least one, because a permitted
+ * <p><b>The pipeline permits a SET, not a single value</b> - today a set of one. The 5.1 gate was
+ * widened to an allowlist for the Entra cutover and narrowed back to {@code {azure}} when Entra was
+ * removed, so this test is deliberately written against the SHAPE rather than the membership: it
+ * parses whatever arm is there and checks every permitted profile string carries AT LEAST ONE
+ * deployed marker. Not every token needs to be one - a feature profile riding alongside a marker is
+ * fine and correctly is not itself a marker - but at least one must be, because a permitted
  * profile with no marker at all would run in production with the storage/keys/demo guards <b>disarmed</b>,
  * which is exactly the T189 defect ({@code azure} was the real prod profile and nothing recognised it).
  * The marker set is read from {@link DeployedEnvironment} - the single source of truth from #78 - never
@@ -92,7 +93,7 @@ class PipelineProfileReconciliationTest {
                             + "one the application treats as a deployed environment - so every guard "
                             + "keyed on DeployedEnvironment would be inert in production under that value, "
                             + "which is exactly the state T189 found and fixed. A permitted profile must "
-                            + "carry at least one of %s (feature profiles like 'entra' may ride alongside, "
+                            + "carry at least one of %s (a feature profile may ride alongside, "
                             + "but cannot be the only token). Add a marker to the profile, or change the "
                             + "pipeline; do not change only one", profile, DeployedEnvironment.DEPLOYED_MARKERS)
                     .isNotEmpty();

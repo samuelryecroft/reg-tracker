@@ -29,9 +29,10 @@ import org.springframework.test.web.servlet.MockMvc;
 /**
  * T113 Inc 4: the emergency local sign-in cannot be used quietly.
  *
- * <p>Runs with the path OPEN (see {@link AbstractBreakGlassEnabledTest}) and with the Entra flag at
- * its default of false - the honest configuration for an emergency path, and a structural proof that
- * neither the WARN line nor the audit event is gated behind {@code if (entraEnabled)}.
+ * <p>Runs with the path OPEN (see {@link AbstractBreakGlassEnabledTest}). It also used to run with
+ * the Entra flag off as a structural proof that neither the WARN line nor the audit event was gated
+ * behind {@code if (entraEnabled)}; Entra is gone, so that flag no longer exists and the proof went
+ * with it. What is asserted below is unchanged.
  *
  * <p>The closed-path assertions live in {@link BreakGlassClosedIntegrationTest}, which needs no
  * property override and so costs no context. Splitting them is not tidiness: the pair only means
