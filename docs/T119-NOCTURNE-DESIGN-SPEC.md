@@ -1986,50 +1986,124 @@ to make `--tint` mirror, which would have added a second definition of a token t
 merely that the wrong one did, is the one worth acting on.
 
 
-## 6h · A live 2.4.11 failure on every text input — and a correction to my own T186 severity claim (Creed, 5 Sep)
+## 6h · WITHDRAWN AND REPLACED — the ring does render; the real defect is that its correctness depends on source order (Creed, 5 Sep; corrected 7 Sep after Jim's PR #81)
 
-**Correcting myself first:** I told god that T186's legacy override makes "the focus ring the raw brand hex,
-on every keyboard user on every focusable element." **That is wrong.** The app-wide focus ring is
+> **The claim this section originally made — *"every text input, select and textarea in the app has a focus
+> indicator that fails 2.4.11, at every brand hue, in both appearances"* — is FALSE, and it was the sentence
+> gating the pilot. It is withdrawn in full.** Jim raised the premise rather than fitting an implementation
+> to it; he was right. What follows is the corrected reading. The measured table is kept because the numbers
+> are correct — it is the claim about *what they measure* that was wrong.
+
+**Correcting myself first (this part stands):** I told god that T186's legacy override makes "the focus ring
+the raw brand hex, on every keyboard user on every focusable element." That is wrong. The app-wide ring is
 `:focus-visible { outline: 2px solid var(--color-accent) }` — the **long** name, which the legacy block never
-touches. Only **two** rules use the overridden `--accent` for focus, not all of them.
+touches. Only **two** rules used the overridden `--accent` for focus, not all of them.
 
-But checking that turned up something worse, and unconditional:
+### What I got wrong, and the mechanism of the error
 
 ```css
-input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); }
+:754  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); }
+:757  a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible,
+      textarea:focus-visible, summary:focus-visible, .checkbox-option:focus-within {
+          outline: 2px solid var(--ink); outline-offset: 2px; border-radius: 4px; }
 ```
 
-`input:focus` is specificity (0,1,1) and beats `:focus-visible` at (0,1,0), so **`outline: none` wins and the
-global ring never renders on a text field.** The only remaining focus signal is the border changing from
-`--color-control-border` to the accent. Measured, focused-vs-unfocused, which is what **WCAG 2.2 AA 2.4.11**
-requires at 3:1:
+I compared `input:focus` at **(0,1,1)** against the **bare** `:focus-visible` at **(0,1,0)**, concluded the
+suppression wins, and stopped. **`input:focus-visible` at :757 is also (0,1,1), and it is later in source.**
+Equal specificity, later wins — **so the ring renders.** Verified at `0149f38`: no `@layer` anywhere in the
+file, no `@media` wrapper (all four rules brace-walk to depth 0), no `!important` on any focus rule, and
+`--ink: var(--color-text)` at :195. A text input matches `:focus-visible` on pointer focus too, so this is
+not a keyboard-only rescue.
 
-| | worst | best | fails 3:1 |
+The measured table is kept, because the numbers are right — the border change, focused-vs-unfocused:
+
+| | worst | best | below 3:1 |
 |---|---|---|---|
-| dark | 1.48:1 | 1.70:1 | **360/360 hues** |
-| light | 1.47:1 | 1.79:1 | **360/360 hues** |
+| dark | 1.48:1 | 1.70:1 | 360/360 hues |
+| light | 1.47:1 | 1.79:1 | 360/360 hues |
 
-**Every text input, select and textarea in the app has a focus indicator that fails 2.4.11, at every brand
-hue, in both appearances — for default-brand organisations too.** It is not a branding bug; branding only
-makes the same rule's colour additionally unguaranteed. Every form is affected: raising a request, the
-send-back comment, adding a child, sign-in.
+**It measures the border change alone on a control that also has an outline** — a faithful measurement of
+the wrong pair. It still says something true and useful: **the border must never become the only signal**,
+which is precisely why `outline: none` had to go.
 
-**The fix is a deletion:** drop `outline: none` from that rule and let the global `:focus-visible` ring apply.
-It is already correct and already on the safe token. Keep the border-colour change as reinforcement — it just
-must not be the *only* signal.
+> **A measurement is only as good as the claim about which two colours are adjacent, and that claim is
+> cascade analysis, not arithmetic.** I have been telling this floor I am reliable on what I *measure* and
+> unreliable on what I *recall*. This is a third category and the most dangerous of them: **reliable on the
+> arithmetic, unreliable on the premise the arithmetic was handed.** No amount of care inside the contrast
+> pipeline could have caught it, because the pipeline was never asked the failing question.
 
-### This decouples the pilot gate from T186
+The failure shape is one to look for: **I stopped at the first rule that confirmed what I was already looking
+at.** Same shape as the cream `thead` (§6g) — except there a second measurement discriminated, and here
+nothing would have.
 
-With that one deletion, `:740` no longer depends on `--accent` at all, leaving `:1199`
-(`.section-index a:focus-visible`) as the single remaining focus rule on the overridden token — and switching
-it to `--color-accent` is a one-word change. **So the whole pre-pilot accessibility exposure can be closed by
-two lines, independently of Kevin's `secondaryColor` data question.** T186 remains right and necessary for
-the other 24 rules; it simply stops being what the pilot waits on.
+### What actually survives, and it is worth more than the claim it replaces
 
-**The general point, which is why I nearly missed this:** I went looking for what *branding* broke and found
-a rule that was already broken for everyone. **A conditional defect and an unconditional one can live in the
-same declaration, and the conditional one is the more interesting story — which is exactly why it gets found
-first and the plain one underneath it does not.**
+**The correctness is order-dependent, and the tidy-up that looks safest is the one that breaks it.**
+
+Lines **409** and **757** are *the same rule twice* — identical selector lists, `--color-text` and `--ink`,
+which alias each other. Anyone deduplicating will delete one. **Delete the later copy — the obvious choice,
+since the earlier one reads as the original — and the surviving copy at :409 now sits BEFORE `input:focus` at
+:754. Equal specificity, earlier loses. `outline: none` wins, and the app-wide failure I wrongly claimed
+becomes real.** Silently: no test fails, no screenshot diff moves, because nothing in a static render is
+focused.
+
+**That is why the deletion is right, and it is a better reason than the one I gave.** Removing `outline: none`
+from :754 **converts a correctness that depends on source order into one that does not** — afterwards, either
+duplicate can go safely. The rule is general:
+
+> **Code that is correct only because of the order two equal-specificity rules happen to appear in is
+> invisible to the person tidying it, and a "remove the duplicate" edit is the most likely edit there is.**
+
+Jim's guard — *does this suppressing selector name something a keyboard user can actually reach?* — is
+sufficient **after** the fix, because the only remaining way back to the defect is re-adding `outline: none`,
+which is exactly what it catches. **Do not extend it to assert source ordering: a guard against a hazard the
+fix has eliminated is a guard against your own patch being reverted, which is the fix's own test's job.**
+
+The two duplicated blocks should still become one rule — a small separate ticket, safe to do *after* #81.
+
+### `.card[id]:focus { outline: none }` — agreed, and the reasoning generalises
+
+Verified: **all 20** `.card[id]` occurrences in the templates carry `tabindex="-1"`; they are jump targets
+focused programmatically so the reading cursor follows an in-page link. Outlining a whole card because
+someone followed a section link is noise. The only occurrence without a `tabindex` is inside an HTML
+**comment** at `fragments/report-fields.html:16` — prose written to explain the markup, which the guard's
+first version read as evidence of it.
+
+> **A source guard's corpus includes the documentation written to explain the guard.** Strip comments before
+> matching. Third time this week.
+
+And the framing is right, not just the outcome: **a guard that asks "is this reachable?" stops being true the
+day the answer changes; an exclusion list naming `.card[id]` as allowed stays quietly true forever.** That is
+the whole difference between a guard and an allowlist, and it is worth applying to the next one.
+
+### The citation was wrong too, and it should be checked before it reaches an auditor
+
+I have cited **"WCAG 2.2 AA 2.4.11 Focus Appearance"** throughout. In WCAG 2.2 as published, **2.4.11 is
+*Focus Not Obscured (Minimum)***; **Focus Appearance moved to 2.4.13 and to AAA** during Candidate
+Recommendation. The AA criterion that actually binds a focus indicator's contrast is **1.4.11 Non-text
+Contrast** at 3:1 — the one this spec uses everywhere else. **I am citing from memory in a section where I
+have just been wrong once, so treat this as a flag to check against the published Recommendation rather than
+a correction to apply on my word.** It matters because a pilot gate that cites a AAA criterion as AA is
+exactly what an auditor finds.
+
+### The pilot gate — conclusion survives, reasoning corrected
+
+I wrote that the deletion leaves `:754` "no longer depending on `--accent` at all". **It still does** —
+`border-color: var(--accent)` remains, as reinforcement. The conclusion holds for a different reason:
+**that dependence is no longer load-bearing for accessibility**, because the indicator is `--color-text`,
+which is appearance-aware and never brand-derived. With `.section-index a:focus-visible` moved to
+`--color-accent`, no focus *indicator* reads the overridden token. T186 remains right and necessary for the
+other 24 rules; it is simply not what the pilot waits on.
+
+### No further measurement is needed, and Jim should stop trying to produce one
+
+The number I asked for — rendered focused-vs-unfocused — existed to evidence a failure that does not exist.
+The ring is `--color-text` at `outline-offset: 2px`, i.e. **against `--color-bg`/`--color-surface`: the locked
+1.4.3 anchors, far above 3:1 at every hue in both appearances.** There is nothing left to measure, and Jim is
+blocked on a hung Docker for a figure whose purpose evaporated.
+
+> **The evidence bar for withdrawing a claim is lower than for making one.** Two independent cascade readings
+> are enough to retract "every input fails"; they would not have been enough to assert it.
 
 
 ## 7a · T187 — making the 72-hour verdict self-verifiable in the exported document (Creed, 5 Sep)
