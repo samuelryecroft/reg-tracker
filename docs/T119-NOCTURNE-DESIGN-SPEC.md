@@ -2178,3 +2178,72 @@ four things rather than respecced:
 creation order** (supplier → care providers → homes), and that is two templates today. One tree means one
 screen; whether the second route survives is a build decision, but **the reader should meet one hierarchy,
 not two lists that must be mentally joined.**
+
+
+## 7c · D-4a-4 — the visitor load figure becomes deadline-aware (Creed, 5 Sep)
+
+D-4a-2 said "open-allocation count", and #75 built exactly that. **A count is a blunt instrument on a
+72-hour clock:** a visitor with one allocation due in four hours may be less available than one with three
+due in three days, and this screen exists to pick someone who can complete the interview *inside the window*.
+The data is already computed — `DeadlineTracker` tiers every open request.
+
+### The shape: count, plus the most urgent tier among them
+
+```
+Jane Patel        3 open allocations · 1 overdue
+Ravi Chowdhury    3 open allocations · 2 due within 24 hours
+Ama Boateng       3 open allocations
+Tom Reilly        No open allocations
+```
+
+**The worst tier only, with its own count** — not a three-way breakdown. A list row is not a table, and the
+tier that constrains a visitor is the one that decides whether they can take another case. Zero reads
+**"No open allocations"**, not "0" — that is the state a coordinator is looking for, and it should read like
+an answer rather than a measurement.
+
+### Reuse the vocabulary; reuse the threshold; do not reuse the sentence
+
+`DueState` and `DueStateCopy` already exist, and `DueStateCopy` exposes the **bare state word** —
+`"Overdue"`, `"Due soon"`, `"On track"` — separately from its full sentence. **Take the word.** The
+coordinator arrives from a queue grouped by exactly those tiers, so the mental model transfers with no new
+concept.
+
+**Do not reuse or re-word `DueStateCopy`'s full sentences** ("Overdue — statutory 72 hours passed"). Those
+are human-signed-off *statutory-surface* copy, and a visitor row is not that surface: the sentence describes
+a request's compliance, not a person's workload. Take the word, write the count phrasing here.
+Likewise reuse `DeadlineTracker.DUE_SOON_THRESHOLD` rather than restating 24 hours — a second definition of
+the threshold is the same drift this spec keeps deleting.
+
+### D-4a-4a · No semantic colour on a person's row
+
+The due badges elsewhere colour OVERDUE with `--error`. **Here they must not.** The same fact carries a
+different meaning depending on what it is attached to:
+
+> **On a case card, red urgency describes the case. On a person's row, it describes the person.** *"1
+> overdue"* in error-red beside a visitor's name reads as *this visitor is failing*, when what it actually
+> means is *this visitor is already carrying pressure* — which is a reason to protect them, not to mark them.
+
+So the load figure stays in `--color-text-muted`, as the count already is. **Reuse the words, not the
+colours.** The urgency palette belongs to a request's own deadline.
+
+### What it is NOT: a figure relative to *this* request
+
+The most decision-relevant number would be *how many of this visitor's allocations compete with the request
+being allocated right now*. **Rejected.** It makes the same visitor show different numbers on different
+screens, so the figure cannot be verified, compared, or carried in the reader's head between two requests.
+**A number whose meaning changes with context is not a number a coordinator can trust**, and the marginal
+gain over "1 overdue" does not buy that back.
+
+### Sorting stays predictable
+
+**Primary sort unchanged — count ascending** (so #75's test still holds). Add one tiebreak: at equal counts,
+**least urgent first**. That is fully predictable — *same number? the one with nothing due soon comes first* —
+and it never reorders across counts.
+
+Deliberately **not** a compound sort by tier-then-count. It would put a visitor with one overdue below one
+with three on-track, which is arguably more correct and definitely less legible: **a sort the reader cannot
+predict is worse than a slightly cruder one, because a reader who cannot verify an order stops trusting it.**
+The sort is the starting point; the tier text is the correction, and the coordinator makes the call.
+
+`NO_CLOCK` allocations count toward the total and are excluded from the tier line — `returned_at` has been
+NOT NULL since V15, so this can only be historical data, and it should not be able to masquerade as urgency.
