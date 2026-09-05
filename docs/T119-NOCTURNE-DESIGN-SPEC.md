@@ -37,6 +37,7 @@ reasoning that produced it is often still useful. It is simply not the answer.**
 | **D-1b-7's placement** | **SUPERSEDED** (§6f) | Both branches of the guard sit **above the content**, not beside the actions. |
 | **D-1b-8** (§6a) | **CLOSED** (§6c) | Show the prior send-back, at the **top**, in the `--sent-back` family. |
 | **D-1b-2's selector** | **CORRECTED** (§6a) | `.readonly-val`, not `dl.detail dd`. |
+| **§5b, whole section** | **⛔ UNSAFE** (7 Sep) | Premised on Entra shipping. **Entra was dropped; T206 is open; main still collects username + password.** Building 6d to it provisions a person who cannot sign in. See the banner on §5b. |
 | **T186's scope** (§0, §6g) | **CORRECTED** (§7i) | It affected **every** organisation, not only branded ones — `theme` is never null. My "invisible on a default-brand org" note was wrong. **Fix is on `feat/t186-hue-only`, NOT on main.** |
 | **1d's fate** (§1, D-Q2) | **RULED** (§7h) | **In scope, MERGED into 1c.** Not a screen — the section panel of 1c's progress bar. **2b's reasoning does not transfer**; see D-1d-1. Screen count 25 → **24**. |
 | **D-4b-9's bed-count caveat** | **WITHDRAWN** (T195) | The human declined to make protection contingent on home size: *"protect all PII regardless of home size"*. **No home size returns age to the screen.** Kevin's reasoning is unaffected. |
@@ -670,6 +671,24 @@ accent's light-mode behaviour regardless.
 ---
 
 ## 5b · Screens that must NOT be built — credential surfaces (Entra / T113)
+
+> ## ⛔ DO NOT BUILD TO THIS SECTION — ITS PREMISE IS GONE (Creed, 7 Sep)
+>
+> **Every instruction below assumes Entra ships and takes credentials out of the app. The Entra lane was
+> dropped by the human, and T206 — *what authenticates the pilot* — is OPEN.** On `origin/main` today
+> `admin/user-form.html` still collects `Username *` and a required `Password *` (`minlength=8`), because
+> nothing has replaced them.
+>
+> **So the three live instructions here are now unsafe, not merely stale:** *build 6d without the credential
+> block*, *delete the first-password sentence*, and *drop `Username` because email/UPN becomes the key*.
+> Following any of them produces a screen that **provisions a person who cannot sign in.**
+>
+> **What survives:** the observation that no forgot-password / reset / activation / MFA screen exists
+> anywhere in the handoff — that was a sweep of the canvas and is still true, and it matters *more* now that
+> the app owns credentials again. **4c stays skipped** on its own grounds.
+>
+> **Nothing replaces this section yet.** 6d's credential treatment is blocked on T206: it is an
+> authentication decision, not a design one, and **nobody should draw it before that is answered.**
 
 Skipping 4c is **not sufficient.** A credential flow is hidden inside an administrative screen.
 
