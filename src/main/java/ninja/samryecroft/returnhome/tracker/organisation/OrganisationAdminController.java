@@ -2,12 +2,10 @@ package ninja.samryecroft.returnhome.tracker.organisation;
 
 import jakarta.validation.Valid;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import ninja.samryecroft.returnhome.tracker.document.KeyProvider;
 import ninja.samryecroft.returnhome.tracker.home.HomeRepository;
-import ninja.samryecroft.returnhome.tracker.theme.ThemeSettingsRepository;
 import ninja.samryecroft.returnhome.tracker.user.UserRepository;
 import ninja.samryecroft.returnhome.tracker.document.KeyUnavailableException;
 import ninja.samryecroft.returnhome.tracker.organisation.dto.CreateOrganisationForm;
@@ -35,19 +33,16 @@ public class OrganisationAdminController {
     private final OrganisationLifecycleService lifecycleService;
     private final HomeRepository homeRepository;
     private final UserRepository userRepository;
-    private final ThemeSettingsRepository themeSettingsRepository;
 
     public OrganisationAdminController(OrganisationRepository organisationRepository, ThemeService themeService,
             KeyProvider keyProvider, OrganisationLifecycleService lifecycleService,
-            HomeRepository homeRepository, UserRepository userRepository,
-            ThemeSettingsRepository themeSettingsRepository) {
+            HomeRepository homeRepository, UserRepository userRepository) {
         this.organisationRepository = organisationRepository;
         this.themeService = themeService;
         this.keyProvider = keyProvider;
         this.lifecycleService = lifecycleService;
         this.homeRepository = homeRepository;
         this.userRepository = userRepository;
-        this.themeSettingsRepository = themeSettingsRepository;
     }
 
     /**
@@ -79,16 +74,13 @@ public class OrganisationAdminController {
             userCounts.put((Long) row[0], ((Number) row[1]).intValue());
         }
 
-        // A theme ROW is what "branding set" means here, matching ThemeService.ensureThemeExistsFor:
-        // a supplier gets one when it is created, so this reports whether the supplier has its own
-        // settings rather than whether anyone has changed the colour from the default. Said plainly
-        // because the phrase on screen invites the other reading.
-        Set<Long> branded = new HashSet<>();
-        themeSettingsRepository.findAll().forEach(theme -> {
-            if (theme.getOrganisation() != null) {
-                branded.add(theme.getOrganisation().getId());
-            }
-        });
+        // "Branding set" means someone CHOSE a colour, not that a theme row exists. My first
+        // version used the row, documented the choice, and was wrong for a reason the comment
+        // itself should have caught: ensureThemeExistsFor gives every supplier a default-coloured
+        // row at creation, so the flag was true for all of them and the line said nothing in the
+        // one slot meant to tell an admin whether a supplier is set up. The predicate lives in
+        // ThemeService, next to the default it compares against.
+        Set<Long> branded = themeService.organisationIdsWithChosenBranding();
 
         model.addAttribute("tree", OrganisationTree.from(organisations,
                 homeRepository.findAllWithOrganisation(), userCounts, branded));
