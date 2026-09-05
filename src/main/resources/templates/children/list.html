@@ -26,12 +26,10 @@
         </thead>
         <tbody>
         <!--
-          T193 (PILOT-GATE, spec §7f D-4b-11): the birth date is Article-9 encrypted, so this row
-          reads it only through childRows (built server-side in ChildController, same shape as
-          childIdentities above) - never straight off the entity, or the mask is defeated on this
-          masked page. The case reference goes through the same projection but is never gated - it
-          is already shown, by design, in the name column's own masked label (see ChildListRow's
-          javadoc for why gating this cell too would misreport its own state).
+          T193 (PILOT-GATE, spec §7f D-4b-11): the birth date and case reference are both
+          Article-9 encrypted, so this row reads them only through childRows (built server-side in
+          ChildController, same shape as childIdentities above) - never straight off the entity, or
+          the mask is defeated on this masked page.
         -->
         <tr th:each="c : ${children}">
             <td th:text="${childIdentities[c.id].label()}">Child Name</td>
