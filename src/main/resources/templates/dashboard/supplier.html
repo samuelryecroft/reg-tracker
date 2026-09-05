@@ -176,7 +176,9 @@
                 <td th:text="${entry.childCount()}">0</td>
                 <td><a class="rowlink" th:href="${entry.href()}">View children →</a></td>
             </tr>
-            <tr th:if="${#lists.isEmpty(view.recurrenceCounts())}"><td colspan="4" class="muted">No recurring missing episodes flagged on any open or recent request.</td></tr>
+            <!-- R-Q13 (spec §5d), final copy - drive-by fix (6b, spec §7b) from a shorter,
+                 pre-final line this screen shared with care-provider.html. -->
+            <tr th:if="${#lists.isEmpty(view.recurrenceCounts())}"><td colspan="4" class="muted">No recurring missing episodes have been flagged on open or recent requests. These are flagged by the home on the request form, so this does not rule out recurrence.</td></tr>
             </tbody>
         </table>
         </div>
@@ -190,7 +192,7 @@
                 </dl>
                 <div class="act"><a class="rowlink" th:href="${entry.href()}">View children →</a></div>
             </div>
-            <div class="empty" th:if="${#lists.isEmpty(view.recurrenceCounts())}">No recurring missing episodes flagged on any open or recent request.</div>
+            <div class="empty" th:if="${#lists.isEmpty(view.recurrenceCounts())}">No recurring missing episodes have been flagged on open or recent requests. These are flagged by the home on the request form, so this does not rule out recurrence.</div>
         </div>
     </section>
 </main>
