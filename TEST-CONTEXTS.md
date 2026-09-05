@@ -247,6 +247,28 @@ None of these is wrong to do. Each costs a context and roughly 10 connections,
 and the cost is invisible at the point where it is paid — that is the whole
 lesson of T148.
 
+### The trap: the expensive version looks *more* rigorous in review
+
+`@MockitoBean`/`@MockBean` is the one to watch, because the shape it is natural
+for is a test that needs to observe **whether a collaborator was called** — and
+the obvious way to write that is `@SpringBootTest` plus a mocked bean. That
+single annotation forks the context cache key and buys a whole new context and
+pool, sometimes for a test whose entire content is two branch assertions.
+
+A plain JUnit class constructing the unit under test with Mockito mocks proves
+the same thing for **zero** contexts and zero connections. Prefer it whenever
+the assertion is about a branch rather than about wiring.
+
+The reason this needs saying out loud: **an integration test reads as stronger
+evidence than a unit test**, so the version that costs a pool is the one that
+survives review unchallenged. The cost is not visible in the diff, and nobody
+is looking at this document while reviewing a test.
+
+Measured example (T197, #86): four new test classes, **zero new pools.** Three
+have no Spring annotations at all; the fourth is `@SpringBootTest` +
+`@AutoConfigureMockMvc` extending `AbstractIntegrationTest` with nothing that
+forks the cache key, so it joins the existing context rather than making one.
+
 ## Running the suite locally — two failures that are the environment, not the code
 
 Both of these present as a broken commit on a branch CI says is green. Neither
