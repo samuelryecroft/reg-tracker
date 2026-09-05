@@ -1,7 +1,6 @@
 package ninja.samryecroft.returnhome.tracker.organisation;
 
 import ninja.samryecroft.returnhome.tracker.home.HomeRepository;
-import ninja.samryecroft.returnhome.tracker.theme.ThemeSettingsRepository;
 import ninja.samryecroft.returnhome.tracker.user.UserRepository;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -41,8 +40,7 @@ class OrganisationActivationMessageTest {
     private final OrganisationLifecycleService lifecycle = mock(OrganisationLifecycleService.class);
     private final OrganisationAdminController controller =
             new OrganisationAdminController(repository, mock(ThemeService.class), mock(KeyProvider.class),
-                    lifecycle, mock(HomeRepository.class), mock(UserRepository.class),
-                    mock(ThemeSettingsRepository.class));
+                    lifecycle, mock(HomeRepository.class), mock(UserRepository.class));
     private final AppUserPrincipal principal = mock(AppUserPrincipal.class);
 
     private Organisation pendingCareProvider() {

@@ -95,7 +95,18 @@
             </div>
         </div>
 
-        <!--/* Care providers with no supplier. A tree grouped by supplier drops these silently,
+        <!--/* Care providers with no supplier.
+
+             RAISED, NOT SETTLED (Creed): this state may be UNREACHABLE through the application.
+             OrganisationAdminController rejects a CARE_PROVIDER submitted without a supplier, so
+             the only way to hold one is seeded data, legacy rows, or a direct write - which makes
+             this branch a WORKAROUND FOR A MISSING DATABASE CONSTRAINT rather than a UI for a
+             normal state. The open question is whether supplier_organisation_id should be
+             constrained NOT NULL for CARE_PROVIDER rows; if it is, this branch can go. It stays
+             for now because the column is nullable and T170's soft delete could make genuine
+             orphans possible, at which point the copy has to survive that too.
+
+             A tree grouped by supplier drops these silently,
              and the column is nullable - so the natural implementation hides exactly the records
              that are misconfigured, on the screen whose whole job is to show every organisation
              on the platform. Rendered under a heading that says what the state is, because an
