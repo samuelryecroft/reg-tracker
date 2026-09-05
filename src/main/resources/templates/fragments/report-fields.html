@@ -9,15 +9,108 @@
   valid Thymeleaf/SpEL); th:field keeps using *{property} on its own, which is the one place that
   syntax is meant to stand alone.
 
-  The six <fieldset class="step"> groups below are also the visitor stepper's step model (T7 / roadmap
-  2.4): report-stepper.js shows one at a time on the pages that opt in via data-js="stepper" on the
-  <form>; everywhere else (this fragment used without that JS, or th:if="${readonly}") all six render
-  as one flowing document, which is also the correct no-JS fallback.
+  T173(1b) - spec §6a: the six field groups below are shared verbatim between two DIFFERENT
+  wrappers now, not one. `fields(readonly)` (visitor/report-form's stepper, T7/roadmap 2.4) keeps
+  its original <fieldset class="step"><legend> shape unchanged - report-stepper.js depends on that
+  exact structure and 1c is out of this ticket's scope. `reviewerFields()` (1b, review-form) wraps
+  the identical field content in D-1b-4's numbered <h2>/<div class="card" id="..."> shape instead,
+  matching 1a's own section/id/section-index convention (D-1b-3: "structurally identical to 1a
+  below its 1060px breakpoint... reuse it and change nothing"). Each section's field markup is
+  factored into its own sectionN(readonly) fragment so it exists ONCE and is called from both
+  wrappers - the alternative (duplicating ~30 fields across two copies of this file) is exactly
+  the kind of divergence risk a shared fragment exists to prevent.
 -->
 <th:block th:fragment="fields(readonly)">
     <fieldset class="step" data-step="1">
     <legend class="section-title">Details</legend>
+    <th:block th:insert="~{::section1(${readonly})}"></th:block>
+    </fieldset>
 
+    <fieldset class="step" data-step="2">
+    <legend class="section-title">Return Home Interview</legend>
+    <th:block th:insert="~{::section2(${readonly})}"></th:block>
+    </fieldset>
+
+    <fieldset class="step" data-step="3">
+    <legend class="section-title">Future Incidents</legend>
+    <th:block th:insert="~{::section3(${readonly})}"></th:block>
+    </fieldset>
+
+    <fieldset class="step" data-step="4">
+    <legend class="section-title">Interviewer's Comments</legend>
+    <th:block th:insert="~{::section4(${readonly})}"></th:block>
+    </fieldset>
+
+    <fieldset class="step" data-step="5">
+    <legend class="section-title">Recommendations</legend>
+    <th:block th:insert="~{::section5(${readonly})}"></th:block>
+    </fieldset>
+
+    <fieldset class="step" data-step="6">
+    <legend class="section-title">Declaration</legend>
+    <th:block th:insert="~{::section6(${readonly})}"></th:block>
+    </fieldset>
+</th:block>
+
+<!--
+  1b only ever renders readonly - a report exists by definition on the review screen, so this
+  fragment takes no parameter (unlike fields(readonly) above, which genuinely needs both branches
+  for the same visitor screen at different times). Ids match 1a's own report-content cards exactly
+  (report-details/rhi/future-incidents/interviewer-comments/recommendations/declaration) -
+  deliberately: two pages never render at once, so id collision isn't a concern, and reusing 1a's
+  own names means "the same anchor means the same thing" on both screens rather than inventing a
+  second vocabulary for one entity.
+-->
+<th:block th:fragment="reviewerFields()">
+    <div class="card" id="report-details" tabindex="-1"
+         th:with="notAnswered=${(form.interviewLocation == null ? 1 : 0) + (form.ifNotWhyLate == null ? 1 : 0)
+                               + (form.consultationWithHomeStaff == null ? 1 : 0) + (form.previouslyMissing == null ? 1 : 0)
+                               + (form.missingOccasionsLast30Days == null ? 1 : 0) + (form.confidentialityExplained == null ? 1 : 0)}">
+        <h2>1. Details
+            <span class="section-count" th:if="${notAnswered > 0}" th:text="${notAnswered + ' not answered'}"></span>
+        </h2>
+        <th:block th:insert="~{::section1(true)}"></th:block>
+    </div>
+
+    <div class="card" id="rhi" tabindex="-1"
+         th:with="notAnswered=${(form.interviewAccepted == null ? 1 : 0) + (form.interviewDeclinedReason == null ? 1 : 0)
+                               + (form.whereWereYouWhileMissing == null ? 1 : 0) + (form.whoWereYouWithWhileMissing == null ? 1 : 0)
+                               + (form.whatMadeYouGoMissing == null ? 1 : 0) + (form.whatCanBeDoneToAddressReasons == null ? 1 : 0)
+                               + (form.consideredSelfMissing == null ? 1 : 0) + (form.whatDidYouDoWhileMissing == null ? 1 : 0)
+                               + (form.whatHappenedWhenReturned == null ? 1 : 0) + (form.preventFutureMissingSuggestions == null ? 1 : 0)
+                               + (form.additionalCommentsFromYoungPerson == null ? 1 : 0) + (form.additionalInfoFromParentCarer == null ? 1 : 0)}">
+        <h2>2. Return Home Interview
+            <span class="section-count" th:if="${notAnswered > 0}" th:text="${notAnswered + ' not answered'}"></span>
+        </h2>
+        <th:block th:insert="~{::section2(true)}"></th:block>
+    </div>
+
+    <div class="card" id="future-incidents" tabindex="-1"
+         th:with="notAnswered=${(form.risksIdentifiedDuringEpisode == null ? 1 : 0) + (form.risksIncreaseFutureEpisodes == null ? 1 : 0)
+                               + (form.safeguardingConcernsToExplore == null ? 1 : 0) + (form.infoToHelpLocateFuture == null ? 1 : 0)}">
+        <h2>3. Future Incidents
+            <span class="section-count" th:if="${notAnswered > 0}" th:text="${notAnswered + ' not answered'}"></span>
+        </h2>
+        <th:block th:insert="~{::section3(true)}"></th:block>
+    </div>
+
+    <div class="card" id="interviewer-comments" tabindex="-1">
+        <h2>4. Interviewer's Comments</h2>
+        <th:block th:insert="~{::section4(true)}"></th:block>
+    </div>
+
+    <div class="card" id="recommendations" tabindex="-1">
+        <h2>5. Recommendations</h2>
+        <th:block th:insert="~{::section5(true)}"></th:block>
+    </div>
+
+    <div class="card" id="declaration" tabindex="-1">
+        <h2>6. Declaration</h2>
+        <th:block th:insert="~{::section6(true)}"></th:block>
+    </div>
+</th:block>
+
+<th:block th:fragment="section1(readonly)">
     <label th:id="${readonly} ? 'heldAt-label' : null" th:for="${readonly} ? null : 'heldAt'">
         Date and time the interview was held
         <span class="req" aria-hidden="true" th:unless="${readonly}">*</span>
@@ -73,11 +166,9 @@
         <option value="true">Yes</option>
         <option value="false">No</option>
     </select>
-    </fieldset>
+</th:block>
 
-    <fieldset class="step" data-step="2">
-    <legend class="section-title">Return Home Interview</legend>
-
+<th:block th:fragment="section2(readonly)">
     <label th:id="${readonly} ? 'interviewAccepted-label' : null" th:for="${readonly} ? null : 'interviewAccepted'">Interview accepted?</label>
     <div class="readonly-val" role="group" aria-labelledby="interviewAccepted-label" th:if="${readonly}"
          th:text="${form.interviewAccepted == null} ? 'Not answered' : (${form.interviewAccepted} ? 'Yes' : 'No')">Answer</div>
@@ -145,11 +236,9 @@
     <div class="readonly-val" th:classappend="${#strings.isEmpty(form.additionalInfoFromParentCarer)} ? ' empty' : ''" role="group" aria-labelledby="additionalInfoFromParentCarer-label"
          th:if="${readonly}" th:text="${#strings.isEmpty(form.additionalInfoFromParentCarer)} ? 'Not answered' : ${form.additionalInfoFromParentCarer}">Answer</div>
     <textarea id="additionalInfoFromParentCarer" th:field="*{additionalInfoFromParentCarer}" th:unless="${readonly}"></textarea>
-    </fieldset>
+</th:block>
 
-    <fieldset class="step" data-step="3">
-    <legend class="section-title">Future Incidents</legend>
-
+<th:block th:fragment="section3(readonly)">
     <label th:id="${readonly} ? 'risksIdentifiedDuringEpisode-label' : null" th:for="${readonly} ? null : 'risksIdentifiedDuringEpisode'">Any identified risks during this missing episode?</label>
     <div class="readonly-val" th:classappend="${#strings.isEmpty(form.risksIdentifiedDuringEpisode)} ? ' empty' : ''" role="group" aria-labelledby="risksIdentifiedDuringEpisode-label"
          th:if="${readonly}" th:text="${#strings.isEmpty(form.risksIdentifiedDuringEpisode)} ? 'Not answered' : ${form.risksIdentifiedDuringEpisode}">Answer</div>
@@ -169,30 +258,24 @@
     <div class="readonly-val" th:classappend="${#strings.isEmpty(form.infoToHelpLocateFuture)} ? ' empty' : ''" role="group" aria-labelledby="infoToHelpLocateFuture-label"
          th:if="${readonly}" th:text="${#strings.isEmpty(form.infoToHelpLocateFuture)} ? 'Not answered' : ${form.infoToHelpLocateFuture}">Answer</div>
     <textarea id="infoToHelpLocateFuture" th:field="*{infoToHelpLocateFuture}" th:unless="${readonly}"></textarea>
-    </fieldset>
+</th:block>
 
-    <fieldset class="step" data-step="4">
-    <legend class="section-title">Interviewer's Comments</legend>
-
+<th:block th:fragment="section4(readonly)">
     <label th:id="${readonly} ? 'interviewerComments-label' : null" th:for="${readonly} ? null : 'interviewerComments'">Comments</label>
     <div class="readonly-val" th:classappend="${#strings.isEmpty(form.interviewerComments)} ? ' empty' : ''" role="group" aria-labelledby="interviewerComments-label"
          th:if="${readonly}" th:text="${#strings.isEmpty(form.interviewerComments)} ? 'Not answered' : ${form.interviewerComments}">Answer</div>
     <textarea id="interviewerComments" th:field="*{interviewerComments}" th:unless="${readonly}"></textarea>
-    </fieldset>
+</th:block>
 
-    <fieldset class="step" data-step="5">
-    <legend class="section-title">Recommendations</legend>
-
+<th:block th:fragment="section5(readonly)">
     <label th:id="${readonly} ? 'recommendations-label' : null" th:for="${readonly} ? null : 'recommendations'">Recommendations</label>
     <p class="hint" th:unless="${readonly}">Following analysis of the information held within this report, and observations/discussions during the visit.</p>
     <div class="readonly-val" th:classappend="${#strings.isEmpty(form.recommendations)} ? ' empty' : ''" role="group" aria-labelledby="recommendations-label"
          th:if="${readonly}" th:text="${#strings.isEmpty(form.recommendations)} ? 'Not answered' : ${form.recommendations}">Answer</div>
     <textarea id="recommendations" th:field="*{recommendations}" th:unless="${readonly}"></textarea>
-    </fieldset>
+</th:block>
 
-    <fieldset class="step" data-step="6">
-    <legend class="section-title">Declaration</legend>
-
+<th:block th:fragment="section6(readonly)">
     <label th:id="${readonly} ? 'conductedByStatement-label' : null" th:for="${readonly} ? null : 'conductedByStatement'">Statement</label>
     <div class="readonly-val" th:classappend="${#strings.isEmpty(form.conductedByStatement)} ? ' empty' : ''" role="group" aria-labelledby="conductedByStatement-label"
          th:if="${readonly}" th:text="${#strings.isEmpty(form.conductedByStatement)} ? 'Not answered' : ${form.conductedByStatement}">Answer</div>
@@ -202,7 +285,6 @@
     <div class="readonly-val" th:classappend="${form.dateReportShared == null} ? ' empty' : ''" role="group" aria-labelledby="dateReportShared-label"
          th:if="${readonly}" th:text="${form.dateReportShared != null} ? ${#temporals.format(form.dateReportShared, 'dd MMMM yyyy')} : 'Not shared yet'">Date</div>
     <input type="date" id="dateReportShared" th:field="*{dateReportShared}" th:unless="${readonly}"/>
-    </fieldset>
 </th:block>
 </body>
 </html>
