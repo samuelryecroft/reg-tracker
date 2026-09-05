@@ -2,7 +2,7 @@ package ninja.samryecroft.returnhome.tracker.auth;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrlPattern;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import ninja.samryecroft.returnhome.tracker.AbstractIntegrationTest;
@@ -31,6 +31,21 @@ class ClaimCodeRouteIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private MockMvc mockMvc;
 
+    /**
+     * Matches both the bare {@code /login} and an absolute one.
+     *
+     * <p>Written as a matcher rather than {@code redirectedUrlPattern("**/login")}, which was the
+     * first attempt and does not match {@code /login} at all - the Ant {@code **}{@code /} requires a
+     * preceding segment. That failed in CI on the assertion's syntax while the behaviour under test
+     * was correct all along.
+     */
+    private static org.springframework.test.web.servlet.ResultMatcher redirectsToLogin() {
+        return result -> assertThat(result.getResponse().getRedirectedUrl())
+                .as("an unauthenticated route must send the caller to sign in")
+                .isNotNull()
+                .endsWith("/login");
+    }
+
     /** A session in exactly the state the failure handler leaves behind. */
     private MockHttpSession pendingRedemption() {
         MockHttpSession session = new MockHttpSession();
@@ -44,7 +59,7 @@ class ClaimCodeRouteIntegrationTest extends AbstractIntegrationTest {
                 "/coordinator/requests", "/reports/1/view")) {
             mockMvc.perform(get(route).session(pendingRedemption()))
                     .andExpect(status().is3xxRedirection())
-                    .andExpect(redirectedUrlPattern("**/login"));
+                    .andExpect(redirectsToLogin());
         }
     }
 
@@ -63,13 +78,13 @@ class ClaimCodeRouteIntegrationTest extends AbstractIntegrationTest {
     void theClaimScreenIsNotReachableWithoutACompletedSignIn() throws Exception {
         mockMvc.perform(get("/onboarding/claim"))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrlPattern("**/login"));
+                .andExpect(redirectsToLogin());
 
         mockMvc.perform(post("/onboarding/claim").with(
                         org.springframework.security.test.web.servlet.request
                                 .SecurityMockMvcRequestPostProcessors.csrf())
                         .param("code", "ZZZZ-ZZZZ-ZZZZ-ZZZZ-ZZZZ-ZZZZ-ZZ"))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrlPattern("**/login"));
+                .andExpect(redirectsToLogin());
     }
 }
