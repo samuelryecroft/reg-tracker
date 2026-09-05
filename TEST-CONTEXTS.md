@@ -246,3 +246,50 @@ A guard covers only the first of these:
 None of these is wrong to do. Each costs a context and roughly 10 connections,
 and the cost is invisible at the point where it is paid — that is the whole
 lesson of T148.
+
+## Running the suite locally — two failures that are the environment, not the code
+
+Both of these present as a broken commit on a branch CI says is green. Neither
+is. They are here because "twenty-four identical initialisation errors on a
+green branch" is an hour of someone's life, and the second one already cost it.
+
+### `Could not initialize plugin: org.mockito.plugins.MockMaker`
+
+**Every Mockito test in the suite fails at once**, all with the same error, and
+the count makes it look catastrophic. The cause is four `Caused by` levels down:
+
+```
+Could not initialize inline Byte Buddy mock maker.
+It appears as if your JDK does not supply a working agent attachment mechanism.
+Caused by: Could not self-attach to current VM using external process
+```
+
+Mockito's default inline mock maker attaches an agent to its own JVM. **Any
+sandbox that blocks process attachment breaks it** — several agent and CI
+sandboxes do, and the failure text says nothing about sandboxing.
+
+**The remedy is to run the tests outside the sandbox.** Switching to the
+subclass mock maker sounds like the lighter fix and is the first thing you will
+try; `-Dmockito.mock.maker=subclass` on the Maven command line does **not**
+work, and neither does passing it through `-DargLine` — the stack still shows
+`InlineDelegateByteBuddyMockMaker`. Getting it to take needs a
+`src/test/resources/mockito-extensions/org.mockito.plugins.MockMaker` file,
+which is a permanent change to how every test in the suite mocks, in exchange
+for a local environment quirk. Not worth it — but the two command-line forms
+are written down here so nobody spends the hour re-discovering that they fail.
+
+Note the shape rather than the specific error: **the count is uninformative.**
+N identical failures across unrelated classes is nearly always one
+environmental cause, and reading the *last* `Caused by` finds it faster than
+reading the first failure carefully.
+
+### The build fails before any test runs, in `install-playwright-browsers`
+
+```
+Failed to execute goal ...exec-maven-plugin... (install-playwright-browsers)
+```
+
+That step downloads browsers, so it needs network. Offline, it fails and aborts
+the build **before surefire starts**, so you get no test results at all rather
+than a test failure. Add `-Dexec.skip=true` when running offline and everything
+that does not need a browser runs normally.
