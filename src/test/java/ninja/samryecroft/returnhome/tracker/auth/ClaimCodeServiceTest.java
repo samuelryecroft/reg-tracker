@@ -65,10 +65,6 @@ class ClaimCodeServiceTest {
     }
 
     /**
-     * <b>The plaintext exists once.</b> Only a hash is stored, which is what makes "an administrator
-     * can reissue, never reveal" a property of the storage rather than a rule someone remembers.
-     */
-    /**
      * <b>Only the SECRET half is hashed, and the plaintext exists once.</b> The selector is stored in
      * clear on purpose - it is the lookup, not the secret - and a slow salted hash cannot be looked
      * up, which is why the split exists at all.
@@ -132,10 +128,12 @@ class ClaimCodeServiceTest {
     /**
      * <b>The lockout is the control, not the entropy</b> - about fifty bits is defensible only
      * because this screen sits behind a successful sign-in in a tenant with self-service sign-up
-     * off, and because the code dies after five wrong guesses.
+     * off, and because the code dies once its attempts are spent. The loop below counts to
+     * {@link ClaimCodeService#MAX_ATTEMPTS} rather than to a literal, so moving the cap moves the
+     * test with it - the number was five when this was written and is ten now.
      */
     @Test
-    void fiveWrongAttemptsKillTheCodeEvenIfTheRightOneArrivesAfterwards() {
+    void spendingEveryAttemptKillsTheCodeEvenIfTheRightOneArrivesAfterwards() {
         User user = enabledUser();
         String code = service.issue(user);
         String wrong = user.getClaimCodeSelector() + "-ZZZZZ";

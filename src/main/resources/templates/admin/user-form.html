@@ -114,7 +114,7 @@
 
              The oid is deliberately NOT shown. It is an identifier an admin has no use for, and
              putting it on screen recreates the GUID ceremony this feature removed. -->
-        <section th:if="${user != null and user.id != null}" style="margin-top: var(--s5);">
+        <section th:if="${entraEnabled and user != null and user.id != null}" style="margin-top: var(--s5);">
             <h2>Sign-in</h2>
 
             <p th:if="${user.idpSubject != null}" class="muted">
@@ -126,7 +126,7 @@
                 <strong>Code outstanding.</strong>
                 Issued <span th:text="${#temporals.format(user.claimCodeIssuedAt, 'dd MMM yyyy HH:mm')}">-</span>,
                 expires <span th:text="${#temporals.format(user.claimCodeExpiresAt, 'dd MMM yyyy HH:mm')}">-</span>.
-                <span th:text="${user.claimCodeAttempts} + ' of 5 attempts used'">0 of 5 attempts used</span>.
+                <span th:text="${user.claimCodeAttempts} + ' of ' + ${claimCodeMaxAttempts} + ' attempts used'">0 of 10 attempts used</span>.
                 Reissuing stops the current code working.
             </p>
 

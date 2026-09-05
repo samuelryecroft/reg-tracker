@@ -33,7 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
  * is people an administrator deliberately created an account for. Insider escalation, not
  * enumeration.
  *
- * <p>Which makes the protections load-bearing rather than courtesies: <b>five attempts per code and
+ * <p>Which makes the protections load-bearing rather than courtesies: <b>ten attempts per code and
  * then it is dead</b>, and a slow hash, because fifty bits is below the line where a fast hash is
  * safe.
  *
@@ -45,11 +45,17 @@ import org.springframework.transaction.annotation.Transactional;
  * row, the second is the secret <b>verifier</b>, and only the verifier is hashed.
  *
  * <p>This is the standard shape for the problem rather than an invention, and it is what makes
- * "five attempts per code" countable at all - without a selector there is no identified code to
+ * "ten attempts per code" countable at all - without a selector there is no identified code to
  * count attempts against until after you have found it, which is the thing you needed the count for.
- * <b>Flagged to Kevin as a gap in the note</b>: the secret half is five characters, so the effective
- * secret is about twenty-five bits, and it is the lockout that makes that safe. If he wants the full
- * fifty bits secret, the code grows and the shape stays.
+ *
+ * <p><b>Kevin ruled on the split and recorded it as §6g, an omission in his own note rather than an
+ * ambiguity here: a salted hash cannot be looked up, which made "attempts per code" unimplementable
+ * as written.</b> Five and five stays, and the two entropy figures belong to different attackers.
+ * <b>~50 bits blind</b>, since every refusal is indistinguishable and the per-session cap in
+ * {@code ClaimCodeController} stops selector-walking - that cap is what makes the split safe, more
+ * than the split is. <b>~25 bits for someone already holding a valid selector</b>, which only arises
+ * from partially observing a real code, at which point the observation is the weak link rather than
+ * ten guesses against thirty-three million.
  *
  * <h2>The code is a credential</h2>
  *
@@ -75,8 +81,17 @@ public class ClaimCodeService {
     private static final int VERIFIER_LENGTH = 5;
     private static final Duration VALID_FOR = Duration.ofDays(7);
 
-    /** Five, then the code is dead. The design calls this load-bearing and it is. */
-    static final int MAX_ATTEMPTS = 5;
+    /**
+     * Ten, then the code is dead.
+     *
+     * <p>Ten rather than five for an operational reason that got stronger when the code became
+     * hyphenated and ten characters long: <b>that shape has more typo surface than five attempts was
+     * priced against, and a care worker who fat-fingers it at 7am should not need a reissue to get to
+     * work.</b> Security-wise ten guesses against thirty-three million is indistinguishable from
+     * five - the lockout's job is to make guessing hopeless, not to make it exactly five times
+     * hopeless.
+     */
+    public static final int MAX_ATTEMPTS = 10;
 
     private final SecureRandom random = new SecureRandom();
     private final UserRepository userRepository;
@@ -99,7 +114,7 @@ public class ClaimCodeService {
      */
     @Transactional
     public String issue(User user) {
-        String selector = randomChars(SELECTOR_LENGTH);
+        String selector = freeSelector();
         String verifier = randomChars(VERIFIER_LENGTH);
         user.setClaimCodeSelector(selector);
         user.setClaimCodeVerifierHash(passwordEncoder.encode(verifier));
@@ -167,6 +182,31 @@ public class ClaimCodeService {
         user.setClaimCodeSelector(null);
         user.setClaimCodeVerifierHash(null);
         return userRepository.save(user);
+    }
+
+    /**
+     * A selector no live code is using.
+     *
+     * <p>{@code uq_users_claim_code_selector} is the guarantee - <b>the constraint is, not this</b>,
+     * which is the house pattern and the reason the index exists at all. This only stops the
+     * ordinary case reaching it: two live codes colliding would make the redemption lookup ambiguous
+     * at the moment it must not be, and without a retry the admin would meet a constraint violation
+     * as a 500 while issuing a code, which is a puzzle at whatever hour it happens.
+     *
+     * <p>Bounded rather than looping: at five Crockford characters against the handful of codes live
+     * at once, one collision is already remarkable and three in a row means something is wrong with
+     * the randomness rather than with luck - at which point failing is the honest answer.
+     */
+    private String freeSelector() {
+        for (int attempt = 0; attempt < 3; attempt++) {
+            String candidate = randomChars(SELECTOR_LENGTH);
+            if (userRepository.findByClaimCodeSelector(candidate).isEmpty()) {
+                return candidate;
+            }
+        }
+        throw new IllegalStateException(
+                "Could not find a free claim-code selector in three attempts, which should be "
+                        + "impossible at this scale - check the random source rather than retrying");
     }
 
     /**

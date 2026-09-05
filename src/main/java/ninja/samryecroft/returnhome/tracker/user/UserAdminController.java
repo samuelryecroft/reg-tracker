@@ -4,11 +4,13 @@ import jakarta.validation.Valid;
 import java.util.HashSet;
 import ninja.samryecroft.returnhome.tracker.audit.AuditEventPublisher;
 import ninja.samryecroft.returnhome.tracker.audit.AuditHistoryService;
+import ninja.samryecroft.returnhome.tracker.auth.ClaimCodeService;
 import ninja.samryecroft.returnhome.tracker.home.HomeRepository;
 import ninja.samryecroft.returnhome.tracker.organisation.OrganisationRepository;
 import ninja.samryecroft.returnhome.tracker.organisation.OrgType;
 import ninja.samryecroft.returnhome.tracker.user.dto.CreateUserForm;
 import ninja.samryecroft.returnhome.tracker.user.dto.EditUserForm;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -30,15 +32,19 @@ public class UserAdminController {
     private final OrganisationRepository organisationRepository;
     private final AuditHistoryService auditHistoryService;
     private final AuditEventPublisher auditEventPublisher;
-    private final ninja.samryecroft.returnhome.tracker.auth.ClaimCodeService claimCodeService;
+    private final ClaimCodeService claimCodeService;
 
+    /**
+     * The same flag {@code application-entra.properties} sets - one source, not a second that merely
+     * looks like it. (T189's lesson, checked rather than assumed.)
+     */
     @org.springframework.beans.factory.annotation.Value("${app.auth.entra.enabled:false}")
     private boolean entraEnabled;
 
     public UserAdminController(UserService userService, UserRepository userRepository, HomeRepository homeRepository,
             OrganisationRepository organisationRepository, AuditHistoryService auditHistoryService,
             AuditEventPublisher auditEventPublisher,
-            ninja.samryecroft.returnhome.tracker.auth.ClaimCodeService claimCodeService) {
+            ClaimCodeService claimCodeService) {
         this.claimCodeService = claimCodeService;
         this.userService = userService;
         this.userRepository = userRepository;
@@ -119,6 +125,18 @@ public class UserAdminController {
     @PostMapping("/{id}/reissue-code")
     public String reissueClaimCode(@PathVariable Long id, @AuthenticationPrincipal AppUserPrincipal principal,
             Model model) {
+        // Gated exactly as creation is, and for the same reason - Kevin caught that I had applied my
+        // own argument to only one of its two paths. With Entra off, this minted precisely the
+        // unredeemable credential the create gate exists to avoid: stored, in the audit trail, able
+        // to leak, and doing nothing.
+        //
+        // The button is also not rendered in that state, because a button that 403s is worse than a
+        // button that is not there: it tells an admin the feature exists and then refuses, with no
+        // way to tell a permissions problem from a configuration one.
+        if (!entraEnabled) {
+            throw new AccessDeniedException(
+                    "Claim codes are only issued when Entra sign-in is enabled");
+        }
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("No such user: " + id));
         model.addAttribute("user", user);
@@ -177,6 +195,15 @@ public class UserAdminController {
     }
 
     private void addPickerAttributes(AppUserPrincipal principal, Model model) {
+        // T197. The claim-code section renders only under Entra. Kevin's point, and it is the right
+        // one: a button that 403s is worse than a button that is not there - it tells the admin the
+        // action exists and that they are not permitted it, when in fact nobody is. The server-side
+        // gate on the reissue handler stays regardless; this is the second half of that pair, not a
+        // substitute for it.
+        model.addAttribute("entraEnabled", entraEnabled);
+        // Bound from the constant rather than typed into the template, because the template already
+        // drifted once: it still said "of 5" after the cap moved to 10.
+        model.addAttribute("claimCodeMaxAttempts", ClaimCodeService.MAX_ATTEMPTS);
         model.addAttribute("roles", userService.allowedRolesFor(principal));
         if (principal.hasRole(Role.ADMIN)) {
             model.addAttribute("homes", homeRepository.findAllWithOrganisation());
