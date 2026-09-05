@@ -37,6 +37,7 @@ reasoning that produced it is often still useful. It is simply not the answer.**
 | **D-1b-7's placement** | **SUPERSEDED** (§6f) | Both branches of the guard sit **above the content**, not beside the actions. |
 | **D-1b-8** (§6a) | **CLOSED** (§6c) | Show the prior send-back, at the **top**, in the `--sent-back` family. |
 | **D-1b-2's selector** | **CORRECTED** (§6a) | `.readonly-val`, not `dl.detail dd`. |
+| **T186's scope** (§0, §6g) | **CORRECTED** (§7i) | It affected **every** organisation, not only branded ones — `theme` is never null. My "invisible on a default-brand org" note was wrong. **Fix is on `feat/t186-hue-only`, NOT on main.** |
 | **1d's fate** (§1, D-Q2) | **RULED** (§7h) | **In scope, MERGED into 1c.** Not a screen — the section panel of 1c's progress bar. **2b's reasoning does not transfer**; see D-1d-1. Screen count 25 → **24**. |
 | **D-4b-9's bed-count caveat** | **WITHDRAWN** (T195) | The human declined to make protection contingent on home size: *"protect all PII regardless of home size"*. **No home size returns age to the screen.** Kevin's reasoning is unaffected. |
 | **D-4b-8's reserved decision** | **CLOSED** | It reads as open ("ask Kevin before building it"). It was ruled twice — by Kevin (D-4b-9) and then by the human (T195). **Age is off the screen.** |
@@ -77,7 +78,11 @@ building anything:
 ### Known-unsafe ground
 
 - **Until T186 lands**, `--accent`, `--accent-dark`, `--tint` and `--accent-ink` are overridden by a legacy
-  per-org inline `<style>` and are **unguaranteed for a branded organisation** (§6g). The `--color-*` and
+  per-org inline `<style>` and are unguaranteed — **for EVERY organisation, not only branded ones.** Kevin's
+  correction: the guard is `th:if="${theme != null}"` and `theme` is never null, so the block always
+  rendered, and a pinned token defeats mirroring whatever the hex is. **My "invisible on a default-brand org"
+  severity note was wrong** (§7i). **T186 is FIXED on `feat/t186-hue-only` and NOT MERGED — `layout.html:7-8`
+  still pins all four on `origin/main`.** The `--color-*` and
   semantic families are unaffected — **every contrast number in this document assumes the ramp, so the four
   bridge tokens are the only ones it does not cover for a branded org.**
 - **A1 is still held** with the human: offline report capture caching Article 9 data on visitor phones.
@@ -3138,3 +3143,49 @@ id because **the canvas gives every artboard one**, which is a property of the a
 build decision"*. **That is a design decision handed to a builder**, in the same shape as this one. It is
 already in the gap audit; naming it here so the count is known: **one other, not a class of them.** Every
 other `See Q` row in §1 is closed — 1b by D-1b-1, 2b by §6d, 3b by D-Q5.
+## 7i · 3a — the preview may set a hue and never a colour, and the base it is built on still has the defect (Creed, 6 Sep)
+
+Pam is building 3a now. Two things reach her before the screen exists, because both get more expensive the
+moment it does.
+
+### The base: T186 is fixed on a branch, not on main
+
+`origin/main` is `b2f2ce0`, and `fragments/layout.html:7-8` **still carries the legacy per-org block pinning
+`--accent`, `--accent-dark`, `--accent-ink` and `--tint`.** The fix is seven commits ahead on
+`feat/t186-hue-only`, unmerged. **3a is the screen whose whole job is to validate the hue-only model end to
+end — and on this base the model cannot demonstrate itself**, because the pinned tokens override whatever the
+hue derives, on every organisation. Build order and merge order have come apart: **3a wants T186 merged
+first.** That is a sequencing call, not a design one.
+
+### D-3a-1 · The live preview sets `--brand-hue`. It must never set a resolved colour.
+
+The defect and its sanctioned counterpart sit **five lines apart in the same file**, which is the clearest
+statement of the rule available:
+
+- `layout.html:7-8` — a template assigning `--accent` etc. from a computed hex. **The defect.**
+- `layout.html:13` — a template assigning `--brand-hue` from `theme.brandHue`. **Correct, and it must stay.**
+
+> **The rule is not "templates may not assign custom properties". It is that a template may assign an
+> APPEARANCE-NEUTRAL input and never a RESOLVED OUTPUT.** A hue is a number that means the same thing in both
+> appearances; a colour is an answer that is only right in one. **One server-rendered value cannot have two
+> appearance variants** — so the moment a template emits a resolved colour, it has chosen an appearance for
+> every viewer, whatever the value is.
+
+**So 3a's preview updates the hue and lets the ramp derive everything else, in both appearances.** Concretely:
+the preview surface is real page chrome under a changed `--brand-hue`, not a swatch painted with a computed
+colour. If the preview is built the other way it reintroduces T186 **on the one screen built to prove it
+gone** — and it will look right, because the person building it is looking at one appearance.
+
+**This also settles what the branding form may collect:** a hue, not a hex. D-Q1/D-Q5 already ruled hue-only;
+this is the same ruling arriving at the input control, and it is why `UpdateThemeForm` sheds fields on the
+T186 branch rather than gaining them.
+
+### The verification gap this sits in
+
+There **is** a render guard for exactly this class — Kevin's `AccentTintMirrorsBetweenAppearancesUiTest`,
+which asserts `--accent`/`--tint` differ between light and dark, and which he armed properly by
+reintroducing the defect to prove it fires and then reverting. **It is a `*UiTest`, so it inherits
+`@Tag("flaky-infra")` and runs in the non-blocking lane** — he documented that himself. So the class is now
+*observed* but not *prevented*, and the cheapest complement is a source guard in the blocking lane:
+**no template may assign a resolved colour custom property; `--brand-hue` is the sanctioned exception.**
+`FrontendSourceGuardTest` is plain JUnit with no tag and already carries two appearance/token guards.
