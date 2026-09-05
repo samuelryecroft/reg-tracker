@@ -31,7 +31,7 @@
           childIdentities above) - never straight off the entity, or the mask is defeated on this
           masked page. The case reference goes through the same projection but is never gated - it
           is already shown, by design, in the name column's own masked label (see ChildListRow's
-          javadoc for why a masked "Hidden" here would be a false one).
+          javadoc for why gating this cell too would misreport its own state).
         -->
         <tr th:each="c : ${children}">
             <td th:text="${childIdentities[c.id].label()}">Child Name</td>
