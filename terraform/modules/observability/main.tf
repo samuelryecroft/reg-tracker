@@ -77,11 +77,20 @@ resource "azurerm_monitor_metric_alert" "latency" {
 # a red build.
 # COMPLETE BUT UNPROVEN until someone with apply rights fires it once. Nothing here can demonstrate
 # that a notification actually arrives - that needs a real apply and a real break-glass sign-in, and
-# it stays unproven until then. It used to be carried by the Entra cutover checklist ("break-glass
-# verified: enabling it works, using it raises the audit event, and the alert actually arrives");
-# that cutover is not happening, so THIS VERIFICATION NOW HAS NO OWNER and needs one attaching to
-# whatever the next apply-with-rights is. Flagged rather than quietly dropped - the check did not
-# stop being necessary when the checklist carrying it went away.
+# it stays unproven until then. The proof lives in GO-LIVE-READINESS.md P20: Pam-devops fires it,
+# the human confirms receipt, and per T113 it counts as verified only by seeing the alert ARRIVE -
+# not by failing to see a problem.
+#
+# It used to be carried by the Entra cutover checklist, and deliberately recorded in only one place
+# on the reasoning that two checklists for one action is how they start disagreeing. That reasoning
+# was right, and it is also how the check nearly vanished: Entra was dropped, the document holding
+# it is being retired, and a single-home policy fails silently when the home is demolished - the
+# whole point was that there was nowhere else to look. Kevin re-homed it as P20. The single-home
+# principle stands; it now points somewhere that is not being deleted.
+#
+# The stakes moved the wrong way in the meantime: with Entra gone, form login is the only way in, so
+# break-glass is THE emergency path and this alert is more load-bearing than when the note was
+# written - while nobody has yet seen it fire.
 resource "azurerm_monitor_scheduled_query_rules_alert_v2" "break_glass_login" {
   name                = "alert-${var.name_prefix}-break-glass-login"
   resource_group_name = var.resource_group_name
