@@ -38,9 +38,16 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
  * {@link ninja.samryecroft.returnhome.tracker.child.ChildIdentity} projection, so the page is a
  * masked surface - but read date of birth and local case reference straight off the entity in both
  * renderings (the table and the card stack), printing both {@code @Encrypted} Article-9 fields in
- * the clear beside a masked name. This class pins the fix: masked shows the words "Hidden", never
- * the value (not even a hidden-but-present one - checked by asserting the real value is ABSENT
- * from the whole response, not just invisible), and revealed shows the real values in both places.
+ * the clear beside a masked name.
+ *
+ * <p>Only the birth date is actually gated: masked shows the word "Hidden", never the value (not
+ * even a hidden-but-present one - checked by asserting the real value is ABSENT from the whole
+ * response, not just invisible), and revealed shows the real value in both renderings. The case
+ * reference is routed through the same server-side projection (so it is never read off the entity
+ * directly either) but is deliberately NEVER masked - Kevin's masked name label already shows it
+ * on every row by design, so a masked "Hidden" in the column would be a FALSE one, about a value
+ * already on screen (Creed's T193 follow-up correction, after an earlier version of this fix
+ * masked both fields "for consistency").
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -99,7 +106,7 @@ class ChildListFieldMaskingIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void maskedShowsTheWordsNotTheValueInBothTheTableAndTheCardStack() throws Exception {
+    void maskedGatesTheBirthDateButNeverFalselyHidesTheAlreadyVisibleCaseReference() throws Exception {
         String html = mockMvc.perform(get("/children").with(asUser()).session(session))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
@@ -108,11 +115,16 @@ class ChildListFieldMaskingIntegrationTest extends AbstractIntegrationTest {
         // response, not merely be styled invisible - "it was in the DOM but hidden" is exactly the
         // position Creed's spec (via ChildIdentity's own javadoc) rejects.
         assertThat(html).doesNotContain("22 Jul 2013");
-        // The raw case reference legitimately still appears once, via the masked LABEL itself
-        // ("J.M. · CH-T193..." - Kevin's design, unrelated to this fix) - but never as a second,
-        // ungated column value. Four "Hidden"s: DOB + case reference, in both the table and the
-        // stack rendering.
-        assertThat(occurrencesOf(html, "Hidden")).isEqualTo(4);
+        // Only the birth date is gated - two "Hidden"s (table + stack). An earlier version of this
+        // fix also gated the case reference and asserted four; that was wrong (Creed's T193
+        // follow-up) - the masked LABEL already shows the reference by design ("J.M. · CH-T193..."),
+        // so a masked "Hidden" in the column would be a FALSE one, about a value already on screen.
+        assertThat(occurrencesOf(html, "Hidden")).isEqualTo(2);
+        // The real case reference appears four times even while masked, none of them gated: the
+        // masked LABEL renders once per rendering context (table + stack), same as every other
+        // field on this page, and the never-gated COLUMN renders once per context too (table +
+        // stack) - 2 + 2.
+        assertThat(occurrencesOf(html, caseReference)).isEqualTo(4);
     }
 
     @Test
@@ -127,8 +139,15 @@ class ChildListFieldMaskingIntegrationTest extends AbstractIntegrationTest {
 
         assertThat(occurrencesOf(html, "22 Jul 2013")).isEqualTo(2); // table + stack
         // Revealed, the label becomes ChildIdentity.of's full-name form (getFullName() alone, no
-        // case reference - that asymmetry is D-4b-3/D-4b-8, a separate ticket) - so the reference
-        // now appears ONLY through this fix's own gated column, not doubled up with the label too.
+        // case reference - that asymmetry is D-4b-3/D-4b-8, a separate, already-ruled ticket) - so
+        // today the reference appears twice: the never-gated column, once per rendering context
+        // (table + stack), never via the label.
+        // TRIPWIRE (Creed, T193 follow-up): once ChildIdentity goes additive, the revealed label
+        // will ALSO carry the reference once per context (table + stack), and this count becomes 4
+        // - the expected, correct effect of that separate change, not a regression to "fix" back to
+        // 2. That is also the moment the case-reference COLUMN becomes fully redundant in the
+        // revealed view too (D-4b-3's own column-drop question) - if you're touching this number,
+        // you're touching that question.
         assertThat(occurrencesOf(html, caseReference)).isEqualTo(2); // table + stack
         assertThat(html).doesNotContain("Hidden");
     }
