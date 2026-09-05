@@ -14,21 +14,43 @@
     <h1 th:text="${childIdentity.label()}">Child Name</h1>
     <p class="muted" th:text="${'Home: ' + child.home.name}">Home</p>
 
-    <div class="card" th:if="${canExport}" style="display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap">
-        <div style="flex:1 1 320px">
-            <h3 style="margin-top:0">Case file</h3>
-            <p style="margin:0">Every return home interview raised for this child, with its full timeline and its
+    <!-- D-4b-8 (spec §7e): date of birth sits INSIDE the reveal - @Encrypted Article-9 data, so the
+         masked branch (ChildController's ChildIdentityDetail) contains no date of birth at all, not
+         a hidden one. Case reference is never gated - childIdentity.label() already carries it above
+         whenever one is recorded (D-4b-12/D-4b-14's rule, same page). No age anywhere (T195). -->
+    <dl class="detail">
+        <dt>Date of birth</dt>
+        <dd th:text="${identityDetail.dob()}">DOB</dd>
+        <dt>Case reference</dt>
+        <dd th:text="${identityDetail.caseReference()}">Case reference</dd>
+    </dl>
+
+    <!-- D-4b-5 (spec §7e): the split-card shape - description beside an action, wrapping under a
+         narrow viewport - given a class instead of four inline style attributes, because 4a's own
+         summary wants this exact shape too. -->
+    <div class="card split-card" th:if="${canExport}">
+        <div class="split-card-info">
+            <h3>Case file</h3>
+            <p>Every return home interview raised for this child, with its full timeline and its
                 approved report — assembled into one dated evidence pack.</p>
-            <p class="hint" style="margin-top:8px" th:text="${#lists.size(requests) + ' interview' + (#lists.size(requests) == 1 ? '' : 's') + ' · ' + approvedReportCount + ' approved report' + (approvedReportCount == 1 ? '' : 's')}">Summary</p>
+            <p class="hint" th:text="${#lists.size(requests) + ' interview' + (#lists.size(requests) == 1 ? '' : 's') + ' · ' + approvedReportCount + ' approved report' + (approvedReportCount == 1 ? '' : 's')}">Summary</p>
         </div>
-        <div style="flex:0 0 auto">
+        <!-- D-4b-4: the only sentence telling a user this action is recorded belongs above the
+             button and at body weight, not below it in the page's smallest muted type reading like
+             the button's own caption. A neutral fact about an authorised action, not a warning. -->
+        <div class="split-card-actions">
+            <p class="muted">Exports are recorded</p>
             <a class="btn" th:href="@{/children/{id}/export(id=${child.id})}">Export case file</a>
-            <p class="hint" style="margin-top:8px;text-align:right">Exports are recorded</p>
         </div>
     </div>
 
-    <h2>Return Home Interview History</h2>
-    <div class="table-wrap responsive">
+    <!-- D-4b-6: renamed from "Return Home Interview History" - "Case history" below is a different
+         history (the audit trail), and a reader scanning headings needs the two words to differ. -->
+    <h2>Return home interviews</h2>
+    <!-- D-4b-2: an empty case file must not render a table promising columns over nothing - the
+         caption names what the table contains, so both renderings share the same guard as the
+         .empty message below, not just the message. -->
+    <div class="table-wrap responsive" th:if="${!#lists.isEmpty(requests)}">
     <table>
         <caption>Every interview request raised for this child.</caption>
         <thead>
@@ -36,6 +58,7 @@
             <th scope="col">Status</th>
             <th scope="col">Raised</th>
             <th scope="col">Scheduled</th>
+            <th scope="col">Due</th>
             <th scope="col" class="visually-hidden">Action</th>
         </tr>
         </thead>
@@ -43,7 +66,18 @@
         <tr th:each="r : ${requests}">
             <td><span class="status" th:classappend="${r.status}" th:text="${r.status.displayName}">STATUS</span></td>
             <td th:text="${#temporals.format(r.createdAt, 'dd MMM yyyy HH:mm')}">Raised</td>
-            <td th:text="${r.scheduledAt} != null ? ${#temporals.format(r.scheduledAt, 'dd MMM yyyy HH:mm')} : '—'">Scheduled</td>
+            <!-- D-4b-1: was '—' here and 'Not yet scheduled' in the card stack below - the same
+                 absence, two words, on one page nobody reads both halves of at once. -->
+            <td th:text="${r.scheduledAt} != null ? ${#temporals.format(r.scheduledAt, 'dd MMM yyyy HH:mm')} : 'Not yet scheduled'">Scheduled</td>
+            <!-- D-4b-7: a badge only where DeadlineTracker.badgeFor returns one - a completed or
+                 cancelled request has no live clock and shows none, meaningfully rather than as a gap. -->
+            <td>
+                <span th:if="${dueBadges.get(r.id)} != null" class="due" th:classappend="${dueBadges.get(r.id).cssClass()}">
+                    <th:block th:replace="~{fragments/layout :: dueIcon(${dueBadges.get(r.id).state()})}"></th:block>
+                    <span th:text="${dueBadges.get(r.id).text()}">Deadline</span>
+                </span>
+                <span th:if="${dueBadges.get(r.id)} == null" class="muted">—</span>
+            </td>
             <td>
                 <a class="rowlink" th:href="@{/interview-requests/{id}(id=${r.id})}">View details</a>
                 <a class="rowlink" th:if="${r.status.name() == 'REPORT_APPROVED'}"
@@ -54,12 +88,17 @@
     </table>
     </div>
 
-    <div class="stack">
+    <div class="stack" th:if="${!#lists.isEmpty(requests)}">
         <div class="srow" th:each="r : ${requests}">
             <div class="top"><span class="status" th:classappend="${r.status}" th:text="${r.status.displayName}">STATUS</span></div>
             <dl>
                 <dt>Raised</dt><dd th:text="${#temporals.format(r.createdAt, 'dd MMM yyyy HH:mm')}">Raised</dd>
                 <dt>Scheduled</dt><dd th:text="${r.scheduledAt} != null ? ${#temporals.format(r.scheduledAt, 'dd MMM yyyy HH:mm')} : 'Not yet scheduled'">Scheduled</dd>
+                <dt th:if="${dueBadges.get(r.id)} != null">Due</dt>
+                <dd th:if="${dueBadges.get(r.id)} != null" class="due" th:classappend="${dueBadges.get(r.id).cssClass()}">
+                    <th:block th:replace="~{fragments/layout :: dueIcon(${dueBadges.get(r.id).state()})}"></th:block>
+                    <span th:text="${dueBadges.get(r.id).text()}">Deadline</span>
+                </dd>
             </dl>
             <div class="act">
                 <a class="btn ghost" th:href="@{/interview-requests/{id}(id=${r.id})}">View details</a>

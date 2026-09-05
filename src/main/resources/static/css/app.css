@@ -1431,6 +1431,18 @@ dialog.dialog { border: none; }
     .zone, .tile, table { break-inside: avoid; }
 }
 
+/* ============================== split card (D-4b-5, spec §7e) ==============================
+   A description block beside an action block, wrapping under a narrow viewport - not a one-off,
+   it is the shape a card wants whenever it pairs "what this is" with "what to do about it" (4a's
+   own summary wants it too). Replaces four inline style attributes that used to live in
+   children/detail.html's case-file card. */
+.split-card { display: flex; gap: var(--s5); align-items: flex-start; flex-wrap: wrap; }
+.split-card-info { flex: 1 1 320px; }
+.split-card-info h3 { margin-top: 0; }
+.split-card-info > p { margin: 0; }
+.split-card-info > p + p { margin-top: var(--s2); }
+.split-card-actions { flex: 0 0 auto; display: flex; flex-direction: column; align-items: flex-start; gap: var(--s2); }
+
 /* ============================== audit feed (roadmap 2.5) ============================== */
 .filters { display: flex; gap: var(--s3); flex-wrap: wrap; align-items: flex-end; margin: var(--s4) 0; }
 .filters .f { display: flex; flex-direction: column; gap: var(--s1); }
