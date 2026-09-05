@@ -7,6 +7,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import ninja.samryecroft.returnhome.tracker.audit.AuditEventPublisher;
@@ -30,8 +31,15 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class ReportService {
 
-    private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("dd MMM yyyy");
-    private static final DateTimeFormatter DATETIME_FMT = DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm");
+    // Locale pinned rather than inherited (T187). Without it these formatters follow the JVM's
+    // default locale, so the same report generated on a differently configured container prints its
+    // month names in another language - in a document that is a statutory record and gets read by a
+    // court, an IRO or a local authority. Found while adding the 72-hour reading; it was latent
+    // here already rather than introduced by it.
+    private static final DateTimeFormatter DATE_FMT =
+            DateTimeFormatter.ofPattern("dd MMM yyyy", Locale.UK);
+    private static final DateTimeFormatter DATETIME_FMT =
+            DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm", Locale.UK);
     private static final String NOT_RECORDED = "Not recorded";
 
     private final InterviewReportRepository interviewReportRepository;
@@ -418,11 +426,16 @@ public class ReportService {
         values.put("dateReportShared", report.getDateReportShared() == null
                 ? "Not yet shared" : report.getDateReportShared().format(DATE_FMT));
 
-        // T98 head block. When the interview happened, and whether that met the 72 hours - the one
-        // fact in this document with statutory meaning, stated up front rather than eight rows into
-        // the first table. If it was not met, the reason belongs in the same breath as the "No".
-        // The template cannot branch, so the sentence is composed here.
-        values.put("interviewHeldLine", interviewHeldLine(report));
+        // T98 head block, rebuilt as five labelled rows for T187 (spec 7a). The one fact in this
+        // document with statutory meaning, stated up front rather than eight rows into the first
+        // table - and stated so a reader can CHECK it rather than take it. The template cannot
+        // branch, so every case is decided in SeventyTwoHourReading and each row always has a value.
+        SeventyTwoHourReading reading = SeventyTwoHourReading.of(report);
+        values.put("returnedLine", reading.returnedLine());
+        values.put("heldLine", reading.heldLine());
+        values.put("elapsedLine", reading.elapsedLine());
+        values.put("verdictLine", reading.verdictLine());
+        values.put("reasonLine", reading.reasonLine());
 
         // T98 / D-02. A statutory record signed by one person for a two-person process misstates
         // how it was produced. Generation only ever happens from approve(), which sets both of
@@ -436,22 +449,6 @@ public class ReportService {
 
         values.put("generatedAt", LocalDateTime.now().format(DATETIME_FMT));
         return values;
-    }
-
-    /** The head block's "Interview held" line: when it happened and whether that met the 72 hours. */
-    private String interviewHeldLine(InterviewReport report) {
-        String date = report.getInterviewDate() == null
-                ? NOT_RECORDED : report.getInterviewDate().format(DATE_FMT);
-        Boolean within = report.getWithin72Hours();
-        if (within == null) {
-            return date + " - 72-hour outcome not recorded";
-        }
-        if (within) {
-            return date + " - within 72 hours of return";
-        }
-        String reason = report.getIfNotWhyLate();
-        return date + " - NOT within 72 hours of return"
-                + ((reason == null || reason.isBlank()) ? ", no reason recorded" : ": " + reason);
     }
 
     private String yesNo(Boolean value) {
