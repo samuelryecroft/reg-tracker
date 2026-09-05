@@ -2667,10 +2667,69 @@ precisely the mode a user enters when they need to be certain who they are looki
 > **A disclosure control should add information, never subtract it.** Reveal is meant to answer *"which
 > child is this?"*, and today it answers it less completely than the masked state it replaced.
 
-**Revealed label carries the case reference too.** This is a change to `ChildIdentity`, so it touches every
-screen that shows a child — raise it with Kevin, who owns that design, rather than changing it in a screen
-ticket. The date of birth is also collected on the add form and displayed on no screen at all; it belongs in
-a small identity block on this page, not in the label.
+**Revealed label carries the case reference too.** Kevin owns that design; raised with him, and **he ruled:
+do it, and there is no disclosure argument against it.** His reasoning is worth keeping because it closes the
+question rather than settling it by authority — the same class already says *"masking is not access control:
+everyone who can see a page containing a `ChildIdentity` is already authorised to see the full name"*, and
+*"masking defeats a stranger's glance, not a colleague's"*. **So once the full name is on screen, the case
+reference is strictly less identifying than what is already there, and the marginal disclosure of including
+it is zero.**
+
+> **THE INVARIANT (Kevin's words): reveal is strictly additive — the revealed label must carry everything the
+> masked label carries, plus the name. Anything that identifies a child while masked must still identify them
+> while revealed.**
+
+**Two corrections to what I wrote when I raised it.**
+
+1. **I said it "changes every screen that shows a child". It changes one method.** That is what the
+   projection is *for* — screens print `identity.label()` and make no decisions. `ChildIdentity.of` plus its
+   tests, and nothing else moves. I held Pam off for a reason that was not true; the work is small, it is
+   simply not 4b's.
+2. **It is more acute than either of us said.** `ChildIdentities.mapOf` is a **list** projection — a list is
+   where you *choose* which child to act on — and `CaseFileExportPageController` calls `ChildIdentity.of`
+   **three times** (verified: lines 52, 78, 85). Picking the wrong child there is not *acting on the wrong
+   record*; it is **assembling one child's safeguarding file and sending it out under another child's name**,
+   and reveal is exactly what someone turns on to be sure before doing it.
+
+**And the root cause, in Kevin's own diagnosis, is the one worth generalising:** the implicit assumption was
+*"the name is the identity, so the reference is redundant"* — **true only if names are unique, which is
+precisely the assumption the same javadoc refuses to make about initials three paragraphs earlier.** The
+safety reasoning was applied to one half of a toggle and not the other, and then written up in a way that
+made the gap invisible, *because the paragraph reads as being about masking rather than about
+identification*. Siblings and shared surnames are the ordinary case, and children placed in one home are
+more likely to be related than the base rate, not less.
+
+> **A rule written under the heading of the mechanism it was discovered in will not be applied to the other
+> half of that mechanism. Kevin's paragraph was filed under "masking" when it was really about
+> "identification", and the half it did not mention stayed unexamined for as long as the prose read as
+> complete.**
+
+### D-4b-8 · The identity block, and where the date of birth sits relative to the reveal
+
+I told Kevin the missing date of birth had *"no masking implications I can see"*. **That was wrong and the
+implications are the load-bearing part.** `dateOfBirth` is `@Encrypted` on `Child` (verified, alongside
+`firstName`, `lastName` and `localCaseReference`) — Article 9 data, not an ordinary attribute.
+
+**So the constraint is: the date of birth sits INSIDE the reveal, not beside it.** Initials + date of birth +
+home is close to uniquely identifying, so a masked view printing a DOB **has been de-anonymised by its own
+identity block** — and the mask would then defeat nobody while still claiming to, which is worse than not
+masking, because it is a false promise. Kevin's two corollaries: the *never both strings at once* rule
+applies to it exactly as to the name (it is in the DOM of any page that renders it), and a decrypted date of
+birth must not reach a log line or an exception message (T179 was a real defect this month).
+
+**The block:** a short labelled pair under the `<h1>`, beside the existing home line — `Date of birth` and
+`Case reference`, in the shipped `dl.detail` shape. When masked, the DOB row renders the **words**, not the
+value: *"Hidden — reveal names to show"*. Naming what is withheld beats dropping the row (D-1a-1), it keeps
+the layout stable across the toggle, and it tells a user the control exists. **Server-side branch: the masked
+render must contain no date of birth at all, not a hidden one.**
+
+**One decision I am NOT taking, because it is a disclosure line and I have just been shown I got one wrong.**
+*Age* is the operationally relevant fact — under-16 versus 16+ changes the process, and a repeatedly missing
+12-year-old reads differently from a 17-year-old — and **age is a coarsening of the datum, not the datum**,
+so it could reasonably sit on the always-visible side while the exact DOB stays behind the reveal. That
+separates cleanly: **age answers the operational question, DOB answers the identification question.** But
+whether *age + initials + home* stays under the de-anonymisation line is Kevin's threshold to set, not mine.
+Ask him before building it; ship the block with DOB-behind-reveal only if the answer has not come back.
 
 ### D-4b-4 · "Exports are recorded" is a consequence notice wearing a hint's clothes
 
