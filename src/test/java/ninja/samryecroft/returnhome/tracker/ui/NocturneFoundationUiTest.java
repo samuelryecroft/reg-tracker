@@ -47,7 +47,12 @@ class NocturneFoundationUiTest extends AbstractUiTest {
         // sidebar is its own separate chance to be blank; they are checked one at a time.
         Locator navIcons = page.locator(".shell-nav .icon");
         int navIconCount = navIcons.count();
-        assertThat(navIconCount).isGreaterThan(5); // the admin account sees the whole sidebar
+        // Deliberately a low floor, not a count of the sidebar: most nav entries are gated to
+        // roles ADMIN does not hold (Dashboard, both request lists, Interviews, Review Queue),
+        // so this account sees a handful - Children, Homes, Audit, Users, Organisations. The
+        // floor exists only so a selector that stops matching cannot pass this as a green sweep
+        // over an empty list.
+        assertThat(navIconCount).isGreaterThan(3);
         for (int i = 0; i < navIconCount; i++) {
             Locator icon = navIcons.nth(i);
             assertThat(drawnSizeOf(icon))
@@ -180,6 +185,18 @@ class NocturneFoundationUiTest extends AbstractUiTest {
         int expectedHue = AccentRamp.hueFrom("#F36E2A"); // ThemeService's own shipped platform default
         assertThat(hueValue).isEqualTo(String.valueOf(expectedHue));
         assertThat(Integer.parseInt(hueValue)).isNotEqualTo(289); // app.css's hardcoded default - must be overridden
+    }
+
+    /** THROWAWAY (evidence branch only): the assertion T169 replaced, run against the same
+     * deliberately broken Homes icon that fails the real guards in this run. It passes. */
+    @Test
+    void oldGuardWouldHavePassedOverThisBrokenIcon() {
+        login(ADMIN_USERNAME, ADMIN_PASSWORD);
+        page.waitForSelector(".shell-side");
+        Object iconWidth = page.locator(".shell-nav a[href='/admin/homes'] .icon").first()
+                .evaluate("el => el.getBoundingClientRect().width");
+        System.out.println("EVIDENCE: old assertion reads " + iconWidth + " on the broken Homes icon");
+        assertThat(((Number) iconWidth).doubleValue()).isGreaterThan(0);
     }
 
     /**

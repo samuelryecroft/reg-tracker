@@ -115,7 +115,7 @@
         </a>
         <a th:if="${#authorization.expression('hasAnyRole(''ADMIN'',''ORG_ADMIN'')')}" href="/admin/homes"
            th:aria-current="${path == '/admin/homes' or #strings.startsWith(path, '/admin/homes/')} ? 'page'">
-            <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-house-line'"></use></svg>Homes</a>
+            <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-house-lines'"></use></svg>Homes</a>
         <a th:if="${#authorization.expression('hasAnyRole(''ORG_ADMIN'',''VIEWER'',''COORDINATOR'',''ADMIN'')')}" href="/audit"
            th:aria-current="${path == '/audit' or #strings.startsWith(path, '/audit/')} ? 'page'">
             <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-clock-counter-clockwise'"></use></svg>Audit</a>
