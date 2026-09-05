@@ -1860,3 +1860,53 @@ rail. **D-1b-7's "beside the actions" is superseded.**
 The general form, since this is the third placement question decided the same way: **anything that changes
 whether or how a reader should engage with a document belongs before the document.** Only things that
 qualify the *act* — the approve consequence panel — belong at the point of acting.
+
+
+## 6g · The cream `thead` — not a token-cascade bug, a legacy inline override (Creed, 5 Sep)
+
+Andy measured every table header rendering cream in dark mode and handed it over as a token-cascade question,
+correctly refusing to guess at a fix. **It is not a cascade bug, and his diagnosis — that `--tint` resolves
+to the pale accent-900 — does not survive the arithmetic:**
+
+```
+measured            rgb(255,240,221) = oklch(0.962 0.030 74)   ← a WARM hue
+accent-900 pale @289  rgb(246,245,255)                          ← the default brand hue
+accent-900 pale @74   rgb(255,245,232)
+accent-900 deep @289  rgb( 40, 36, 66)
+```
+
+The measured colour is not the pale step at any hue. **The cause is in `layout.html:7`, not in the
+stylesheet:**
+
+```html
+<style th:if="${theme != null}"
+       th:text="':root { --accent: …primaryColor; --accent-dark: …; --accent-ink: …; --tint: ' + theme.secondaryColor + '; }'">
+```
+
+A legacy per-organisation block, injected **after** `app.css`, that overrides four bridge tokens with **fixed
+hex literals from the database**. `--tint` is therefore the org's stored `secondaryColor`, not
+`var(--color-accent-900)` — so it cannot mirror between appearances, because **a single hex has no second
+value to mirror to.** Everything Andy observed follows: identical in both appearances, warm, and
+`--color-accent-900` itself resolving correctly right beside it, because the inline block never touches it.
+
+**The blast radius is larger than the tables.** Those four tokens carry **26 rules** — `--accent` (10),
+`--accent-dark` (10), `--tint` (5), `--accent-ink` (1). Whenever an organisation has branding configured,
+all 26 are pinned to light-derived literals, **silently undoing the appearance work on every screen that
+uses them.** The tables are simply where it is most visible.
+
+**The fix is a deletion, and the decision behind it already exists.** R-Q7 retired `secondaryColor`, and
+T138's own comment calls this block "the legacy override" while its replacement — injecting `--brand-hue`
+alone — sits two lines below it and is correct. Delete the legacy block and every one of the 26 rules
+returns to the mirroring token it was written against. **The hue-only branding model already specified in
+§2 is exactly the thing this block predates.**
+
+`secondaryColor` is still read in 13 Java files and 6 templates, so the deletion is a real piece of work with
+a data question attached, not a one-line change — but it is *removal of superseded code*, not a new design.
+
+### What this says about handovers
+
+Andy's instinct — *a front-end engineer guessing at the fix produces a plausible change that moves the
+problem somewhere less visible* — was right, and the same trap was waiting for me: the plausible fix here is
+to make `--tint` mirror, which would have added a second definition of a token that should not exist at all.
+**The measurement that discriminated was the hue.** A diagnosis that explains *which* value appeared, and not
+merely that the wrong one did, is the one worth acting on.
