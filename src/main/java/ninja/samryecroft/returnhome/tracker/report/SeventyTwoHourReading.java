@@ -41,6 +41,28 @@ import java.time.format.DateTimeFormatter;
 public record SeventyTwoHourReading(String returnedLine, String heldLine, String elapsedLine,
         String verdictLine, String reasonLine) {
 
+    /**
+     * The one-word answer for the statutory form's own question list, where the block above is the
+     * reading of it.
+     *
+     * <p><b>Derived from {@link #verdictLine()} rather than re-deciding.</b> A second ladder over the
+     * same state is how a document ends up disagreeing with itself, which is the defect T187 exists
+     * to remove - so this reads the sentence that was already chosen instead of asking the report
+     * again. One source, stated twice, incapable of disagreeing.
+     *
+     * <p>{@code Not measurable} rather than the generic {@code Not recorded} the other answers use.
+     * That vocabulary belongs to stored answers - questions a person did or did not fill in, where
+     * "not recorded" is exactly right. This value is <em>computed</em> and always has an answer, and
+     * for an interview recorded before the return "not recorded" would be <b>false</b>: that time is
+     * recorded, it is inconsistent. <b>A derived value needs its own words.</b>
+     */
+    public String verdict() {
+        if (verdictLine.startsWith("Not measurable")) {
+            return "Not measurable";
+        }
+        return verdictLine.startsWith("NOT within") ? "No" : "Yes";
+    }
+
     /** Locale pinned: a statutory record must not print its month names in whatever language the
      * container happens to default to. Matches {@code ReportService}'s formatters, so the rows in
      * this block and the rest of the document cannot drift apart. */

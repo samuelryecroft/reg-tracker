@@ -389,11 +389,28 @@ public class ReportService {
         values.put("visitorName", report.getVisitor().getFullName());
         values.put("requestReceivedAt", request.getCreatedAt().format(DATETIME_FMT));
         values.put("missingEpisodeDate", formatDateTime(request.getMissingSince()));
-        values.put("interviewDate", report.getInterviewDate() == null ? NOT_RECORDED : report.getInterviewDate().format(DATE_FMT));
+
+        // Built once, above its first use. Every 72-hour value in this document - the head block AND
+        // the statutory question list further down - comes off this one object, so the two cannot
+        // disagree about the same fact. Before T187 they were computed independently and did.
+        SeventyTwoHourReading reading = SeventyTwoHourReading.of(report);
+        // reading.heldLine(), NOT getInterviewDate(). This is the row T187 exists to fix and it was
+        // still printing heldAt truncated to a date - THE VERY VALUE 7a OPENS BY NAMING AS THE
+        // DEFECT - three rows from the precise one. Two same-date reports with opposite verdicts
+        // showed an identical "Date of Interview", so a reader who read the question list and
+        // stopped saw the original paradox completely intact.
+        //
+        // The spec was written against ReportService.interviewHeldLine() and the template was never
+        // opened. A DEFECT SPECCED AGAINST A JAVA METHOD IS SPECCED AGAINST ONE OF ITS CALLERS -
+        // and the template is a caller.
+        values.put("interviewDate", reading.heldLine());
         values.put("interviewLocation", orNotProvided(report.getInterviewLocation()));
 
-        values.put("within72Hours", yesNo(report.getWithin72Hours()));
-        values.put("ifNotWhyLate", orNotProvided(report.getIfNotWhyLate()));
+        // Both off the same reading as the block above, so the question list and the head block are
+        // one source stated twice and cannot disagree. yesNo() and orNotProvided() are for STORED
+        // answers - a question a person filled in or did not - and these two are derived.
+        values.put("within72Hours", reading.verdict());
+        values.put("ifNotWhyLate", reading.reasonLine());
         values.put("consultationWithHomeStaff", orNotProvided(report.getConsultationWithHomeStaff()));
         values.put("previouslyMissing", yesNo(report.getPreviouslyMissing()));
         values.put("missingOccasionsLast30Days", report.getMissingOccasionsLast30Days() == null
@@ -430,7 +447,6 @@ public class ReportService {
         // document with statutory meaning, stated up front rather than eight rows into the first
         // table - and stated so a reader can CHECK it rather than take it. The template cannot
         // branch, so every case is decided in SeventyTwoHourReading and each row always has a value.
-        SeventyTwoHourReading reading = SeventyTwoHourReading.of(report);
         values.put("returnedLine", reading.returnedLine());
         values.put("heldLine", reading.heldLine());
         values.put("elapsedLine", reading.elapsedLine());

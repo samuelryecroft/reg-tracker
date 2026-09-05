@@ -124,6 +124,39 @@ class SeventyTwoHourReadingTest {
     }
 
     /**
+     * The statutory form's own question list takes its answers from this same reading, so the head
+     * block and the question list are one source stated twice and cannot disagree.
+     *
+     * <p>{@code verdict()} is derived from {@code verdictLine()} rather than re-deciding from the
+     * report - a second ladder over the same state is exactly how a document ends up contradicting
+     * itself, which is what T187 exists to remove.
+     */
+    @Test
+    void theOneWordVerdictAgreesWithTheSentenceItIsDerivedFrom() {
+        assertThat(SeventyTwoHourReading.of(report(RETURNED, RETURNED.plusHours(10), null)).verdict())
+                .isEqualTo("Yes");
+        assertThat(SeventyTwoHourReading.of(report(RETURNED, RETURNED.plusHours(80), null)).verdict())
+                .isEqualTo("No");
+        assertThat(SeventyTwoHourReading.of(report(RETURNED, null, null)).verdict())
+                .isEqualTo("Not measurable");
+    }
+
+    /**
+     * <b>"Not recorded" would be false here, and that is why the derived value needs its own words.</b>
+     * The interview time IS recorded for an impossible sequence - it is inconsistent, not absent -
+     * so the vocabulary the other answers use (stored questions a person did or did not fill in)
+     * asserts an absence that is not there.
+     */
+    @Test
+    void anImpossibleSequenceIsNotMeasurableRatherThanNotRecorded() {
+        SeventyTwoHourReading reading =
+                SeventyTwoHourReading.of(report(RETURNED, RETURNED.minusHours(3), null));
+
+        assertThat(reading.verdict()).isEqualTo("Not measurable");
+        assertThat(reading.verdict()).isNotEqualTo("Not recorded");
+    }
+
+    /**
      * These are {@code LocalDateTime}. Printing an offset or "UTC" would assert a precision the
      * stored data does not carry, which is its own false claim - so no row may acquire one.
      */

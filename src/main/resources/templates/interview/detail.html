@@ -270,9 +270,14 @@
 
             <dt>Was this interview offered and completed within 72 hours of return?</dt>
             <!-- T187: null widened from "no heldAt" to "the clock cannot be read", which now also
-                 covers an interview recorded before the return. This is the one surface that names
-                 the CAUSE, so naming only the old one would start lying about which half is missing. -->
-            <dd class="unanswered" th:if="${report.within72Hours == null}">Not measurable — the interview time is missing or precedes the return</dd>
+                 covers an interview recorded before the return. This is the one surface that NAMES
+                 THE CAUSE, so the two causes are held apart here exactly as they are in Java.
+                 "missing or precedes the return" was a disjunction - true, and it told a reader that
+                 one of two things happened without saying which, which is the opposite of naming a
+                 cause. The distinction also matters for what to DO: a missing time is a gap to fill,
+                 an inconsistent pair is two recorded times to check against each other. -->
+            <dd class="unanswered" th:if="${report.within72Hours == null and report.heldAt == null}">Not measurable — the interview time is not recorded</dd>
+            <dd class="unanswered" th:if="${report.within72Hours == null and report.heldAt != null}">Not measurable — the interview is recorded as held before the return</dd>
             <dd th:unless="${report.within72Hours == null}" th:text="${report.within72Hours} ? 'Yes' : 'No'">—</dd>
 
             <dt>If not, why?</dt>
