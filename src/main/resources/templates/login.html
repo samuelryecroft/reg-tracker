@@ -9,20 +9,30 @@
 <main id="main" class="narrow">
     <h1>Return Home Tracker</h1>
     <p class="sub">Sign in to raise, allocate or complete a return home interview.</p>
+    <!--/* D-4c-3 (spec §7l): the glyph literals become vendored Phosphor, per §5j - a character is
+         not a state, and both sat in aria-hidden spans doing decorative work an icon should do
+         properly. D-4c-1's own lockout banner is deliberately NOT built here - carded as T215,
+         gated on Kevin's ruling on whether the attempt counter tracks unknown usernames too (a
+         distinct message on real accounts only is a username enumeration oracle). */-->
     <div class="banner err" role="alert" th:if="${param.error}">
-        <span class="ic" aria-hidden="true">▲</span>
+        <svg class="icon" aria-hidden="true"><use th:href="@{/icons/phosphor.svg} + '#ph-warning-circle'"></use></svg>
         <div><strong>We couldn't sign you in</strong><p>Check your username and password and try again.</p></div>
     </div>
     <div class="banner ok" role="status" th:if="${param.logout}">
-        <span class="ic" aria-hidden="true">✓</span>
+        <svg class="icon" aria-hidden="true"><use th:href="@{/icons/phosphor.svg} + '#ph-check-circle'"></use></svg>
         <div><strong>You've been signed out</strong></div>
     </div>
     <div class="card">
+        <!--/* D-4c-5: required on both fields - the server-rendered banner above stays the
+             authority (the no-JS path still produces it on an empty POST), this only saves the
+             round trip the browser can catch for free. No summary panel: two fields, one generic
+             outcome - the floor pattern earns its keep on a form with groups to distinguish, not
+             a two-field card. */-->
         <form method="post" th:action="@{/login}">
             <label for="username">Username</label>
-            <input type="text" id="username" name="username" autocomplete="username" autofocus="autofocus"/>
+            <input type="text" id="username" name="username" autocomplete="username" autofocus="autofocus" required/>
             <label for="password">Password</label>
-            <input type="password" id="password" name="password" autocomplete="current-password"/>
+            <input type="password" id="password" name="password" autocomplete="current-password" required/>
             <div class="btn-row"><button type="submit" class="btn block">Log in</button></div>
         </form>
     </div>
