@@ -37,6 +37,7 @@ reasoning that produced it is often still useful. It is simply not the answer.**
 | **D-1b-7's placement** | **SUPERSEDED** (§6f) | Both branches of the guard sit **above the content**, not beside the actions. |
 | **D-1b-8** (§6a) | **CLOSED** (§6c) | Show the prior send-back, at the **top**, in the `--sent-back` family. |
 | **D-1b-2's selector** | **CORRECTED** (§6a) | `.readonly-val`, not `dl.detail dd`. |
+| **1d's fate** (§1, D-Q2) | **RULED** (§7h) | **In scope, MERGED into 1c.** Not a screen — the section panel of 1c's progress bar. **2b's reasoning does not transfer**; see D-1d-1. Screen count 25 → **24**. |
 | **D-4b-9's bed-count caveat** | **WITHDRAWN** (T195) | The human declined to make protection contingent on home size: *"protect all PII regardless of home size"*. **No home size returns age to the screen.** Kevin's reasoning is unaffected. |
 | **D-4b-8's reserved decision** | **CLOSED** | It reads as open ("ask Kevin before building it"). It was ruled twice — by Kevin (D-4b-9) and then by the human (T195). **Age is off the screen.** |
 | **R-Q8**, **R-Q13** | **CLOSED** (§5d) | Take the closed versions; R-Q8 is further amended in §5e. |
@@ -86,14 +87,14 @@ building anything:
 
 ## 1 · Screen → template map
 
-27 screens in scope (4c skipped — Entra owns sign-in, T113).
+27 screens in scope (4c skipped — Entra owns sign-in, T113). **Two have since been removed from the count: 2b dropped (§6d) and 1d merged into 1c (D-1d-1).**
 
 | Screen | Template today | Action |
 |---|---|---|
 | **1a** Interview record, report-first | `interview/detail.html` + `report/view.html` + `fragments/audit-history.html` | **Merge.** The record leads with the report; history moves into a 316px right column. Two templates become one. |
 | **1b** Same record, document-first, sticky approve/send-back bar, reviewer guard | `reviewer/review-form.html` | Rework. See **Q2** — 1a/1b read as alternatives in the README, but 1b's actions and guard line make it the *reviewer's* view, not a second option. |
 | **1c** Report capture (phone, 390px) | `visitor/report-form.html` + `static/js/report-stepper.js` | Rework in place. Stepper already exists; add offline banner, autosave indicator, dictate affordance, six-segment progress. |
-| **1d** Same capture, section index | same | See **Q2** — variant or an additional overlay? |
+| ~~**1d**~~ Same capture, section index | same | **RULED — MERGED INTO 1c** (D-1d-1). Not a separate screen: the section panel of 1c's progress bar. One build, one PR. **Not counted in the screen total.** |
 | **2a** Coordinator queue, cards by deadline proximity | `coordinator/requests.html` | Rework. Table → grouped cards (Overdue / Due within 24h / On track). |
 | **2b** Same queue as a dated feed | same | See **Q2**. |
 | **2c** Supplier dashboard | `dashboard/supplier.html` | Rework. Tiles + 72-hour figure + compliance bars + recurrence counts. |
@@ -2995,6 +2996,7 @@ property of the code — the same move as holding the verdict in an enum rather 
 I checked the thing in front of me and not the frame around it. **Not a reason to hold #87**, which
 implements §7d faithfully; a follow-up ticket of its own.
 
+
 ## 7g · 5d Add a child — the form where three different questions all got asked as "isAdmin" (Creed, 8 Sep)
 
 Specced against **main @bd298fc**: `children/form.html`, `ChildController.create` / `homePickerOptionsFor`,
@@ -3079,3 +3081,60 @@ matching rule** — on encrypted names, with siblings and shared surnames as the
 question with real false-positive costs and it belongs with the product owner, not in a screen spec. Flagged
 so the absence is a decision rather than an oversight.
 
+## 7h · 1d — ruled. It is not a screen, and the reason 2b was dropped does not reach it (Creed, 6 Sep)
+
+Pam surfaced that **1d's fate was never explicitly ruled when 2b was dropped.** It has sat in the queue as a
+question. §1 says *"See Q2 — variant or an additional overlay?"*; D-Q2 answered only the **route**, not
+whether it survives. That is the D-4b-8 failure in the build queue rather than in this document: a thing that
+reads open long after it should have been settled.
+
+### D-1d-1 · 1d is IN SCOPE and MERGED INTO 1c. It stops being counted as a screen.
+
+**The 2b reasoning does not transfer, and it is worth being explicit about why, because the two look alike.**
+Both are "the same data in a second arrangement, on the same route, behind a control". §6d records what
+survived of the 2b drop: *a queue answers "what next", which is urgency, not chronology.*
+
+**That is a statement about a rival ordering of the same answer.** 2b re-sorted the same cards to answer the
+same question — *what do I do next* — and answered it worse. Offering it means offering a wrong answer
+alongside the right one, so it goes.
+
+**1d re-orders nothing and re-renders nothing.** The six sections and every answer in them are identical in
+both states; the panel is a list of the section legends. It answers a **different question**: not *what is in
+this report* but *where am I, and how do I get back to section 2*. **Dropping it does not remove a rival
+answer — it removes the only answer to a question 1c cannot answer at all.**
+
+> **The test, which generalises past both screens: does the second view answer the same question differently,
+> or a different question altogether?** Same question → one of the two is worse, and the worse one goes.
+> Different question → **it was never a view. It is a control**, and dropping it drops a capability rather
+> than a duplicate.
+
+**Grounded in the built stepper, not asserted.** `report-stepper.js` navigates **`‹ Back` / `Next ›` only**,
+starting at `current = 0`, over the six `fieldset.step` groups in `fragments/report-fields.html` (Details,
+Return Home Interview, Future Incidents, Interviewer's Comments, Recommendations, Declaration). **Reaching
+section 2 from section 6 is four presses of Back, and the form reopens at section 1 every time.**
+
+**Where that actually bites is the sent-back loop**, and that is the load-bearing argument: a reviewer
+returns a report with comments about specific answers, the visitor reopens it at section 1, and with no jump
+control they page through the whole instrument to reach the two answers they were asked to fix — on a phone,
+often with the child still present. **That is the correction loop of a statutory record, not a convenience.**
+
+**Structurally it was never a screen.** D-Q2 already placed it as *"a panel toggled from the sticky progress
+bar"*, and that bar is built either way — the six-segment progress is inside 1c's own scope, and the chrome
+exists in primitive form today (`.dots` + `.step-label`, injected by the stepper). A panel opened from a
+control that is being built regardless is **the control's disclosure, not a second screen**. 1d has a screen
+id because **the canvas gives every artboard one**, which is a property of the artefact, not of the product.
+
+**Consequences, stated so nobody has to infer them:**
+- **1c and 1d are one build and one PR.** There is no separate 1d ticket.
+- **Screen count: 25 real screens → 24. 13 remaining → 12.**
+- The panel still needs specifying (what it lists, how a partly-answered section reads, focus on close) —
+  **that is inside the 1c gap already raised, not a new one.** Ruling it in scope does not spec it.
+- **1c's `?` state is unchanged**: no new route, no new template, no split autosave state — which was D-Q2's
+  original reason for the shared route and survives intact.
+
+### One more thing that reads open, named rather than swept
+
+**4e — `admin/organisation-list` + `admin/home-list`.** §7b says *"whether the second route survives is a
+build decision"*. **That is a design decision handed to a builder**, in the same shape as this one. It is
+already in the gap audit; naming it here so the count is known: **one other, not a class of them.** Every
+other `See Q` row in §1 is closed — 1b by D-1b-1, 2b by §6d, 3b by D-Q5.
