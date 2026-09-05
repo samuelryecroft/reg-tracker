@@ -2852,3 +2852,42 @@ worse: once reveal becomes additive, the revealed row will show it twice as well
 > directly.** That is checkable from the entity's own annotations rather than from a list of field names,
 > so it stays true as fields are added.
 
+### D-4b-12 · Gating the case reference is a DE-DUPLICATION, not a disclosure fix (added 8 Sep, on T193's routing)
+
+T193 was routed to interim-gate **both** the date of birth and the case reference behind the reveal.
+**Gating the reference is harmless and removes a visible duplicate — but it fixes no exposure, and the ticket
+must not say it does.** Verified in `ChildIdentity.maskedLabel`:
+
+```java
+return reference == null || reference.isBlank()
+        ? child.getInitials()
+        : child.getInitials() + MIDDLE_DOT + reference;   //  "A.B. · CH-0041"
+```
+
+**The case reference is on every masked row already, inside `label()`, deliberately** — Kevin's javadoc
+defends it: initials alone would be ambiguous, and *"two children sharing initials in one home is a safety
+problem, not just a UX one."*
+
+> **The risk is to the record, not the code.** The next reader takes T193 to mean the masked view does not
+> carry the reference, finds that `maskedLabel` does, and "finishes the job" by stripping it —
+> **reintroducing the exact ambiguity the design rejects, in the name of a fix.** A ticket that misdescribes
+> what it fixed is a defect with a delay on it.
+
+**Only the date of birth gating is the disclosure fix.** Everything else on T193 is tidiness riding along.
+
+**And the ordering on the column drop is forced rather than preferential.** Today the revealed label is the
+full name and nothing else, so the standalone column is **the only place the reference appears in the
+revealed view**. Dropping it before `ChildIdentity` is additive removes it exactly where it is load-bearing
+while leaving it where it is redundant. **Gate now, delete after — not before.**
+
+### D-4b-13 · The guard (T194) must not widen from "went round the projection" to "rendered a protected value"
+
+`localCaseReference` **legitimately** reaches the DOM through `maskedLabel`. So a guard phrased as *no
+`@Encrypted` value reaches the DOM* flags correct code — and **a guard that fires on the correct pattern gets
+suppressed rather than fixed.**
+
+> **The property being guarded is "a template went round the projection", not "a protected value was
+> rendered."** Those are indistinguishable in both known instances and come apart on the third. This is the
+> guard-shape rule again (§5j, §6e): **a guard inherits the incidental properties of the instances that
+> motivated it**, and the tempting generalisation is usually one of those properties rather than the defect.
+
