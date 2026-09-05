@@ -79,6 +79,14 @@ resource "azurerm_subnet" "containerapps" {
 # until the env's managed LB releases the frontend IP (a 10-20 min ordering trap). The ephemeral env
 # is created out-of-band by the deploy procedure (az CLI), NOT by Terraform - it must not live in
 # state - so this module only provisions the subnet and exposes its id.
+# ⚠️ STATE DRIFT (T180, 2026-09-08): this subnet was CREATED MANUALLY with `az network vnet subnet
+# create` on 2026-09-08 (same name/CIDR/delegation as this block) for the release-2 ephemeral-migration
+# proof, because a manual `terraform apply` needs the TF_VAR_* DB-password secrets the operator does
+# not hold (the pipeline that has them via OIDC has never run - see .github/workflows/deploy.yml). So
+# it EXISTS in Azure but is NOT in Terraform state yet. Before the next apply: `terraform import
+# module.network[0].azurerm_subnet.migrate <its resource id>` FIRST. DO NOT let a plan create it (it
+# already exists) and above all DO NOT let a plan delete+recreate it - a migration environment may be
+# sitting in it at the time. This comment's job is done the moment it is imported; delete it then.
 resource "azurerm_subnet" "migrate" {
   name                 = "snet-ca-migrate"
   resource_group_name  = var.resource_group_name
