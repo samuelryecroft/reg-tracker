@@ -196,6 +196,16 @@ jobs:
           az containerapp job update -g '${{ steps.tf.outputs.rg }}' -n '${{ steps.tf.outputs.job_name }}' \
             --image "${acr}/rht-db-plane@${digest}"
 
+      # !!! T180 STALE-STEP WARNING - READ BEFORE TRUSTING THIS STEP !!!
+      # This workflow has NEVER completed a deploy (see the header: no 'prod' Environment, no OIDC
+      # identities/secrets, deploy job guarded to main only). GO-LIVE IS THE MANUAL RUNBOOK, and the
+      # LIVE migration path is no longer this standing `az containerapp job start`: it is the
+      # PER-RUN EPHEMERAL Container Apps env documented in terraform/README.md (WS-E "Ephemeral
+      # migration env (T180)"), which kills the idle load balancer's ~£6.5/mo. The step below is left
+      # as-is ON PURPOSE - a fake-working ephemeral rewrite in a pipeline that never runs would be a
+      # stale claim that misleads. When the pipeline is actually enabled (T122/T110), REWRITE this
+      # step to the ephemeral create->run->destroy pattern from the runbook; do not enable it as-is.
+      #
       # --- DB plane: run 01 SQL -> Flyway -> 02 SQL VNet-side, BEFORE the new jar goes live ---
       # (expand/contract migrations keep the running jar valid, so rollback-by-swap stays safe).
       # M2 (Kevin T89): 'az containerapp job start' returns as soon as the execution is CREATED, so we

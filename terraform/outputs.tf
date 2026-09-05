@@ -23,6 +23,13 @@ output "container_registry_login_server" {
   value       = one(azurerm_container_registry.acr[*].login_server)
 }
 
+# T180: the dedicated subnet the deploy procedure creates the EPHEMERAL migration env in (az CLI,
+# out-of-band - not a Terraform-managed env). Null on the public/pre-prod path (enable_vnet=false).
+output "migrate_subnet_id" {
+  description = "Dedicated /23 subnet for the per-run ephemeral DB-migration Container Apps env (T180)."
+  value       = var.enable_vnet ? module.network[0].migrate_subnet_id : null
+}
+
 output "app_service_principal_id" {
   description = "Object id of the App Service system-assigned managed identity."
   value       = module.app_service.identity_principal_id
