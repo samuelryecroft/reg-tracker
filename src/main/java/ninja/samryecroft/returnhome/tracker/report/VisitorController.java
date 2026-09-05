@@ -63,9 +63,25 @@ public class VisitorController {
     private static final DateTimeFormatter DATETIME_LOCAL_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm");
     private static final DateTimeFormatter SCHEDULE_ERROR_DATE_FMT = DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm");
 
+    /**
+     * D-5b-6 (spec §7d follow-up, found reviewing #87): {@code getAuthorized} enforces
+     * AUTHORIZATION and says nothing about STATUS - {@link InterviewRequestService#confirmSchedule}
+     * carries its own precondition, so the POST was always safe, but the GET offered this form at
+     * every status, including ones {@code confirmSchedule} would refuse. Two consequences that made
+     * this worth fixing rather than leaving as a documented assumption: a status past SCHEDULED (or
+     * CANCELLED) makes {@code DeadlineTracker.badgeFor} return empty, rendering a labelled clock row
+     * with nothing in it; and the page offered a Confirm button the server would reject outright -
+     * the same shape already fixed once on {@code children/list.html} ("a supplier org-admin... was
+     * offered an action the server then refused"). Gating here means {@code populateScheduleModel}'s
+     * own claim that {@code badgeFor} never returns empty is now a property of the code, not an
+     * assumption about every caller, present and future.
+     */
     @GetMapping("/interviews/{id}/schedule")
     public String scheduleForm(@PathVariable Long id, @AuthenticationPrincipal AppUserPrincipal principal, Model model) {
         InterviewRequest request = interviewRequestService.getAuthorized(id, principal);
+        if (!InterviewRequestService.isAwaitingSchedule(request)) {
+            return "redirect:/interview-requests/" + id;
+        }
         populateScheduleModel(model, request);
         model.addAttribute("form", new ConfirmScheduleForm());
         return "visitor/schedule-form";
@@ -100,8 +116,9 @@ public class VisitorController {
      * {@link DeadlineTracker#RETURN_WINDOW} rather than restating 72 hours as a literal;
      * {@code timeRemaining} is taken through the same {@link DeadlineTracker#badgeFor} path the
      * queue uses, so the two screens say the same words about the same request - never re-worded
-     * here. Always present: this screen is reachable only at ALLOCATED, which always tracks the
-     * deadline, so {@code badgeFor} never returns empty for it.
+     * here. Always present: both callers reach this only after {@link InterviewRequestService#isAwaitingSchedule}
+     * has confirmed ALLOCATED (D-5b-6), which always tracks the deadline, so {@code badgeFor} never
+     * returns empty here - a property the GET handler enforces, not an assumption about its caller.
      */
     private void populateScheduleModel(Model model, InterviewRequest request) {
         model.addAttribute("request", request);
