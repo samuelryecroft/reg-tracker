@@ -1,6 +1,7 @@
 package ninja.samryecroft.returnhome.tracker.child;
 
 import jakarta.validation.Valid;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Locale;
@@ -11,6 +12,7 @@ import ninja.samryecroft.returnhome.tracker.child.dto.CreateChildForm;
 import ninja.samryecroft.returnhome.tracker.export.ExportCapability;
 import ninja.samryecroft.returnhome.tracker.home.Home;
 import ninja.samryecroft.returnhome.tracker.home.HomeRepository;
+import ninja.samryecroft.returnhome.tracker.interview.DeadlineTracker;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewRequest;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewRequestRepository;
 import ninja.samryecroft.returnhome.tracker.organisation.OrgType;
@@ -145,6 +147,47 @@ public class ChildController {
         }
     }
 
+    /**
+     * D-4b-8 (spec §7e, closed via D-4b-9/T195): the identity block under the {@code <h1>} - date of
+     * birth and case reference, in the shipped {@code dl.detail} shape. {@code dateOfBirth} is
+     * {@code @Encrypted} Article-9 data, so - the same rule and the same guard (T194) as
+     * {@link ChildListRow} - the masked branch resolves to the words themselves and never contains a
+     * date of birth at all, not a hidden one: there is nothing here a template could leak by reaching
+     * past this record. Naming what is withheld (D-4b-8) beats dropping the row (D-1a-1) - the layout
+     * stays stable across the toggle and a masked viewer is told the control exists.
+     *
+     * <p>{@code caseReference()} is never gated, for the same reason it isn't on
+     * {@code children/list.html} (D-4b-12/D-4b-14): {@code childIdentity.label()} already carries it
+     * on this same page whenever one is recorded, so a "Hidden" here would misreport a value that is
+     * two lines above it.
+     *
+     * <p><strong>No age, in either state (T195, human, 6 Sep).</strong> Age was considered as a
+     * coarsening of the date of birth that might sit outside the reveal (D-4b-9's first draft), but
+     * Kevin's axis - <em>who can read it</em>, not how much information it carries - ruled it out: an
+     * integer age is legible to a far wider population than the case reference is, which makes it
+     * identifying to precisely the population the mask exists to defeat. The human then closed it
+     * without a bed-count-dependent escape hatch: there is no home size at which age returns to the
+     * screen. There is no age concept anywhere in this system to add one from here.
+     *
+     * <p>Named {@code dob()}/{@code caseReference()} rather than mirroring {@code Child}'s own
+     * accessors, for the same reason as {@link ChildListRow}: T194's guard scans for a bare
+     * property-read of either encrypted field name, by design with no receiver-type check, so a
+     * differently-named accessor here can never register as a fresh read of the entity.
+     */
+    private record ChildIdentityDetail(String dob, String caseReference) {
+        private static final DateTimeFormatter DOB_FMT = DateTimeFormatter.ofPattern("dd MMM yyyy", Locale.UK);
+        private static final String DOB_HIDDEN = "Hidden — reveal names to show";
+
+        static ChildIdentityDetail of(Child child, boolean revealed) {
+            String dob = revealed
+                    ? (child.getDateOfBirth() == null ? "Not recorded" : child.getDateOfBirth().format(DOB_FMT))
+                    : DOB_HIDDEN;
+            String reference = child.getLocalCaseReference() == null || child.getLocalCaseReference().isBlank()
+                    ? "—" : child.getLocalCaseReference();
+            return new ChildIdentityDetail(dob, reference);
+        }
+    }
+
     @GetMapping("/{id}")
     public String detail(@PathVariable Long id, @AuthenticationPrincipal AppUserPrincipal principal, Model model) {
         Child child = childRepository.findDetailedById(id)
@@ -157,9 +200,19 @@ public class ChildController {
         long approvedReportCount = requests.stream()
                 .filter(r -> r.getStatus().name().equals("REPORT_APPROVED"))
                 .count();
+        boolean revealed = nameRevealService.isRevealed();
+        LocalDateTime now = LocalDateTime.now();
         model.addAttribute("child", child);
-        model.addAttribute("childIdentity", ChildIdentity.of(child, nameRevealService.isRevealed()));
+        model.addAttribute("childIdentity", ChildIdentity.of(child, revealed));
+        model.addAttribute("identityDetail", ChildIdentityDetail.of(child, revealed));
         model.addAttribute("requests", requests);
+        // D-4b-7 (spec §7e): a due badge only where DeadlineTracker.badgeFor actually returns one -
+        // a completed or cancelled request has no live clock and must show no urgency (D-4a-4's
+        // NO_CLOCK rule), so its absence here is meaningful rather than a gap. Same shape as
+        // VisitorController's own dueBadges map (screen 2f).
+        model.addAttribute("dueBadges", requests.stream()
+                .filter(r -> DeadlineTracker.badgeFor(r, now).isPresent())
+                .collect(Collectors.toMap(InterviewRequest::getId, r -> DeadlineTracker.badgeFor(r, now).orElseThrow())));
         model.addAttribute("caseHistory", auditHistoryService.caseHistoryFor(requests));
         model.addAttribute("canExport", ExportCapability.canExport(principal));
         model.addAttribute("approvedReportCount", approvedReportCount);
