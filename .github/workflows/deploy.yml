@@ -155,9 +155,12 @@ jobs:
             echo "acr=$(terraform output -raw container_registry_login_server)"
           } >> "$GITHUB_OUTPUT"
 
-      # --- 5.1: assert the app is pinned to the 'azure' profile and NEVER 'demo' (fail closed). ---
-      # The allowlist is {azure} (Terraform passes the literal "azure"; there is no 'prod' profile).
-      # This is the pipeline half of the two-layer demo guard - DemoProfileGuard is the in-app half.
+      # --- 5.1: assert the app is pinned to an allowed profile and NEVER 'demo' (fail closed). ---
+      # The allowlist is the EXPLICIT set {azure, "azure,entra"} - "azure" is the current state and
+      # "azure,entra" is the Entra sign-in cutover (T200; Terraform passes one literal or the other,
+      # gated on entra_enabled). It is deliberately NOT a prefix/substring match: this is the pipeline
+      # half of the two-layer demo guard (DemoProfileGuard is the in-app half), so the 'demo' refusal
+      # below must survive any widening. There is no 'prod' profile.
       - name: Assert SPRING_PROFILES_ACTIVE
         run: |
           profiles="$(az webapp config appsettings list \
@@ -167,10 +170,13 @@ jobs:
           case ",${profiles}," in
             *,demo,*) echo "FATAL: 'demo' profile present on a real deployment - refusing." >&2; exit 1 ;;
           esac
-          if [ "${profiles}" != "azure" ]; then
-            echo "FATAL: SPRING_PROFILES_ACTIVE='${profiles}', expected exactly 'azure' (allowlist)." >&2
-            exit 1
-          fi
+          case "${profiles}" in
+            azure|azure,entra) ;;  # explicit allowlist - keep exact, not a prefix match
+            *)
+              echo "FATAL: SPRING_PROFILES_ACTIVE='${profiles}', expected 'azure' or 'azure,entra' (allowlist)." >&2
+              exit 1
+              ;;
+          esac
 
       # --- DB-plane image: build the custom flyway+psql+jq image with the migration payload baked in
       # (deploy/db-plane/Dockerfile), push to ACR, and DIGEST-PIN it into the job. The CD identity has
