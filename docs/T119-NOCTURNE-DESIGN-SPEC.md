@@ -2049,8 +2049,8 @@ right. **Removing a paradox is not the same as supplying evidence.**
 ### D-187-2 · Four facts, as a labelled block, not a sentence
 
 ```
-Returned                02 Sep 2026, 14:20
-Interview held          05 Sep 2026, 11:05
+Returned                02 Sep 2026 14:20
+Interview held          05 Sep 2026 11:05
 Elapsed                 68 hours 45 minutes
 Statutory 72 hours      Within 72 hours of return
 ```
@@ -2107,6 +2107,77 @@ Two constraints follow from *how* it is read, not whether:
 sentence is composed in Java. Keep that — four fixed placeholders (`returnedLine`, `heldLine`, `elapsedLine`,
 `verdictLine`) plus a `reasonLine` that reads *"Not applicable"* when the verdict is met. No template
 branching, and the null-`heldAt` case is handled by what Java puts in each placeholder.
+
+
+### D-187-5 · The three rulings from the build (added 7 Sep, after PR #77)
+
+Jim built §7a as written and came back with two gaps and one deviation. All three are gaps in my writing,
+and the first one turned out not to be a display question at all.
+
+**(a) The comma in D-187-2's mock is not part of the spec — the document's own format is.** I wrote
+`02 Sep 2026, 14:20`; `ReportService.DATETIME_FMT` renders `02 Sep 2026 14:20`, and these rows sit beside
+`requestReceivedAt` and `approverSignedLine`. **Two datetime formats inside one statutory document is a worse
+outcome than a mock going unmatched.** The mock above is corrected to the document's format.
+
+> **General rule: where a spec's illustration and the surface's established format disagree, the surface
+> wins, and the spec is the thing that was wrong.**
+
+**(b) Locale: pin it, and pin it everywhere in the document, not only on the new rows.** `DATE_FMT` and
+`DATETIME_FMT` inherited the JVM default, so the same statutory record could print its month names in another
+language depending on the container it was generated in. Pinning only the new rows would have let two date
+formats drift apart inside one document. `Locale.UK` is right and stays. *Note for whoever reads it next:*
+under CLDR, `Locale.UK` renders September as **"Sept"**, four characters where every other month is three.
+That is the correct British abbreviation, not a bug, and it should not be "fixed" to `Locale.ENGLISH` later.
+
+**(c) An interview recorded before the return is a data-quality state, and the document was never its
+first problem.** `heldAt` earlier than `returnedAt` gives a negative duration. Jim correctly refused to print
+a signed figure — that is D-187-3's rule applied to a case D-187-3 did not name. But the naive block reads:
+
+```
+Elapsed                 Interview recorded before the return - times need checking
+Statutory 72 hours      Within 72 hours of return
+```
+
+**which is the same contradiction one row further down.** `InterviewReport.getWithin72Hours()` computes
+`!heldAt.isAfter(returnedAt + 72h)`, and an impossible sequence satisfies it, so this record is not merely
+*displayed* as compliant — it is **counted in the numerator of the dashboard's compliance rate.**
+
+That method's own javadoc records fixing the mirror of this bug: an unanswered question was *"counted as a
+breach while still sitting in the denominator."* **Half of that defect was fixed. This is the other half:
+an impossible state counted as a pass while sitting in the numerator.**
+
+> **Fix the predicate, not the presentation.** A display rule can stop a document contradicting itself; it
+> cannot stop a broken record inflating a statistic. When the presentation layer has to invent language for
+> a state, ask first whether the state should exist.
+
+So:
+
+1. `getWithin72Hours()` returns **null** when `heldAt.isBefore(returnedAt)`. Its contract widens from *"no
+   recorded `heldAt`"* to **"the clock cannot be read"**, and the javadoc must say so. Equality stays
+   measurable — a zero-elapsed record is odd, not impossible.
+2. The rate excludes it and `RateStat.excludedNotMeasurable` counts it, with no change to either class.
+3. `interview/detail.html:272` already reads *"Not measurable — interview time not recorded"* off a null; its
+   copy widens to cover a second cause. It is the one surface that names the reason, so it must stay true.
+4. **This is not a fourth verdict state.** The third state already exists — Jim wrote it for the null branch.
+   Not-measurable is one verdict with more than one cause; the *cause* belongs in the elapsed row, which is
+   what that row is for. Same verdict string in all three cases.
+5. The elapsed row must then distinguish the causes, because *"Cannot be calculated without both times"* is
+   false when both times are present and merely inconsistent. Three cases: a missing end → *"Cannot be
+   calculated without both times"*; an inconsistent pair → Jim's *"Interview recorded before the return —
+   times need checking"*, with both timestamps still printed, since they are the evidence the reader needs
+   to correct the record.
+
+**(d) A gap of mine that (c) exposed: the reason row on a not-measurable case.** §7a said the fifth row
+carries the reason *"when the verdict is not met"* and never said what a not-measurable case does with it.
+The built code falls through to *"No reason recorded"* — which reads as an accusation of a missing
+explanation for a breach that did not happen. **A reason is only owed when the window was measured and
+missed.** So: if a reason was recorded, print it (never hide data a visitor entered); if not, the row reads
+*"Not applicable"*, exactly as a met case does. The blank fallback depends on whether an explanation was
+**owed**, not on whether the verdict was true.
+
+**This changes a published compliance statistic**, so it is called out in the PR body rather than shipped
+quietly — but it belongs inside T187 rather than after it, because T187 exists to stop the document making a
+compliance claim that cannot be checked, and this is that claim with a rarer trigger.
 
 
 ## 7b · 4a Allocate, and the remaining list screens (Creed, 5 Sep)
