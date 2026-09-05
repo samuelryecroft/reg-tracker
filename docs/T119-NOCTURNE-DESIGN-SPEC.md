@@ -2941,3 +2941,36 @@ test's `occurrencesOf(html, caseReference) == 2` becomes `4` once `ChildIdentity
 assertion is the tripwire that forces the column drop to be noticed — but only if it is labelled as one.**
 Unlabelled, whoever lands the additive change bumps the number and the redundancy becomes permanent.
 
+### D-5b-6 · The GET is not status-gated, so 5b offers an action the server refuses — a gap in §7d, not in the build
+
+Found reviewing PR #87. `VisitorController.scheduleForm` calls `interviewRequestService.getAuthorized`, which
+**enforces authorization and says nothing about status.** `confirmSchedule` carries its own precondition
+(*"awaiting a scheduled time"*, deliberately not expressed through the transition table), **so the POST is
+safe.** The GET is not gated at all.
+
+Two consequences, and the second is the larger one:
+
+1. `DeadlineTracker.badgeFor` returns empty whenever `tracksDeadline` is false — i.e. at every status past
+   `SCHEDULED`, and at `CANCELLED`. `timeRemaining` is then `null` and the block renders **a labelled row
+   with nothing in it**, under a *72-hour deadline* that is no longer running. The implementation's javadoc
+   states *"this screen is reachable only at ALLOCATED… so `badgeFor` never returns empty"* — **that is true
+   of the intended flow and enforced nowhere.**
+2. **The page offers a Confirm button the server will refuse.** That is a defect this codebase has already
+   fixed once and left a comment about, on `children/list.html`: *"This hid the button from VIEWER only, so a
+   supplier org-admin — who can reach this page — was offered an action the server then refused."* **Same
+   shape, same repo, already named.**
+
+**Fix: gate the GET on the same precondition `confirmSchedule` enforces**, and send a visitor who does not
+meet it to the request detail rather than to a form that cannot succeed. Then `timeRemaining` cannot be null
+**by construction**, and the javadoc's claim stops being an assumption about reachability and becomes a
+property of the code — the same move as holding the verdict in an enum rather than re-reading its sentence
+(D-187-9).
+
+> **A comment asserting that an input cannot occur is a claim about every caller, present and future. Either
+> the code enforces it or the next caller falsifies it.**
+
+**This is a gap in §7d.** I specced the field, the block, the constraint and the validation, and never asked
+*who can reach this screen and in what state* — the same omission as citing a class from the wrong branch:
+I checked the thing in front of me and not the frame around it. **Not a reason to hold #87**, which
+implements §7d faithfully; a follow-up ticket of its own.
+
