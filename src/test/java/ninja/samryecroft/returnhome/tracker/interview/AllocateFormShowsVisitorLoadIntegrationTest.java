@@ -119,7 +119,8 @@ class AllocateFormShowsVisitorLoadIntegrationTest extends AbstractIntegrationTes
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
 
-        assertThat(html).contains("0 open allocations");
+        // D-4a-4: zero reads as an answer ("No open allocations"), never a measurement ("0 ...").
+        assertThat(html).contains("No open allocations");
         assertThat(html).contains("2 open allocations");
         // Sorted least-loaded first: the free visitor's row must appear before the busy one's.
         int freeIndex = html.indexOf("t4a-free-visitor");
