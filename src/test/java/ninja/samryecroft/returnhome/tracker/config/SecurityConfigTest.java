@@ -9,6 +9,7 @@ import ninja.samryecroft.returnhome.tracker.audit.AuditEventPublisher;
 import ninja.samryecroft.returnhome.tracker.child.NameRevealService;
 import ninja.samryecroft.returnhome.tracker.home.HomeRepository;
 import ninja.samryecroft.returnhome.tracker.organisation.OrganisationAccessService;
+import ninja.samryecroft.returnhome.tracker.security.LoginFailureHandler;
 import ninja.samryecroft.returnhome.tracker.theme.ThemeService;
 import ninja.samryecroft.returnhome.tracker.user.RoleMatrix;
 import ninja.samryecroft.returnhome.tracker.web.LoginController;
@@ -24,6 +25,17 @@ import org.springframework.test.web.servlet.MockMvc;
 @WebMvcTest(controllers = {RootController.class, LoginController.class})
 @Import(SecurityConfig.class)
 class SecurityConfigTest {
+
+    /**
+     * T215's failure handler. SecurityConfig now requires it, and this slice imports SecurityConfig
+     * without component-scanning, so without a bean here the whole context fails to start and every
+     * test in the class errors before asserting anything. Mocked rather than imported: the real one
+     * needs LoginAttemptService and AppProperties, and this class is about which routes each role
+     * may reach, not about what a failed sign-in renders (that is LoginFailureHandlerTest and
+     * LoginLockoutIntegrationTest).
+     */
+    @MockitoBean
+    private LoginFailureHandler loginFailureHandler;
 
     @Autowired
     private MockMvc mockMvc;
