@@ -184,6 +184,37 @@ class ConfirmVisitTimeIntegrationTest extends AbstractIntegrationTest {
         assertThat(updated.getScheduledAt()).isEqualTo(wellOutsideWindow);
     }
 
+    @Test
+    void aRequestThatIsNotAwaitingAScheduleRedirectsToTheDetailPageInsteadOfAFormThatCannotSucceed() throws Exception {
+        // D-5b-6: getAuthorized enforces authorization, not status - a bookmark or stale link must
+        // not reach a form offering a Confirm the server would refuse (confirmSchedule's own
+        // precondition is ALLOCATED only). Seeded already SCHEDULED here; CANCELLED would fail the
+        // same way, for the same reason - one status past the precondition is enough to prove the
+        // gate, not an exhaustive sweep of every non-ALLOCATED value.
+        InterviewRequest alreadyScheduled = InterviewRequestTestFixtures.requestAt(InterviewStatus.SCHEDULED);
+        Child child = new Child();
+        child.setFirstName("Casey");
+        child.setLastName("T5b6" + suffix);
+        child.setDateOfBirth(LocalDate.of(2014, 1, 1));
+        child.setHome(homeOf(requestId));
+        Child savedChild = childRepository.save(child);
+        alreadyScheduled.setChild(savedChild);
+        alreadyScheduled.setHome(homeOf(requestId));
+        alreadyScheduled.setRequestedBy(userRepository.findByUsername("t5b-coordinator" + suffix).orElseThrow());
+        alreadyScheduled.setAllocatedVisitor(userRepository.findByUsername(visitorUsername).orElseThrow());
+        alreadyScheduled.setReturnedAt(returnedAt);
+        alreadyScheduled.setScheduledAt(returnedAt.plusHours(20));
+        Long scheduledId = interviewRequestRepository.save(alreadyScheduled).getId();
+
+        mockMvc.perform(get("/visitor/interviews/{id}/schedule", scheduledId).with(asUser(visitorUsername)))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/interview-requests/" + scheduledId));
+    }
+
+    private Home homeOf(Long requestId) {
+        return interviewRequestRepository.findById(requestId).orElseThrow().getHome();
+    }
+
     private String getForm() throws Exception {
         return mockMvc.perform(get("/visitor/interviews/{id}/schedule", requestId).with(asUser(visitorUsername)))
                 .andExpect(status().isOk())
