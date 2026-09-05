@@ -3,6 +3,7 @@ package ninja.samryecroft.returnhome.tracker.child;
 import jakarta.validation.Valid;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Locale;
 import java.util.stream.Collectors;
 import ninja.samryecroft.returnhome.tracker.audit.AuditEventPublisher;
 import ninja.samryecroft.returnhome.tracker.audit.AuditHistoryService;
@@ -92,18 +93,25 @@ public class ChildController {
 
     /**
      * T193 (PILOT-GATE, spec §7f D-4b-11): {@code children/list.html} took names through
-     * {@link ChildIdentities} but read two of {@code Child}'s other {@code @Encrypted} (Article 9)
-     * fields straight off the entity, so a masked row showed initials alongside an exact birth
-     * date and case reference in the clear. Gated here the same way {@link ChildIdentity} resolves
-     * its own fields: the caller decides {@code revealed} once, and the template receives exactly
-     * one already-resolved string per field - never a hidden value sitting unrendered in the DOM,
-     * and never both strings present at once.
+     * {@link ChildIdentities} but read {@code Child}'s date of birth straight off the entity - an
+     * {@code @Encrypted} (Article 9) field - so a masked row showed initials alongside an exact
+     * birth date in the clear. Gated here the same way {@link ChildIdentity} resolves its own
+     * fields: the caller decides {@code revealed} once, and the template receives exactly one
+     * already-resolved string - never a hidden value sitting unrendered in the DOM, and never both
+     * strings present at once. The original T193 fix also gated the case reference; see below for
+     * why that part was reverted.
      *
-     * <p><strong>Gating the case reference is not a disclosure fix.</strong> Kevin's masked label
-     * already carries it on every row ("A.B. · CH-0041" - see {@link ChildIdentity}'s own javadoc);
-     * masking defeats a stranger's glance, not a colleague's, by design. This column duplicated
-     * that value in the clear, so gating it removes a duplicate, not an exposure - do not read
-     * this fix as evidence the masked label should stop carrying the reference; it must.
+     * <p><strong>The case reference is never gated - it is not a disclosure to begin with.</strong>
+     * Kevin's masked label already carries it on every row ("A.B. · CH-0041" - see
+     * {@link ChildIdentity}'s own javadoc); masking defeats a stranger's glance, not a colleague's,
+     * by design. An earlier version of this fix masked the column too, "for consistency" - that was
+     * wrong: a masked row then read <em>Case reference: Hidden</em> two columns from a name that
+     * openly displayed it, so the only value the column withheld was one already on screen. A false
+     * "Hidden" doesn't just mislead, it makes the reader act - the one control on offer to see a
+     * value that's already visible is the reveal toggle, so a user chasing the reference reveals
+     * every child's full name on the page to get back something they could already read. Deciding a
+     * value MAY be withheld is a different decision from deciding what the withheld state SAYS, and
+     * the column's text is the one a reader actually acts on (Creed, T193 follow-up).
      *
      * <p>A private, page-scoped record rather than a change to {@link ChildIdentity} itself: that
      * type is a separate, already-ruled ticket (making reveal strictly additive), and this page
@@ -118,14 +126,19 @@ public class ChildController {
      * two fields are already-resolved strings, not the encrypted values themselves.
      */
     private record ChildListRow(String dob, String caseReference) {
-        private static final DateTimeFormatter DOB_FMT = DateTimeFormatter.ofPattern("dd MMM yyyy");
+        // Pinned explicitly rather than left to inherit the JVM default: the #temporals.format
+        // call this replaced resolved its locale through Thymeleaf/Spring's own LocaleResolver
+        // (no custom bean configured, so it falls back to the request's Accept-Language, not a
+        // fixed one), so leaving this formatter unpinned would be a real behaviour change, not a
+        // like-for-like swap - the same class of gap Jim's report-date formatters have (Creed's
+        // T193 follow-up).
+        private static final DateTimeFormatter DOB_FMT = DateTimeFormatter.ofPattern("dd MMM yyyy", Locale.UK);
         private static final String HIDDEN = "Hidden";
 
         static ChildListRow of(Child child, boolean revealed) {
-            if (!revealed) {
-                return new ChildListRow(HIDDEN, HIDDEN);
-            }
-            String dob = child.getDateOfBirth() == null ? "Not recorded" : child.getDateOfBirth().format(DOB_FMT);
+            String dob = revealed
+                    ? (child.getDateOfBirth() == null ? "Not recorded" : child.getDateOfBirth().format(DOB_FMT))
+                    : HIDDEN;
             String reference = child.getLocalCaseReference() == null || child.getLocalCaseReference().isBlank()
                     ? "—" : child.getLocalCaseReference();
             return new ChildListRow(dob, reference);
