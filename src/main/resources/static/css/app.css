@@ -1718,3 +1718,24 @@ nav.seg .seg-opt { color: inherit; text-decoration: none; }
 @media (max-width: 720px) {
     .org-children { margin-left: var(--s2); padding-left: var(--s3); }
 }
+
+/* ============================== 6c · one audit event in full ==============================
+   No new components: the record itself is a dl.detail, the absences are a plain list, and
+   the permanence line is the only new piece because it is the only thing on the page that
+   is an assurance rather than a field. */
+.page-head { margin-bottom: var(--s4); }
+.page-head h1 { margin: 0 0 var(--s1); }
+.not-kept-head { font-size: var(--t-md); margin: 0 0 var(--s3); }
+/* Dashes as list markers, matching the canvas: these rows are absences, and a bullet reads
+   as a thing that is present. The dash is decorative, so it is a ::before rather than a
+   character in the text - the sentence is what gets announced. */
+.not-kept { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--s2); }
+.not-kept li { position: relative; padding-left: var(--s4); color: var(--muted); font-size: var(--t-sm); }
+.not-kept li::before { content: "—"; position: absolute; left: 0; }
+.permanence {
+    display: flex; align-items: flex-start; gap: var(--s3);
+    margin: var(--s4) 0; padding: var(--s3) var(--s4);
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    font-size: var(--t-sm); color: var(--muted);
+}
+.permanence .icon { flex: none; margin-top: 2px; }

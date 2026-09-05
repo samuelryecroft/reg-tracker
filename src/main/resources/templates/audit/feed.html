@@ -114,6 +114,12 @@
                 </p>
                 <span class="detail" th:if="${row.entry().detail() != null}" th:text="${row.entry().detail()}">Detail</span>
                 <a class="rowlink" th:href="@{/interview-requests/{id}(id=${row.requestId()})}">Open this record</a>
+                <!--/* 6c's entry point. Without it the event page exists and nothing reaches it,
+                     which is the shape of a screen that gets built and then quietly rots. The two
+                     links go to different things and say so: the record this event is ABOUT, and
+                     the event ITSELF - including what is deliberately not kept against it. */-->
+                <a class="rowlink" th:if="${row.entry().id() != null}"
+                   th:href="@{/audit/{id}(id=${row.entry().id()})}">This event in full</a>
             </li>
         </ol>
     </th:block>
