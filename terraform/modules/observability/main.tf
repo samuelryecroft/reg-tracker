@@ -18,6 +18,13 @@ resource "azurerm_application_insights" "this" {
   workspace_id        = azurerm_log_analytics_workspace.this.id
   application_type    = "java"
   tags                = var.tags
+
+  # ⚠️ DO NOT set sampling_percentage below 100 without moving the T201 secret-expiry alert off this
+  # component first. That alert (modules/secret_expiry_alert) fires from ONE low-volume customEvent
+  # per day; ingestion sampling would silently drop it, and the alert's failure mode is silence - it
+  # would look healthy while never firing, exactly the class of failure T201 exists to prevent. This
+  # is why the P19 quarterly fire-test in GO-LIVE-READINESS.md is load-bearing: it is the only thing
+  # that would catch such a change. (Sampling is 100% today: unset here, and 100 in the app config.)
 }
 
 resource "azurerm_monitor_action_group" "oncall" {

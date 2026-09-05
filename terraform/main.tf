@@ -83,6 +83,11 @@ module "secret_expiry_alert" {
   secret_name      = var.secret_expiry_secret_name
   recipient_emails = var.secret_expiry_recipient_emails
   enabled          = var.secret_expiry_alert_enabled
+
+  # Carrier (A1): the checker posts customEvents to the app's App Insights; scheduled-query alerts read
+  # them. This alert shares fate with appi-rht - see the sampling warning in the observability module.
+  app_insights_id                = module.observability.app_insights_id
+  app_insights_connection_string = module.observability.app_insights_connection_string
 }
 
 module "storage" {

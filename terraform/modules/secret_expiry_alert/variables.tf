@@ -55,3 +55,18 @@ variable "enabled" {
   type        = bool
   default     = false
 }
+
+# --- Carrier (A1): Application Insights. The Logic App posts a customEvent every run; scheduled-query
+# alerts over customEvents fire the action group. Uses the EXISTING appi-rht (fewest new parts).
+variable "app_insights_id" {
+  description = "Resource ID of the Application Insights component (appi-rht) - scope for the scheduled-query alerts."
+  type        = string
+  default     = ""
+}
+
+variable "app_insights_connection_string" {
+  description = "App Insights connection string (carries the InstrumentationKey + IngestionEndpoint the Logic App posts customEvents to). The ikey is an ingestion-only key, already used by the app - not a new standing credential."
+  type        = string
+  default     = ""
+  sensitive   = true
+}

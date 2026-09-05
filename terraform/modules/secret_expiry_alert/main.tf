@@ -19,16 +19,21 @@
 #  - DEAD-MAN'S SWITCH: the checker's own failure mode is silence. RunsFailed>0 and, load-bearing, a
 #    liveness alert (RunsSucceeded<1 over 24h) that catches a disabled/stopped checker.
 #
-# TELEMETRY SINK IS STUBBED pending Kevin's carrier ruling (custom-metric-on-KV was PROVEN dead at the
-# fire-test: KV returns 200 and silently stores nothing). Candidates: (A1, god-endorsed) App Insights
-# custom telemetry + scheduled-query alert v2; (A2) Log Analytics Logs-Ingestion + scheduled-query
-# alert. The evaluator emits fire/expired decisions; the sink resource(s) that carry them to the
-# action group drop in once the carrier is named. Everything below the "SINK STUB" marker is the only
-# carrier-dependent part; the rest is proven/ruled and final.
+# CARRIER = (A1) Application Insights (custom-metric-on-KV was PROVEN dead at the fire-test: KV 200s
+# the emit then stores nothing). The checker posts a customEvent to appi-rht EVERY run; scheduled-query
+# alerts v2 over customEvents fire the action group. Emitting every run (not only on rungs) is what
+# makes "no event" mean "the bridge died" rather than "not a rung day" - hence the bridge-liveness alert.
 
 locals {
   create           = var.enabled ? 1 : 0
   escalation_array = join(", ", [for d in var.escalation_days : tostring(d)])
+
+  # Parse the ingestion-only bits out of the AI connection string (ikey + regional ingest endpoint).
+  # The connection string is InstrumentationKey=..;IngestionEndpoint=https://<region>.in...;...
+  ai_ikey            = local.create == 0 ? "" : regex("InstrumentationKey=([^;]+)", var.app_insights_connection_string)[0]
+  ai_ingest_raw      = local.create == 0 ? "" : regex("IngestionEndpoint=([^;]+)", var.app_insights_connection_string)[0]
+  ai_ingest_endpoint = endswith(local.ai_ingest_raw, "/") ? local.ai_ingest_raw : "${local.ai_ingest_raw}/"
+  ai_event_name      = "SecretExpiry"
 }
 
 # Action group - the notification sink. Native email_receiver = real mail with no connector auth, and
@@ -186,22 +191,166 @@ resource "azurerm_logic_app_action_custom" "compose_expired" {
   depends_on = [azurerm_logic_app_action_custom.compose_days]
 }
 
-# ============================ SINK STUB (carrier-dependent) ============================
-# Everything above is proven/ruled and final. The part below - how the fire/expired DECISIONS reach
-# the action group - is the ONLY carrier-dependent piece, held pending Kevin's A1(App Insights) /
-# A2(Log Analytics) ruling. custom-metric-on-KV was PROVEN dead at the fire-test (KV 200s then drops).
-#
-# When the carrier lands, this stub is replaced by:
-#   - an emit action in the Logic App (runAfter Compose_fire + Compose_expired): POST the WARNING
-#     signal (value = outputs('Compose_fire')) and the EXPIRED signal (value = outputs('Compose_expired'))
-#     to the chosen telemetry store [A1: App Insights track endpoint; A2: Log Analytics ingestion];
-#   - the identity/role that emit needs [A1/A2 auth];
-#   - a WARNING alert rule (signal>=1 -> action group) and a separate EXPIRED alert rule
-#     (expired>=1 -> same action group, DISTINCT incident subject/body), replacing the dead
-#     azurerm_monitor_metric_alert on the KV custom metric.
-# Until then the checker runs, guards, and computes, but does not yet notify on the ladder; the
-# dead-man's switch below is live and carrier-independent.
-# =======================================================================================
+# ============================ CARRIER (A1): Application Insights ============================
+# custom-metric-on-KV was PROVEN dead at the fire-test (KV 200s the emit then stores nothing). Carrier
+# is App Insights (appi-rht, existing, purpose-built for custom telemetry). The Logic App posts a
+# customEvent EVERY run (not only on rung days) carrying fire (1 on a rung, else 0), expired and
+# daysToExpiry; scheduled-query alerts over customEvents fire the action group.
+
+# 7) Emit a customEvent to App Insights EVERY run. Emitting every day (not only on rungs) is what makes
+#    "no event" mean "the bridge died" rather than "not a rung day" - the exact silent failure the KV
+#    bridge had (ran, 200, stored nothing). The rung alert queries fire==1, so the toggle is preserved.
+#    Breeze v2/track envelope; ikey is ingestion-only (already the app's), not a new standing credential.
+resource "azurerm_logic_app_action_custom" "emit_event" {
+  count        = local.create
+  name         = "Emit_event"
+  logic_app_id = azurerm_logic_app_workflow.checker[0].id
+  body = jsonencode({
+    type = "Http"
+    inputs = {
+      method  = "POST"
+      uri     = "${local.ai_ingest_endpoint}v2/track"
+      headers = { "Content-Type" = "application/json" }
+      body = {
+        name = "Microsoft.ApplicationInsights.Event"
+        time = "@{utcNow()}"
+        iKey = local.ai_ikey
+        tags = { "ai.cloud.role" = "t201-secret-expiry" }
+        data = {
+          baseType = "EventData"
+          baseData = {
+            ver  = 2
+            name = local.ai_event_name
+            properties = {
+              secretName   = var.secret_name
+              fire         = "@{string(outputs('Compose_fire'))}"
+              expired      = "@{string(outputs('Compose_expired'))}"
+              daysToExpiry = "@{string(outputs('Compose_days'))}"
+            }
+          }
+        }
+      }
+    }
+    runAfter = {
+      Compose_fire    = ["Succeeded"]
+      Compose_expired = ["Succeeded"]
+    }
+  })
+  depends_on = [
+    azurerm_logic_app_action_custom.compose_fire,
+    azurerm_logic_app_action_custom.compose_expired,
+  ]
+}
+
+# WARNING ladder alert: a customEvent with fire==1 appears only on isolated rung days, so the result
+# oscillates present/absent and the alert auto-resolves + RE-FIRES per rung.
+resource "azurerm_monitor_scheduled_query_rules_alert_v2" "warning" {
+  count                   = local.create
+  name                    = "alert-${var.name_prefix}-secret-expiry-warning"
+  resource_group_name     = var.resource_group_name
+  location                = var.location
+  scopes                  = [var.app_insights_id]
+  description             = "ENTRA-CLIENT-SECRET is approaching expiry (escalating rungs: ${local.escalation_array} days)."
+  severity                = 1
+  evaluation_frequency    = "PT1H"
+  window_duration         = "PT1H"
+  auto_mitigation_enabled = true
+  tags                    = var.tags
+
+  criteria {
+    query                   = <<-KQL
+      customEvents
+      | where name == "${local.ai_event_name}"
+      | where tostring(customDimensions.secretName) == "${var.secret_name}"
+      | where toint(customDimensions.fire) == 1
+    KQL
+    time_aggregation_method = "Count"
+    operator                = "GreaterThanOrEqual"
+    threshold               = 1
+    failing_periods {
+      minimum_failing_periods_to_trigger_alert = 1
+      number_of_evaluation_periods             = 1
+    }
+  }
+
+  action {
+    action_groups = [azurerm_monitor_action_group.secret_expiry[0].id]
+  }
+}
+
+# EXPIRED alarm: fires once when expiry has passed. Separate rule, DISTINCT incident description - its
+# job is diagnosis (the first thing in the inbox when sign-in breaks names the cause). Fires-once is
+# right; it only has to say the cause once, so auto-mitigation is off.
+resource "azurerm_monitor_scheduled_query_rules_alert_v2" "expired" {
+  count                   = local.create
+  name                    = "alert-${var.name_prefix}-secret-expiry-EXPIRED"
+  resource_group_name     = var.resource_group_name
+  location                = var.location
+  scopes                  = [var.app_insights_id]
+  description             = "INCIDENT: the Entra client secret (${var.secret_name}) has EXPIRED - Entra sign-in is failing for every user now. This is the cause; mint a new secret into kv-rht and re-apply. (Not a warning - the ladder's warnings already passed.)"
+  severity                = 0
+  evaluation_frequency    = "PT1H"
+  window_duration         = "PT1H"
+  auto_mitigation_enabled = false
+  tags                    = var.tags
+
+  criteria {
+    query                   = <<-KQL
+      customEvents
+      | where name == "${local.ai_event_name}"
+      | where tostring(customDimensions.secretName) == "${var.secret_name}"
+      | where toint(customDimensions.expired) == 1
+    KQL
+    time_aggregation_method = "Count"
+    operator                = "GreaterThanOrEqual"
+    threshold               = 1
+    failing_periods {
+      minimum_failing_periods_to_trigger_alert = 1
+      number_of_evaluation_periods             = 1
+    }
+  }
+
+  action {
+    action_groups = [azurerm_monitor_action_group.secret_expiry[0].id]
+  }
+}
+
+# BRIDGE-LIVENESS: NO customEvent of ANY kind from this checker in 24h => fire. The dead-man's switch
+# below watches whether the Logic App RUNS; this watches whether its EMIT actually LANDS. The KV bridge
+# proved the emit can die independently while the run succeeds with a 200, so this layer is required.
+resource "azurerm_monitor_scheduled_query_rules_alert_v2" "bridge_liveness" {
+  count                   = local.create
+  name                    = "alert-${var.name_prefix}-secret-expiry-bridge-liveness"
+  resource_group_name     = var.resource_group_name
+  location                = var.location
+  scopes                  = [var.app_insights_id]
+  description             = "No secret-expiry customEvent reached App Insights in 24h - the checker's emit (or App Insights ingestion/sampling) may have silently failed while the Logic App still succeeded. The expiry ladder cannot fire without these events, so this is a silent-failure guard on the bridge itself."
+  severity                = 1
+  evaluation_frequency    = "PT1H"
+  window_duration         = "P1D"
+  auto_mitigation_enabled = true
+  tags                    = var.tags
+
+  criteria {
+    query                   = <<-KQL
+      customEvents
+      | where name == "${local.ai_event_name}"
+      | where tostring(customDimensions.secretName) == "${var.secret_name}"
+    KQL
+    time_aggregation_method = "Count"
+    operator                = "LessThan"
+    threshold               = 1
+    failing_periods {
+      minimum_failing_periods_to_trigger_alert = 1
+      number_of_evaluation_periods             = 1
+    }
+  }
+
+  action {
+    action_groups = [azurerm_monitor_action_group.secret_expiry[0].id]
+  }
+}
+# ==========================================================================================
 
 # DEAD-MAN'S SWITCH (a): a run threw. Catches a failing checker (incl. the not-found/no-expiry throw).
 resource "azurerm_monitor_metric_alert" "runs_failed" {
