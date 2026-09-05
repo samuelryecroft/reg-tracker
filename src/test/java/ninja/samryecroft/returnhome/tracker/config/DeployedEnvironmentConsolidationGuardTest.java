@@ -25,57 +25,48 @@ import org.junit.jupiter.api.Test;
  * lists without removing the mechanism that produced them would leave a fifth one free to appear,
  * and it would be invisible in review of any single file - each list reads as correct where it
  * lives.
+ *
+ * <p><b>It keys on the FACT, not on the container.</b> The first version matched
+ * {@code Set.of}/{@code List.of} initialisers, then grew alternations for {@code String[]} and
+ * {@code Arrays.asList} and then a qualifier for {@code java.util.Arrays.asList} - each round
+ * catching a shape the round before had missed, which is a heuristic teaching its readers that it is
+ * incomplete. Asking instead "does any other file name a deployed environment at all" catches every
+ * shape including the ones nobody has thought of: an {@code equals("prod") || equals("azure")}
+ * chain, a comma-separated constant that gets {@code split(",")}, a switch. There is no fifth shape
+ * to discover later, because it is not looking at shapes.
+ *
+ * <p>Kevin proposed it having measured that the allowlist is empty today, which is the only reason
+ * it is affordable; I measured the same thing independently before taking it, because the whole
+ * point of that number is that nobody should be taking it on trust.
  */
 class DeployedEnvironmentConsolidationGuardTest {
 
     private static final Path MAIN_JAVA = Path.of("src/main/java");
 
-    /** Enough markers that two together mean an environment list rather than a coincidence. */
-    private static final Set<String> MARKERS =
-            Set.of("prod", "production", "staging", "azure", "dev", "demo");
+    /**
+     * The names of a deployed environment - and only those.
+     *
+     * <p>Deliberately not {@code dev} or {@code demo}, which the earlier two-or-more heuristic
+     * included: those name a developer's machine, which is a different question, and
+     * {@code DemoProperties} legitimately says {@code "demo"}. A guard that flagged it would be
+     * asking "does this file mention an environment" rather than "does this file decide whether we
+     * are deployed", and the first question has no useful answer.
+     */
+    private static final Set<String> MARKERS = Set.copyOf(DeployedEnvironment.DEPLOYED_MARKERS);
+
 
     /**
-     * The two lists that are allowed to exist, and why each is allowed - by name, with the reason,
-     * rather than by an accident of pattern.
+     * The one file allowed to name a deployed environment.
      *
-     * <p>{@code LOCAL_PROFILES} is not a fifth answer to the same question: it asks "is this
-     * positively a developer's machine", which is a different question, and requiring positive
-     * evidence rather than inferring it from the absence of a marker is the reason
-     * {@code DatabasePasswordGuard} survived the consolidation with its meaning intact.
+     * <p>Empty of exceptions on purpose, and that is what makes this affordable: measured on this
+     * branch, {@code DeployedEnvironment} is the <b>only</b> file in {@code src/main/java} that
+     * contains a marker literal at all. Every future file that legitimately needs one makes this
+     * more expensive to adopt, so it is adopted now.
      */
-    private static final Set<String> PERMITTED = Set.of("DEPLOYED_MARKERS", "LOCAL_PROFILES");
-
-    /**
-     * The forms a list of environment markers is naturally written in, qualified or not - not just the one the four
-     * lists happened to use.
-     *
-     * <p>The first version matched only {@code Set.of(...)} / {@code List.of(...)}, and Kevin's
-     * review found the hole with a live example: {@code DemoProfileGuardTest} held
-     * {@code new String[] {"prod", "production", "staging", "PROD"}} - <b>the one remaining copy of
-     * the fact, written in the one shape the guard could not see.</b> That is proof the missed form
-     * is the natural thing to write rather than a contrivance.
-     *
-     * <p><b>And it is exactly what the §6.4 proof could not tell me.</b> Running the guard against
-     * the pre-refactor tree proves it catches four instances of ONE shape; it says nothing about a
-     * fifth written differently, because there was never a differently-shaped one there to catch.
-     * The mutation was real and right, and its scope was narrower than the claim I used it to
-     * support - so this pattern gets its own control, below the same standard.
-     *
-     * <p>The qualifier is there because that control earned it: {@code java.util.Arrays.asList(...)}
-     * walked past the first version of this while the bare {@code Arrays.asList(...)} was caught. A
-     * pattern that only sees the import style the codebase happens to use today is the same defect
-     * as one that only sees the shape the four lists happened to have.
-     */
-    private static final String QUALIFIER = "(?:[\\w.]*\\.)?";
-
-    private static final Pattern LITERAL_SET = Pattern.compile(
-            "(?:Set|List)<String>\\s+(\\w+)\\s*=\\s*" + QUALIFIER + "(?:Set|List)\\.of\\(([^)]*)\\)"
-                    + "|String\\[\\]\\s+(\\w+)\\s*=\\s*\\{([^}]*)\\}"
-                    + "|(\\w+)\\s*=\\s*" + QUALIFIER + "Arrays\\.asList\\(([^)]*)\\)"
-                    + "|new\\s+String\\[\\]\\s*()\\{([^}]*)\\}");
+    private static final String CANONICAL = "DeployedEnvironment.java";
 
     @Test
-    void thereIsExactlyOneAnswerToIsThisADeployedEnvironment() throws IOException {
+    void onlyOneFileNamesADeployedEnvironment() throws IOException {
         List<Path> sources = javaSources();
         assertThat(sources)
                 .as("the scanned tree must exist and contain files - a scan that silently finds "
@@ -84,35 +75,32 @@ class DeployedEnvironmentConsolidationGuardTest {
                 .isNotEmpty();
 
         List<String> offences = new ArrayList<>();
-        int listsSeen = 0;
+        int canonicalMarkers = 0;
         for (Path file : sources) {
-            String source = withoutComments(Files.readString(file, StandardCharsets.UTF_8));
-            Matcher m = LITERAL_SET.matcher(source);
-            while (m.find()) {
-                String name = firstNonNull(m, 1, 3, 5, 7);
-                String arguments = firstNonNull(m, 2, 4, 6, 8);
-                long markers = literals(arguments).stream().filter(MARKERS::contains).count();
-                if (markers < 2) {
-                    continue;
-                }
-                listsSeen++;
-                if (name == null || name.isBlank() || !PERMITTED.contains(name)) {
-                    offences.add(file.getFileName() + " -> " + name);
-                }
+            String code = withoutComments(Files.readString(file, StandardCharsets.UTF_8));
+            long markers = literals(code).stream().filter(DeployedEnvironmentConsolidationGuardTest::namesDeployedEnvironments).count();
+            if (markers == 0) {
+                continue;
+            }
+            if (file.getFileName().toString().equals(CANONICAL)) {
+                canonicalMarkers += markers;
+            } else {
+                offences.add(file.getFileName().toString());
             }
         }
 
-        assertThat(listsSeen)
-                .as("the guard must find the lists it permits - finding none means the pattern has "
-                        + "stopped matching and this test is guarding nothing")
-                .isGreaterThanOrEqualTo(PERMITTED.size());
+        assertThat(canonicalMarkers)
+                .as("the guard must find the markers in %s - finding none means the scan has "
+                        + "stopped working and this test is guarding nothing", CANONICAL)
+                .isGreaterThan(0);
 
         assertThat(offences)
-                .as("this is a second answer to 'is this a deployed environment'. Point it at "
-                        + "DeployedEnvironment - or, if it genuinely asks a different question, say "
-                        + "which, as LOCAL_PROFILES does. Four copies of this answer existed before "
-                        + "T189 and two of them had never fired in production, because each one "
-                        + "reads as correct in the file it lives in")
+                .as("this file names a deployed environment, so it is a second answer to 'is this a "
+                        + "deployed environment'. Call DeployedEnvironment.isDeployed instead - or, "
+                        + "if it genuinely asks a different question, express it in terms of that "
+                        + "one, as DatabasePasswordGuard's LOCAL_PROFILES does. Four copies of this "
+                        + "answer existed before T189 and two had never fired in production, because "
+                        + "each reads as correct in the file it lives in")
                 .isEmpty();
     }
 
@@ -168,18 +156,35 @@ class DeployedEnvironmentConsolidationGuardTest {
         return source.length();
     }
 
-    private static String firstNonNull(Matcher m, int... groups) {
-        for (int group : groups) {
-            if (m.group(group) != null) {
-                return m.group(group);
+
+    /**
+     * Whether a string literal is naming deployed environments, as opposed to merely mentioning one.
+     *
+     * <p>Neither exact match nor substring match is right, and a control proved it. Exact match
+     * misses {@code "prod,azure"} - a comma-separated constant that gets {@code split(",")}, which
+     * is one of the shapes this guard was adopted to catch. Substring match flags
+     * {@code "this is not permitted in production"}, which is prose in an exception message and
+     * exactly the kind of false positive that teaches people to add exclusions.
+     *
+     * <p>So: every non-empty token must be a marker. A list of markers is all markers; a sentence
+     * that happens to contain one is not.
+     */
+    private static boolean namesDeployedEnvironments(String literal) {
+        String[] tokens = literal.trim().split("[,;\\s]+");
+        if (tokens.length == 0 || literal.isBlank()) {
+            return false;
+        }
+        for (String token : tokens) {
+            if (!token.isEmpty() && !MARKERS.contains(token.toLowerCase(java.util.Locale.ROOT))) {
+                return false;
             }
         }
-        return null;
+        return true;
     }
 
-    private static List<String> literals(String arguments) {
+    private static List<String> literals(String code) {
         List<String> values = new ArrayList<>();
-        Matcher m = Pattern.compile("\"([^\"]*)\"").matcher(arguments);
+        Matcher m = Pattern.compile("\"([^\"\\\\]*)\"").matcher(code);
         while (m.find()) {
             values.add(m.group(1));
         }
