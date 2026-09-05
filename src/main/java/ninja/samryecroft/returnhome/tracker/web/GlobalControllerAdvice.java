@@ -264,6 +264,21 @@ public class GlobalControllerAdvice {
         return null;
     }
 
+    /**
+     * T218: an export link that cannot be redeemed gets its own page rather than the generic error
+     * one, because there is ruled copy for this case and a bare 404 had nowhere to put it.
+     *
+     * <p><b>No model attributes, and that is the point.</b> The generic handler above passes
+     * {@code message} through; here there is deliberately nothing to pass, because the four reasons
+     * a redeem fails - unknown, expired, already spent, another user's - must be indistinguishable.
+     * A handler that accepted a message would be one edit away from explaining which one it was.
+     */
+    @ExceptionHandler(ninja.samryecroft.returnhome.tracker.export.ExportLinkUnavailableException.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public String handleExportLinkUnavailable() {
+        return "export/expired";
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     @ResponseStatus(HttpStatus.NOT_FOUND)
     public String handleNotFound(IllegalArgumentException ex, Model model) {
