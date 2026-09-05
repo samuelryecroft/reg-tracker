@@ -2,6 +2,7 @@ package ninja.samryecroft.returnhome.tracker.interview;
 
 import jakarta.validation.Valid;
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
 import ninja.samryecroft.returnhome.tracker.child.ChildIdentities;
 import ninja.samryecroft.returnhome.tracker.child.ChildIdentity;
@@ -102,11 +103,37 @@ public class CoordinatorController {
         return "redirect:/coordinator/requests";
     }
 
-    /** Platform ADMIN sees every visitor; a coordinator/org-admin only their own organisation's. */
-    private List<User> visitorsFor(AppUserPrincipal principal) {
-        if (principal.hasRole(Role.ADMIN)) {
-            return userRepository.findByRoleOrderByFullName(Role.VISITOR);
-        }
-        return userRepository.findByRoleAndOrganisationId(Role.VISITOR, principal.getOrganisationId());
+    /**
+     * D-4a-2 (spec §7b): "a coordinator allocating blind cannot load-balance, and an overloaded
+     * visitor is how a 72-hour deadline gets missed" - so the visitor list carries each one's
+     * CURRENT LOAD, sorted least-loaded first, rather than a bare name list. Platform ADMIN sees
+     * every visitor; a coordinator/org-admin only their own organisation's (unchanged from before).
+     */
+    private List<VisitorOption> visitorsFor(AppUserPrincipal principal) {
+        List<User> visitors = principal.hasRole(Role.ADMIN)
+                ? userRepository.findByRoleOrderByFullName(Role.VISITOR)
+                : userRepository.findByRoleAndOrganisationId(Role.VISITOR, principal.getOrganisationId());
+        return visitors.stream()
+                .map(v -> new VisitorOption(v.getId(), v.getFullName(), openAllocationCount(v)))
+                .sorted(Comparator.comparingLong(VisitorOption::openAllocations))
+                .toList();
+    }
+
+    /**
+     * "Current load" means work still on this visitor's plate: allocated or scheduled but not yet
+     * visited-and-written-up, or sent back and awaiting a rewrite. Once a report is submitted the
+     * ball is in the reviewer's court, and once it's approved/cancelled the record is closed - so
+     * neither counts against the visitor a coordinator is trying to load-balance for a NEW request.
+     */
+    private long openAllocationCount(User visitor) {
+        return interviewRequestService.listAllocatedTo(visitor.getId()).stream()
+                .filter(r -> r.getStatus() == InterviewStatus.ALLOCATED
+                        || r.getStatus() == InterviewStatus.SCHEDULED
+                        || r.getStatus() == InterviewStatus.REPORT_REJECTED)
+                .count();
+    }
+
+    /** One row of the D-4a-2 visitor list: a stable id/name/load triple, sorted before rendering. */
+    public record VisitorOption(Long id, String fullName, long openAllocations) {
     }
 }
