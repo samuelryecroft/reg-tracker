@@ -1518,7 +1518,11 @@ nav.seg .seg-opt { color: inherit; text-decoration: none; }
 .seg-count { font-variant-numeric: tabular-nums; opacity: 0.75; }
 
 /* ============================== S-1/S-2 · the case card ==============================
-   One component for every list of interview requests (fragments/case-card.html). The
+   The row used by every list of PEOPLE OR CASES: the four interview lists through
+   fragments/case-card.html, and 4d's user list directly on these classes. This said "every
+   list of interview requests", which was true when it was written and stopped being true
+   when 4d adopted the row - a scope clause is a claim in its own right, and this one would
+   have gone on reading as a rule against reuse long after reuse was the intended thing. The
    columns are shared so a list scans down its own edges: identity, the screen's second
    fact, the two tags, one action with a MINIMUM width (D-2a-3 - 104px in the canvas is
    incidental; a fixed width truncates a longer label and breaks under translation, while
@@ -1560,6 +1564,21 @@ nav.seg .seg-opt { color: inherit; text-decoration: none; }
 /* The reason a card has no action (2d's self-review guard, D-2d-1): a sentence, never a
    disabled button - a disabled control is not focusable, so it cannot explain itself. */
 .case-action .case-no-action { font-size: var(--t-xs); color: var(--muted); }
+
+/* 4d additions. Deliberately NOT .case-action: that carries min-width:104px for a button, and
+   an icon stretched to 104px is the width reaching for an aligned button edge on a row that
+   has no button. */
+.case-edit { flex: none; display: grid; place-items: center; color: var(--muted); }
+.case-edit:hover { color: var(--accent-dark); }
+.role-chips { flex-wrap: wrap; }
+/* The username under the name, as a second identifier rather than a second name - monospace so
+   a login key reads as one and cannot be mistaken for the person's own spelling of themselves. */
+.case-username { font-family: ui-monospace, Menlo, Consolas, monospace; }
+/* A disabled account is dimmed on the canvas. The dimming is reinforcement only - the "Disabled"
+   chip carries the meaning - because opacity is a colour-only signal and 1.4.1 does not accept
+   one alone. Held at .62 as drawn; the chip and the name stay above AA at that value because
+   both sit on --surface rather than on the page ground. */
+.case-inactive { opacity: 0.62; }
 
 /* Below the shell's own breakpoint the row cannot hold five columns, so it stacks. The
    action goes full width rather than shrinking: it is the one thing on the card that is a
@@ -1641,3 +1660,86 @@ nav.seg .seg-opt { color: inherit; text-decoration: none; }
 .theme-preview h3 { margin: 0 0 var(--s2); }
 .theme-preview p { margin: 0 0 var(--s3); }
 .theme-preview .btn-row { margin-top: 0; }
+
+/* ============================== 6e · the error page ==============================
+   Centred, one card, no shell. The no-shell part is INHERITED, not decided here: error.html
+   has never included fragments/layout's nav, and no note says why. It is left that way
+   because the reason that suggests itself is a good one - a 403 is precisely the case where
+   the sidebar's own links may be what the person cannot reach - but that is this author's
+   reading of an existing choice, not a recorded one, and it should not harden into a rule
+   by being written down confidently. Either way the page has to stand alone at every width. */
+.error-page {
+    min-height: 70vh; display: grid; place-items: center;
+    padding: var(--s5); text-align: center;
+}
+.error-card {
+    max-width: 46ch; display: flex; flex-direction: column;
+    align-items: center; gap: var(--s3);
+}
+.error-icon { width: 2.5rem; height: 2.5rem; color: var(--muted); }
+.error-card h1 { margin: 0; }
+.error-body { margin: 0; color: var(--muted); line-height: 1.55; }
+.error-actions { display: flex; gap: var(--s3); flex-wrap: wrap; justify-content: center; }
+/* The status, demoted from the <h1> it used to be (FE-19). Small and muted because it is
+   for quoting to someone else, not for reading first. */
+.error-status { margin: var(--s2) 0 0; font-size: var(--t-xs); color: var(--muted); }
+/* The 404's own message - which link was broken. Monospace because it usually contains an
+   identifier, and an identifier read in prose type is one a person mis-transcribes. */
+.error-detail {
+    margin: 0; font-size: var(--t-sm); color: var(--muted);
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+    overflow-wrap: anywhere;
+}
+
+/* ============================== 4e · the organisation tree ==============================
+   Reuses the .case row from 4d/the interview lists rather than inventing a node component:
+   a supplier and a care provider are both "one entity, its second fact, its tags", which is
+   what that row already is. What the tree adds is only the INDENT and the rule that draws
+   the relationship. */
+.org-tree { display: flex; flex-direction: column; gap: var(--s5); margin-top: var(--s4); }
+.org-branch { display: flex; flex-direction: column; gap: var(--s2); }
+/* The children sit inside a left rule rather than on a bare margin, so the relationship is
+   drawn rather than implied by whitespace - whitespace alone reads as a gap once the list is
+   longer than one screen. --border, not the accent: the rule is structure, not emphasis. */
+.org-children {
+    display: flex; flex-direction: column; gap: var(--s2);
+    margin-left: var(--s4); padding-left: var(--s4);
+    border-left: 2px solid var(--border);
+}
+.org-children:empty { display: none; }
+.org-supplier .case-avatar { background: var(--accent); color: var(--accent-ink); }
+.org-icon { width: 1.25rem; height: 1.25rem; color: var(--muted); flex: none; }
+.org-orphan-head { font-size: var(--t-md); margin: 0; }
+/* The supplier and provider rows are not links - nothing is behind them yet. .case-link carries
+   the layout, .rowlink carries the affordance, and only the second is omitted, so these read as
+   information rather than as controls that do nothing (Creed's shell-org caret ruling). */
+.org-tree .case-link { display: flex; align-items: center; gap: var(--s3); flex: 1.4 1 0; min-width: 0; }
+
+@media (max-width: 720px) {
+    .org-children { margin-left: var(--s2); padding-left: var(--s3); }
+}
+
+/* ============================== 6c · one audit event in full ==============================
+   No new components: the record itself is a dl.detail, the absences are a plain list, and
+   the permanence line is the only new piece because it is the only thing on the page that
+   is an assurance rather than a field. */
+.page-head { margin-bottom: var(--s4); }
+.page-head h1 { margin: 0 0 var(--s1); }
+.not-kept-head { font-size: var(--t-md); margin: 0 0 var(--s3); }
+/* Dashes as list markers, matching the canvas: these rows are absences, and a bullet reads
+   as a thing that is present. THE DASH IS aria-hidden MARKUP, NOT A ::before content STRING.
+   I wrote the ::before first, reasoning that a pseudo-element is decorative by definition -
+   it is not: AnnouncedGlyphSourceGuardTest caught it, and it is right that the major screen
+   readers expose ::before content to the accessibility tree, where it is announced before the
+   sentence it decorates. "Decorative" is a property of what the accessibility tree is told,
+   not of which layer draws it. */
+.not-kept { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--s2); }
+.not-kept li { display: flex; gap: var(--s3); color: var(--muted); font-size: var(--t-sm); }
+.not-kept .mark { flex: none; }
+.permanence {
+    display: flex; align-items: flex-start; gap: var(--s3);
+    margin: var(--s4) 0; padding: var(--s3) var(--s4);
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    font-size: var(--t-sm); color: var(--muted);
+}
+.permanence .icon { flex: none; margin-top: 2px; }

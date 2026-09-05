@@ -2,7 +2,7 @@
 <html xmlns:th="http://www.thymeleaf.org" lang="en" th:attr="data-appearance=${#strings.toLowerCase(appearancePreference)}">
 <head>
     <meta charset="UTF-8"/>
-    <title>Pack ready — Return Home Tracker</title>
+    <title>Export ready — Return Home Tracker</title>
     <th:block th:replace="~{fragments/layout :: styles}"></th:block>
 </head>
 <body>
@@ -12,9 +12,18 @@
     <p class="sub" th:text="${childIdentity.label()}">Child</p>
 
     <div class="card">
+        <!--/* 6e copy, and the tick is the sprite symbol rather than a literal U+2713.
+             CORRECTION TO WHAT I FIRST WROTE HERE: I claimed this was the same defect T165 fixed
+             on the clock a few lines below - a decorative character announced by name before the
+             sentence it decorates. IT WAS NOT. The clock was a U+25F7 inside a th:text, i.e. in
+             announced content; this tick was already aria-hidden and was never read out. I
+             generalised from the neighbouring case without checking this one.
+             The swap still stands, for the reason that actually applies: a bare glyph depends on
+             the reader's font having it, and every other status marker in the app is a sprite
+             symbol. That is a consistency and rendering argument, not an accessibility one. */-->
         <div class="banner ok" style="margin-bottom:14px">
-            <span class="ic" aria-hidden="true">✓</span>
-            <div><strong>Pack ready</strong><p>Recorded in this child's case history.</p></div>
+            <svg class="icon ic" aria-hidden="true"><use th:href="@{/icons/phosphor.svg} + '#ph-check-circle'"></use></svg>
+            <div><strong>Your export is ready</strong><p>This export has been added to the case history.</p></div>
         </div>
         <p style="margin:0 0 4px;font-weight:650;font-size:14px" th:text="${result.filename()}">case-file.zip</p>
         <p class="hint" style="font-family:ui-monospace,Menlo,monospace" th:text="${'SHA-256: ' + result.checksum()}">checksum</p>
@@ -31,11 +40,10 @@
             <!--/* T165: the clock is aria-hidden markup, not a character inside announced text. As a
                  U+25F7 in the th:text it was read out as the character NAME before the sentence
                  that said what was actually happening. */-->
-            <span class="expires"><svg class="icon" aria-hidden="true"><use th:href="@{/icons/phosphor.svg} + '#ph-clock-countdown'"></use></svg><span th:text="${'Link expires in ' + result.expiresInMinutes() + ' minutes'}">Expires</span></span>
+            <span class="tag tag-neutral expires"><svg class="icon" aria-hidden="true"><use th:href="@{/icons/phosphor.svg} + '#ph-clock-countdown'"></use></svg><span th:text="${'Link expires in ' + result.expiresInMinutes() + ' minutes'}">Expires</span></span>
         </p>
-        <p class="hint" style="margin-top:14px">Re-downloading after expiry means generating again — which writes a
-            second row in this child's case history. Every extraction being separately recorded is the feature, not
-            a limitation.</p>
+        <p class="hint" style="margin-top:14px">After that you can generate it again — each download is
+            recorded separately, which is what makes the history reliable.</p>
     </div>
 
     <a class="btn ghost" th:href="@{/children/{id}(id=${child.id})}">Back to the child record</a>

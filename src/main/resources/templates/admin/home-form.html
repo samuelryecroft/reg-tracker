@@ -2,13 +2,20 @@
 <html xmlns:th="http://www.thymeleaf.org" lang="en" th:attr="data-appearance=${#strings.toLowerCase(appearancePreference)}">
 <head>
     <meta charset="UTF-8"/>
-    <title>Add Home — Return Home Tracker</title>
+    <title>Add a home — Return Home Tracker</title>
     <th:block th:replace="~{fragments/layout :: styles}"></th:block>
 </head>
 <body>
 <div th:replace="~{fragments/layout :: nav}"></div>
 <main id="main">
-    <h1>Add Home</h1>
+    <h1>Add a home</h1>
+    <!--/* 6d's standfirst. It states the ORDER the data has to be created in, which is the same
+         thing 4e's tree draws - a home belongs to one care provider, and children come after the
+         home. Worth a sentence on the form because this is where someone meets that rule for the
+         first time, and the error if they have it backwards is an empty dropdown with no
+         explanation. */-->
+    <p class="sub">A home belongs to one care provider. Children are added to the home
+        afterwards.</p>
 
     <div class="card">
         <form method="post" th:action="@{/admin/homes}" th:object="${form}">
@@ -33,7 +40,18 @@
                 <select id="organisationId" th:field="*{organisationId}" required
                         th:errorclass="is-invalid" th:aria-invalid="${#fields.hasErrors('organisationId')}" aria-describedby="organisationId-error">
                     <option value="">Select a care provider…</option>
-                    <option th:each="o : ${organisations}" th:value="${o.id}" th:text="${o.name}">Organisation</option>
+                    <!--/* The canvas puts "Served by Beacon Return Home Services." in a hint
+                         BELOW this select, describing whichever provider is currently chosen.
+                         That hint is per-selection, so server-side it would either be blank until
+                         something is picked or need a script to follow the dropdown. Folded into
+                         the option label instead: the same fact, visible for every provider at
+                         once rather than one at a time, and no JS on a form that otherwise needs
+                         none. A provider with no supplier says so rather than trailing an empty
+                         clause - and that is a real state, which 4e now surfaces too. */-->
+                    <option th:each="o : ${organisations}" th:value="${o.id}"
+                            th:text="${o.name + (o.supplierOrganisation != null
+                                     ? ' — served by ' + o.supplierOrganisation.name
+                                     : ' — no supplier linked')}">Organisation</option>
                 </select>
                 <div th:replace="~{fragments/layout :: fieldError('organisationId')}"></div>
             </div>
@@ -51,8 +69,17 @@
             <input type="text" id="postcode" th:field="*{postcode}"/>
 
             <label for="what3words">what3words</label>
-            <p class="hint">e.g. ///filled.count.soap</p>
-            <input type="text" id="what3words" th:field="*{what3words}"/>
+            <!--/* 6d adds the canvas's "Helps a visitor find an entrance that is hard to
+                 describe." The example was already here, above the input. Merged into ONE hint
+                 rather than stacking a second below: purpose and format are one thought, and a
+                 field sandwiched between two hints makes the reader work out whether they say
+                 different things. Given an id and wired with aria-describedby, which neither
+                 hint had - unassociated hint text is invisible to a screen reader, so the
+                 guidance existed for sighted users only. */-->
+            <p class="hint" id="what3words-hint">Helps a visitor find an entrance that is hard to
+                describe — for example ///filled.count.soap</p>
+            <input type="text" id="what3words" th:field="*{what3words}"
+                   aria-describedby="what3words-hint"/>
 
             <label for="localAuthority">Local authority</label>
             <input type="text" id="localAuthority" th:field="*{localAuthority}"/>

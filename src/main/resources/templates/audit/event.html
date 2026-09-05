@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en" th:attr="data-appearance=${#strings.toLowerCase(appearancePreference)}">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Audit event — Return Home Tracker</title>
+    <th:block th:replace="~{fragments/layout :: styles}"></th:block>
+</head>
+<body>
+<div th:replace="~{fragments/layout :: nav}"></div>
+<main id="main">
+    <!--/*
+      6c (spec §7m, D-6c-1..6): one audit event in full, and what is deliberately not kept.
+
+      Built on AuditHistoryEntry, never on AuditEvent. That projection is the GDPR-safe one -
+      ids, statuses and timestamps, never a free-text field off the raw row - and its per-event
+      allow-list FAILS CLOSED: an event type nobody has written a case for renders its own name
+      and no detail, so a type added in a year cannot leak a metadata key nobody reviewed.
+    */-->
+    <div class="page-head">
+        <h1 th:text="${row.entry().headline()}">Report submitted for review</h1>
+        <!--/* The event's own id, NOT the canvas's "Event 4 of 6". A position inside a filtered
+             view means different things depending on how the reader arrived, so two people can
+             cite "event 4" and mean different rows - and on an append-only trail the denominator
+             moves. An id is stable and citable, which is what a reader quoting this page needs. */-->
+        <p class="sub">Event <span th:text="${row.entry().id()}">4</span> ·
+            recorded <span th:text="${row.entry().when()}">14 Mar 2026, 21:52</span></p>
+    </div>
+
+    <div class="card">
+        <dl class="detail">
+            <dt>Event</dt><dd th:text="${row.entry().headline()}">Report submitted for review</dd>
+            <dt>When</dt><dd th:text="${row.entry().when()}">14 Mar 2026, 21:52</dd>
+
+            <!--/* ACTING ROLE, and never the actor's name or username. The column
+                 actor_username_at_time exists and is right here in the entity, which is exactly
+                 why this says so: its existence is not permission to display it. Role-only was
+                 decided in T38 and overrode the mockup's own full name, and it matters more once
+                 usernames become email addresses. */-->
+            <dt th:if="${row.entry().actorRole() != null}">Acting role</dt>
+            <dd th:if="${row.entry().actorRole() != null}" th:text="${row.entry().actorRole()}">Visitor</dd>
+
+            <dt th:if="${row.requestId() != null}">Interview</dt>
+            <dd th:if="${row.requestId() != null}">
+                <a class="rowlink" th:href="@{/interview-requests/{id}(id=${row.requestId()})}"
+                   th:text="${'RHI-' + row.requestId()}">RHI-2044</a>
+            </dd>
+
+            <!--/* The child resolves LIVE, and that is correct rather than merely convenient: the
+                 trail records what happened to whom, and "whom" persists. Frozen, a corrected
+                 spelling or a legal name change would split one child's history across two names
+                 and make the record LESS accurate about who it concerns. Masked initials plus case
+                 reference, under the same page-level reveal as everywhere else - masking is a
+                 screen affordance and this is a screen. */-->
+            <dt th:if="${row.childLabel() != null}">Child</dt>
+            <dd th:if="${row.childLabel() != null}" th:text="${row.childLabel()}">A.B. · CH-0041</dd>
+
+            <dt th:if="${row.homeName() != null}">Home</dt>
+            <dd th:if="${row.homeName() != null}" th:text="${row.homeName()}">Oakwood House</dd>
+
+            <!--/* No transition, no row. A dash beside "Status change" renders an absence as a
+                 value and reads as "the status changed to nothing" (D-1a-1). detail is already
+                 null for the event types that have no transition, so this needs no new
+                 mechanism - it reuses the timeline's own rule. */-->
+            <dt th:if="${row.entry().detail() != null}">Detail</dt>
+            <dd th:if="${row.entry().detail() != null}" th:text="${row.entry().detail()}">Interview held within 72 hours</dd>
+        </dl>
+    </div>
+
+    <div class="card">
+        <h2 class="not-kept-head">Not recorded</h2>
+        <!--/* Stated positively on the page because the absences are the assurance. This is the
+             list §7m fixes; it is not derived from the data, so it must not drift from what the
+             projection actually permits - AuditHistoryEntry's javadoc is the contract behind it. */-->
+        <ul class="not-kept">
+            <li><span class="mark" aria-hidden="true">—</span><span>The individual's name — only the role they acted in</span></li>
+            <li><span class="mark" aria-hidden="true">—</span><span>Anything the child said, or any answer from the report</span></li>
+            <li><span class="mark" aria-hidden="true">—</span><span>Before-and-after values, so no version of the report can be reconstructed from this history</span></li>
+        </ul>
+    </div>
+
+    <!--/* SHARPENED, not softened. The first draft of this screen was going to weaken the canvas's
+         "cannot be edited or deleted, including by an administrator" because I could not find the
+         guarantee enforced below the application. I was wrong: V11__add_audit_events.sql creates
+         audit_events_no_update_or_delete, a BEFORE UPDATE OR DELETE trigger that RAISE EXCEPTIONs,
+         chosen over a DO INSTEAD NOTHING rule so a tamper fails loudly rather than silently
+         succeeding. So the claim is well supported, and it now NAMES ITS MECHANISM - a claim a
+         reader can check beats a more insistent one.
+
+         The residual gap is real and is deliberately NOT on this page: a table owner can DISABLE
+         TRIGGER, and TRUNCATE does not fire row-level triggers at all. That is a threat-model
+         entry (the runtime role must not be the table owner - Kevin, WS-G), not a caveat for a
+         page an IRO or a court reads, where it would weaken a true assurance to no one's benefit. */-->
+    <p class="permanence">
+        <svg class="icon" aria-hidden="true"><use th:href="@{/icons/phosphor.svg} + '#ph-archive'"></use></svg>
+        <span>Permanent record. Audit entries cannot be edited or deleted — the database itself
+            rejects the attempt, not only the application.</span>
+    </p>
+
+    <div class="btn-row">
+        <a class="btn secondary" th:if="${row.requestId() != null}"
+           th:href="@{/interview-requests/{id}(id=${row.requestId()})}">Open the interview</a>
+        <a class="btn secondary" href="/audit">Full history</a>
+    </div>
+</main>
+</body>
+</html>

@@ -11,36 +11,40 @@
     <h1>Homes</h1>
     <a th:if="${can.addHome}" class="btn" href="/admin/homes/new">Add home</a>
 
-    <div class="table-wrap responsive">
-    <table>
-        <caption>All children's homes.</caption>
-        <thead>
-        <tr>
-            <th scope="col">Name</th>
-            <th scope="col">Organisation</th>
-            <th scope="col">Address</th>
-            <th scope="col">Local authority</th>
-        </tr>
-        </thead>
-        <tbody>
-        <tr th:each="h : ${homes}">
-            <td th:text="${h.name}">Home name</td>
-            <td th:text="${h.organisation.name}">Organisation</td>
-            <td th:text="${h.fullAddress} ?: '—'">Address</td>
-            <td th:text="${h.localAuthority} ?: '—'">Local authority</td>
-        </tr>
-        </tbody>
-    </table>
-    </div>
+    <!--/*
+      4e, the management half. The TREE on /admin/organisations is now where homes are browsed -
+      it shows each care provider with its homes, which is the relationship this flat list could
+      never express. THIS screen keeps the job the tree does not do: adding and editing. 6d needs
+      home-form.html regardless, so there was never a version of this where the route disappears.
+      (Pam's read, Creed confirming.)
 
-    <div class="stack">
-        <div class="srow" th:each="h : ${homes}">
-            <div class="top"><span class="name" th:text="${h.name}">Home name</span></div>
-            <dl>
-                <dt>Organisation</dt><dd th:text="${h.organisation.name}">Organisation</dd>
-                <dt>Address</dt><dd th:text="${h.fullAddress} ?: '—'">Address</dd>
-                <dt>Local authority</dt><dd th:text="${h.localAuthority} ?: '—'">Local authority</dd>
-            </dl>
+      The <table>/card-stack duplication goes for the same R-Q12 reason as 4d and 6a. Homes are
+      not an aggregate - they are the places a child comes back to.
+
+      UNLIKE 4d and 4e, THE TWO RENDERINGS HERE HAD NOT DRIFTED: both wrote a missing address and
+      a missing local authority as the same em dash. I had written that they had, on the strength
+      of the other two screens, and checked before shipping it - which is the whole of why it is
+      worth saying here. This is the same duplication BEFORE it costs anything; the other two are
+      what it looks like afterwards. The reason to remove it is that it is a second copy, not that
+      it has already gone wrong.
+    */-->
+    <div class="case-list">
+        <div class="case" th:each="h : ${homes}">
+            <span class="case-link">
+                <svg class="icon org-icon" aria-hidden="true"><use th:href="@{/icons/phosphor.svg} + '#ph-buildings'"></use></svg>
+                <span class="case-ident">
+                    <span class="case-name" th:text="${h.name}">Oakwood House</span>
+                    <span class="case-meta" th:text="${h.organisation.name}">Harbourside Children&#39;s Care</span>
+                </span>
+            </span>
+            <span class="case-aside">
+                <span class="lbl">Address</span>
+                <span th:text="${h.fullAddress} ?: 'Not recorded'">Address</span>
+            </span>
+            <span class="case-aside">
+                <span class="lbl">Local authority</span>
+                <span th:text="${h.localAuthority} ?: 'Not recorded'">Local authority</span>
+            </span>
         </div>
     </div>
 

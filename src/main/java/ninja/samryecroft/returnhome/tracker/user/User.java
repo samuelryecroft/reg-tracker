@@ -203,6 +203,29 @@ public class User {
         return firstName + " " + lastName;
     }
 
+    /**
+     * Initials for the 4d avatar - one letter per name token the person actually has.
+     *
+     * <p>Mirrors {@link #getFullName()}'s null handling rather than assuming a pair, and for the
+     * same recorded reason: {@code firstName} is nullable because a person with a single name has
+     * it in {@code lastName} alone. Taking {@code firstName.charAt(0)} unconditionally would throw
+     * on exactly those rows, and an avatar is not worth a 500 on a list page.
+     *
+     * <p>Staff, so never masked - the 5. masking rule covers children, and a redesign that hid
+     * colleagues' initials from the admin managing their accounts would be masking the wrong
+     * people.
+     */
+    @Transient
+    public String getInitials() {
+        if (lastName == null || lastName.isBlank()) {
+            return "";
+        }
+        if (firstName == null || firstName.isBlank()) {
+            return lastName.substring(0, 1).toUpperCase();
+        }
+        return (firstName.substring(0, 1) + lastName.substring(0, 1)).toUpperCase();
+    }
+
     public Set<Role> getRoles() {
         return roles;
     }

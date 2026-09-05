@@ -26,6 +26,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 
 /**
@@ -83,6 +84,42 @@ public class AuditFeedController {
         model.addAttribute("to", to);
         model.addAttribute("purposes", ExportPurpose.values());
         return "audit/feed";
+    }
+
+    /**
+     * T119 6c: one audit event in full - everything kept against it, and what deliberately is not.
+     *
+     * <h2>Scope is resolved through the feed's own rule, not a second one written here</h2>
+     *
+     * <p>The row is found by building the caller's feed and picking the event out of it. That is
+     * more work than loading the event by id, and it is the point: <b>a detail view reachable by an
+     * audience that could not have seen the row in the list makes the list's scoping decorative.</b>
+     * Any independent scoping rule written here would be a second implementation of
+     * {@link #requestsInScope} that could drift from it, and the drift would be silent and would
+     * disclose across organisations. The cost is bounded - this is an admin screen, and the feed is
+     * the same query the audience already runs on /audit.
+     *
+     * <h2>404, never 403, for an event outside scope</h2>
+     *
+     * <p><b>"You may not see this" tells the asker there is something to see.</b> A 403 confirms the
+     * event exists and turns the id into an enumeration oracle - Creed's ruling, and the same shape
+     * as the sign-in lockout wording. Not-found and not-yours therefore leave through <em>one</em>
+     * branch with one message, so the two cannot be told apart by response, status, or text.
+     */
+    @GetMapping("/audit/{id}")
+    public String event(@AuthenticationPrincipal AppUserPrincipal principal, @PathVariable Long id,
+            Model model) {
+        authorize(principal);
+        AuditFeedRow row = auditHistoryService
+                .caseActivityFeed(requestsInScope(principal), null, null, null).stream()
+                .filter(candidate -> id.equals(candidate.entry().id()))
+                .findFirst()
+                // IllegalArgumentException is the codebase's 404 (GlobalControllerAdvice), and the
+                // message is rendered. It says only what the caller already supplied.
+                .orElseThrow(() -> new IllegalArgumentException("No such audit event: " + id));
+
+        model.addAttribute("row", row);
+        return "audit/event";
     }
 
     /**

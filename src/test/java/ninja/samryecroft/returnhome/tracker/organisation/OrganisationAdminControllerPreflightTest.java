@@ -9,6 +9,9 @@ import java.util.Optional;
 import ninja.samryecroft.returnhome.tracker.document.KeyProvider;
 import ninja.samryecroft.returnhome.tracker.document.KeyUnavailableException;
 import ninja.samryecroft.returnhome.tracker.organisation.dto.CreateOrganisationForm;
+import ninja.samryecroft.returnhome.tracker.home.HomeRepository;
+import ninja.samryecroft.returnhome.tracker.theme.ThemeSettingsRepository;
+import ninja.samryecroft.returnhome.tracker.user.UserRepository;
 import ninja.samryecroft.returnhome.tracker.theme.ThemeService;
 import org.junit.jupiter.api.Test;
 import org.springframework.ui.ExtendedModelMap;
@@ -33,7 +36,9 @@ class OrganisationAdminControllerPreflightTest {
     private final KeyProvider keyProvider = mock(KeyProvider.class);
     private final OrganisationLifecycleService lifecycleService = mock(OrganisationLifecycleService.class);
     private final OrganisationAdminController controller =
-            new OrganisationAdminController(repository, themeService, keyProvider, lifecycleService);
+            new OrganisationAdminController(repository, themeService, keyProvider, lifecycleService,
+                    mock(HomeRepository.class), mock(UserRepository.class),
+                    mock(ThemeSettingsRepository.class));
 
     private static CreateOrganisationForm careProviderForm() {
         CreateOrganisationForm form = new CreateOrganisationForm();
