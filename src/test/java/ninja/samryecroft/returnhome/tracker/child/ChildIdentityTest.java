@@ -89,4 +89,40 @@ class ChildIdentityTest {
 
         assertThat(identity.avatar()).isEqualTo("A");
     }
+
+    /**
+     * S-1: on a case card the disc already shows the initials, so the label beside it carries the
+     * case reference alone rather than repeating them - "A.B" + "CH-0041", never "A.B" + "A.B. ·
+     * CH-0041". Both sit inside the card's one link, so the accessible name still says both.
+     */
+    @Test
+    void besideAnAvatarTheMaskedLabelIsTheCaseReferenceAloneAndNeverRepeatsTheInitials() {
+        ChildIdentity identity = ChildIdentity.of(childNamed("Alex", "Brennan", "CH-0041"), false);
+
+        assertThat(identity.besideAvatar()).isEqualTo("CH-0041");
+        assertThat(identity.besideAvatar()).doesNotContain(identity.avatar());
+        // The un-disced projection is untouched: this is a second projection, not a replacement.
+        assertThat(identity.label()).isEqualTo("A.B. · CH-0041");
+    }
+
+    /**
+     * A child can exist here before intake assigns a reference. Dropping to the reference alone
+     * would then leave a card whose only text is a disc, naming nobody - so it falls back to the
+     * ordinary masked label rather than to nothing.
+     */
+    @Test
+    void besideAnAvatarWithNoCaseReferenceItFallsBackToTheOrdinaryMaskedLabel() {
+        assertThat(ChildIdentity.of(childNamed("Alex", "Brennan", null), false).besideAvatar())
+                .isEqualTo("A.B.");
+        assertThat(ChildIdentity.of(childNamed("Alex", "Brennan", "  "), false).besideAvatar())
+                .isEqualTo("A.B.");
+    }
+
+    /** Revealed, a card names the child exactly as every other screen does. */
+    @Test
+    void revealedTheCardLabelIsTheFullNameLikeTheOrdinaryOne() {
+        ChildIdentity identity = ChildIdentity.of(childNamed("Alex", "Brennan", "CH-0041"), true);
+
+        assertThat(identity.besideAvatar()).isEqualTo("Alex Brennan").isEqualTo(identity.label());
+    }
 }

@@ -1,6 +1,7 @@
 package ninja.samryecroft.returnhome.tracker.interview;
 
 import java.util.List;
+import java.util.stream.Stream;
 import ninja.samryecroft.returnhome.tracker.audit.AuditHistoryEntry;
 import ninja.samryecroft.returnhome.tracker.audit.AuditHistoryService;
 import ninja.samryecroft.returnhome.tracker.audit.AuditHistorySection;
@@ -39,12 +40,19 @@ public class ReviewerController {
         this.auditHistoryService = auditHistoryService;
     }
 
+    /**
+     * Screen 2d. The queue carries BOTH lists: what this reviewer may act on, and what is waiting
+     * that they may not review themselves (D-2d-1, R-Q13). The second used to be discarded, which
+     * left "there is no work" and "there is work and none of it is yours" rendering the same words.
+     */
     @GetMapping("/reports")
     public String queue(@AuthenticationPrincipal AppUserPrincipal principal, Model model) {
-        List<InterviewRequest> requests = interviewRequestService.listPendingReview(principal);
-        model.addAttribute("requests", requests);
+        ReviewQueue queue = interviewRequestService.pendingReviewFor(principal);
+        List<InterviewRequest> shown = Stream.concat(queue.reviewable().stream(), queue.yourOwn().stream()).toList();
+        model.addAttribute("queue", queue);
         model.addAttribute("childIdentities",
-                ChildIdentities.mapOf(requests, InterviewRequest::getChild, nameRevealService.isRevealed()));
+                ChildIdentities.mapOf(shown, InterviewRequest::getChild, nameRevealService.isRevealed()));
+        model.addAttribute("reports", reportService.reportsByRequestId(shown));
         return "reviewer/queue";
     }
 
