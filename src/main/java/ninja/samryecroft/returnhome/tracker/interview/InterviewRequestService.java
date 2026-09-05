@@ -214,11 +214,7 @@ public class InterviewRequestService {
     @Transactional
     public InterviewRequest confirmSchedule(Long id, LocalDateTime scheduledAt, AppUserPrincipal principal) {
         InterviewRequest request = getAuthorized(id, principal);
-        // Kept, and deliberately NOT replaced by the transition table: the table permits
-        // SCHEDULED -> SCHEDULED (re-allocation), so expressing this precondition through it would
-        // widen the operation to allow re-confirming an already-scheduled interview. "Awaiting a
-        // scheduled time" is a statement about this operation, not about the machine.
-        if (request.getStatus() != InterviewStatus.ALLOCATED) {
+        if (!isAwaitingSchedule(request)) {
             throw new IllegalStateException("This interview is not awaiting a scheduled time");
         }
         InterviewStatus statusBefore = request.getStatus();
@@ -227,6 +223,23 @@ public class InterviewRequestService {
         InterviewRequest saved = interviewRequestRepository.save(request);
         auditEventPublisher.interviewRequestScheduled(saved, statusBefore, principal);
         return saved;
+    }
+
+    /**
+     * "Awaiting a scheduled time" - the precondition {@link #confirmSchedule} enforces before
+     * writing, exposed so a caller deciding whether to OFFER the action (e.g. whether to even show
+     * the schedule form) can ask the same question a caller PERFORMING it already must answer,
+     * rather than re-deriving it and risking the two drifting apart (D-5b-6: the visitor schedule
+     * form's GET offered this action at every status until this existed - the POST alone being
+     * guarded left a Confirm button the server would refuse).
+     *
+     * <p>Deliberately NOT expressed through {@link InterviewStatusTransitions}: that table permits
+     * SCHEDULED -> SCHEDULED (re-allocation), so folding this precondition into it would widen the
+     * operation to allow re-confirming an already-scheduled interview. "Awaiting a scheduled time"
+     * is a statement about this operation, not about the machine - see that class's own javadoc.
+     */
+    public static boolean isAwaitingSchedule(InterviewRequest request) {
+        return request.getStatus() == InterviewStatus.ALLOCATED;
     }
 
     /**
