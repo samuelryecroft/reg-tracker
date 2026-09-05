@@ -2033,3 +2033,74 @@ Two constraints follow from *how* it is read, not whether:
 sentence is composed in Java. Keep that — four fixed placeholders (`returnedLine`, `heldLine`, `elapsedLine`,
 `verdictLine`) plus a `reasonLine` that reads *"Not applicable"* when the verdict is met. No template
 branching, and the null-`heldAt` case is handled by what Java puts in each placeholder.
+
+
+## 7b · 4a Allocate, and the remaining list screens (Creed, 5 Sep)
+
+Specced against **main @0149f38**. Both lanes are between screens and 2a now points its one action button at
+an unredesigned form, so 4a is the live seam.
+
+### D-4a-1 · 4a stays a route. It is not a dialog — and the rule that decides it generalises
+
+The canvas draws 4a as a dialog over the queue. **Build it as the page route it already is.** A dialog here
+needs either one inline form per card — forty forms on a queue page — or a fetch-and-inject, which is a
+fourth script and a new pattern. And **allocation is what starts the visitor's clock on a statutory
+deadline**, so making it JS-dependent is #71's send-back failure again, with more at stake.
+
+This does not contradict D-1b-5, where a dialog was right, and the difference is worth keeping:
+
+> **A dialog is right when its content belongs to the page you are already on. It is wrong when its content
+> belongs to one row of a list.**
+
+5c's send-back is about the one report you are reading; 4a's form is about one of forty cards. The benefit
+the dialog was reaching for — not losing your place — is delivered by returning to the queue with the filter
+preserved, which costs no script.
+
+### D-4a-2 · The visitor list must show current load — it is the whole reason the screen exists
+
+Today it is a bare `<select>` of names. The canvas says *"Visitor list shows each visitor's current load"*,
+and that is the decision the screen exists to support: **a coordinator allocating blind cannot load-balance,
+and an overloaded visitor is how a 72-hour deadline gets missed.**
+
+A radio list, one row per visitor — name plus open-allocation count — not a `<select>`: a `<option>` cannot
+carry a second field, and the canvas already says *list*. Sort **least-loaded first**, because that is the
+choice the screen is for.
+
+**Flagged, not designed:** continuity — a child who has been interviewed before may be better served by the
+same visitor, which cuts against a load-first sort. I have not specified it because I have not verified the
+data exists to support it. It is a product question, not a layout one.
+
+### D-4a-3 · The button currently lies, and the fix needs no JavaScript
+
+The label is **"Allocate & schedule"** in both cases, but the canvas rule is: *no time → Allocated (visitor
+confirms); time → Scheduled.* So with the time left blank the control names an effect that does not happen.
+
+The live-updating label is the tempting fix and it needs a script. It is not needed:
+
+> **A label that is true in both states beats a label that is right in one and wrong in the other.**
+
+So the button reads **"Allocate"** — true either way, since scheduling is an *additional* effect — and the
+consequence sits under the time field, stating both outcomes plainly: leave it blank and the request becomes
+**Allocated** for the visitor to arrange with the home; set a time and it becomes **Scheduled**. Today's hint
+describes the *mechanism* ("leave blank for the visitor to arrange") and never names the resulting status,
+which is the thing the coordinator is actually choosing between.
+
+`<span class="ic">▲</span>` becomes `ph-warning-circle` per §5j.
+
+### The remaining list screens — deltas on the shipped shared layer
+
+`children/list`, `admin/user-list`, `admin/organisation-list` + `home-list`, and `dashboard/care-provider`
+are all consumers of S-1–S-5. They need **no new components**, and each should be checked against the same
+four things rather than respecced:
+
+1. **Delete the table** on anything listing cases or people; keep it only for aggregates (R-Q12).
+2. **A list scoped to one person, home or child does not spend a column repeating that scope** (D-2f-1) —
+   `children/detail`'s interview list must not repeat the child; `home-list` must not repeat the provider.
+3. **Empty states come from R-Q13**, including the filtered variants — do not write new copy.
+4. `dashboard/care-provider` is the second dashboard, so it carries the same `.tile` and compliance-bar
+   rulings as 2c (D-2c-1: value as text in the row, bar as a CSS width, no chart library).
+
+`admin/organisation-list` + `home-list` is the one with a real question: the canvas shows **one tree in
+creation order** (supplier → care providers → homes), and that is two templates today. One tree means one
+screen; whether the second route survives is a build decision, but **the reader should meet one hierarchy,
+not two lists that must be mentally joined.**
