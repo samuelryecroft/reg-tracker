@@ -1956,3 +1956,80 @@ the other 24 rules; it simply stops being what the pilot waits on.
 a rule that was already broken for everyone. **A conditional defect and an unconditional one can live in the
 same declaration, and the conditional one is the more interesting story — which is exactly why it gets found
 first and the plain one underneath it does not.**
+
+
+## 7a · T187 — making the 72-hour verdict self-verifiable in the exported document (Creed, 5 Sep)
+
+Specced against **main @0149f38**. `ReportService.interviewHeldLine()` composes the head-block sentence from
+`getInterviewDate()` — which is `@Transient`, `heldAt.toLocalDate()` — beside a verdict derived from the full
+`heldAt`. So the document **truncates the very value its claim rests on.**
+
+### D-187-1 · The stated minimum does not achieve the stated goal
+
+The brief asks for "at least `heldAt` date+time". **That is not enough to make the verdict self-verifiable.**
+The verdict is `heldAt <= returnedAt + 72h`, so a reader needs **both** ends of the clock. Adding the time to
+`heldAt` alone removes the *apparent contradiction* — two same-date reports with opposite verdicts — without
+delivering verification: the reader can now see *why* they differ, but still cannot check whether either is
+right. **Removing a paradox is not the same as supplying evidence.**
+
+### D-187-2 · Four facts, as a labelled block, not a sentence
+
+```
+Returned                02 Sep 2026, 14:20
+Interview held          05 Sep 2026, 11:05
+Elapsed                 68 hours 45 minutes
+Statutory 72 hours      Within 72 hours of return
+```
+
+with a fifth row when the verdict is *not* met — `Reason given` / *"No reason recorded"* — kept **in the same
+block**, so a marginal case is never presented without its explanation.
+
+`returned_at` has been NOT NULL since V15, so the clock's start is always printable; the existing null branch
+is only needed for `heldAt`, and it should still print `Returned` and say the interview time is not recorded,
+rather than collapsing to a bare "not recorded". Naming what is missing beats hiding the row (D-1a-1).
+
+**Why the elapsed figure and not just the two timestamps:** verification should be a *comparison*, not an
+arithmetic exercise. "68 hours 45 minutes" against "72 hours" is one glance; subtracting two datetimes across
+a midnight boundary is where a reader makes the error and concludes *we* are wrong. The timestamps stay so
+the elapsed figure is itself auditable. **Elapsed is the verification; the timestamps are the audit of the
+verification.**
+
+### D-187-3 · Never round the elapsed figure, and never change its units
+
+Always hours **and** minutes. Rounding to whole hours puts "72 hours" beside *within* on a 71h50m case and
+"72 hours" beside *not within* on a 72h10m one — **the same displayed number beside opposite verdicts, which
+is precisely the defect being fixed, reintroduced one layer up.**
+
+Nor should large values switch units: "400 hours 12 minutes" reads awkwardly, but "16 days" forces the reader
+to convert before comparing to a threshold expressed in hours. **Comparability against the stated threshold
+outweighs elegance.**
+
+> **General rule: display precision must never be able to contradict the verdict it sits beside.**
+
+These are `LocalDateTime` — no zone. **Print no zone marker and no offset**; asserting a precision the stored
+data does not carry is its own false claim.
+
+### D-187-4 · The judgement that was reserved for me — what the reader is invited to do
+
+**Invite the check.** The document is the statutory evidence pack that goes to councils; its purpose is to
+evidence that the duty was discharged. **A compliance claim that cannot be checked is an assertion, not
+evidence.**
+
+On proportionality, which is the real question behind it: **the document already makes the claim. Publishing
+the basis of a claim you are already publishing is not an expansion of disclosure** — it adds no new category
+of information about the child, only the grounds for a statement already on the page. The pack already
+carries the entire interview report, which is far more sensitive than a return time.
+
+Two constraints follow from *how* it is read, not whether:
+
+- **The verdict is about the process, not the interview.** A late interview is still a valid interview whose
+  content matters. Keep the block factual and neutral — a labelled block, never a red banner — so a reader
+  does not discount the report's substance because of a process failure.
+- **Near-boundary cases must not read as blame.** With minutes visible a 72h04m case is visibly marginal,
+  which is correct; the reason row sitting in the same block is what stops it being presented bare. Make that
+  adjacency structural rather than a comma-appended clause.
+
+**Implementation note for Jim:** the existing comment says the template cannot branch, which is why the
+sentence is composed in Java. Keep that — four fixed placeholders (`returnedLine`, `heldLine`, `elapsedLine`,
+`verdictLine`) plus a `reasonLine` that reads *"Not applicable"* when the verdict is met. No template
+branching, and the null-`heldAt` case is handled by what Java puts in each placeholder.
