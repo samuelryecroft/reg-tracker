@@ -32,6 +32,9 @@ public class UserAdminController {
     private final AuditEventPublisher auditEventPublisher;
     private final ninja.samryecroft.returnhome.tracker.auth.ClaimCodeService claimCodeService;
 
+    @org.springframework.beans.factory.annotation.Value("${app.auth.entra.enabled:false}")
+    private boolean entraEnabled;
+
     public UserAdminController(UserService userService, UserRepository userRepository, HomeRepository homeRepository,
             OrganisationRepository organisationRepository, AuditHistoryService auditHistoryService,
             AuditEventPublisher auditEventPublisher,
@@ -78,13 +81,22 @@ public class UserAdminController {
             return "admin/user-form";
         }
         // T197 §6f: the code is issued ON CREATE and the confirmation shows it once. Issuing here
-        // rather than as a separate later step is what makes it one action for the admin - and a
-        // seven-day expiry is only generous if renewing it is trivial, otherwise admins ask for a
-        // longer window and the bound stops meaning anything.
-        model.addAttribute("user", created);
-        model.addAttribute("claimCode", claimCodeService.issue(created));
-        auditEventPublisher.claimCodeIssued(created, principal);
-        return "admin/claim-code-issued";
+        // rather than as a later step is what makes it one action for the admin - and a seven-day
+        // expiry is only generous if renewing it is trivial, otherwise admins ask for a longer
+        // window and the bound stops meaning anything.
+        //
+        // GATED ON ENTRA BEING LIVE, which the design does not say and I am flagging rather than
+        // deciding silently. §6f was written for the world after cutover; before it, minting a code
+        // on every create would put a standing claim on an account in a deployment where nothing can
+        // ever redeem it - a credential that exists for no reason, which is the kind of thing that
+        // is later found and wondered about. Where Entra is off, creation redirects as it always did.
+        if (entraEnabled) {
+            model.addAttribute("user", created);
+            model.addAttribute("claimCode", claimCodeService.issue(created));
+            auditEventPublisher.claimCodeIssued(created, principal);
+            return "admin/claim-code-issued";
+        }
+        return "redirect:/admin/users";
     }
 
     /**
