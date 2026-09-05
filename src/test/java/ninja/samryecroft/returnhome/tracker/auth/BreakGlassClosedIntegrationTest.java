@@ -93,13 +93,14 @@ class BreakGlassClosedIntegrationTest extends AbstractIntegrationTest {
      * account, not by checking a known row. "At most one" is a claim about everything, and a test
      * that samples proves it about one thing.
      *
-     * <p><b>This is the P8-era invariant, and it is not true of production yet. Read that before
-     * acting on it.</b> N2 and §5's rollback reasoning keep existing users' passwords deliberately
-     * until P8, so that rolling back is a configuration change and one restart rather than a data
-     * restore. Between cutover and P8, production will legitimately hold many enabled accounts with
-     * credentials. Anyone who reads this as a live invariant and strips those passwords to bring
-     * reality into line will destroy the rollback path at the one moment it might be needed - which
-     * is a worse outcome than the state they were tidying.
+     * <p><b>This is not a live invariant, and the reason is now stronger than when it was written.
+     * Read that before acting on it.</b> It used to say production would legitimately hold accounts
+     * with passwords "between cutover and P8", because §5's rollback kept them deliberately. There
+     * is no cutover and no P8 - Entra was removed and <b>form login is the only way in</b>. So
+     * production does not merely happen to hold accounts with credentials; every usable account
+     * must have one. Anyone who reads this as a live invariant and strips those passwords to bring
+     * reality into line now locks every user out permanently, rather than destroying a rollback
+     * path. The warning survived the feature that prompted it and got sharper.
      *
      * <p>What it guards <em>now</em> is narrower and still worth having: that no code path mints
      * credentials beyond the ones fixtures create for themselves. It is asserted here, before P8

@@ -77,9 +77,11 @@ resource "azurerm_monitor_metric_alert" "latency" {
 # a red build.
 # COMPLETE BUT UNPROVEN until someone with apply rights fires it once. Nothing here can demonstrate
 # that a notification actually arrives - that needs a real apply and a real break-glass sign-in, and
-# it is already a cutover gate in ENTRA-AUTH-DESIGN.md §8 ("break-glass verified: enabling it works,
-# using it raises the audit event, and the alert actually arrives"). Deliberately not repeated as a
-# second procedure: two checklists for one action is how they start disagreeing.
+# it stays unproven until then. It used to be carried by the Entra cutover checklist ("break-glass
+# verified: enabling it works, using it raises the audit event, and the alert actually arrives");
+# that cutover is not happening, so THIS VERIFICATION NOW HAS NO OWNER and needs one attaching to
+# whatever the next apply-with-rights is. Flagged rather than quietly dropped - the check did not
+# stop being necessary when the checklist carrying it went away.
 resource "azurerm_monitor_scheduled_query_rules_alert_v2" "break_glass_login" {
   name                = "alert-${var.name_prefix}-break-glass-login"
   resource_group_name = var.resource_group_name

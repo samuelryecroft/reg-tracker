@@ -34,9 +34,13 @@ public class User {
     private String username;
 
     /**
-     * Null for an account that has no local credential - which, after cutover, is every account but
-     * one. Form login fails closed for such a row: {@code BCryptPasswordEncoder.matches} rejects a
-     * null encoding rather than matching anything.
+     * Null for an account that has no local credential. Form login fails closed for such a row:
+     * {@code BCryptPasswordEncoder.matches} rejects a null encoding rather than matching anything.
+     *
+     * <p>This used to say that after the Entra cutover a null password would be every account but
+     * one. There is no cutover: Entra was removed, form login is the only way in, and <b>a row with
+     * a null password is therefore an account nobody can sign in as</b> - the opposite of the
+     * routine case the old sentence described.
      *
      * <p>This column is <b>not</b> being dropped. P8 originally said to remove it; D5 withdrew that,
      * because dropping it would have removed the break-glass admin D2 requires - a tenant-wide
