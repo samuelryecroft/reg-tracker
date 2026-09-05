@@ -173,11 +173,13 @@ class AuditFeedIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
 
-        // The home-picker legitimately lists every home in scope (including the unselected one),
-        // so the leak check is scoped to the results table itself, not the whole page.
-        String resultsTable = html.substring(html.indexOf("<tbody>"));
-        assertThat(resultsTable).contains(home.getName());
-        assertThat(resultsTable).doesNotContain(otherHome.getName());
+        // The home picker legitimately names every home in scope (including the unselected one),
+        // so the leak check is scoped to the results, not the whole page. That reasoning is
+        // unchanged by 2g - only the anchor is: the results were a <tbody> and are now the dated
+        // feed, and the picker went from a <select> to chips, which name the homes just the same.
+        String results = html.substring(html.indexOf("class=\"feed\""));
+        assertThat(results).contains(home.getName());
+        assertThat(results).doesNotContain(otherHome.getName());
     }
 
     @Test

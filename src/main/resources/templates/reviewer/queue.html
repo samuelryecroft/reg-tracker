@@ -10,49 +10,85 @@
 <main id="main">
     <h1>Reports Awaiting Review</h1>
 
-    <div class="table-wrap responsive">
-    <table>
-        <caption>Reports submitted by visitors, awaiting your review.</caption>
-        <thead>
-        <tr>
-            <th scope="col">Child</th>
-            <th scope="col">Home</th>
-            <th scope="col">Visitor</th>
-            <th scope="col">Raised</th>
-            <th scope="col" class="visually-hidden">Action</th>
-        </tr>
-        </thead>
-        <tbody>
-        <tr th:each="r : ${requests}">
-            <td th:text="${childIdentities[r.child.id].label()}">Child Name</td>
-            <td th:text="${r.home.name}">Home</td>
-            <td th:text="${r.allocatedVisitor} ? ${r.allocatedVisitor.fullName} : '—'">Visitor</td>
-            <td th:text="${#temporals.format(r.createdAt, 'dd MMM yyyy HH:mm')}">Created</td>
-            <td>
-                <a class="rowlink" th:href="@{/interview-requests/{id}(id=${r.id})}">View details</a>
-                <a class="rowlink" th:href="@{/reviewer/reports/{id}/review(id=${r.id})}">Review</a>
-            </td>
-        </tr>
-        </tbody>
-    </table>
+    <!--
+      Screen 2d, on the shared case card (S-1). The table and its duplicate .stack card list are
+      both gone: they were two renderings of one dataset, which is the drift class §6b exists to
+      delete, and R-Q12 rules cards for cases.
+
+      2d has no urgency tiers - the clock stops when the interview is held, so every row here is
+      past it and DeadlineTracker returns no state. The card's deadline tag is therefore absent
+      rather than empty: a request with no live clock has no deadline STATE, and a "—" would be
+      claiming one. What a reviewer needs instead is how long the report has been waiting, which is
+      what the meta line carries.
+    -->
+    <div class="case-list" th:if="${!#lists.isEmpty(queue.reviewable())}">
+        <th:block th:each="r : ${queue.reviewable()}" th:with="report=${reports[r.id]}">
+            <div th:replace="~{fragments/case-card :: caseCard(
+                    identity=${childIdentities[r.child.id]},
+                    href=@{/interview-requests/{id}(id=${r.id})},
+                    meta=${r.home.name + (report != null and report.submittedAt != null
+                            ? ' · submitted ' + #temporals.format(report.submittedAt, 'dd MMM yyyy, HH:mm')
+                            : '')},
+                    asideLabel='Visitor',
+                    aside=${r.allocatedVisitor != null ? r.allocatedVisitor.fullName : 'Not recorded'},
+                    badge=null,
+                    status=${r.status},
+                    actionLabel='Review',
+                    actionHref=@{/reviewer/reports/{id}/review(id=${r.id})},
+                    noAction=null,
+                    noteLabel=null,
+                    note=null)}"></div>
+        </th:block>
     </div>
 
-    <div class="stack">
-        <div class="srow" th:each="r : ${requests}">
-            <div class="top"><span class="name" th:text="${childIdentities[r.child.id].label()}">Child Name</span></div>
-            <dl>
-                <dt>Home</dt><dd th:text="${r.home.name}">Home</dd>
-                <dt>Visitor</dt><dd th:text="${r.allocatedVisitor} ? ${r.allocatedVisitor.fullName} : '—'">Visitor</dd>
-                <dt>Raised</dt><dd th:text="${#temporals.format(r.createdAt, 'dd MMM yyyy HH:mm')}">Raised</dd>
-            </dl>
-            <div class="act">
-                <a class="btn" th:href="@{/reviewer/reports/{id}/review(id=${r.id})}">Review</a>
-                <a class="btn ghost" th:href="@{/interview-requests/{id}(id=${r.id})}">View details</a>
-            </div>
+    <!--
+      D-2d-1: a report this reviewer submitted themselves gets a card with NO action and the reason
+      there is none - never a disabled button. D-1b-7's reasoning transfers, and a queue card is not
+      the honest exception to it: a disabled control is not focusable, so it cannot explain itself,
+      and this rule is PERMANENT - nothing could later enable the button. The card is safe to show
+      because the rule is enforced at the endpoint (ReportService.getReviewable), not by hiding the
+      row; hiding it is what made "no work" and "work you can't do" read identically.
+    -->
+    <section class="case-group" th:if="${!#lists.isEmpty(queue.yourOwn())}">
+        <h2 class="case-group-head">
+            <span>Waiting, but not yours to review</span>
+            <span class="case-group-count" th:text="${#lists.size(queue.yourOwn())}">1</span>
+            <span class="visually-hidden" th:text="${#lists.size(queue.yourOwn()) == 1} ? 'report' : 'reports'">reports</span>
+        </h2>
+        <div class="case-list">
+            <th:block th:each="r : ${queue.yourOwn()}" th:with="report=${reports[r.id]}">
+                <div th:replace="~{fragments/case-card :: caseCard(
+                        identity=${childIdentities[r.child.id]},
+                        href=@{/interview-requests/{id}(id=${r.id})},
+                        meta=${r.home.name + (report != null and report.submittedAt != null
+                                ? ' · submitted ' + #temporals.format(report.submittedAt, 'dd MMM yyyy, HH:mm')
+                                : '')},
+                        asideLabel='Visitor',
+                        aside=${r.allocatedVisitor != null ? r.allocatedVisitor.fullName : 'Not recorded'},
+                        badge=null,
+                        status=${r.status},
+                        actionLabel=null,
+                        actionHref=null,
+                        noAction='You submitted this report',
+                        noteLabel=null,
+                        note=null)}"></div>
+            </th:block>
         </div>
-    </div>
+    </section>
 
-    <div class="empty" th:if="${#lists.isEmpty(requests)}">Nothing awaiting review.</div>
+    <!--
+      R-Q13: the two empty states are different facts and must not share words. "Nothing is waiting"
+      and "everything waiting is yours" were previously indistinguishable, because the second set of
+      rows was discarded before the screen ever saw it - an empty list reading as an all-clear when
+      there is in fact work, which is Oscar's named danger for a safeguarding queue.
+    -->
+    <div class="empty" th:if="${queue.isAllYourOwn()}">
+        The reports waiting were all submitted by you, so you can't review them yourself. Another
+        reviewer will pick them up.
+    </div>
+    <div class="empty" th:if="${queue.isEmpty()}">
+        Nothing is waiting for review. Reports appear here when a visitor submits them.
+    </div>
 </main>
 </body>
 </html>

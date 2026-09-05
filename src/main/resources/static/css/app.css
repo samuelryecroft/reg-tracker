@@ -809,7 +809,10 @@ textarea:focus-visible, summary:focus-visible, .checkbox-option:focus-within {
 input.is-invalid, select.is-invalid, textarea.is-invalid {
     border-color: var(--error);
     border-width: 2px;
-    background: #FFF7F7;
+    /* Was #FFF7F7: a fixed pale-red fill under an ink that follows the appearance, i.e. the
+       .tile.urgent bug on EVERY invalid field in the app, in the one state a user most needs
+       to be able to read. Creed's sweep found the tiles; this came out of searching the shape. */
+    background: var(--error-bg);
 }
 .field-error {
     display: flex;
@@ -949,8 +952,10 @@ fieldset.checkbox-fieldset > legend {
     border-radius: 12px;
     font-size: var(--t-xs);
     font-weight: 700;
-    background: #eef2f6;
-    color: #333;
+    /* Both halves were hard-coded, so this pair was at least self-consistent - but it ignored
+       the appearance entirely, and every .status.* modifier below already takes a themed pair. */
+    background: var(--neutral-bg);
+    color: var(--neutral);
 }
 .status.REQUESTED { background: var(--warn-bg); color: var(--warn); }
 .status.ALLOCATED, .status.SCHEDULED, .status.REPORT_SUBMITTED { background: var(--info-bg); color: var(--info); }
@@ -1023,9 +1028,6 @@ fieldset.checkbox-fieldset > legend {
    the rail marker, the status tag and the visitor's own banner already share; the tokens
    themselves were already locked (D-1a-2a). */
 .banner.sent-back { background: var(--sent-back-bg); color: var(--sent-back); border: 1px solid transparent; border-color: color-mix(in srgb, var(--sent-back) 25%, transparent); }
-/* .banner-warning kept as an alias so nothing already using it silently loses its styling. */
-.banner-warning { background: var(--warn-bg); color: var(--warn); border: 1px solid #EBCF8A; border-radius: var(--radius); padding: var(--s4); margin-bottom: var(--s4); }
-.banner-warning p { margin: 0.35rem 0 0; white-space: pre-wrap; }
 
 .muted { color: var(--muted); }
 dl.detail dt { font-weight: 650; margin-top: var(--s3); font-size: var(--t-xs); color: var(--muted); }
@@ -1106,7 +1108,6 @@ table caption { text-align: left; font-size: var(--t-xs); color: var(--muted); p
 }
 .rowlink { color: var(--accent-dark); font-weight: 650; text-decoration: none; display: inline-flex; align-items: center; min-height: 44px; margin-right: var(--s3); }
 .rowlink:hover, .rowlink:focus-visible { text-decoration: underline; }
-tr.group th { background: #F3F4F6; color: var(--ink); text-transform: none; font-size: var(--t-sm); letter-spacing: 0; }
 /* T165: the urgency-tier glyph is an aria-hidden <svg> in markup now, not a character inside the
    announced heading text - this keeps it on the text baseline in both the table and .stack views. */
 .due-group-head { display: inline-flex; align-items: center; gap: 6px; }
@@ -1415,8 +1416,19 @@ dialog.dialog { border: none; }
 .tile .num { display: block; font-size: 30px; font-weight: 700; line-height: 1.15; margin: 4px 0 2px; font-variant-numeric: tabular-nums; }
 .tile .den { display: block; font-size: var(--t-xs); color: var(--muted); }
 .tile .go { display: block; font-size: var(--t-xs); font-weight: 700; color: var(--accent-dark); margin-top: var(--s2); }
-.tile.urgent { border-color: #F3C0C0; background: #FFFAFA; }
-.tile.warn { border-color: #EBCF8A; background: #FFFDF6; }
+/* LIVE DARK-MODE DEFECT, fixed (Creed's 2c review). Both rules used to set a hard-coded
+   LIGHT background (#FFFAFA / #FFFDF6) and no ink at all, so .num / .lab / .den / .go kept
+   inheriting --color-text - which is near-white in dark. Measured on dark: the .num, the
+   30px COUNT ITSELF, at 1.17:1 and 1.19:1; .lab/.den 2.23-2.27:1; .go 1.43-1.59:1. These
+   are the "needs attention" tiles, so the number that was invisible was the overdue count.
+   Same class as the .due.overdue bug (#48), not cosmetic.
+
+   The fix takes fill AND border from the semantic family and sets NO ink, so color:inherit
+   keeps working in both appearances. The border derives at 25% (§5h) and its fallback for a
+   browser without color-mix() is TRANSPARENT, never the old literal: a fallback degrades to
+   ABSENCE, because #F3C0C0 is precisely the value that produces the bug this removes. */
+.tile.urgent { background: var(--error-bg); border: 1px solid transparent; border-color: color-mix(in srgb, var(--error) 25%, transparent); }
+.tile.warn { background: var(--warn-bg); border: 1px solid transparent; border-color: color-mix(in srgb, var(--warn) 25%, transparent); }
 
 /* small flag chips (recurrence panel) - reuses the same neutral/semantic families as .due and .status */
 .pill {
@@ -1455,4 +1467,127 @@ dialog.dialog { border: none; }
 .expires {
     display: inline-flex; align-items: center; gap: 6px; font-size: var(--t-xs); font-weight: 700;
     background: var(--warn-bg); color: var(--warn); padding: 3px 10px; border-radius: 999px;
+}
+
+/* ============================== 2a · queue filter chips ==============================
+   D-2a-4: the chips are .seg/.seg-opt, the shipped single-choice treatment - the controller
+   takes one `filter` param, so filtering IS single-choice, and .checkbox-option would promise
+   a combination the backend cannot honour. The component ships keyed off `:has(input:checked)`
+   because its first use was radio inputs; here the options are links, so selection arrives as
+   aria-current instead. These two rules give a selected LINK the same accent ink plus inset
+   ring - the ring is the point: it is what stops the active chip being colour alone.
+   Additive only; the existing .seg-opt rules above are untouched. */
+.seg-opt[aria-current] { color: var(--color-accent); box-shadow: inset 0 0 0 1px var(--color-accent); }
+.seg-opt:not([aria-current]):hover { background: color-mix(in srgb, var(--color-text) 7%, transparent); }
+/* The chip row is a link group, so its options need the link ink reset and a wrap: a coordinator
+   with a deep-linked filter on sees six chips, which will not fit one line on a narrow window. */
+nav.seg { flex-wrap: wrap; text-decoration: none; }
+nav.seg .seg-opt { color: inherit; text-decoration: none; }
+/* Tabular figures so the counts do not jitter the chip widths between renders. */
+.seg-count { font-variant-numeric: tabular-nums; opacity: 0.75; }
+
+/* ============================== S-1/S-2 · the case card ==============================
+   One component for every list of interview requests (fragments/case-card.html). The
+   columns are shared so a list scans down its own edges: identity, the screen's second
+   fact, the two tags, one action with a MINIMUM width (D-2a-3 - 104px in the canvas is
+   incidental; a fixed width truncates a longer label and breaks under translation, while
+   a minimum still gives the list one aligned button edge, which is what that number was
+   reaching for). Nothing above this block is edited. */
+.case-group + .case-group { margin-top: var(--s5); }
+.case-group-head {
+    display: flex; align-items: center; gap: var(--s3);
+    font-size: var(--t-md); margin: 0 0 var(--s3);
+}
+.case-group-count { color: var(--muted); font-weight: 400; font-variant-numeric: tabular-nums; }
+.case-list { display: flex; flex-direction: column; gap: var(--s2); }
+.case {
+    display: flex; align-items: center; gap: var(--s4);
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: var(--s3) var(--s4);
+}
+/* The link is the identity block, not the row: the whole-card target is deliberately
+   rejected (S-1/D-2a-7), so the name is what carries the affordance. .rowlink already
+   supplies the 44px minimum. */
+.case-link { display: flex; align-items: center; gap: var(--s3); flex: 1.4 1 0; min-width: 0; }
+.case-avatar {
+    width: 38px; height: 38px; border-radius: 50%; flex: none;
+    display: grid; place-items: center;
+    background: var(--tint); color: var(--accent-dark);
+    font-size: var(--t-sm); font-weight: 650;
+}
+.case-ident { min-width: 0; }
+.case-name { display: block; font-size: var(--t-md); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.case-meta { display: block; font-size: var(--t-xs); font-weight: 400; color: var(--muted); }
+.case-aside { flex: 1 1 0; min-width: 0; font-size: var(--t-sm); }
+.case-aside .lbl {
+    display: block; font-size: var(--t-xs); letter-spacing: 0.09em;
+    text-transform: uppercase; color: var(--muted);
+}
+.case-tags { display: flex; align-items: center; gap: var(--s2); flex: none; }
+.case-action { flex: none; display: flex; align-items: center; gap: var(--s2); min-width: 104px; }
+.case-action .btn { margin-top: 0; width: 100%; }
+/* The reason a card has no action (2d's self-review guard, D-2d-1): a sentence, never a
+   disabled button - a disabled control is not focusable, so it cannot explain itself. */
+.case-action .case-no-action { font-size: var(--t-xs); color: var(--muted); }
+
+/* Below the shell's own breakpoint the row cannot hold five columns, so it stacks. The
+   action goes full width rather than shrinking: it is the one thing on the card that is a
+   tap target, and D-Q3's 44px is a floor, not a target to squeeze back towards. */
+@media (max-width: 720px) {
+    .case { flex-wrap: wrap; align-items: flex-start; }
+    .case-link { flex: 1 1 100%; }
+    .case-aside { flex: 1 1 100%; }
+    .case-tags { flex: 1 1 100%; flex-wrap: wrap; }
+    .case-action { flex: 1 1 100%; }
+}
+/* 2f's sent-back card: the reviewer's comment is what the visitor has to act on, so it
+   sits on the card rather than one navigation away. A note breaks the row's single line,
+   so the card becomes a two-row block; the label is what attributes the words to their
+   author, without which "you must add the times" arrives unattributed. */
+.case-with-note { flex-wrap: wrap; }
+.case-note {
+    flex: 1 1 100%;
+    border-top: 1px solid var(--border);
+    margin-top: var(--s2);
+    padding-top: var(--s3);
+}
+.case-note .lbl {
+    display: block; font-size: var(--t-xs); letter-spacing: 0.09em;
+    text-transform: uppercase; color: var(--muted);
+}
+.case-note p { margin: var(--s1) 0 0; font-size: var(--t-sm); white-space: pre-wrap; }
+
+/* ============================== 2c · compliance bars ==============================
+   D-2c-1. The bar is decoration over a number the row already states in words, so it
+   carries no ARIA and needs none - it is aria-hidden, and removing it loses nothing but
+   the at-a-glance comparison between rows. It still takes 3:1 against its own track:
+   an invisible encoding is not a safe encoding just because it is redundant. */
+.rate { display: block; font-variant-numeric: tabular-nums; }
+.bar {
+    display: block; height: 6px; margin-top: 5px; min-width: 90px;
+    border-radius: 999px; background: var(--neutral-bg); overflow: hidden;
+}
+.bar-fill { display: block; height: 100%; background: var(--accent-dark); border-radius: inherit; }
+
+/* ============================== 2e · the raise-a-request form ==============================
+   Four groups with a sticky rail. The rail is jump links, not tabs (D-1a-3's reasoning: a
+   long form that is read and checked in full, and printed). scroll-margin-top on the
+   headings so a jumped-to heading clears the sticky shell header instead of landing
+   underneath it, and tabindex="-1" in the markup so the jump moves the READING CURSOR and
+   not just the scroll position - without it a keyboard or screen-reader user is scrolled
+   to a section their focus is nowhere near. */
+.form-layout { display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: var(--s5); align-items: start; }
+.form-rail { position: sticky; top: 76px; display: flex; flex-direction: column; gap: 2px; }
+.form-rail a {
+    display: flex; align-items: center; min-height: 44px;
+    padding: 0 var(--s3); border-radius: 6px;
+    color: var(--muted); text-decoration: none; font-size: var(--t-sm);
+}
+.form-rail a:hover, .form-rail a:focus-visible { background: var(--tint); color: var(--accent-dark); }
+.form-layout h3 { scroll-margin-top: 76px; }
+/* The rail is a shortcut, not the only way through: below the breakpoint the form is one
+   column and every section is a short scroll away, so the rail stops earning its width. */
+@media (max-width: 900px) {
+    .form-layout { grid-template-columns: 1fr; }
+    .form-rail { display: none; }
 }

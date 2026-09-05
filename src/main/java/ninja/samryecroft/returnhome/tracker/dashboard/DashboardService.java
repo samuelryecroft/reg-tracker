@@ -19,6 +19,7 @@ import ninja.samryecroft.returnhome.tracker.interview.DueState;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewRequest;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewRequestRepository;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewStatus;
+import ninja.samryecroft.returnhome.tracker.interview.QueueFilter;
 import ninja.samryecroft.returnhome.tracker.organisation.OrganisationAccessService;
 import ninja.samryecroft.returnhome.tracker.organisation.Organisation;
 import ninja.samryecroft.returnhome.tracker.organisation.OrganisationRepository;
@@ -100,7 +101,7 @@ public class DashboardService {
         Map<Long, List<InterviewReport>> completedByHome = completedByKey(completed, r -> r.getInterviewRequest().getHome().getId());
 
         List<BreakdownRow> rows = homes.stream()
-                .map(h -> rowFor(h.getId(), h.getName(), null, "/coordinator/requests?homeId=" + h.getId(),
+                .map(h -> rowFor(h.getId(), h.getName(), null, QueueFilter.QUEUE_PATH + "?homeId=" + h.getId(),
                         liveByHome.getOrDefault(h.getId(), List.of()), completedByHome.getOrDefault(h.getId(), List.of()), now))
                 .toList();
 
@@ -174,13 +175,13 @@ public class DashboardService {
 
         return List.of(
                 new LiveTile("Overdue now", String.valueOf(overdue), "past the 72-hour window",
-                        "/coordinator/requests?filter=overdue", "View overdue →", overdue > 0 ? "urgent" : ""),
+                        QueueFilter.OVERDUE.href(), "View overdue →", overdue > 0 ? "urgent" : ""),
                 new LiveTile("Due in next 24h", String.valueOf(dueSoon), "interview not yet held",
-                        "/coordinator/requests?filter=dueSoon", "View due soon →", dueSoon > 0 ? "warn" : ""),
+                        QueueFilter.DUE_SOON.href(), "View due soon →", dueSoon > 0 ? "warn" : ""),
                 new LiveTile("No return time recorded", String.valueOf(noClock), "no clock can start",
-                        "/coordinator/requests?filter=noClock", "View requests →", noClock > 0 ? "warn" : ""),
+                        QueueFilter.NO_CLOCK.href(), "View requests →", noClock > 0 ? "warn" : ""),
                 new LiveTile("Consent not confirmed", String.valueOf(consentMissing), "already allocated to a visitor",
-                        "/coordinator/requests?filter=consent", "View requests →", consentMissing > 0 ? "warn" : ""));
+                        QueueFilter.CONSENT.href(), "View requests →", consentMissing > 0 ? "warn" : ""));
     }
 
     private List<LiveTile> supplierLiveTiles(List<InterviewRequest> requests, LocalDateTime now, Long supplierOrgId) {
@@ -206,11 +207,11 @@ public class DashboardService {
 
         return List.of(
                 new LiveTile("Overdue now", String.valueOf(overdue), "across every care provider we serve",
-                        "/coordinator/requests?filter=overdue", "View overdue →", overdue > 0 ? "urgent" : ""),
+                        QueueFilter.OVERDUE.href(), "View overdue →", overdue > 0 ? "urgent" : ""),
                 new LiveTile("Unallocated", String.valueOf(unallocated.size()), oldestWaiting,
-                        "/coordinator/requests?filter=unallocated", "Allocate now →", unallocated.isEmpty() ? "" : "warn"),
+                        QueueFilter.UNALLOCATED.href(), "Allocate now →", unallocated.isEmpty() ? "" : "warn"),
                 new LiveTile("Awaiting review", String.valueOf(awaitingReview.size()), "reports pending a decision",
-                        "/coordinator/requests?filter=awaitingReview", "Go to review queue →", awaitingReview.isEmpty() ? "" : "warn"),
+                        QueueFilter.AWAITING_REVIEW.href(), "Go to review queue →", awaitingReview.isEmpty() ? "" : "warn"),
                 new LiveTile("Visitors with no work", String.valueOf(visitorsWithNoWork), "of " + visitors.size() + " active visitors",
                         "/admin/users", "View visitors →", ""));
     }
@@ -279,7 +280,7 @@ public class DashboardService {
         Map<Long, List<InterviewRequest>> liveByHome = liveRequestsByKey(requests, r -> r.getHome().getId());
         Map<Long, List<InterviewReport>> completedByHome = completedByKey(completed, r -> r.getInterviewRequest().getHome().getId());
         return homes.stream()
-                .map(h -> rowFor(h.getId(), h.getName(), null, "/coordinator/requests?homeId=" + h.getId(),
+                .map(h -> rowFor(h.getId(), h.getName(), null, QueueFilter.QUEUE_PATH + "?homeId=" + h.getId(),
                         liveByHome.getOrDefault(h.getId(), List.of()), completedByHome.getOrDefault(h.getId(), List.of()), now))
                 .toList();
     }
@@ -368,7 +369,7 @@ public class DashboardService {
         }
         return homeById.values().stream()
                 .map(h -> new RecurrenceCount(h.getName(), h.getOrganisation().getName(),
-                        flaggedChildIdsByHome.get(h.getId()).size(), "/coordinator/requests?homeId=" + h.getId()))
+                        flaggedChildIdsByHome.get(h.getId()).size(), QueueFilter.QUEUE_PATH + "?homeId=" + h.getId()))
                 .sorted(Comparator.comparingInt(RecurrenceCount::childCount).reversed())
                 .toList();
     }

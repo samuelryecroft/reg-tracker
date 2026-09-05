@@ -46,38 +46,37 @@ public class CoordinatorController {
      * rows are real links, not dead ends - "the list it opens visibly matches the tile" (Oscar's
      * dashboard-build-brief.md). Both are pure narrowing of what {@code listVisible} already
      * authorized this principal to see, so neither widens access.
+     *
+     * <p>The filter chips (screen 2a) count over the list AFTER {@code homeId} narrowing and before
+     * {@code filter} narrowing, because that is the set the chips offer to move between: a chip
+     * counting across homes the queue is not showing would name a number this screen cannot
+     * produce. Counts and narrowing both go through {@link QueueFilter#matches}, so they cannot
+     * disagree - see {@link QueueFilterChip}.
      */
     @GetMapping("/requests")
     public String list(@AuthenticationPrincipal AppUserPrincipal principal,
             @RequestParam(required = false) Long homeId, @RequestParam(required = false) String filter, Model model) {
+        LocalDateTime now = LocalDateTime.now();
+        QueueFilter selected = QueueFilter.byKey(filter).orElse(null);
+
         List<InterviewRequest> requests = interviewRequestService.listVisible(principal);
         if (homeId != null) {
             requests = requests.stream().filter(r -> r.getHome().getId().equals(homeId)).toList();
         }
-        if (filter != null) {
-            LocalDateTime now = LocalDateTime.now();
-            requests = requests.stream().filter(r -> matchesFilter(r, filter, now)).toList();
+        model.addAttribute("filterChips", QueueFilterChip.chipsFor(requests, selected, now));
+        if (selected != null) {
+            requests = requests.stream().filter(r -> selected.matches(r, now)).toList();
         }
+
         model.addAttribute("requests", requests);
         model.addAttribute("dueGroups", deadlineTrackingService.groupByUrgency(requests));
         model.addAttribute("homeId", homeId);
-        model.addAttribute("filter", filter);
+        // The RESOLVED filter, never the raw parameter: an unrecognised ?filter= narrows nothing, so
+        // the page must not claim a filtered view either (QueueFilter#byKey).
+        model.addAttribute("filter", selected);
         model.addAttribute("childIdentities",
                 ChildIdentities.mapOf(requests, InterviewRequest::getChild, nameRevealService.isRevealed()));
         return "coordinator/requests";
-    }
-
-    private boolean matchesFilter(InterviewRequest r, String filter, LocalDateTime now) {
-        return switch (filter) {
-            case "overdue" -> DeadlineTracker.stateOf(r, now).map(s -> s == DueState.OVERDUE).orElse(false);
-            case "dueSoon" -> DeadlineTracker.stateOf(r, now).map(s -> s == DueState.DUE_SOON).orElse(false);
-            case "noClock" -> DeadlineTracker.stateOf(r, now).map(s -> s == DueState.NO_CLOCK).orElse(false);
-            case "consent" -> (r.getStatus() == InterviewStatus.ALLOCATED || r.getStatus() == InterviewStatus.SCHEDULED)
-                    && (r.getConsentProvided() == null || !r.getConsentProvided());
-            case "unallocated" -> r.getStatus() == InterviewStatus.REQUESTED;
-            case "awaitingReview" -> r.getStatus() == InterviewStatus.REPORT_SUBMITTED;
-            default -> true;
-        };
     }
 
     @GetMapping("/requests/{id}/allocate")
