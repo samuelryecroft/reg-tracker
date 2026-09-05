@@ -2245,5 +2245,37 @@ with three on-track, which is arguably more correct and definitely less legible:
 predict is worse than a slightly cruder one, because a reader who cannot verify an order stops trusting it.**
 The sort is the starting point; the tier text is the correction, and the coordinator makes the call.
 
+### D-4a-4b · Sent-back work needs its own rung, or silence means two different things
+
+Building it surfaced something §7c did not anticipate, found by Pam: **`REPORT_REJECTED` rows count toward
+the total but can never reach a tier**, because `tracksDeadline` is false for them — the interview already
+happened, so the 72-hour return-to-interview clock is spent.
+
+The consequence is a real conflation. A visitor with three sent-back reports renders **"3 open allocations"**
+with no suffix — **identical to a visitor with three genuinely on-track ones.** So the absence of a suffix
+currently means two different things: *nothing pressing*, and *the pressure is not of a kind this line can
+express.* Three lots of rework reading as "loaded but relaxed" is the wrong signal on the screen that decides
+whether to add a fourth.
+
+**Fix, and it stays one suffix:** extend the ladder by one rung —
+
+> **overdue → due soon → sent back → nothing**
+
+This is not a second axis and not the table D-4a-4 rejected. The display rule was always *name the single
+most constraining fact*; sent-back work is more constraining than on-track work and less than a live
+deadline, so it is one more rung in the same ordering. `urgencyRank` gains the same rung so the tiebreak
+still matches what is shown.
+
+Take the word from the `--sent-back` vocabulary the rail, the status tag and the visitor's banner already
+share — **as a word only. D-4a-4a still holds: no colour on a person's row.**
+
+### NO_CLOCK needs no integration test, and writing one would be worse than not
+
+`returned_at` has been NOT NULL since V15, confirmed at the constraint. **An integration test for a state the
+schema forbids would have to defeat the constraint to create the row — and would then assert behaviour for
+data that cannot exist.** That is worse than no test: a passing test implies the state is reachable, and
+someone will later maintain a code path for it on that evidence. Unit-level classification plus a comment
+saying why there is no integration test is the right shape.
+
 `NO_CLOCK` allocations count toward the total and are excluded from the tier line — `returned_at` has been
 NOT NULL since V15, so this can only be historical data, and it should not be able to masquerade as urgency.
