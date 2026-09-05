@@ -91,12 +91,19 @@ class UserListLayoutIntegrationTest extends AbstractIntegrationTest {
 
         String html = usersPageAs(admin);
 
-        assertThat(html).contains("Coordinator").contains("Reviewer");
-        // The enum constant must not reach the page. Asserted on the underscore form because the
-        // single-word constants are indistinguishable from their own labels once upper-cased, so
-        // only HOME_STAFF and ORG_ADMIN can carry this negative - and they are the two the
-        // derive-from-name() shortcut would have got wrong anyway.
-        assertThat(html).doesNotContain("HOME_STAFF").doesNotContain("ORG_ADMIN");
+        assertThat(html).contains(">Coordinator<").contains(">Reviewer<");
+
+        // Asserted on ELEMENT TEXT, not on the bare substring, and the first version got this
+        // wrong: it said doesNotContain("HOME_STAFF") and failed in CI against a page that renders
+        // its chips perfectly. fragments/layout.html carries a plain HTML comment naming
+        // HOME_STAFF and ORG_ADMIN, plain comments ship to the client (T209), and the shell is on
+        // every page - so the assertion was reading the shared layout's comment and calling it a
+        // defect in this screen's chips.
+        //
+        // The underscore forms are still the ones worth naming: the single-word constants are
+        // indistinguishable from their own labels once upper-cased, and these two are exactly what
+        // a derive-the-label-from-name() shortcut would have got wrong.
+        assertThat(html).doesNotContain(">HOME_STAFF<").doesNotContain(">ORG_ADMIN<");
     }
 
     @Test

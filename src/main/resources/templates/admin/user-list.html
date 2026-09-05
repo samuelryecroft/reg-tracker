@@ -39,6 +39,15 @@
                 <span class="case-ident">
                     <span class="case-name" th:text="${u.fullName}">Naomi Clarke</span>
                     <span class="case-meta case-username" th:text="${u.username}">username</span>
+                    <!--/* Contact details are not on the 4d canvas, and dropping them was still a
+                         regression rather than a simplification: this list is the only place an
+                         admin sees them without opening each account in turn, and
+                         UserProfileFieldsIntegrationTest was already asserting they are here.
+                         Kept as a second meta line so the canvas's column structure is untouched.
+                         "Not recorded" rather than an empty run of separators, because a blank
+                         reads as a rendering fault and says nothing about whether anyone ever
+                         supplied one. */-->
+                    <span class="case-meta" th:text="${(u.email ?: 'Not recorded') + ' · ' + (u.contactPhone ?: 'Not recorded')}">email · phone</span>
                 </span>
             </a>
 

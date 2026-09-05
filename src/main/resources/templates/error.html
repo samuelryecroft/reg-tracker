@@ -28,6 +28,18 @@
             <h1>We can't find that page</h1>
             <p class="error-body">It may have moved, or you may not have access to it. If you were
                 sent a link, ask your administrator to check it.</p>
+            <!--/* The message IS printed on 404 and is NOT printed on the generic branch, and the
+                 asymmetry is the point. A 404 from this application is raised by our own code
+                 about a thing the person just asked for by name - "No such child: 987654321" -
+                 so it identifies which link is broken, which is the one fact that makes the page
+                 actionable. The generic branch catches unhandled exceptions, where Spring's
+                 default message is the exception's own text: an internal type, or an identifier
+                 out of a safeguarding record, shown to whoever happened to trip it.
+                 TemplateRenderCoverageIntegrationTest#errorPageRenders asserts the 404 half, and
+                 it was right to - the first version of this screen dropped the message from both
+                 branches and lost real information to a concern that only applies to one. */-->
+            <p class="error-detail" th:if="${message != null and !#strings.isEmpty(message)}"
+               th:text="${message}">No such child: 987654321</p>
         </th:block>
 
         <th:block th:unless="${status != null and status == 404}">
