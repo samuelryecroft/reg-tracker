@@ -2621,3 +2621,92 @@ The error banner, the `fieldError` fragment and the button row are the shipped p
 `<h1>` already carries the child and the home. **This screen needs one block, one attribute, one validation
 and one sentence — not a redesign.**
 
+## 7e · 4b Child record — where the duplication stopped being a risk and became a defect (Creed, 8 Sep)
+
+Specced against **main @2eb514a**: `children/detail.html`, `ChildIdentity`.
+
+### D-4b-1 · The table/card divergence has ALREADY happened, on this page
+
+`children/detail.html` renders the interview history twice — a `<table>` and a `.stack` of `.srow`s, one
+visible per viewport. They have drifted:
+
+| | null `scheduledAt` renders as |
+|---|---|
+| table, line 48 | `—` |
+| card stack, line 66 | `Not yet scheduled` |
+
+**Same absence, two words, one page, and no reader ever sees both.** Every previous argument for collapsing
+the duplication (D-2d-2) was a prediction; this is the outcome, already shipped.
+
+> **A duplication defect is invisible in exactly the case it is designed to serve — the two renderings are
+> mutually exclusive, so nothing on screen and no screenshot can ever show the disagreement.** Only reading
+> both branches finds it, which is what nobody does.
+
+Fix the copy now (`Not yet scheduled` — naming the absence beats a dash, D-1a-1), and **attach this page to
+the dedupe ticket as its evidence.** It is the strongest case on the floor for doing that work.
+
+### D-4b-2 · An empty case file renders an empty table skeleton *and* the empty message
+
+`#lists.isEmpty(requests)` guards the `.empty` div only. The `<table>` (with its `<caption>` — *"Every
+interview request raised for this child"* — and its four `<th>`s) and the `.stack` are ungarded, so a child
+with no interviews gets column headers over nothing, followed by *"No return home interviews recorded yet."*
+
+The caption is the giveaway: **it makes a promise about content that is not there.** Guard both renderings
+with the same condition that guards the message — one `th:if`, twice, and it disappears.
+
+### D-4b-3 · Revealing the name LOSES the field that distinguishes two children
+
+`ChildIdentity.of` masked → *initials + local case reference*; revealed → `child.getFullName()` and nothing
+else. **So the masked view carries more disambiguating information than the revealed one.**
+
+`ChildIdentity`'s own javadoc names the safety case: *"two children sharing initials in one home is a safety
+problem (acting on the wrong child's record), not just a UX one."* That reasoning does not stop at initials.
+**Two children sharing a NAME in one home is the same problem, and reveal is the mode where it bites** —
+precisely the mode a user enters when they need to be certain who they are looking at.
+
+> **A disclosure control should add information, never subtract it.** Reveal is meant to answer *"which
+> child is this?"*, and today it answers it less completely than the masked state it replaced.
+
+**Revealed label carries the case reference too.** This is a change to `ChildIdentity`, so it touches every
+screen that shows a child — raise it with Kevin, who owns that design, rather than changing it in a screen
+ticket. The date of birth is also collected on the add form and displayed on no screen at all; it belongs in
+a small identity block on this page, not in the label.
+
+### D-4b-4 · "Exports are recorded" is a consequence notice wearing a hint's clothes
+
+It sits under the export button as `class="hint"`, right-aligned, in the smallest muted type on the page.
+**It is the only sentence telling a user that their action against a child's case file is logged** — and it
+has the page's weakest visual treatment, below the button it qualifies, where a right-aligned line reads as
+a caption on the button rather than a condition of pressing it.
+
+Move it **above** the button, at body size in `--color-text-muted`, left-aligned with the block it belongs
+to. Not a warning, not an `--error` treatment: it is a neutral fact about an authorised action, and dressing
+it as a hazard would discourage a legitimate export. **Weight follows consequence, not tone.**
+
+### D-4b-5 · The inline layout styles are the design system having no purchase here
+
+`style="display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap"`, `style="flex:1 1 320px"`,
+`style="margin-top:8px;text-align:right"`, `style="margin-top:0"`. Four inline style attributes in one card.
+
+These are not one-offs; they are a **split card** — a description block beside an action block, wrapping
+under a narrow viewport — which is a component the app will want again (it is the shape 4a's summary wants
+too). Give it a class. **T186 is the standing lesson: styling that lives in templates is exactly where a
+model everyone believes was migrated carries on running.**
+
+### D-4b-6 · Two headings on one page both called "history", meaning different things
+
+*"Return Home Interview History"* is the list of requests; *"Case history"* is the audit trail. A reader
+scanning headings sees the same word twice and has no way to know which one holds what they want.
+Rename the first to **"Return home interviews"** — it is a list of things, not a history — and leave the
+audit block as *"Case history"*, which is what it is.
+
+### D-4b-7 · An open request in this table shows no deadline state
+
+Every other list in the app carries the due badge; this one shows `Status / Raised / Scheduled` only. For a
+**completed** request that is right — `tracksDeadline` is false and a historical row must not display
+urgency (D-4a-4's `NO_CLOCK` rule). But a child with a **live** request has a running statutory clock, and
+this page is where a home manager looks when they are asked about that child.
+
+Show the badge **only where `DeadlineTracker.badgeFor` returns one**, through the existing path, with no new
+copy. Absence of a badge on a finished row is then meaningful rather than a gap.
+
