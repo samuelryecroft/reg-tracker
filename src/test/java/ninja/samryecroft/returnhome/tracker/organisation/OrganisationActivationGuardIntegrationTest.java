@@ -140,6 +140,40 @@ class OrganisationActivationGuardIntegrationTest extends AbstractIntegrationTest
     }
 
     /**
+     * D-5d-3 (spec §7g): the case the guard's own message used to get wrong. A single-home
+     * HOME_STAFF user never renders the {@code homeId} field at all ({@code needsHomePicker} is
+     * false), so a rejection attached to that field as a {@code FieldError} would point a banner
+     * link at a control that is not on the page. Asserted through the real endpoint, not the
+     * controller in isolation, so a future change to which users get a picker cannot silently
+     * re-break this without failing here too.
+     */
+    @Test
+    void aSingleHomeUserWithNoHomeIdFieldOnThePageStillSeesTheBannerWithNoDeadLink() throws Exception {
+        String singleHomeStaffUsername = "guard-single-staff" + suffix;
+        User singleHomeStaff = new User();
+        singleHomeStaff.setUsername(singleHomeStaffUsername);
+        singleHomeStaff.setPassword(passwordEncoder.encode("password123"));
+        singleHomeStaff.setFirstName("Guard");
+        singleHomeStaff.setLastName("Single");
+        singleHomeStaff.setEmail(singleHomeStaffUsername + "@example.test");
+        singleHomeStaff.setRoles(new HashSet<>(Set.of(Role.HOME_STAFF)));
+        singleHomeStaff.setHomes(new HashSet<>(Set.of(pendingHome)));
+        userRepository.save(singleHomeStaff);
+
+        String html = mockMvc.perform(post("/children")
+                        .with(asUser(singleHomeStaffUsername)).with(csrf())
+                        .param("firstName", "Refused")
+                        .param("lastName", "Child")
+                        .param("dateOfBirth", LocalDate.of(2012, 1, 1).toString()))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(html).contains("not yet active");
+        // The field this used to be a FieldError on is genuinely absent from this user's page.
+        assertThat(html).doesNotContain("id=\"homeId\"");
+    }
+
+    /**
      * The control. Without it, a guard that refused EVERY add-child would pass the test above while
      * being catastrophically wrong - and the V19 backfill (existing organisations to ACTIVE, not
      * PENDING) is exactly the line where that mistake would be made.

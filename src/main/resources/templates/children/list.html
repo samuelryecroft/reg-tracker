@@ -8,7 +8,11 @@
 <body>
 <div th:replace="~{fragments/layout :: nav}"></div>
 <main id="main">
-    <h1 th:text="${isAdmin} ? 'Children' : 'My Children'">Children</h1>
+    <!-- D-5d-1 (spec §7g): renamed from isAdmin - it never meant "is an administrator" here (a
+         multi-home HOME_STAFF sees the column too), and a name after the mechanism it was written
+         for rather than the property it encodes is exactly how a future reader mis-reasons about
+         who this applies to. Named for what it decides, matching ChildController's own local var. -->
+    <h1 th:text="${showHomeColumn} ? 'Children' : 'My Children'">Children</h1>
     <!-- The matrix, not a role flag. This hid the button from VIEWER only, so a supplier
          org-admin - who can reach this page - was offered an action the server then refused. -->
     <a class="btn" href="/children/new" th:if="${can.addChild}">Add child</a>
@@ -20,7 +24,7 @@
         <tr>
             <th scope="col">Name</th>
             <th scope="col">Date of birth</th>
-            <th scope="col" th:if="${isAdmin}">Home</th>
+            <th scope="col" th:if="${showHomeColumn}">Home</th>
             <th scope="col">Case reference</th>
         </tr>
         </thead>
@@ -36,7 +40,7 @@
         <tr th:each="c : ${children}">
             <td th:text="${childIdentities[c.id].label()}">Child Name</td>
             <td th:text="${childRows[c.id].dob()}">DOB</td>
-            <td th:if="${isAdmin}" th:text="${c.home.name}">Home</td>
+            <td th:if="${showHomeColumn}" th:text="${c.home.name}">Home</td>
             <td th:text="${childRows[c.id].caseReference()}">Case reference</td>
         </tr>
         </tbody>
@@ -48,7 +52,7 @@
             <div class="top"><span class="name" th:text="${childIdentities[c.id].label()}">Child Name</span></div>
             <dl>
                 <dt>Date of birth</dt><dd th:text="${childRows[c.id].dob()}">DOB</dd>
-                <dt th:if="${isAdmin}">Home</dt><dd th:if="${isAdmin}" th:text="${c.home.name}">Home</dd>
+                <dt th:if="${showHomeColumn}">Home</dt><dd th:if="${showHomeColumn}" th:text="${c.home.name}">Home</dd>
                 <dt>Case reference</dt><dd th:text="${childRows[c.id].caseReference()}">Case reference</dd>
             </dl>
         </div>
