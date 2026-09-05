@@ -10,12 +10,12 @@
 <main id="main">
     <h1>Raise a Return Home Interview Request</h1>
 
-    <!--
+    <!--/*
       2e is four groups with a sticky rail. The rail is jump links in a nav landmark - the same
       answer as D-1a-3 and for the same reason: this form is long, is read and checked in full, and
       real tab semantics would hide three quarters of it from Ctrl-F and from print. It is a way
       through the form, not a way to see less of it.
-    -->
+    */-->
     <div class="form-layout">
     <nav class="form-rail" aria-label="Sections of this request">
         <a href="#young-person">Young person</a>
@@ -36,12 +36,12 @@
                 <option th:each="c : ${children}" th:value="${c.id}" th:text="${c.fullName}">Child</option>
             </select>
             <div th:replace="~{fragments/layout :: fieldError('childId')}"></div>
-            <!-- T138 1c: masking applies where a child is being read about, not where one is being
+            <!--/* T138 1c: masking applies where a child is being read about, not where one is being
                  identified (Creed's review) - this picker is how the person raising the request
                  tells the system which real child they mean, and staff think in names, not case
                  references, so a masked option they can't resolve isn't a protected control, it's
                  a broken one. Exempting it silently would read as a bug and as an unannounced
-                 privacy behaviour, so it's stated here rather than left for someone to notice. -->
+                 privacy behaviour, so it's stated here rather than left for someone to notice. */-->
             <p class="hint">Full names are shown here so you pick the right child, even when names are masked elsewhere.</p>
             <p class="muted" th:if="${can.addChild}"><a href="/children/new">+ Add a child</a> not in this list</p>
 
@@ -55,9 +55,9 @@
             <p class="hint">Likes/dislikes and any potential barriers to completing the RHI.</p>
             <textarea id="aboutYoungPerson" th:field="*{aboutYoungPerson}"></textarea>
 
-            <!-- The two clock fields head this group rather than sitting under "Young person":
+            <!--/* The two clock fields head this group rather than sitting under "Young person":
                  they are facts about the EPISODE, and returnedAt is the one the statutory 72-hour
-                 window is measured from, so it belongs where someone recording an episode looks. -->
+                 window is measured from, so it belongs where someone recording an episode looks. */-->
             <h3 id="missing-episode" tabindex="-1">Missing episode</h3>
 
             <label for="missingSince">Date of missing episode</label>

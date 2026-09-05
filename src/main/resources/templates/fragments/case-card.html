@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
-<!--
+<!--/*
   The case card (spec §6b S-1): ONE component for every list of interview requests - 2a's
   coordinator queue, 2d's reviewer queue, 2f's visitor list, and home staff's requests.
 
@@ -31,10 +31,10 @@
   - The due tag's own word is NOT stripped inside a tier group (D-2a-1 REVISED): the copy is
     DueStateCopy's, human-signed-off and test-pinned, and a card is scanned and deep-linked on its
     own, where nothing else supplies the tier.
--->
+*/-->
 <body>
 
-<!--
+<!--/*
   identity    - ChildIdentity for this row (the disc takes avatar(), the label besideAvatar(), S-1)
   href        - where the child's name links
   meta        - the line under the name: home and return time on 2a, submitted-ago on 2d
@@ -55,7 +55,7 @@
   by ~{::selector} looks more flexible and is harder to be sure of: the selector resolves against
   the calling template as a whole, which inside a th:each is exactly where a subtle wrong answer
   would be invisible. What actually varies between these four screens is the words, not the shape.
--->
+*/-->
 <div th:fragment="caseCard(identity, href, meta, asideLabel, aside, badge, status, actionLabel, actionHref, noAction, noteLabel, note)"
      th:classappend="${note != null} ? 'case-with-note'" class="case">
     <a class="case-link rowlink" th:href="${href}">
@@ -88,11 +88,11 @@
         <span th:if="${actionLabel == null and noAction != null}" class="case-no-action" th:text="${noAction}">You submitted this report</span>
     </span>
 
-    <!--
+    <!--/*
       The note is a labelled region rather than loose text: without the label it arrives as an
       unattributed paragraph after the card's own facts, and "you must change the times" reads very
       differently depending on who is understood to be saying it.
-    -->
+    */-->
     <div th:if="${note != null}" class="case-note">
         <span class="lbl" th:text="${noteLabel}">Reviewer's comment</span>
         <p th:text="${note}">Please add the times you spoke to the young person.</p>

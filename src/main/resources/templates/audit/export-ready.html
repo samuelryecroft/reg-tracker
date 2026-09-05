@@ -20,9 +20,9 @@
         <p class="hint" style="font-family:ui-monospace,Menlo,monospace" th:text="${'SHA-256: ' + checksum}">checksum</p>
         <a class="btn block" th:href="@{/export/download/{token}(token=${token})}">Download CSV</a>
         <p style="margin-top:12px;text-align:center">
-            <!-- T165: the clock is aria-hidden markup, not a character inside announced text. As a
+            <!--/* T165: the clock is aria-hidden markup, not a character inside announced text. As a
                  U+25F7 in the th:text it was read out as the character NAME before the sentence
-                 that said what was actually happening. -->
+                 that said what was actually happening. */-->
             <span class="expires"><svg class="icon" aria-hidden="true"><use th:href="@{/icons/phosphor.svg} + '#ph-clock-countdown'"></use></svg><span th:text="${'Link expires in ' + expiresInMinutes + ' minutes'}">Expires</span></span>
         </p>
         <p class="hint" style="margin-top:14px">Re-downloading after expiry means generating again — which writes a

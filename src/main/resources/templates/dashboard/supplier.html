@@ -23,7 +23,7 @@
         <noscript><button type="submit" class="btn secondary" style="min-height:44px;padding:0 14px">Apply</button></noscript>
     </form>
 
-    <!-- ============ LIVE ZONE ============ -->
+    <!--/* ============ LIVE ZONE ============ */-->
     <section class="zone live" aria-labelledby="z1">
         <div class="zone-hd">
             <h2 id="z1">Needs attention</h2>
@@ -39,7 +39,7 @@
         </div>
     </section>
 
-    <!-- ============ PERFORMANCE ZONE ============ -->
+    <!--/* ============ PERFORMANCE ZONE ============ */-->
     <section class="zone" aria-labelledby="z2">
         <div class="zone-hd">
             <h2 id="z2">Our performance</h2>
@@ -66,10 +66,10 @@
                 <span class="num" th:if="${view.overallRate().percent().isPresent()}" th:text="${view.overallRate().percent().getAsInt()} + '%'">82%</span>
                 <span class="num" style="font-size:19px;color:var(--muted);font-weight:650" th:unless="${view.overallRate().percent().isPresent()}">Not enough data yet</span>
                 <span class="den" th:text="${view.overallRate().within72() + ' of ' + view.overallRate().validCompleted()}">41 of 50</span>
-                <!-- T165: the clock is aria-hidden markup, not a character inside announced text.
+                <!--/* T165: the clock is aria-hidden markup, not a character inside announced text.
                      As a U+25F7 baked into this th:text it reached a screen reader as the CHARACTER'S
                      NAME, ahead of the sentence that said what had actually been excluded. The guard
-                     that was meant to stop this only scanned Java and CSS, never templates. -->
+                     that was meant to stop this only scanned Java and CSS, never templates. */-->
                 <span class="den" style="display:block;margin-top:8px;padding-top:8px;border-top:1px solid var(--border);color:var(--warn);font-weight:650" th:if="${view.overallRate().excludedNotMeasurable() > 0}">
                     <svg class="icon" aria-hidden="true"><use th:href="@{/icons/phosphor.svg} + '#ph-clock-countdown'"></use></svg>
                     <span th:text="${view.overallRate().excludedNotMeasurable() + ' further interview'
@@ -92,7 +92,7 @@
                 <td><a class="rowlink" th:href="${row.href()}" th:text="${row.name()}">Provider</a>
                     <span style="font-size:11px;color:var(--muted);display:block" th:if="${row.subLabel() != null}" th:text="${row.subLabel()}">4 homes</span></td>
                 <td th:text="${row.stat().validCompleted()}">0</td>
-                <!--
+                <!--/*
                   D-2c-1: no chart library, no SVG, no ARIA. The value is in the row AS TEXT
                   ("41 of 50 · 82%") and the bar is a CSS width on top of it, so the bar is a
                   visual encoding of a number that is already readable and the table row is
@@ -100,7 +100,7 @@
                   is cheap and keeps the encoding perceivable - but nothing depends on the bar
                   alone, which is what makes 1.4.11 the floor here rather than the whole answer.
                   A no-build app also gains no dependency this way.
-                -->
+                */-->
                 <td>
                     <span class="rate" th:text="${row.stat().within72() + ' of ' + row.stat().validCompleted()
                             + ' · ' + row.stat().percent().getAsInt() + '%'}">41 of 50 · 82%</span>
@@ -158,7 +158,7 @@
         </div>
     </section>
 
-    <!-- ============ RECURRENCE PANEL (D-1 safe default: counts, no names) ============ -->
+    <!--/* ============ RECURRENCE PANEL (D-1 safe default: counts, no names) ============ */-->
     <section class="zone" aria-labelledby="z3">
         <div class="zone-hd">
             <h2 id="z3">Recurring missing episodes</h2>

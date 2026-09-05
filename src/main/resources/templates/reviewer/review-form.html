@@ -7,18 +7,18 @@
 </head>
 <body>
 <div th:replace="~{fragments/layout :: nav}"></div>
-<!--
+<!--/*
   T173(1b) / spec §6a: "the canvas presents 1a and 1b as two treatments of one record, which reads
   like a choice. It is not one. 1a shipped as the record view for every role. 1b is the reviewer's
   decision surface" - the only place in the app an irreversible action is taken on someone else's
   work. Every decision below follows from that sentence.
--->
+*/-->
 <main id="main" class="review" th:with="ico=@{/icons/phosphor.svg}">
     <h1 th:text="${'Review: ' + childIdentity.label()}">Review report</h1>
     <span class="status" th:classappend="${request.status}" th:text="${request.status.displayName}">STATUS</span>
     <p class="muted" th:text="${'Home: ' + request.home.name}">Home</p>
 
-    <!--
+    <!--/*
       D-1b-8 CLOSED (god + Creed, spec §6c/§6d) - a correction to the FIRST attempt at this, worth
       keeping the note on: D-1b-8 originally said "at the top, with the guard attestation", but
       D-1b-7 had ALREADY put that attestation beside the actions - the two can't both be satisfied,
@@ -35,7 +35,7 @@
       own banner already use - aria-hidden, no hidden state word needed since the visible text
       already carries it (D-1a-2b's converse). Independent of canDecide - anyone viewing this page
       benefits from the context, self-reviewer or not. Copy ratified by god, plural-aware.
-    -->
+    */-->
     <p class="prior-send-back" th:if="${priorSendBack != null}">
         <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-arrow-u-up-left'"></use></svg>
         <span th:if="${priorSendBackCount == 1}">
@@ -50,7 +50,7 @@
         </span>
     </p>
 
-    <!--
+    <!--/*
       D-1b-7 CLOSED, corrected (Creed's second #71 review, spec §6f): originally the attestation
       sat beside the actions and the not-satisfied banner replaced the bar in the same spot - but
       that means a BLOCKED reviewer reads the entire safeguarding report before ever learning they
@@ -62,7 +62,7 @@
       controls remain beside the actions below. canReview already enforces this server-side
       (getReviewable's own conflict-of-interest check) - this is still only saying so, never a
       disabled button (permanent, not provisional - there is nothing that could later enable one).
-    -->
+    */-->
     <p class="muted" th:if="${canDecide}">You did not submit this report.</p>
     <div class="banner warn" th:unless="${canDecide}">
         <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-warning-circle'"></use></svg>
@@ -74,12 +74,12 @@
         </div>
     </div>
 
-    <!--
+    <!--/*
       D-1b-8 (rail limitation, unchanged from the original §6a note): kept for orientation, same
       component as 1a. A report sent back once and resubmitted is back at REPORT_SUBMITTED - the
       rail shows CURRENT and the earlier send-back is invisible there, which is exactly why the
       note above exists.
-    -->
+    */-->
     <ol class="rail" aria-label="Interview status">
         <li th:each="step, stat : ${statusRail}" th:classappend="'rail-' + ${step.state()}"
             th:attr="aria-current=${step.state().name() == 'CURRENT'} ? 'step'">
@@ -107,14 +107,14 @@
         </li>
     </ol>
 
-    <!--
+    <!--/*
       D-1b-1: replaces a link to /interview-requests/{id} that took a reviewer holding an
       irreversible decision away from it to check the intake, with no way back but the browser's
       own back button. Same component D-1a-5 shipped (#68), always closed (a report exists by
       definition on this screen, unlike 1a where open/closed is status-derived). Not in the
       section index below - it sits at the top of the page, already in view on load, unlike 1a's
       own disclosure which sits deep in a long scroll and needs a jump target to be reachable.
-    -->
+    */-->
     <details class="card disclosure">
         <summary>
             <svg class="icon caret-closed" aria-hidden="true"><use th:href="${ico} + '#ph-caret-right'"></use></svg>
@@ -153,9 +153,9 @@
         </dl>
     </details>
 
-    <!-- D-1b-9: both already vendored and aria-hidden; neither needs a hidden state word - each
+    <!--/* D-1b-9: both already vendored and aria-hidden; neither needs a hidden state word - each
          sits in a banner whose visible text already carries the state (D-1a-2b's converse: a
-         hidden word there would be duplication, not access). -->
+         hidden word there would be duplication, not access). */-->
     <div class="banner info">
         <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-lock-simple'"></use></svg>
         <div>
@@ -165,11 +165,11 @@
         </div>
     </div>
 
-    <!--
+    <!--/*
       D-1b-3: a section, not a tab, as 1a already ruled for a stronger reason here - this is the
       screen where a reviewer scans and prints before generating the document. D-1b-1's disclosure
       is deliberately not listed (see its own comment above).
-    -->
+    */-->
     <nav class="section-index" aria-label="Report sections">
         <a href="#report-details">1. Details</a>
         <a href="#rhi">2. Return Home Interview</a>
@@ -180,11 +180,11 @@
         <a href="#history">History</a>
     </nav>
 
-    <!--
+    <!--/*
       #fields.hasErrors requires an active th:object scope, so this banner must be the FIRST
       CHILD inside the form below, never before it - a standing gotcha in this codebase, not new
       to 1b (see fragments/layout's own error-summary convention elsewhere).
-    -->
+    */-->
     <form method="post" th:action="@{/reviewer/reports/{id}/review(id=${request.id})}" th:object="${form}">
         <div class="banner err" role="alert" th:if="${#fields.hasErrors('reviewComments')}">
             <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-warning-circle'"></use></svg>
@@ -202,17 +202,17 @@
             <div th:replace="~{fragments/audit-history :: timeline(${auditHistory})}"></div>
         </div>
 
-        <!--
+        <!--/*
           D-1b-7: canReview already enforces this server-side (getReviewable's own conflict-of-
           interest check). The "SAY so" half of this rule now lives entirely at the top of the
           page (Creed's second #71 review, spec §6f - see that comment there for why); only the
           controls a satisfied reviewer actually needs remain here, gated the same way.
-        -->
+        */-->
         <div th:if="${canDecide}">
             <div class="consequence">
                 <p>Approving generates the final Word document, releases it to the child's home, and can't be undone.</p>
             </div>
-            <!--
+            <!--/*
               Creed's review of #71: the no-JS fallback pointed the wrong way. Approve was already
               a real submit (works without JS); Send back was type="button" (dead without JS) - so
               a broken/disabled script let a reviewer APPROVE (irreversible) but not send back
@@ -224,14 +224,14 @@
               re-render (see its own `open` attribute below), one extra round-trip, same complete
               flow, never a dead end. D-1a-3's own principle: where the enhancement is missing, you
               get the plain version, never nothing.
-            -->
+            */-->
             <div class="sticky-actions">
                 <button type="submit" name="action" value="approve" class="btn">Approve and generate document</button>
                 <button type="submit" name="action" value="reject" class="btn sent-back" id="openSendBackDialog">Send back with comments</button>
                 <a class="btn ghost" href="/reviewer/reports">Cancel</a>
             </div>
 
-            <!--
+            <!--/*
               D-1b-5: send back opens this dialog rather than submitting the page directly. The
               comment is required only here, and .dialog co-locates the control, its requirement
               and its error - today (pre-fix) that textarea sat in a card while the button was
@@ -239,7 +239,7 @@
               screen: you press a button you can see and get an error you cannot. `open` is set
               statically when the server round-trip re-renders with this exact error, so the
               no-JS/JS-failed case still shows it without depending on send-back-dialog.js.
-            -->
+            */-->
             <dialog class="dialog" id="sendBackDialog" th:attr="open=${#fields.hasErrors('reviewComments')} ? 'open' : null">
                 <h2 class="dialog-title">Send this report back?</h2>
                 <div class="dialog-body">

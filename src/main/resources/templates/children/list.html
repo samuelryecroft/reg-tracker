@@ -8,16 +8,16 @@
 <body>
 <div th:replace="~{fragments/layout :: nav}"></div>
 <main id="main">
-    <!-- D-5d-1 (spec §7g): renamed from isAdmin - it never meant "is an administrator" here (a
+    <!--/* D-5d-1 (spec §7g): renamed from isAdmin - it never meant "is an administrator" here (a
          multi-home HOME_STAFF sees the column too), and a name after the mechanism it was written
          for rather than the property it encodes is exactly how a future reader mis-reasons about
-         who this applies to. Named for what it decides, matching ChildController's own local var. -->
+         who this applies to. Named for what it decides, matching ChildController's own local var. */-->
     <h1 th:text="${showHomeColumn} ? 'Children' : 'My Children'">Children</h1>
-    <!-- The matrix, not a role flag. This hid the button from VIEWER only, so a supplier
-         org-admin - who can reach this page - was offered an action the server then refused. -->
+    <!--/* The matrix, not a role flag. This hid the button from VIEWER only, so a supplier
+         org-admin - who can reach this page - was offered an action the server then refused. */-->
     <a class="btn" href="/children/new" th:if="${can.addChild}">Add child</a>
 
-    <!--
+    <!--/*
       6a (spec §7b): children are people, not an aggregate - R-Q12 rules cards for people and
       tables for aggregates, so the table this page used to render alongside this same list is
       deleted rather than kept as a second copy. It was the strongest case on the floor for that
@@ -31,7 +31,7 @@
       masked page. The case reference goes through the same projection but is never gated - it is
       already shown, by design, in the name column's own masked label (see ChildListRow's javadoc
       for why gating this cell too would misreport its own state).
-    -->
+    */-->
     <div class="stack solo">
         <div class="srow" th:each="c : ${children}">
             <div class="top"><span class="name" th:text="${childIdentities[c.id].label()}">Child Name</span></div>
@@ -43,7 +43,7 @@
         </div>
     </div>
 
-    <!-- R-Q13 (spec §5d), final copy - do not reword. -->
+    <!--/* R-Q13 (spec §5d), final copy - do not reword. */-->
     <div class="empty" th:if="${#lists.isEmpty(children)}">
         No children added yet. Add a child before you can raise an interview request.
         <a class="btn secondary" href="/children/new" th:if="${can.addChild}">Add a child</a>
