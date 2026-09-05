@@ -132,7 +132,23 @@ variable "entra_client_id" {
 }
 
 variable "entra_issuer_uri" {
-  description = "OIDC issuer URI for the External ID tenant, used for discovery. NOT a secret."
+  description = "OIDC issuer URI for the External ID tenant, used for discovery. NOT a secret. MUST be the GUID form (https://<tenant-guid>.ciamlogin.com/<tenant-guid>/v2.0); the domain form resolves but returns a GUID-form issuer, which fails Spring's issuer validation at startup (ENTRA-TENANT-PROVISIONED.md)."
   type        = string
   default     = ""
+}
+
+# The active Spring profile string written to SPRING_PROFILES_ACTIVE. Variable-driven so the T200
+# Entra sign-in cutover is a gated tfvars flip rather than a code edit. The allowlist here mirrors
+# deploy.yml's 5.1 gate exactly {azure, "azure,entra"}; there is no 'prod' profile and 'demo' is never
+# permitted on a real deployment. ORDERING: only set "azure,entra" AFTER entra_enabled=true and after
+# ENTRA-CLIENT-SECRET exists in Key Vault - the entra profile has no secret fallback and fails closed.
+variable "spring_profiles_active" {
+  description = "SPRING_PROFILES_ACTIVE for the App Service. 'azure' (default, current state) or 'azure,entra' (Entra cutover). Flipping to 'azure,entra' is the P7 cutover step; gate it on entra_enabled and the minted client secret."
+  type        = string
+  default     = "azure"
+
+  validation {
+    condition     = contains(["azure", "azure,entra"], var.spring_profiles_active)
+    error_message = "spring_profiles_active must be exactly \"azure\" or \"azure,entra\" (mirrors the deploy.yml allowlist; 'demo' and 'prod' are never permitted)."
+  }
 }

@@ -153,7 +153,11 @@ module "app_service" {
   tags                = var.tags
 
   # WS-B fail-fast boot vars: the app refuses to start in prod without these.
-  spring_profiles_active = "azure"
+  # Profile is variable-driven so the T200 Entra cutover flip ("azure" -> "azure,entra") is a single
+  # gated tfvars change, not a code edit. Default is "azure"; setting "azure,entra" is the cutover and
+  # MUST come after entra_enabled=true and after the human has minted ENTRA-CLIENT-SECRET into Key
+  # Vault (otherwise the entra profile activates with no secret and the app fails closed at boot).
+  spring_profiles_active = var.spring_profiles_active
   blob_endpoint          = module.storage.primary_blob_endpoint
   key_vault_uri          = module.keyvault.vault_uri
 

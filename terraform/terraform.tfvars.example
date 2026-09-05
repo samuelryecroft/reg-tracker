@@ -28,3 +28,21 @@ enable_vnet = true
 # T114 budget notifications recipient. REQUIRED (no default) so a real mailbox is always chosen
 # deliberately - the human's is justsam33@gmail.com. Set it here (this file's real copy is git-ignored).
 budget_alert_email = "you@example.org"
+
+# --- T200 Entra External ID sign-in cutover (PREPARED, gated - see ENTRA-CUTOVER-READINESS.md §4-5).
+# All three values below are NON-secret (recorded from the app registration, ENTRA-TENANT-PROVISIONED.md).
+# The client SECRET is never here and never in Terraform state as a value: it is minted by the human
+# straight into Key Vault as ENTRA-CLIENT-SECRET, and Terraform holds only a @Microsoft.KeyVault(...)
+# reference. Leave this whole block commented until cutover.
+#
+# ORDER (do not skip):
+#   1. Human mints ENTRA-CLIENT-SECRET into kv-rht-fq58t (portal) + creates the sign-in user flow.
+#   2. entra_enabled = true  (provisions the KV secret container + writes ENTRA_* app settings;
+#      app still serves form login because the profile is still "azure").  -> apply
+#   3. deploy.yml allowlist widened to accept "azure,entra" (PR #91) is merged.
+#   4. spring_profiles_active = "azure,entra"  -> apply  = the cutover. Form login + break-glass stay.
+#
+# entra_enabled          = true
+# entra_client_id        = "726d965d-e292-4e29-b6e3-0170ebcc853d"
+# entra_issuer_uri       = "https://1d7a3706-4101-4620-a57d-426e95f41971.ciamlogin.com/1d7a3706-4101-4620-a57d-426e95f41971/v2.0"
+# spring_profiles_active = "azure,entra"   # step 4 ONLY - leave "azure" (the default) until then
