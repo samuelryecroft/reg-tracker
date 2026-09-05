@@ -252,25 +252,26 @@ subnet, which is why `snet-ca-migrate` is separate from `containerapps` (the lat
 standing `modules/migrator_job` env, **kept as the fallback** until this path is proven in a real
 deploy, then removed).
 
-**Procedure (manual, per deploy), BEFORE the jar goes live:**
+**Procedure (per deploy), BEFORE the jar goes live** — one committed script, not a checklist:
+
 1. `terraform apply` (idempotent) so `snet-ca-migrate` exists; read `migrate_subnet_id`.
-2. **Pre-create sweep** (required — a stale env from a failed prior run holds the subnet): if an env
-   named `cae-<prefix>-migrate` exists, `az containerapp env delete … --yes` and wait for its `ME_*`
-   RG to disappear.
-3. `az containerapp env create -n cae-<prefix>-migrate --internal-only true
-   --infrastructure-subnet-resource-id <migrate_subnet_id> --logs-workspace-id/-key <log-analytics>`.
-4. `az containerapp job create -n caj-<prefix>-migrate` in that env: **same** digest-pinned image,
-   `--mi-user-assigned rht-cd-prod`, `--registry-server <acr> --registry-identity rht-cd-prod`, and
-   the same env vars as `modules/migrator_job` (`KEY_VAULT_URI`, `AZURE_CLIENT_ID`, `DB_HOST`,
-   `DB_NAME`, `ADMIN_LOGIN`, `MIGRATOR_LOGIN`, `SQL_DIR=/payload/sql`,
-   `FLYWAY_LOCATIONS=/payload/migration`), `--replica-timeout 1800 --replica-retry-limit 0`.
-5. `az containerapp job start` → **poll the execution to `Succeeded`; abort the deploy on `Failed`**
-   (same WS-G ordering guarantee as the standing step: `01 → Flyway → 02` completes before the jar).
-6. **Always-teardown** (success or failure): `az containerapp job delete` then
-   `az containerapp env delete` (env refuses while the job exists; the subnet refuses deletion while
-   the env's managed LB holds its frontend IP — so the order is **job → env**, and the subnet is
-   PERMANENT precisely to avoid that 10–20 min delete-ordering trap). The next run's pre-create sweep
-   is the backstop if a teardown is interrupted.
+2. Run **`deploy/db-plane/ephemeral-migrate.sh`** with the environment it documents (`RG`,
+   `NAME_PREFIX`, `LOCATION`, `MIGRATE_SUBNET_ID`, the Log Analytics `LOG_WS_ID`/`LOG_WS_KEY`,
+   `ACR_LOGIN_SERVER`, the **digest-pinned** `DB_PLANE_IMAGE`, `CD_IDENTITY_ID`/`CD_CLIENT_ID`, and
+   `KEY_VAULT_URI`/`DB_HOST`/`DB_NAME`/`ADMIN_LOGIN`/`MIGRATOR_LOGIN`). It performs, in order:
+   **pre-create sweep** (remove an orphan env from a killed prior run — it still holds the subnet) →
+   **create** the internal env in `snet-ca-migrate` → **create** the job (same digest-pinned image,
+   `rht-cd-prod` managed identity, same env as `modules/migrator_job`) → **start + poll to
+   `Succeeded`**, exit non-zero on `Failed` (same WS-G ordering guarantee: `01 → Flyway → 02` before
+   the jar) → **always-teardown**.
+3. Deploy the jar only if the script returned success.
+
+**Teardown is verified, not fired-and-forgotten** (an env that fails to tear down is the same idle-LB
+cost, only invisible): teardown runs on *every* exit path via a `trap` and the script does not return
+until the env is confirmed gone; if it cannot confirm within the timeout it warns LOUDLY to check the
+platform-managed `ME_*` group for a leftover load balancer. The delete order is **job → env** (env
+refuses while the job exists), and the subnet is **permanent** precisely to avoid the delete-ordering
+trap where a per-run subnet cannot be removed until the env's managed LB releases its frontend IP.
 
 This preserves the Kevin-T89 guarantees exactly (managed identity **in the VNet** + KV read; **ACI is
 still ruled out** — it cannot do MI-in-VNet without a stored credential). It is proven end-to-end on
