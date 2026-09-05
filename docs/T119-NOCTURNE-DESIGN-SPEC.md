@@ -3301,3 +3301,75 @@ do not build a screen around it.**
 **Keep the `platformWide` split.** The count is meaningless for the platform default, whose existing copy
 correctly describes a *fallback* rather than an inheritance — those are different relationships and the
 copy already distinguishes them.
+## 7k · 3a's preview — the hue must be ported exactly, and the ramp must not be copied (Creed, 7 Sep)
+
+Pam flagged D-3a-3's real cost before building it. One of her two problems is smaller than she thinks and
+the other is genuinely worth its 30 lines.
+
+### D-3a-6 · Do NOT duplicate the ramp. Setting `--brand-hue` on the pane already re-derives it.
+
+Her plan was scoped selectors *"mirroring the same oklch step formulas locally"* — documented duplication with
+a comment back to the source. **The duplication is not needed at all**, and the reason is a CSS mechanic worth
+stating because it is the whole basis of the hue-only model:
+
+Every accent token is declared as `oklch(L C var(--brand-hue))`. **Custom properties inherit, and a `var()`
+inside a custom property's value is substituted per element** — so `--color-accent-500` computes separately on
+every element, against *that element's* `--brand-hue`. **A pane that sets its own `--brand-hue` gets the whole
+nine-step ramp re-derived for its subtree, for free, with no declaration copied.**
+
+So the only thing a preview pane cannot inherit is the **appearance switch**, because `:root[data-appearance=
+"light"]` matches the root element and nothing else. **The fix is to extend that block's selector list, never
+to copy its declarations.**
+
+> **A second copy of a rule is not "documented duplication", it is a second thing to keep in sync — and this
+> file has already been bitten twice.** §6g's cream `thead` was a rule that had drifted from its twin, and
+> §6h's focus ring is *correct only because of source order* between two copies of one rule. There is even a
+> guard — `lightAndAutoAppearanceBlocksStayDeclarationIdentical` — asserting that two of these blocks stay
+> identical, which is the codebase saying out loud that copies of this particular block are dangerous.
+> **A third copy would be the first unguarded one.**
+
+Note for the build: adding a selector should not trip that guard, which compares *declarations*. **Run it and
+confirm rather than assume** — and if it does trip, the guard is right and the approach needs revisiting, not
+the guard loosening.
+
+### D-3a-7 · Port `hueFrom()` exactly. An approximation is not a cheaper preview, it is a lying one.
+
+**Port it.** `AccentRamp`'s own javadoc has already decided this:
+
+> *"Pam's CSS half derives `--brand-hue` from the same `primaryColor` this reads, **and the two must agree
+> exactly** — so `hueFrom` is the one place the rounding happens."*
+
+An HSL approximation breaks a stated invariant, silently. Four further reasons, in order of weight:
+
+1. **The error is not uniform.** sRGB-HSL hue and OKLCH hue diverge most at high chroma and worst through the
+   blues. So the preview would be faithful for some brand colours and visibly wrong for others — **and the
+   person choosing cannot tell which case they are in.** A uniformly slightly-wrong preview would be safer
+   than one that is right most of the time.
+2. **The fallback rule.** A fallback degrades to **absence**, never to the value being replaced (§5h). An
+   approximated hue is exactly a plausible wrong value wearing the right value's clothes. **If the true hue
+   were unavailable the correct behaviour would be no live preview at all** — not a cheaper one.
+3. **It defeats the reason the preview exists.** D-3a-3 put it there because it is the one place anyone on
+   this floor looks at dark mode. **A preview known to be provisional is a preview nobody trusts**, and an
+   untrusted preview does not do that job.
+4. **It is testable, and an approximation is not.** Drive the picker in a UI test and assert the computed
+   `--brand-hue` equals what `AccentRamp.hueFrom` returns for the same hex. That check is worth more than the
+   preview: **it is the first thing in this codebase that would compare the two halves of the hue model
+   against each other.**
+
+**Port the grey branch too, explicitly.** `GREY_CHROMA_FLOOR = 0.02` falls back to `NEUTRAL_HUE = 265`. Omit
+it and a near-grey pick previews an arbitrary vivid hue while the server stores neutral — **the most visible
+possible disagreement, on the least obvious input.**
+
+**Cross-language duplication is the residual risk**, so make Pam's own instinct bidirectional: the JS names
+`AccentRamp.hueFrom` as the source of truth, **and `AccentRamp` gains a reciprocal line naming the port.** A
+one-way comment only helps the reader who is already in the right file.
+
+### D-3a-8 · `theme-preview.js`, not an inline `<script>`
+
+Yes — and for a better reason than matching `report-stepper.js`:
+
+- **An inline `<script>` in a template is the same shape as the inline `<style>` that was T186:** logic
+  living in the template rather than in the layer that owns it. That card was expensive; do not reintroduce
+  its shape one screen later.
+- **T129 (CSP) is on the backlog.** An inline script needs a nonce or `unsafe-inline`; a file needs neither.
+  Building it inline is choosing to rewrite it.
