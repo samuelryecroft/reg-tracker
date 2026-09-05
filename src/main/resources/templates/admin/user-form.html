@@ -106,6 +106,23 @@
                 <a class="btn ghost" href="/admin/users">Cancel</a>
             </div>
         </form>
+
+        <!-- T197. Only on an existing user, and outside the edit form: issuing a code is its own
+             action with its own audit record, not a side effect of saving other changes. A code
+             minted because someone corrected a surname would be a standing claim on an account that
+             nobody decided to create. -->
+        <form th:if="${user != null and user.id != null}" method="post"
+              th:action="@{/admin/users/{id}/claim-code(id=${user.id})}" style="margin-top: var(--s5);">
+            <h2>Sign-in claim code</h2>
+            <p class="muted" th:if="${user.idpSubject == null}">This account is not linked to a
+                sign-in identity yet. Issue a one-time code and give it to the person; they enter it
+                once, the first time they sign in.</p>
+            <p class="muted" th:unless="${user.idpSubject == null}">This account is already linked to
+                a sign-in identity, so a claim code cannot be redeemed against it.</p>
+            <div class="btn-row" th:if="${user.idpSubject == null}">
+                <button type="submit" class="btn secondary">Issue a claim code</button>
+            </div>
+        </form>
     </div>
 </main>
 <script th:src="@{/js/role-constraints.js}"></script>

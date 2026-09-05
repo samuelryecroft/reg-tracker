@@ -28,6 +28,28 @@ public enum AuditEventType {
     USER_CREATED,
     USER_UPDATED,
 
+    /**
+     * An Entra identity was pinned onto a user by redeeming a claim code (T197).
+     *
+     * <p><b>This is the event that answers "why is this person in this account?" a year from now.</b>
+     * The link happens once, silently from the outside, and nothing else records that it ever
+     * happened - so this is the only durable trace of how a directory identity came to be attached
+     * to an account holding children's records.
+     */
+    /** An administrator issued or reissued a one-time claim code (T197). Never records the code. */
+    CLAIM_CODE_ISSUED,
+
+    IDENTITY_LINKED,
+
+    /**
+     * A claim-code redemption was refused - wrong, expired, already spent, or for an account that is
+     * already linked.
+     *
+     * <p>Recorded separately from the success because a run of these against one directory identity
+     * is the shape of somebody guessing, and that is only visible if the refusals are counted.
+     */
+    IDENTITY_LINK_REFUSED,
+
     INTERVIEW_REQUEST_CREATED,
     INTERVIEW_REQUEST_ALLOCATED,
     INTERVIEW_REQUEST_SCHEDULED,

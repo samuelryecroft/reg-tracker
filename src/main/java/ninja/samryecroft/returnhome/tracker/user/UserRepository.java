@@ -24,6 +24,9 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @EntityGraph(attributePaths = {"homes", "organisation", "roles"})
     Optional<User> findByIdpSubject(String idpSubject);
 
+    /** Redemption looks a code up by its hash across all users - see {@code ClaimCodeService}. */
+    Optional<User> findByClaimCodeHash(String claimCodeHash);
+
     @Query("select case when count(u) > 0 then true else false end from User u where :role member of u.roles")
     boolean existsByRole(@Param("role") Role role);
 

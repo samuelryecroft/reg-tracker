@@ -223,11 +223,29 @@ public class AuditHistoryService {
             case DOCX_DOWNLOADED -> entry("Report downloaded", event, when, role, null, "");
             case USER_CREATED -> entry("User account created", event, when, role, rolesDetail(meta.get("rolesAssigned")), "info");
             case USER_UPDATED -> entry("User account updated", event, when, role, userUpdateDetail(meta), "info");
+            // Added WITH the enum values, not after them. This switch has a `default ->` arm that
+            // renders the raw enum name, so a new type without a case here shows a reader
+            // "IDENTITY_LINKED" verbatim on the History timeline - a silent degradation rather than
+            // a failure, which is why the design named this cross-reference explicitly.
+            case CLAIM_CODE_ISSUED -> entry("Sign-in claim code issued", event, when, role,
+                    "A one-time code was issued for this account; any previous code stopped working",
+                    "info");
+            case IDENTITY_LINKED -> entry("Sign-in identity linked", event, when, role,
+                    "Directory identity " + orNotRecorded(meta.get("objectId")) + " pinned to this account",
+                    "info");
+            case IDENTITY_LINK_REFUSED -> entry("Sign-in identity link refused", event, when, role,
+                    "A claim code was rejected for directory identity "
+                            + orNotRecorded(meta.get("objectId")), "warn");
             // ACCESS_DENIED has no meaningful target linkage for a per-record view, and its metadata
             // is free text throughout; LOGIN_SUCCESS/FAILURE are excluded upstream for the user page
             // and never match a request/report/child target in the first place.
             default -> entry(event.getEventType().name(), event, when, role, null, "");
         };
+    }
+
+    /** The metadata allow-list is ids and statuses only, so an absent one is stated rather than blank. */
+    private static String orNotRecorded(String value) {
+        return (value == null || value.isBlank()) ? "(not recorded)" : value;
     }
 
     private AuditHistoryEntry entry(String headline, AuditEvent event, String when, String role, String detail, String tone) {

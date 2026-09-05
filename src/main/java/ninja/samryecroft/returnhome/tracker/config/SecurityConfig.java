@@ -2,6 +2,7 @@ package ninja.samryecroft.returnhome.tracker.config;
 
 import ninja.samryecroft.returnhome.tracker.auth.EntraOidcUserService;
 import org.springframework.security.oauth2.client.oidc.web.logout.OidcClientInitiatedLogoutSuccessHandler;
+import ninja.samryecroft.returnhome.tracker.auth.ClaimCodeFailureHandler;
 import ninja.samryecroft.returnhome.tracker.auth.EntraAwareLogoutSuccessHandler;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
@@ -45,6 +46,12 @@ public class SecurityConfig {
                         // permitAll, an unauthenticated fetch of either is intercepted, saved as a
                         // "continue to this URL" target, and redirects a real login back to a font
                         // or icon file instead of the intended landing page.
+                        // T197: reachable without an application account BY DESIGN - that is the
+                        // state it exists to resolve. It grants nothing: the exchange holds only the
+                        // directory oid placed in the session by the FAILURE handler, and every
+                        // application route below still requires an authenticated user. permitAll
+                        // here is not a hole, it is the only route a refused identity may reach.
+                        .requestMatchers("/onboarding/claim").permitAll()
                         .requestMatchers("/login", "/css/**", "/js/**", "/fonts/**", "/icons/**", "/webjars/**", "/error").permitAll()
                         // WS-C: the health endpoint (and its liveness/readiness groups) is public so
                         // App Service probes can reach it unauthenticated. show-details=when-authorized
@@ -144,6 +151,10 @@ public class SecurityConfig {
                 // injected null, and AuthenticationAuditListener would stop writing LOGIN_SUCCESS
                 // without anything throwing.
                 .userInfoEndpoint(userInfo -> userInfo.oidcUserService(requireOidcUserService(entraOidcUserService)))
+                // T197. A valid sign-in with no linked app user is still a FAILURE - the context
+                // stays empty - and this only decides where the refusal lands: the claim-code screen
+                // rather than the generic login error. Everything else keeps the stock behaviour.
+                .failureHandler(new ClaimCodeFailureHandler("/login?error"))
                 .defaultSuccessUrl("/", false));
     }
 

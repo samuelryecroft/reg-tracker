@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en" th:attr="data-appearance=${#strings.toLowerCase(appearancePreference)}">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Claim code issued — Return Home Tracker</title>
+    <th:block th:replace="~{fragments/layout :: styles}"></th:block>
+</head>
+<body>
+<div th:replace="~{fragments/layout :: nav}"></div>
+<main id="main">
+    <h1>Claim code issued</h1>
+    <p th:text="${'For ' + user.fullName}">For the user</p>
+
+    <div class="banner warn" role="alert">
+        <span class="ic" aria-hidden="true">▲</span>
+        <div>
+            <strong>This is the only time this code will be shown</strong>
+            <!-- Not a UX nicety: only a hash is stored, so nobody - including an administrator -
+                 can retrieve it afterwards. If it is lost, issue a new one, which invalidates this. -->
+            <p>Copy it now. It cannot be looked up again. If it is lost, issue a new code — doing so
+                stops this one working.</p>
+        </div>
+    </div>
+
+    <div class="card">
+        <p class="muted">Give this to the person out of band — read it out, hand it over, or email
+            it. How it reaches them does not affect who the system believes they are.</p>
+        <p style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 1.4rem;
+                  letter-spacing: 0.06em; user-select: all;"
+           th:text="${claimCode}">XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XX</p>
+        <p class="muted">They enter it once, the first time they sign in. It expires in 7 days and
+            can only be used once.</p>
+    </div>
+
+    <div class="btn-row">
+        <a class="btn" href="/admin/users">Back to users</a>
+    </div>
+</main>
+</body>
+</html>

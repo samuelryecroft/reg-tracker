@@ -30,9 +30,13 @@ public class UserAdminController {
     private final OrganisationRepository organisationRepository;
     private final AuditHistoryService auditHistoryService;
     private final AuditEventPublisher auditEventPublisher;
+    private final ninja.samryecroft.returnhome.tracker.auth.ClaimCodeService claimCodeService;
 
     public UserAdminController(UserService userService, UserRepository userRepository, HomeRepository homeRepository,
-            OrganisationRepository organisationRepository, AuditHistoryService auditHistoryService, AuditEventPublisher auditEventPublisher) {
+            OrganisationRepository organisationRepository, AuditHistoryService auditHistoryService,
+            AuditEventPublisher auditEventPublisher,
+            ninja.samryecroft.returnhome.tracker.auth.ClaimCodeService claimCodeService) {
+        this.claimCodeService = claimCodeService;
         this.userService = userService;
         this.userRepository = userRepository;
         this.homeRepository = homeRepository;
@@ -73,6 +77,30 @@ public class UserAdminController {
             return "admin/user-form";
         }
         return "redirect:/admin/users";
+    }
+
+    /**
+     * Issues a fresh claim code and shows it to the administrator once (T197).
+     *
+     * <p><b>Shown once and never again.</b> Only a hash is stored, so this response is the sole
+     * moment the code exists outside the administrator's hands - which is what makes "reissue, never
+     * reveal" a property of the storage rather than a rule someone has to remember. Reissuing
+     * invalidates the previous code, and that is the remedy when one is lost or was given to the
+     * wrong person.
+     *
+     * <p>POST rather than GET, because it mints a credential and invalidates the previous one. A GET
+     * would be pre-fetched by a browser, followed by a link checker, and replayed from history.
+     */
+    @PostMapping("/{id}/claim-code")
+    public String issueClaimCode(@PathVariable Long id, @AuthenticationPrincipal AppUserPrincipal principal,
+            Model model) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("No such user: " + id));
+        model.addAttribute("user", user);
+        // The one place the plaintext travels. It is not logged, not audited, and not persisted.
+        model.addAttribute("claimCode", claimCodeService.issue(user));
+        auditEventPublisher.claimCodeIssued(user, principal);
+        return "admin/claim-code-issued";
     }
 
     @GetMapping("/{id}/edit")

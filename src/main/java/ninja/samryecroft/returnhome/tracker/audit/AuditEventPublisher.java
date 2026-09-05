@@ -434,6 +434,58 @@ public class AuditEventPublisher {
     // --- Access control (A.4) ---
 
     /** {@code principal} is null for an anonymous attempt. */
+    /**
+     * An administrator issued (or reissued) a claim code for a user.
+     *
+     * <p>Records that a standing claim on this account now exists and who created it. <b>Never the
+     * code.</b> Reissuing is how a lost code is remedied, so a second of these for one user is
+     * ordinary rather than suspicious - what it means is that the previous code stopped working.
+     */
+    public void claimCodeIssued(User user, AppUserPrincipal principal) {
+        publish(actor(AuditEventRecord.of(AuditEventType.CLAIM_CODE_ISSUED), principal)
+                .target("User", user.getId())
+                .scope(organisationIdOf(user), homeIdOf(user))
+                .build());
+    }
+
+    /**
+     * An Entra identity was pinned onto a user by redeeming a claim code (T197).
+     *
+     * <p>Carries no actor, and that is accurate rather than a gap: <b>nobody is signed in when this
+     * happens.</b> The OIDC attempt was refused, the security context is empty, and the person is
+     * holding a code rather than a session - the same shape {@code organisationActivated} uses for a
+     * system action, for the same reason: inventing an actor would make this indistinguishable from
+     * an administrator having done it.
+     *
+     * <p><b>The claim code is never a parameter here and must never become one.</b> It is a
+     * credential, and audit metadata reaches the shared Log Analytics workspace exactly as a log line
+     * does (T179). The {@code oid} is not a credential - it is the opaque directory identifier an
+     * administrator used to paste by hand - and it is the value that makes this record answer the
+     * question it exists for.
+     */
+    public void identityLinked(User user, String objectId) {
+        publish(AuditEventRecord.of(AuditEventType.IDENTITY_LINKED)
+                .target("User", user.getId())
+                .scope(organisationIdOf(user), homeIdOf(user))
+                .meta("objectId", objectId)
+                .build());
+    }
+
+    /**
+     * A claim-code redemption was refused.
+     *
+     * <p>Records the directory identity that attempted it and nothing about the code - not its
+     * value, not its length, not which of the four reasons applied. A run of these against one
+     * identity is the shape of somebody guessing, and counting them is what makes that visible.
+     */
+    public void identityLinkRefused(String objectId, String path) {
+        publish(AuditEventRecord.of(AuditEventType.IDENTITY_LINK_REFUSED)
+                .target("HttpRequest", null)
+                .meta("objectId", objectId)
+                .meta("path", path)
+                .build());
+    }
+
     public void accessDenied(AppUserPrincipal principal, String method, String path, String message) {
         AuditEventRecord.Builder builder = AuditEventRecord.of(AuditEventType.ACCESS_DENIED)
                 .target("HttpRequest", null)

@@ -53,12 +53,25 @@ public class EntraOidcUserService implements OAuth2UserService<OidcUserRequest, 
         this.delegate = delegate;
     }
 
+    /**
+     * <p><b>This still only ever looks up, and it still throws when there is no match.</b> T197 added
+     * the claim code, and the one thing that must not change is this: when no user is linked to the
+     * token's {@code oid}, no principal is returned. The refusal is now
+     * {@link UnlinkedIdentityException}, which carries the {@code oid} so the redemption exchange
+     * can use it - but it is a subclass of the same exception, reaching the same failure handler,
+     * leaving the same empty security context.
+     *
+     * <p>Returning some partial principal here and letting a filter sort it out later is the
+     * implementation the design warned about, and it would satisfy every functional test of the
+     * claim-code flow.
+     */
     @Override
     public OidcUser loadUser(OidcUserRequest userRequest) throws OAuth2AuthenticationException {
         OidcUser token = delegate.loadUser(userRequest);
-        User user = userRepository.findByIdpSubject(objectIdOf(token))
+        String objectId = objectIdOf(token);
+        User user = userRepository.findByIdpSubject(objectId)
                 .filter(User::isEnabled)
-                .orElseThrow(() -> refuse());
+                .orElseThrow(() -> new UnlinkedIdentityException(objectId, REFUSED));
         return new EntraUserPrincipal(user, token.getIdToken(), token.getUserInfo());
     }
 

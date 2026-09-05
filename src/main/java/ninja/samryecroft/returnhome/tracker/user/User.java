@@ -178,6 +178,64 @@ public class User {
         this.password = password;
     }
 
+    /**
+     * SHA-256 of the one-time claim code, hex. <b>Never the code itself.</b>
+     *
+     * <p>The code is a credential and is shown once, to the admin who issues it, then unrecoverable -
+     * an administrator can reissue, never reveal. A fast hash is correct here <em>because</em> the
+     * code carries 128 bits of {@code SecureRandom}: there is nothing to brute-force, so the slow
+     * hash a short human-friendly code would have needed buys nothing. See {@code ClaimCodeService}
+     * for the entropy decision, which is the load-bearing half of that trade.
+     */
+    @Column(name = "claim_code_hash", length = 64)
+    private String claimCodeHash;
+
+    @Column(name = "claim_code_issued_at")
+    private LocalDateTime claimCodeIssuedAt;
+
+    /**
+     * Short - days, not months. <b>An unredeemed code is a standing claim on an account</b>, and the
+     * account it claims is one with an organisation, a role, and access to children's records.
+     */
+    @Column(name = "claim_code_expires_at")
+    private LocalDateTime claimCodeExpiresAt;
+
+    /** Set once, at redemption. Non-null means the code is spent and can never be redeemed again. */
+    @Column(name = "claim_code_consumed_at")
+    private LocalDateTime claimCodeConsumedAt;
+
+    public String getClaimCodeHash() {
+        return claimCodeHash;
+    }
+
+    public void setClaimCodeHash(String claimCodeHash) {
+        this.claimCodeHash = claimCodeHash;
+    }
+
+    public LocalDateTime getClaimCodeIssuedAt() {
+        return claimCodeIssuedAt;
+    }
+
+    public void setClaimCodeIssuedAt(LocalDateTime claimCodeIssuedAt) {
+        this.claimCodeIssuedAt = claimCodeIssuedAt;
+    }
+
+    public LocalDateTime getClaimCodeExpiresAt() {
+        return claimCodeExpiresAt;
+    }
+
+    public void setClaimCodeExpiresAt(LocalDateTime claimCodeExpiresAt) {
+        this.claimCodeExpiresAt = claimCodeExpiresAt;
+    }
+
+    public LocalDateTime getClaimCodeConsumedAt() {
+        return claimCodeConsumedAt;
+    }
+
+    public void setClaimCodeConsumedAt(LocalDateTime claimCodeConsumedAt) {
+        this.claimCodeConsumedAt = claimCodeConsumedAt;
+    }
+
     public String getIdpSubject() {
         return idpSubject;
     }

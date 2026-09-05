@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Enter your claim code — Return Home Tracker</title>
+    <th:block th:replace="~{fragments/layout :: styles}"></th:block>
+</head>
+<body>
+<!-- No nav fragment, deliberately: nobody is signed in on this screen. The OIDC attempt was
+     refused, the security context is empty, and a navigation bar would offer links that every one
+     of them would refuse - while telling an unlinked identity what this application contains. -->
+<main id="main">
+    <div class="card" style="max-width: 34rem; margin: var(--s6) auto;">
+        <h1>One more step</h1>
+        <p>You have signed in successfully, but this account has not been linked to the tracker yet.</p>
+        <p class="muted">An administrator will have given you a claim code. Enter it once and you
+            will not be asked again.</p>
+
+        <div class="banner err" role="alert" th:if="${refused}">
+            <span class="ic" aria-hidden="true">▲</span>
+            <div>
+                <strong>That code is not valid</strong>
+                <!-- One message for wrong, expired, already used, and already-linked. Telling them
+                     apart would confirm to a guesser whether a code ever existed, and the remedy is
+                     the same in every case. -->
+                <p>Codes expire and can only be used once. Ask an administrator to issue you a new one.</p>
+            </div>
+        </div>
+
+        <form method="post" th:action="@{/onboarding/claim}">
+            <div class="field">
+                <label for="code">Claim code</label>
+                <!-- autocomplete=off and no autofocus-on-error: this is a single-use secret, not a
+                     credential a browser should remember. Case and dashes are normalised server
+                     side, so a code read down a phone and typed back in any casing still works. -->
+                <input type="text" id="code" name="code" class="input" required
+                       autocomplete="off" spellcheck="false" autocapitalize="characters"
+                       placeholder="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XX"/>
+            </div>
+            <div class="btn-row">
+                <button type="submit" class="btn">Link my account</button>
+                <a class="btn ghost" th:href="@{/logout}">Sign out</a>
+            </div>
+        </form>
+    </div>
+</main>
+</body>
+</html>
