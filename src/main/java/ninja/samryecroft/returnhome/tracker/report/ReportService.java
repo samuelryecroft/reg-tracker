@@ -409,7 +409,7 @@ public class ReportService {
         // Both off the same reading as the block above, so the question list and the head block are
         // one source stated twice and cannot disagree. yesNo() and orNotProvided() are for STORED
         // answers - a question a person filled in or did not - and these two are derived.
-        values.put("within72Hours", reading.verdict());
+        values.put("within72Hours", reading.verdictAnswer());
         values.put("ifNotWhyLate", reading.reasonLine());
         values.put("consultationWithHomeStaff", orNotProvided(report.getConsultationWithHomeStaff()));
         values.put("previouslyMissing", yesNo(report.getPreviouslyMissing()));

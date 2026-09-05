@@ -39,16 +39,40 @@ import java.time.format.DateTimeFormatter;
  * appearing elsewhere in the document.
  */
 public record SeventyTwoHourReading(String returnedLine, String heldLine, String elapsedLine,
-        String verdictLine, String reasonLine) {
+        Verdict verdict, String reasonLine) {
+
+    /**
+     * The decision, held as a state rather than as a sentence.
+     *
+     * <p>Both renderings below are computed from this, so there is one decision and two renderings
+     * of it - which is what "one source" has to mean. The first attempt derived the short answer by
+     * reading {@code verdictLine()}'s text, and Creed's objection is the one worth keeping: <b>that
+     * avoids a second ladder by introducing a second REPRESENTATION.</b> It made the display sentence
+     * load-bearing state, so rewording it - "NOT within" to "Not within", a softer "Not measurable" -
+     * would silently change the answer printed into a statutory document. And the fallback was
+     * {@code "Yes"}, so any wording drift defaulted to <b>asserting compliance</b>: the third time in
+     * this ticket the failure direction was compliant, after an impossible sequence counting as a
+     * pass.
+     *
+     * <p><b>A state must reach a second renderer AS THE STATE, not as a substring of the first
+     * rendering.</b>
+     */
+    public enum Verdict { MET, MISSED, NOT_MEASURABLE }
+
+    /** The head block's sentence. */
+    public String verdictLine() {
+        return switch (verdict) {
+            case MET -> "Within 72 hours of return";
+            case MISSED -> "NOT within 72 hours of return";
+            case NOT_MEASURABLE ->
+                    "Not measurable - excluded from the 72-hour rate, not counted as a breach";
+        };
+    }
+
 
     /**
      * The one-word answer for the statutory form's own question list, where the block above is the
      * reading of it.
-     *
-     * <p><b>Derived from {@link #verdictLine()} rather than re-deciding.</b> A second ladder over the
-     * same state is how a document ends up disagreeing with itself, which is the defect T187 exists
-     * to remove - so this reads the sentence that was already chosen instead of asking the report
-     * again. One source, stated twice, incapable of disagreeing.
      *
      * <p>{@code Not measurable} rather than the generic {@code Not recorded} the other answers use.
      * That vocabulary belongs to stored answers - questions a person did or did not fill in, where
@@ -56,11 +80,12 @@ public record SeventyTwoHourReading(String returnedLine, String heldLine, String
      * for an interview recorded before the return "not recorded" would be <b>false</b>: that time is
      * recorded, it is inconsistent. <b>A derived value needs its own words.</b>
      */
-    public String verdict() {
-        if (verdictLine.startsWith("Not measurable")) {
-            return "Not measurable";
-        }
-        return verdictLine.startsWith("NOT within") ? "No" : "Yes";
+    public String verdictAnswer() {
+        return switch (verdict) {
+            case MET -> "Yes";
+            case MISSED -> "No";
+            case NOT_MEASURABLE -> "Not measurable";
+        };
     }
 
     /** Locale pinned: a statutory record must not print its month names in whatever language the
@@ -88,14 +113,12 @@ public record SeventyTwoHourReading(String returnedLine, String heldLine, String
             // elapsed row - that is what that row is for. Inventing a fourth verdict state would
             // split a reading the rate does not split.
             return new SeventyTwoHourReading(returnedLine, heldLine,
-                    notMeasurableCause(returnedAt, heldAt),
-                    "Not measurable - excluded from the 72-hour rate, not counted as a breach",
+                    notMeasurableCause(returnedAt, heldAt), Verdict.NOT_MEASURABLE,
                     reason(report, false));
         }
         boolean met = within;
         return new SeventyTwoHourReading(returnedLine, heldLine, elapsed(returnedAt, heldAt),
-                met ? "Within 72 hours of return" : "NOT within 72 hours of return",
-                reason(report, !met));
+                met ? Verdict.MET : Verdict.MISSED, reason(report, !met));
     }
 
     /**

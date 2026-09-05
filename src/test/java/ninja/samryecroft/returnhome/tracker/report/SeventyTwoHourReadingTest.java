@@ -132,13 +132,40 @@ class SeventyTwoHourReadingTest {
      * itself, which is what T187 exists to remove.
      */
     @Test
-    void theOneWordVerdictAgreesWithTheSentenceItIsDerivedFrom() {
-        assertThat(SeventyTwoHourReading.of(report(RETURNED, RETURNED.plusHours(10), null)).verdict())
+    void theOneWordAnswerAndTheSentenceComeFromTheSameDecision() {
+        assertThat(SeventyTwoHourReading.of(report(RETURNED, RETURNED.plusHours(10), null)).verdictAnswer())
                 .isEqualTo("Yes");
-        assertThat(SeventyTwoHourReading.of(report(RETURNED, RETURNED.plusHours(80), null)).verdict())
+        assertThat(SeventyTwoHourReading.of(report(RETURNED, RETURNED.plusHours(80), null)).verdictAnswer())
                 .isEqualTo("No");
-        assertThat(SeventyTwoHourReading.of(report(RETURNED, null, null)).verdict())
+        assertThat(SeventyTwoHourReading.of(report(RETURNED, null, null)).verdictAnswer())
                 .isEqualTo("Not measurable");
+    }
+
+    /**
+     * <b>The sentence is not load-bearing state.</b> Both renderings come from the {@code Verdict}
+     * held in the record, so rewording one cannot change the other.
+     *
+     * <p>The first version recovered the short answer by reading {@code verdictLine()}'s text, which
+     * avoided a second ladder by introducing a second <em>representation</em> - and its fallback was
+     * {@code "Yes"}, so any wording drift defaulted to <b>asserting compliance</b>. Creed's mutation
+     * proved it: changing "NOT within" to "Not within" silently turned a missed window into a "Yes"
+     * in a statutory document. Run against this version, that same mutation fails only a wording
+     * assertion and leaves every answer untouched.
+     *
+     * <p>Exhaustiveness is the compiler's: both switches cover the enum with no {@code default}, so
+     * a fourth state cannot be added without both renderings being confronted.
+     */
+    @Test
+    void everyVerdictStateRendersBothWaysWithoutEitherReadingTheOther() {
+        assertThat(SeventyTwoHourReading.of(report(RETURNED, RETURNED.plusHours(10), null)))
+                .extracting(SeventyTwoHourReading::verdict, SeventyTwoHourReading::verdictAnswer)
+                .containsExactly(SeventyTwoHourReading.Verdict.MET, "Yes");
+        assertThat(SeventyTwoHourReading.of(report(RETURNED, RETURNED.plusHours(80), null)))
+                .extracting(SeventyTwoHourReading::verdict, SeventyTwoHourReading::verdictAnswer)
+                .containsExactly(SeventyTwoHourReading.Verdict.MISSED, "No");
+        assertThat(SeventyTwoHourReading.of(report(RETURNED, RETURNED.minusHours(3), null)))
+                .extracting(SeventyTwoHourReading::verdict, SeventyTwoHourReading::verdictAnswer)
+                .containsExactly(SeventyTwoHourReading.Verdict.NOT_MEASURABLE, "Not measurable");
     }
 
     /**
@@ -152,8 +179,8 @@ class SeventyTwoHourReadingTest {
         SeventyTwoHourReading reading =
                 SeventyTwoHourReading.of(report(RETURNED, RETURNED.minusHours(3), null));
 
-        assertThat(reading.verdict()).isEqualTo("Not measurable");
-        assertThat(reading.verdict()).isNotEqualTo("Not recorded");
+        assertThat(reading.verdictAnswer()).isEqualTo("Not measurable");
+        assertThat(reading.verdictAnswer()).isNotEqualTo("Not recorded");
     }
 
     /**
