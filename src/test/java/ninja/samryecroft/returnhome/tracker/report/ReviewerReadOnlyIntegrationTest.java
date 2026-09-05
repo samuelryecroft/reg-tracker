@@ -257,12 +257,13 @@ class ReviewerReadOnlyIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void aResubmittedReportShowsThePriorSendBackAtTheTopNotBesideTheActions() throws Exception {
-        // D-1b-8 CLOSED (spec §6c): the rail alone shows CURRENT for a resubmitted report - a
-        // prior send-back is invisible there - so this banner is the only place a reviewer learns
+    void aResubmittedReportShowsThePriorSendBackAtTheTopAloneNotBesideTheActions() throws Exception {
+        // D-1b-8 CLOSED (spec §6c/§6d): the rail alone shows CURRENT for a resubmitted report - a
+        // prior send-back is invisible there - so this note is the only place a reviewer learns
         // "this has come back once before" before they start reading. Placement matters: it must
         // appear before the numbered sections (D-1b-4), not down by the sticky actions, since it's
-        // context for READING the report, not a caveat on pressing a button.
+        // context for READING the report, not a caveat on pressing a button - and it stands ALONE
+        // (the D-1b-7 attestation stays beside the actions; the two notes have different jobs).
         Long requestId = submittedReport();
         mockMvc.perform(post("/reviewer/reports/{id}/review", requestId)
                         .with(asUser("ro-reviewer" + suffix)).with(csrf())
@@ -276,20 +277,60 @@ class ReviewerReadOnlyIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
 
-        assertThat(html).contains("This report has already been sent back once");
-        assertThat(html).contains("read what was asked for last time");
+        // Ratified copy (god, ratifying Creed's version), plural-aware branch for exactly one.
+        assertThat(html).contains("This report was sent back once before, on");
+        assertThat(html).contains("history below");
         assertThat(html).contains("href=\"#history\"");
-        // --sent-back, not --warn (§6c: a normal event between two legitimate outcomes, not a
-        // warning - and calling it one would fork the vocabulary the rail/tag/visitor banner share).
-        assertThat(html).contains("class=\"banner sent-back\"");
+        // Not a banner/alert (god's register call: a resubmission isn't a fault) - a plain
+        // context line using --sent-back ink, not --warn (would fork the vocabulary the rail/tag/
+        // visitor banner already share) and not a class the not-satisfied banner below also uses.
+        assertThat(html).contains("class=\"prior-send-back\"");
+        assertThat(html).doesNotContain("class=\"banner sent-back\"");
 
-        // Placement: the banner must appear before the numbered sections, not after them.
-        int bannerIndex = html.indexOf("already been sent back once");
+        // The D-1b-7 attestation is a SEPARATE note and stays beside the actions, not folded into
+        // the one above - the two were briefly conflated in an earlier version of this ticket.
+        assertThat(html).contains("You did not submit this report.");
+
+        // Placement: the note must appear before the numbered sections, not after them.
+        int noteIndex = html.indexOf("sent back once before");
         int firstSectionIndex = html.indexOf("1. Details");
-        assertThat(bannerIndex).isGreaterThan(-1);
+        assertThat(noteIndex).isGreaterThan(-1);
         assertThat(firstSectionIndex).isGreaterThan(-1);
-        assertThat(bannerIndex).as("the prior-send-back banner must render before the report sections, not beside the actions at the bottom")
+        assertThat(noteIndex).as("the prior-send-back note must render before the report sections, not beside the actions at the bottom")
                 .isLessThan(firstSectionIndex);
+    }
+
+    @Test
+    void aReportSentBackTwiceUsesThePluralRatifiedCopy() throws Exception {
+        // The ratified copy is explicitly plural-aware ("This report was sent back once before"
+        // vs "...has been sent back N times before") - this is the only test exercising the
+        // second branch, since every other fixture in this file goes through at most one round.
+        Long requestId = submittedReport();
+        mockMvc.perform(post("/reviewer/reports/{id}/review", requestId)
+                        .with(asUser("ro-reviewer" + suffix)).with(csrf())
+                        .param("action", "reject")
+                        .param("reviewComments", "First round: expand the risk section"))
+                .andExpect(status().is3xxRedirection());
+        resubmitAfterRejection(requestId);
+        mockMvc.perform(post("/reviewer/reports/{id}/review", requestId)
+                        .with(asUser("ro-reviewer" + suffix)).with(csrf())
+                        .param("action", "reject")
+                        .param("reviewComments", "Second round: still missing detail"))
+                .andExpect(status().is3xxRedirection());
+        resubmitAfterRejection(requestId);
+
+        String html = mockMvc.perform(get("/reviewer/reports/{id}/review", requestId)
+                        .with(asUser("ro-reviewer" + suffix)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        // Two separate checks rather than one long string: the source template wraps this across
+        // multiple lines for readability, so the rendered HTML carries the same line break as
+        // literal whitespace - a browser collapses it to one space, but an exact-substring
+        // assertion should not depend on the template's own line wrapping.
+        assertThat(html).contains("This report has been sent back", "2", "times before");
+        assertThat(html).contains("most recently on");
+        assertThat(html).doesNotContain("sent back once before");
     }
 
     /** Resubmits the same request after a reject round, landing it back at REPORT_SUBMITTED. */

@@ -109,20 +109,23 @@ public class ReviewerController {
         List<AuditHistorySection> auditHistory = auditHistoryService.historyFor(request);
         model.addAttribute("auditHistory", auditHistory);
 
-        // D-1b-8 CLOSED (god, via Creed's spec §6c): SHOW it, at the top with the guard
-        // attestation - not a caveat beside the actions. The rail alone shows CURRENT for a
+        // D-1b-8 CLOSED (god, via Creed's spec §6c/§6d): SHOW it, at the top of the page, alone -
+        // NOT paired with the D-1b-7 attestation (that was Creed's own contradiction: D-1b-7
+        // already puts the attestation beside the actions, and the two notes have different jobs -
+        // the attestation is about the DECISION, this is about how to READ the report, changing
+        // what a reviewer looks for in every section). The rail alone shows CURRENT for a
         // resubmitted report, making an earlier send-back invisible at exactly the moment it
         // should change the reviewer's judgement. The curated audit projection's "back" tone is
         // used ONLY for REPORT_REJECTED (AuditHistoryService), so this never reaches past the
-        // GDPR-safe projection for anything more than the one fact + timestamp the template
-        // needs. Newest first (this list's own established order, same as the History card built
-        // from it) - if a report has been sent back more than once, the most recent one is what's
-        // relevant to a reviewer judging the CURRENT resubmission.
-        AuditHistoryEntry priorSendBack = auditHistory.stream()
+        // GDPR-safe projection for anything more than the fact, the count and the timestamp the
+        // ratified copy needs (plural-aware: "sent back once" vs "sent back N times"). Newest
+        // first (this list's own established order) for the date shown - the most recent send-back
+        // is what's relevant to a reviewer judging the CURRENT resubmission.
+        List<AuditHistoryEntry> priorSendBacks = auditHistory.stream()
                 .flatMap(section -> section.entries().stream())
                 .filter(entry -> "back".equals(entry.tone()))
-                .findFirst()
-                .orElse(null);
-        model.addAttribute("priorSendBack", priorSendBack);
+                .toList();
+        model.addAttribute("priorSendBackCount", priorSendBacks.size());
+        model.addAttribute("priorSendBack", priorSendBacks.isEmpty() ? null : priorSendBacks.get(0));
     }
 }
