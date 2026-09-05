@@ -2543,3 +2543,81 @@ saying why there is no integration test is the right shape.
 
 `NO_CLOCK` allocations count toward the total and are excluded from the tier line — `returned_at` has been
 NOT NULL since V15, so this can only be historical data, and it should not be able to masquerade as urgency.
+
+
+## 7d · 5b Confirm visit time — the one screen where the deadline is the decision (Creed, 8 Sep)
+
+Specced against **main @2eb514a**: `visitor/schedule-form.html`, `VisitorController:60-80`,
+`ConfirmScheduleForm`.
+
+The screen is a single `datetime-local` in a card. **The visitor is the person whose action the 72-hour duty
+actually measures, and the form gives them a picker with no return time, no deadline, and no remaining
+time.** This is 4a's blind allocation again, and a stronger case: a coordinator allocating blind picks the
+wrong visitor, a visitor scheduling blind misses the statute.
+
+### D-5b-1 · Show the clock the choice is measured against, above the field
+
+A three-row labelled block, before the input:
+
+```
+Child returned          02 Sep 2026 14:20
+72-hour deadline        05 Sep 2026 14:20
+Time remaining          6h 10m left
+```
+
+**Reuse, do not re-word.** `DeadlineTracker.RETURN_WINDOW` computes the deadline — never restate 72h as a
+literal. The remaining-time figure is `DueStateCopy`'s, taken through the existing badge path so the queue
+and this screen say the same words about the same request. **Do not re-word `DueStateCopy`'s full sentences:
+they are human-signed-off statutory-surface copy** — the trap named in D-4a-4.
+
+**Factual block, never a banner, never `--error`.** A visitor scheduling on day three is working, not
+failing; T187's rule applies unchanged — *the verdict is about the process, not the person*, and a warning
+treatment here would read as an accusation at the moment someone is trying to comply.
+
+Match `SeventyTwoHourReading`'s datetime format (`dd MMM yyyy HH:mm`, `Locale.UK`) rather than inventing a
+third — see D-187-5(a).
+
+### D-5b-2 · `min` on the input, set server-side to the return datetime
+
+`min="${request.returnedAt}"` costs nothing, needs no script, degrades to server validation, and encodes the
+one genuinely impossible answer. **It is the cheapest correct constraint available and the screen has none.**
+
+### D-5b-3 · No `max`, and this is the load-bearing decision
+
+The obvious next step — cap the picker at the deadline — is **wrong.** A visit scheduled outside the 72-hour
+window is legitimate and must stay recordable; blocking it makes the system refuse to record reality, and
+then the reason is recorded nowhere and the rate silently improves.
+
+> **The deadline is a DUTY, not a constraint on the data.** A tool that cannot represent a missed duty cannot
+> evidence one either.
+
+§7a already settled the principle from the other end: *a late interview is still a valid interview whose
+content matters.* Same rule, applied before the fact instead of after it.
+
+### D-5b-4 · The validation the form is missing, and the one it must NOT have
+
+`ConfirmScheduleForm` carries `@NotNull` and nothing else.
+
+- **Add: reject a `scheduledAt` earlier than the request's `returnedAt`.** This is **D-187-7's sibling at the
+  other end of the flow** — the same impossible-sequence class that reached the compliance rate through
+  `heldAt`. Catching it here is the cheap end: the visitor is present and can fix a mistyped date in
+  seconds, where the document reader meets it months later in a council's copy.
+- **Do NOT add `@Future`.** A visit time in the past is not invalid — a visitor may be recording a time
+  after the fact, and the flow explicitly allows scheduling then reporting. **Only *before the return* is
+  impossible.** The obvious annotation is the wrong one, which is exactly why it is worth writing down.
+
+### D-5b-5 · Say the consequence once, here, before it becomes a surprise
+
+If the chosen time falls outside the window, the report will require a reason (`ifNotWhyLate`, and §7a's
+reason row carries it into the exported document). **Say so on this screen, plainly, once** — a single muted
+line under the block. Forward notice at the moment of choice costs one sentence; discovering it at report
+submission costs a re-plan, and discovering it in the council's copy costs the organisation.
+
+No JS: the line states the rule unconditionally, it does not react to the picker.
+
+### What is deliberately NOT changed
+
+The error banner, the `fieldError` fragment and the button row are the shipped patterns and stay. The
+`<h1>` already carries the child and the home. **This screen needs one block, one attribute, one validation
+and one sentence — not a redesign.**
+
