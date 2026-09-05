@@ -9,6 +9,7 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import ninja.samryecroft.returnhome.tracker.security.LoginFailureHandler;
 import org.springframework.security.web.SecurityFilterChain;
 
 @Configuration
@@ -21,7 +22,8 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http,
+            LoginFailureHandler loginFailureHandler) throws Exception {
         http
                 .authorizeHttpRequests(auth -> auth
                         // T119: /fonts/** and /icons/** are static assets the login page itself
@@ -68,6 +70,10 @@ public class SecurityConfig {
                 .formLogin(form -> form
                         .loginPage("/login")
                         .defaultSuccessUrl("/", false)
+                        // T215: without this, EVERY AuthenticationException lands on /login?error
+                        // and a locked-out user is told to check their password - the one thing
+                        // that cannot work - on every attempt for the whole window.
+                        .failureHandler(loginFailureHandler)
                         .permitAll())
                 .logout(logout -> logout
                         .logoutSuccessUrl("/login?logout")

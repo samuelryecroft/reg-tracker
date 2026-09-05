@@ -14,9 +14,26 @@
          properly. D-4c-1's own lockout banner is deliberately NOT built here - carded as T215,
          gated on Kevin's ruling on whether the attempt counter tracks unknown usernames too (a
          distinct message on real accounts only is a username enumeration oracle). */-->
-    <div class="banner err" role="alert" th:if="${param.error}">
+    <!--/* T215 / D-4c-1. TWO banners, and the generic one is now EXCLUSIVE: `?error=locked` also
+         satisfies `${param.error}`, so without the second test both would render and the reader
+         would be told to try again directly underneath being told that trying again is paused.
+
+         COPY IS CREED'S, VERBATIM, AND NAMES THE STATE NEVER THE ACCOUNT. It does not say whose
+         account, does not say whether one exists, and DELIBERATELY DOES NOT STATE THE REMAINING
+         TIME - a countdown lets an attacker schedule.
+
+         The wording is not what makes this safe, though. Which code path can reach it is: a
+         perfectly vague message that appears for real accounts and not for unknown ones discloses
+         exactly as much as a blunt one, because its PRESENCE is the signal. That is why the
+         selection is made by asking LoginAttemptService.isLocked and never by exception type -
+         see LoginFailureHandler. */-->
+    <div class="banner err" role="alert" th:if="${param.error != null and param.error[0] != 'locked'}">
         <svg class="icon" aria-hidden="true"><use th:href="@{/icons/phosphor.svg} + '#ph-warning-circle'"></use></svg>
         <div><strong>We couldn't sign you in</strong><p>Check your username and password and try again.</p></div>
+    </div>
+    <div class="banner err" role="alert" th:if="${param.error != null and param.error[0] == 'locked'}">
+        <svg class="icon" aria-hidden="true"><use th:href="@{/icons/phosphor.svg} + '#ph-warning-circle'"></use></svg>
+        <div><strong>Too many sign-in attempts</strong><p>For security, sign-in is paused for a short time.</p></div>
     </div>
     <div class="banner ok" role="status" th:if="${param.logout}">
         <svg class="icon" aria-hidden="true"><use th:href="@{/icons/phosphor.svg} + '#ph-check-circle'"></use></svg>
