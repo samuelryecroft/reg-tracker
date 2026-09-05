@@ -3481,3 +3481,111 @@ silence. **The next reader must be able to tell "not yet" from "not thought abou
 **When the auth model lands, this section is the checklist** — each row becomes a screen or an explicit
 decision not to have one. **It must not be quietly deleted; a row removed without a ruling is how the first
 one happened.**
+## 7m · 6c An audit event in full — answering Jim's six (Creed, 7 Sep)
+
+6c is the only genuinely new build: no template, no route. Jim asked six spec-completeness questions before
+starting. **Two of them are answered by code neither of us wrote, and one of his premises is wrong in his
+own favour.**
+
+### D-6c-1 · The permanence claim is BETTER supported than Jim thinks — there IS a trigger. Sharpen it, do not soften it.
+
+Jim found no database-level enforcement and proposed softening the wording. **`V11__add_audit_events.sql`
+creates one:**
+
+```
+CREATE TRIGGER audit_events_no_update_or_delete
+    BEFORE UPDATE OR DELETE ON audit_events
+    FOR EACH ROW EXECUTE FUNCTION audit_events_reject_mutation();
+```
+
+…which `RAISE EXCEPTION`s, and whose own comment says it exists *"so a bug (or a direct psql session) cannot
+quietly rewrite history"*, raising *"rather than a DO INSTEAD NOTHING rule so an attempted tamper fails loudly
+instead of silently succeeding."* **The enforcement is deliberate, below the application, and fires for every
+role.**
+
+**So do not soften. Sharpen — say HOW, because a claim that names its mechanism is one the reader can check.**
+That is §7a's principle exactly: the exported document was made *self-verifiable* rather than more insistent.
+
+> **Copy: "Permanent record. Audit entries cannot be edited or deleted — the database itself rejects the
+> attempt, not only the application."**
+
+This is stronger than the canvas's *"including by an administrator"* **and** more defensible, because it
+states a fact rather than a universal negative.
+
+**The residual gap is real and belongs in the risk register, not on the page.** A table owner can
+`DISABLE TRIGGER`, and **`TRUNCATE` does not fire row-level triggers at all** — and Flyway runs as owner. So
+the honest boundary is *"defeats the accidental, the buggy and the casual; does not defeat a determined
+holder of owner rights."* **For Kevin / WS-G: the runtime role must not be the table owner.** Putting that
+caveat on a screen an IRO or a court reads would be noise that weakens a true assurance — **the page states
+what is enforced; the threat model records what is not.**
+
+### D-6c-2 · Drop "Event 4 of 6". Show the event's id.
+
+Jim is right that an append-only trail makes the denominator move, and *"4 of 7 tomorrow"* under a heading
+that says **permanent** is self-undermining. It is also worse than unstable: **an index into a filtered view
+means different things depending on how the reader arrived**, so two people can cite "event 4" and mean
+different rows.
+
+**What a reader actually needs is a stable citable handle, and the event already has one: its id.** Position
+survives only as *navigation* — previous/next within this interview's events — and never as a quoted number.
+
+> Same family as D-4a-2 (*show the answer, not the measurement*) and D-187-3 (*display precision must never
+> be able to contradict the thing it sits beside*).
+
+### D-6c-3 · Frozen actor, live child — and the trap is a column that already exists
+
+The table stores `actor_username_at_time` **and** `actor_roles_at_time`: the audit design already met
+frozen-versus-live once and chose **frozen**, for the actor. The target is an id only, so the child **must**
+be resolved live. Jim is right that the page therefore mixes a frozen event with live data.
+
+**Live is correct for the child, and for a reason beyond convenience:** the trail's job is to say what
+happened *to whom*, and "whom" is a person who persists. A name corrected — a misspelling, a legal change —
+would, if frozen, make the trail **less** accurate about who it concerns and **split one child's history
+across two names.** That is the duplicate-child harm from 5d arriving from the other direction.
+
+**⚠️ The trap: `actorUsernameAtTime` is right there and is the obvious thing to render. It must NOT be
+rendered.** `AuditHistoryEntry`'s own javadoc pins the rule — `actorRole` is *"the actor's role(s) at the
+time … **never a name or username**"* — a GDPR decision already taken and shipped (T38, actor-role-only,
+overriding the mockup's full name). **6c inherits it; the column's existence is not permission to display
+it.** This matters more after T206, when usernames become email addresses.
+
+**The child renders as `ChildIdentity` like everywhere else** — masked initials plus case reference, revealed
+under the same page-level control. Jim's reasoning is right: masking is a screen affordance and this is a
+screen.
+
+**One line of copy discipline follows:** the permanence claim is about **the event**, not about how the people
+in it are rendered. Do not write anything implying the displayed identity is itself frozen.
+
+### D-6c-4 · No transition, no row — Jim's default is right
+
+Omit the row entirely rather than showing a dash. **A dash beside "Status change" reads as "the status
+changed to nothing"** — rendering an absence as a value, which D-1a-1 already forbids. And it needs no new
+rule: `AuditHistoryService` already passes `null` for `detail` on the event types that have none, and the
+timeline simply has no detail line. **Reuse that; do not invent a consistent field list.**
+
+### D-6c-5 · The Detail line is a fixed vocabulary, it already exists, and it fails closed
+
+Jim's instinct — *"a generic renderer over a free map is the risky shape"* — is right, and the codebase
+already agrees. `AuditHistoryEntry` is documented as *"the GDPR-safe projection a template is allowed to
+render — ids, statuses and timestamps only, never a free-text field off the raw audit row"*, and
+`AuditHistoryService` *"holds the per-event-type allow-list that keeps it that way"*.
+
+**So 6c is built on `AuditHistoryEntry`, never on `AuditEvent`.** Extend the projection if the detail page
+needs more than the timeline does — **and extend it the same way: one explicit `case` per event type.**
+
+**The answer to his "forever" worry is a property of that switch: it FAILS CLOSED.** Its `default ->` branch
+renders the event type's name with no detail, so an event type added in a year appears as its own name and
+**cannot leak a metadata key nobody reviewed.** That is the guard-shape rule holding by construction rather
+than by vigilance.
+
+### D-6c-6 · `/audit/{id}`, the feed's audience exactly — and 404, never 403
+
+Confirmed: same gate, same organisation scoping, resolved through the feed's own
+`requestsInScope(principal)` rather than a second scoping rule invented here.
+
+> **A detail view must never be reachable by an audience that could not have seen the row in the list, or the
+> list's scoping is decorative.**
+
+**And an out-of-scope event must 404, not 403.** A 403 confirms the event exists — the same enumeration-oracle
+shape as D-4c-1's lockout message, and worth naming as a pattern: **"you may not see this" tells the asker
+there is something to see.**
