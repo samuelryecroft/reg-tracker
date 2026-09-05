@@ -19,7 +19,6 @@
                     <strong>Before these colours can be saved</strong>
                     <ul>
                         <li th:if="${#fields.hasErrors('primaryColor')}"><a href="#primaryColor" th:text="${#fields.errors('primaryColor')[0]}">Error</a></li>
-                        <li th:if="${#fields.hasErrors('secondaryColor')}"><a href="#secondaryColor" th:text="${#fields.errors('secondaryColor')[0]}">Error</a></li>
                     </ul>
                 </div>
             </div>
@@ -28,11 +27,6 @@
             <input type="color" id="primaryColor" class="swatch-input" th:field="*{primaryColor}"
                    th:errorclass="is-invalid" th:aria-invalid="${#fields.hasErrors('primaryColor')}" aria-describedby="primaryColor-error"/>
             <div th:replace="~{fragments/layout :: fieldError('primaryColor')}"></div>
-
-            <label for="secondaryColor">Secondary colour</label>
-            <input type="color" id="secondaryColor" class="swatch-input" th:field="*{secondaryColor}"
-                   th:errorclass="is-invalid" th:aria-invalid="${#fields.hasErrors('secondaryColor')}" aria-describedby="secondaryColor-error"/>
-            <div th:replace="~{fragments/layout :: fieldError('secondaryColor')}"></div>
 
             <button type="submit" class="btn">Save colours</button>
         </form>

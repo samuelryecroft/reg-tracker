@@ -28,7 +28,6 @@ public class ThemeAdminController {
         ThemeService.ThemeView current = themeService.getOwnFor(principal);
         UpdateThemeForm form = new UpdateThemeForm();
         form.setPrimaryColor(current.primaryColor());
-        form.setSecondaryColor(current.secondaryColor());
         model.addAttribute("form", form);
         model.addAttribute("platformWide", principal.hasRole(Role.ADMIN));
         return "admin/theme-form";
