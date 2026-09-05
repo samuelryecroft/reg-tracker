@@ -136,3 +136,22 @@ variable "entra_issuer_uri" {
   type        = string
   default     = ""
 }
+
+# --- T201: standing-secret near-expiry alert (see modules/secret_expiry_alert). ---
+variable "secret_expiry_alert_enabled" {
+  description = "Provision the ENTRA-CLIENT-SECRET near-expiry alerter. Default false until the secret exists (human mint) and its expiry is a dated obligation in GO-LIVE-READINESS.md."
+  type        = bool
+  default     = false
+}
+
+variable "secret_expiry_secret_name" {
+  description = "Secret watched by the near-expiry alerter. ENTRA-CLIENT-SECRET in prod; override to a throwaway near-expiry secret for the fire-test."
+  type        = string
+  default     = "ENTRA-CLIENT-SECRET"
+}
+
+variable "secret_expiry_recipient_emails" {
+  description = "Recipients of the near-expiry alert. MUST be >=2 before go-live (single-recipient on a single-admin tenant is one unavailable person from the outage it prevents)."
+  type        = list(string)
+  default     = []
+}

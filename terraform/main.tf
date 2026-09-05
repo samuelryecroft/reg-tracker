@@ -67,6 +67,24 @@ module "keyvault" {
   tags                = var.tags
 }
 
+# T201: near-expiry alert for the standing Entra client secret. Off until wired to a real, existing
+# secret (the human mints ENTRA-CLIENT-SECRET; the FIC fallback made it a standing credential whose
+# silent expiry is a total sign-in outage). Least-privilege metadata-only reader; see the module.
+module "secret_expiry_alert" {
+  source = "./modules/secret_expiry_alert"
+
+  name_prefix         = var.name_prefix
+  location            = var.location
+  resource_group_name = azurerm_resource_group.main.name
+  tags                = var.tags
+
+  key_vault_id     = module.keyvault.vault_id
+  key_vault_uri    = module.keyvault.vault_uri
+  secret_name      = var.secret_expiry_secret_name
+  recipient_emails = var.secret_expiry_recipient_emails
+  enabled          = var.secret_expiry_alert_enabled
+}
+
 module "storage" {
   source = "./modules/storage"
 
