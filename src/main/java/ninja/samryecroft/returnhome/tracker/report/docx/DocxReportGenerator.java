@@ -166,13 +166,23 @@ public class DocxReportGenerator {
      * D-07. The title is what Word shows in Recent Files and what a PDF conversion adopts as its
      * document title; the language is what a screen reader uses to choose pronunciation. Creator was
      * literally "Apache POI".
+     *
+     * <p><b>T228: the date here comes from {@code titleDate}, not from {@code interviewDate}.</b>
+     * They were one key, and when that key became a sentence describing the 72-hour reading, the
+     * title silently became one too - a report with no recorded time was NAMED "... - Interview time
+     * not recorded". The title is the last place a data gap should be able to reach, because it is
+     * read before the document is opened and by people deciding whether to open it.
+     *
+     * <p>The lesson is not "pick a safer shared string": a value read by two consumers with
+     * different needs will eventually be corrected for one of them. {@code titleDate} exists so this
+     * one cannot be.
      */
     private void applyDocumentProperties(XWPFDocument document, Map<String, String> values) {
         String child = values.getOrDefault("childName", "Unknown");
-        String interviewDate = values.getOrDefault("interviewDate", "");
+        String titleDate = values.getOrDefault("titleDate", "");
         POIXMLProperties properties = document.getProperties();
         properties.getCoreProperties().setTitle(
-                "Return Home Interview Report - " + child + (interviewDate.isBlank() ? "" : " - " + interviewDate));
+                "Return Home Interview Report - " + child + (titleDate.isBlank() ? "" : " - " + titleDate));
         properties.getCoreProperties().setSubjectProperty("Return Home Interview");
         properties.getCoreProperties().setCreator(values.getOrDefault("supplierName", "Return Home Tracker"));
         properties.getCoreProperties().getUnderlyingProperties().setLanguageProperty(DOCUMENT_LANGUAGE);

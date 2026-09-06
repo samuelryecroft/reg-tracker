@@ -54,11 +54,18 @@ class SeventyTwoHourMeasurementTest {
         assertThat(reportHeldAt(null).getWithin72Hours()).isNull();
     }
 
-    @Test
-    void theCalendarDateIsDerivedSoItCannotDisagreeWithTheMeasurement() {
-        InterviewReport report = reportHeldAt(RETURNED.plusHours(10));
-
-        assertThat(report.getInterviewDate()).isEqualTo(RETURNED.plusHours(10).toLocalDate());
-        assertThat(reportHeldAt(null).getInterviewDate()).isNull();
-    }
+    /*
+     * T228: theCalendarDateIsDerivedSoItCannotDisagreeWithTheMeasurement() used to be here, and it
+     * went with the accessor it tested rather than being quietly dropped.
+     *
+     * It pinned that getInterviewDate() equalled heldAt.toLocalDate(). That was true, and it was
+     * also the promise that made truncation the default for anyone who did not opt in - so the test
+     * was, in effect, guarding the mechanism of the defect. Deleting the accessor is what T228 is;
+     * a test asserting it still behaved correctly would have had to be deleted or made to lie.
+     *
+     * What replaced it is not another test of a getter. The one place that legitimately wants a date
+     * is the document's core title, and DocxReportGeneratorTest now pins that directly:
+     * aMissingInterviewTimeShortensTheTitleRatherThanNamingTheDocumentAfterTheGap. Truncation
+     * happens once, out loud, at that call site.
+     */
 }
