@@ -344,6 +344,59 @@ class DocxReportGeneratorTest {
     }
 
     /**
+     * The unrecorded state's sentence, and the cross-reference it must NOT have.
+     *
+     * <p>The declined sentence ends "The reason is recorded above". This one must not gain an
+     * equivalent: there is nothing above to point at, because the dropdown is blank and that
+     * blankness is the situation. A cross-reference added for symmetry would point at an empty
+     * field - the T231 defect, in a document a court reads.
+     *
+     * <p>The two sentences sit beside each other in the spec, so <b>the missing second half looks
+     * like an oversight and somebody will helpfully complete it.</b> This test is the thing that
+     * stops them.
+     */
+    @Test
+    void theUnrecordedStatementNamesBothAbsencesAndPointsAtNothing(@TempDir Path tempDir)
+            throws Exception {
+        String statement = "This report does not record whether the interview took place, "
+                + "or any answers from the young person.";
+        Path outputPath = tempDir.resolve("unrecorded.docx");
+        try (InputStream templateStream =
+                new ClassPathResource("docx-templates/rhi-report-template.docx").getInputStream()) {
+            generator.generate(templateStream,
+                    Map.of("childName", "Alex Smith", "interviewAccepted", "Not recorded"),
+                    null, null, null, outputPath,
+                    new DocxReportGenerator.RowCollapse(
+                            Set.of("whereWereYouWhileMissing", "whoWereYouWithWhileMissing",
+                                    "whatMadeYouGoMissing", "whatCanBeDoneToAddressReasons",
+                                    "consideredSelfMissing", "whatDidYouDoWhileMissing",
+                                    "whatHappenedWhenReturned", "preventFutureMissingSuggestions",
+                                    "additionalCommentsFromYoungPerson"),
+                            statement));
+        }
+
+        String text = textOf(outputPath);
+
+        assertThat(text).containsOnlyOnce(statement);
+        assertThat(text)
+                .as("there is nothing above to point at - the dropdown is blank, and that IS the "
+                        + "situation. A cross-reference here would point at an empty field")
+                .doesNotContain("The reason is recorded above");
+        assertThat(text)
+                .as("these describe the report as defective, and 'not provided' additionally "
+                        + "implies someone was asked and withheld")
+                .doesNotContain("incomplete")
+                .doesNotContain("not provided");
+        assertThat(text)
+                .as("both imply the answers exist and we are choosing not to display them")
+                .doesNotContain("not shown")
+                .doesNotContain("not included");
+        assertThat(text)
+                .as("the child's questions are gone, as on declined")
+                .doesNotContain("Where were you while missing?");
+    }
+
+    /**
      * Adjacent token-bearing rows do not take an innocent row with them.
      *
      * <p><b>This case is not reachable through the application</b> - the child's questions each sit

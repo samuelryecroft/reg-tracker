@@ -404,6 +404,35 @@ public class ReportService {
         report.setDateReportShared(form.getDateReportShared());
     }
 
+    private static final String DECLINED_STATEMENT =
+            "The young person was not interviewed, so these questions were not asked. "
+                    + "The reason is recorded above.";
+
+    /**
+     * The null state's sentence, and <b>it deliberately does not end the way the declined one does.</b>
+     *
+     * <p>That one closes with "The reason is recorded above". This must not gain an equivalent,
+     * because <b>there is nothing above to point at</b> - the dropdown is blank, and that blankness
+     * IS the situation being described. A cross-reference added for symmetry would point at an empty
+     * field, which is precisely the T231 defect: a sentence referring to something that is not there.
+     * The two sit next to each other in the spec, so the missing second half reads as an oversight
+     * and somebody will helpfully complete it.
+     *
+     * <p>Words ruled out and not to be improved back in: <em>incomplete</em>, <em>missing</em> and
+     * <em>not provided</em> all describe the report as defective, and the last additionally implies
+     * someone was asked and withheld. <em>Not shown</em> and <em>not included</em> imply the answers
+     * exist and we are choosing not to display them. And the two absences are not joined by
+     * "therefore" - the second does not follow from the first, and <b>a false inference in a
+     * court-facing document is worse than a longer sentence.</b>
+     *
+     * <p>The sentence is what makes the hide honest. Bare hiding is a claim; hiding plus a statement
+     * naming both absences is not - which is why hide survived the argument that hiding asserts
+     * something.
+     */
+    private static final String UNRECORDED_STATEMENT =
+            "This report does not record whether the interview took place, "
+                    + "or any answers from the young person.";
+
     /**
      * T244. On a declined interview the questions put to the young person were never asked, so their
      * rows leave the document and one statement takes their place - the same treatment the record
@@ -420,7 +449,7 @@ public class ReportService {
      * printed when somebody has actually recorded it.
      */
     private DocxReportGenerator.RowCollapse childQuestionRows(InterviewReport report) {
-        if (!report.isInterviewDeclined()) {
+        if (report.isChildInterviewed()) {
             return DocxReportGenerator.RowCollapse.none();
         }
         return new DocxReportGenerator.RowCollapse(
@@ -428,8 +457,7 @@ public class ReportService {
                         .filter(q -> q.answeredBy() == Respondent.CHILD)
                         .map(ReportQuestion::exportToken)
                         .collect(java.util.stream.Collectors.toSet()),
-                "The young person was not interviewed, so these questions were not asked. "
-                        + "The reason is recorded above.");
+                report.isInterviewDeclined() ? DECLINED_STATEMENT : UNRECORDED_STATEMENT);
     }
 
     private Map<String, String> buildValues(InterviewRequest request, InterviewReport report) {
