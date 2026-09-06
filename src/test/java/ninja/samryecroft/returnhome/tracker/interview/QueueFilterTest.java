@@ -19,6 +19,8 @@ import java.util.stream.Stream;
 import ninja.samryecroft.returnhome.tracker.child.NameRevealService;
 import ninja.samryecroft.returnhome.tracker.user.UserRepository;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.ui.ConcurrentModel;
 import ninja.samryecroft.returnhome.tracker.child.Child;
 import org.springframework.ui.Model;
@@ -32,6 +34,7 @@ import org.springframework.test.util.ReflectionTestUtils;
  * six filters that exist today, so a filter added later is covered the moment it is declared. A
  * guard scoped to the instances it was written from is a guard whose scope nobody chose.
  */
+@ExtendWith(MockitoExtension.class)
 class QueueFilterTest {
 
     /**
@@ -205,8 +208,11 @@ class QueueFilterTest {
     private CoordinatorController controllerSeeing(List<InterviewRequest> world) {
         InterviewRequestService requests = mock(InterviewRequestService.class);
         when(requests.listVisible(null)).thenReturn(world);
+        // No stubbing on this mock: CoordinatorController only calls identitiesFor/identityFor,
+        // never isRevealed(). A when(reveal.isRevealed()) here matched nothing, and because an
+        // unstubbed boolean already returns false it could never have failed either. Strict stubs
+        // (below) is what stops that from growing back.
         NameRevealService reveal = mock(NameRevealService.class);
-        when(reveal.isRevealed()).thenReturn(false);
         DeadlineTrackingService deadlines = mock(DeadlineTrackingService.class);
         when(deadlines.groupByUrgency(anyList())).thenReturn(List.of());
         return new CoordinatorController(requests, mock(UserRepository.class), deadlines, reveal);
