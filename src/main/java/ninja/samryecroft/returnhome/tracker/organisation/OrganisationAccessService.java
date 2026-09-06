@@ -103,6 +103,63 @@ public class OrganisationAccessService {
     }
 
     /** Whether the principal can see the given Home (its Care Provider org, or one of their own). */
+    /**
+     * Whether the principal may place a new user in the given organisation.
+     *
+     * <p><b>A different question from {@link #canViewCareProviderOrg}, and named separately for that
+     * reason</b> - creating an account is not reading data, and a predicate that answered both would
+     * have to be widened or narrowed by whichever caller needed it next. It resolves the supplier
+     * side through {@link #supplierScopeFor} so there is still one definition of "supplier-side"
+     * (T139), rather than a second reading of {@code supplier_organisation_id}.
+     *
+     * <p><b>This check is not a hardening; it is a precondition.</b> Until T249, a non-ADMIN's
+     * submitted organisation id was <em>ignored</em> - {@code resolveOrganisation} returned the
+     * principal's own organisation whatever was posted - so a supplier could not escalate because
+     * <b>you cannot get a check wrong on an input you never read</b>. Letting a supplier choose one
+     * of their care providers means the code must start reading that id, and the escalation path
+     * becomes real at that moment. The picker and this check therefore ship together; building the
+     * picker alone would introduce the vulnerability while implementing the UX.
+     *
+     * <p>ADMIN is not scoped here. A platform admin's scope <em>is</em> every organisation, and
+     * "helpfully" narrowing it would break platform administration.
+     */
+    public boolean canPlaceUserIn(AppUserPrincipal principal, Long organisationId) {
+        if (organisationId == null) {
+            return false;
+        }
+        if (principal.hasRole(Role.ADMIN)) {
+            return true;
+        }
+        if (organisationId.equals(principal.getOrganisationId())) {
+            return true;
+        }
+        return supplierScopeFor(principal)
+                .flatMap(supplierOrgId -> organisationRepository
+                        .findSupplierOrganisationIdByCareProviderId(organisationId)
+                        .map(supplierOrgId::equals))
+                .orElse(false);
+    }
+
+    /**
+     * The organisations the principal may place a user in - their own, plus any care provider a
+     * supplier serves. Empty for anyone with no organisation.
+     *
+     * <p>The picker is built from the same rule the check enforces, so a form cannot offer an option
+     * the service would refuse. That is deliberate <em>and</em> not relied upon: a filtered dropdown
+     * is not a constraint - it shapes the form, not the POST.
+     */
+    public List<Organisation> organisationsUserMayBePlacedIn(AppUserPrincipal principal) {
+        if (principal == null || principal.getOrganisationId() == null) {
+            return List.of();
+        }
+        List<Organisation> permitted = new java.util.ArrayList<>();
+        organisationRepository.findDetailedById(principal.getOrganisationId()).ifPresent(permitted::add);
+        supplierScopeFor(principal)
+                .map(organisationRepository::findBySupplierOrganisationIdOrderByName)
+                .ifPresent(permitted::addAll);
+        return permitted;
+    }
+
     public boolean canViewHome(AppUserPrincipal principal, Home home) {
         // HOME_STAFF and VIEWER used to be answered by two different mechanisms here - a field
         // comparison against the principal's single home, and a query against the viewer join

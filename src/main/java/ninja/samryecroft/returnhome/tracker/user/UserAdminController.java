@@ -6,6 +6,9 @@ import ninja.samryecroft.returnhome.tracker.audit.AuditEventPublisher;
 import ninja.samryecroft.returnhome.tracker.audit.AuditHistoryService;
 import ninja.samryecroft.returnhome.tracker.home.HomeRepository;
 import ninja.samryecroft.returnhome.tracker.organisation.OrganisationRepository;
+import java.util.List;
+import ninja.samryecroft.returnhome.tracker.organisation.Organisation;
+import ninja.samryecroft.returnhome.tracker.organisation.OrganisationAccessService;
 import ninja.samryecroft.returnhome.tracker.organisation.OrgType;
 import ninja.samryecroft.returnhome.tracker.user.dto.CreateUserForm;
 import ninja.samryecroft.returnhome.tracker.user.dto.EditUserForm;
@@ -28,15 +31,18 @@ public class UserAdminController {
     private final UserRepository userRepository;
     private final HomeRepository homeRepository;
     private final OrganisationRepository organisationRepository;
+    private final OrganisationAccessService organisationAccessService;
     private final AuditHistoryService auditHistoryService;
     private final AuditEventPublisher auditEventPublisher;
 
     public UserAdminController(UserService userService, UserRepository userRepository, HomeRepository homeRepository,
-            OrganisationRepository organisationRepository, AuditHistoryService auditHistoryService, AuditEventPublisher auditEventPublisher) {
+            OrganisationRepository organisationRepository, OrganisationAccessService organisationAccessService,
+            AuditHistoryService auditHistoryService, AuditEventPublisher auditEventPublisher) {
         this.userService = userService;
         this.userRepository = userRepository;
         this.homeRepository = homeRepository;
         this.organisationRepository = organisationRepository;
+        this.organisationAccessService = organisationAccessService;
         this.auditHistoryService = auditHistoryService;
         this.auditEventPublisher = auditEventPublisher;
     }
@@ -131,7 +137,22 @@ public class UserAdminController {
             model.addAttribute("organisations", organisationRepository.findAllWithSupplier());
         } else if (principal.hasRole(Role.ORG_ADMIN) && principal.getOrganisationType() == OrgType.CARE_PROVIDER) {
             model.addAttribute("homes", homeRepository.findByOrganisationIdWithOrganisation(principal.getOrganisationId()));
+        } else {
+            // T249. A supplier org-admin could not previously create a user for one of their care
+            // providers at all - they were pinned to their own organisation - which was a functional
+            // gap rather than a safeguard. The picker offers their own organisation plus the care
+            // providers they serve, built from the SAME rule the service enforces.
+            //
+            // Offering the right options is not what makes this safe. A filtered dropdown is not a
+            // constraint: it shapes the form, not the POST. The constraint is
+            // UserService.resolveOrganisation, which now reads the submitted id and refuses one
+            // outside scope - and it had to arrive in the same commit as this list, because reading
+            // that id at all is what creates the escalation path.
+            List<Organisation> permitted =
+                    organisationAccessService.organisationsUserMayBePlacedIn(principal);
+            if (permitted.size() > 1) {
+                model.addAttribute("organisations", permitted);
+            }
         }
-        // Supplier ORG_ADMIN needs neither picker: their new users' organisation is always their own.
     }
 }
