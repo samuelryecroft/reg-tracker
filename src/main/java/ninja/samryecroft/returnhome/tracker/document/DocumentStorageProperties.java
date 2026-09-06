@@ -135,9 +135,32 @@ public class DocumentStorageProperties {
         private String wrapAlgorithm = "RSA-OAEP-256";
         /**
          * Lazily create {@code org-{id}-kek} on an organisation's first report. Needs Key Vault
-         * Crypto Officer; turn it off to run as Crypto User with keys provisioned from IaC.
+         * Crypto Officer; leave it off to run as Crypto User with keys provisioned from IaC.
+         *
+         * <p><b>T171: defaults to FALSE, and the default is the point.</b> It used to default to
+         * {@code true}, so the mint path created key-encryption keys on demand <em>wherever nobody
+         * had said otherwise</em> - a crypto property that failed OPEN. That runs against this
+         * estate's own convention, in which a security property refuses rather than assumes:
+         * {@code DatabasePasswordGuard} halts startup rather than inventing a password,
+         * {@code ADMIN_SEED_PASSWORD} skips seeding rather than falling back to a baked-in
+         * credential. <b>A default is a decision made on behalf of everyone who did not make
+         * one</b>, and for key material the safe side of that decision is to do nothing.
+         *
+         * <p><b>Scope, checked rather than assumed:</b> this is read only by
+         * {@link ninja.samryecroft.returnhome.tracker.document.KeyVaultKeyProvider}, which is built
+         * only when {@code app.documents.keys=key-vault}. Local and test runs use
+         * {@code LocalKeyProvider} and never consult it, and {@code application-azure.properties}
+         * already pins it to {@code false} - so production behaviour is unchanged and the flip
+         * closes the gap for any Key Vault deployment that is <em>not</em> on the azure profile,
+         * which is where the permissive default was the only thing deciding.
+         *
+         * <p>Turning it on is now a deliberate act, and the failure when it is off says exactly
+         * what to do: {@code KeyVaultKeyProvider#createKey} names the key and states that it must
+         * be provisioned before the first encrypted record. <b>That message is why this flip is
+         * safe to make</b> - failing closed is only an improvement when the closed path explains
+         * itself.
          */
-        private boolean autoCreateKeys = true;
+        private boolean autoCreateKeys = false;
         /**
          * How the app authenticates to Key Vault and Blob Storage.
          *
