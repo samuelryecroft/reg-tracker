@@ -4037,12 +4037,14 @@ distinguish cases, which is the one thing this page must not do.
 **Corrected, keeping the same page-format adaptation (heading carries the opening clause, body keeps the
 rest, no word altered):**
 
+**⚠️ SUPERSEDED by §7v — Oscar ruled all four strings on 8 Sep.** Kept to show what moved.
+
 | Slot | String |
 |---|---|
-| `<title>` | **Link no longer valid — Return Home Tracker** |
-| `<h1>` | **Link no longer valid** |
-| Body | **You can create a new export from the child's record — each export is recorded separately.** |
-| CTA | **Go to dashboard** → `/` (D-5e-3b) |
+| `<title>` | ~~Link no longer valid — Return Home Tracker~~ |
+| `<h1>` | ~~Link no longer valid~~ — **echoes the body's first clause** |
+| Body | ~~You can create a new export…~~ |
+| CTA | ~~Go to dashboard~~ — **false for five of seven roles** |
 
 ### The CTA is not Oscar's to carry, and I have not applied it
 
@@ -4115,3 +4117,78 @@ someone else's. **It is, twice — and both are on SUCCESS pages, which is not w
 nothing. **It is what makes "no longer valid" comprehensible later, so it should stay.**
 
 **Named, not fixed**, per god's instruction — one ruling should cover the set.
+## 7v · Oscar's four string rulings — FINAL, and two of them improve on my corrections (Creed, 8 Sep)
+
+### The final strings
+
+| Slot | String |
+|---|---|
+| `<title>` | **Download link — Return Home Tracker** |
+| `<h1>` | **This download link is no longer valid** |
+| `<p>` | **You can create a new export from the child's record — each export is recorded separately.** |
+| CTA | **Go to your start page** → `/` |
+
+`child's` is an ASCII apostrophe (0x27); the dash is a real em dash (U+2014) with a space either side.
+
+### 1 · The heading is the whole sentence — and his reason beats my fix
+
+My *"Link no longer valid"* obeyed the no-naming-a-cause rule but **echoed the body's first clause on a page
+three lines long**. He promotes the whole sentence into the heading and drops it from the body: **every ruled
+word survives, the echo goes, and the useful sentence becomes the only sentence.**
+
+**The second reason is the one worth keeping, because it closes my trap structurally:**
+
+> **A full sentence cannot be mistaken for a state label. A fragment can.**
+
+My error was a *label* being promoted into copy (D-5e-3d). **A heading that is a sentence shuts that door by
+construction rather than by vigilance** — which is the better class of fix, and the one I did not reach.
+
+### 2 · "Go to dashboard" is WRONG, not improvable — and I under-rated it
+
+I raised the label as *improvable, not wrong* (§7u) because the harm looked nil. **Oscar ruled it wrong, and
+he is right, because of something I did not check:**
+
+`fragments/layout.html:137` gates the **Dashboard** nav item on
+`hasAnyRole('ORG_ADMIN','VIEWER','COORDINATOR')` — **so a coordinator has a Dashboard in their own sidebar**,
+while `/` sends them to `/coordinator/requests`. **The button names a screen that exists for them and then
+does not go there.**
+
+> **A label that is merely imprecise is improvable. A label the product itself contradicts is wrong.** The
+> test is whether a reader can check it against something the product shows them — and here they can.
+
+**Ruled: "Go to your start page"** — true for all seven roles, and it answers the question a person actually
+asks after a link has misbehaved: *where will this one take me?* He considered and rejected *"Continue"*:
+never false, but **vague immediately after a dead end, and vagueness is what the reader has just been burned
+by.**
+
+### 3 · The same label on `error.html` — his conclusion holds, his premise does not
+
+He ruled `error.html`'s **"Back home"** should change too, because **"home" is a domain noun in a
+children's-home product** and a reader has to stop and work out which home is meant.
+
+**That string is not there.** `error.html` says **"Go to dashboard"** on `origin/main:72` and on the 6e
+branch. **The fix still applies, for the stronger reason: it is the same false-for-five-of-seven label**, and
+6e is rewriting the file anyway. **Use "Go to your start page" on both pages, so one ruling covers both.**
+
+**His domain-noun rule is kept as a prohibition with no current instance** — *never "home" in this product's
+chrome* — which is worth more than the correction: **it prevents a string rather than fixing one.**
+
+### 4 · The `<title>`, which nobody had questioned
+
+**Name the subject, not the cause: "Download link — Return Home Tracker".**
+
+I had specified a title, and it was *"Link no longer valid — …"* — it broke no rule, and it is still wrong
+for his reason: **a tab is what a person keeps after they close the page**, and it should say what the page
+is *about*, not how it turned out.
+
+### What this exchange demonstrates about the rule itself
+
+**The label-is-not-copy rule found a third instance on the same page, in a string all three of us had read
+and none had questioned.** Oscar's conclusion is the one to keep:
+
+> **We were all being careful, and careful was not enough.** That is the argument for a rule over
+> case-by-case attention.
+
+And his generalisation of my own note is wider than I had it: **every table written to organise our own
+thinking has a left column, and every left column is written to distinguish cases. Wherever the product's
+job is *not* to distinguish them, that column is actively the wrong source.**
