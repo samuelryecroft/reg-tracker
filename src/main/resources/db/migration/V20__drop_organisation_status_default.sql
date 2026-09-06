@@ -36,6 +36,17 @@
 -- it, so the application could not be serving if the column were absent, and Flyway applies V19's
 -- two statements atomically. If that inference is wrong the column does not exist and this migration
 -- fails loudly on its own terms, which is the correct failure.
+--
+-- WHAT "LOUDLY" DEPENDS ON, and it is not free. Both claims above - this migration failing visibly,
+-- and a bypassing insert failing visibly - assume the DB-plane job's output actually reaches a human.
+-- V20 is the first V-file since the standing migration environment was retired for T180, so it runs
+-- in an env that exists for minutes, and that env's short life races the Log Analytics flush: the
+-- console logs can be gone before they land. What T180 proved end-to-end was a no-op; this executes
+-- DDL. So on infrastructure without capture-logs-on-failure, LOUD INTO A STREAM TORN DOWN BEFORE IT
+-- FLUSHES IS NOT LOUD, and the argument for this migration being safe to get wrong does not hold.
+-- That capture is a PRECONDITION of the release carrying this file, not a refinement of it - written
+-- here because the two facts live in different heads (this one is about the schema, that one about
+-- the teardown) and the dependency between them is invisible from either side alone.
 
 ALTER TABLE organisations
     ALTER COLUMN status DROP DEFAULT;
