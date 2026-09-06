@@ -5310,3 +5310,60 @@ different work back, and only the first can return a negative.
 **It also survived contact with the truth in the right direction** — the hypothesis was wrong, Dwight
 disconfirmed it, and the sweep still found the real thing. Which is D-8f-8's point arriving from the other
 side: **a false lead that produces a finding is still a false lead.**
+
+---
+
+## §8g — T244's third state: treatment (and a correction to §8c that Jim is currently building against)
+
+Oscar ruled the content, register and wording for `interviewAccepted == null`; god asked only **how it
+presents**, and whether three states in one neutral register blur.
+
+### D-8g-1 — reuse the declined chip **exactly**. The blur risk requires a comparison that never happens.
+
+```html
+<span class="tag tag-semantic-neutral">Not yet recorded</span>
+```
+
+**The two chips are mutually exclusive.** A section is *not accepted* or *not yet recorded*, never both, so
+they never appear together and never have to be told apart **from each other**. **Two states that can never
+co-occur need to be READABLE, not DISTINGUISHABLE AT A GLANCE** — and the glance-level message is the same one
+in both cases, which is the message that matters: *there is a status here; do not read the count as the whole
+story.*
+
+**And colour must not carry the difference, for Oscar's own reason.** *Not interviewed* is settled and *not
+yet recorded* is outstanding — **a difference about who acts next, not about how bad it is.** A second tone
+would assert a severity gap that does not exist, which is the error `tag-error` would have made on the first
+chip. **The words are the only thing that can carry this difference, and they are enough because nothing is
+competing with them in that slot.**
+
+`.tag-semantic-neutral` is defined in both appearances (`app.css:185` dark, `:314`/`:373` light), so no new
+token and nothing to re-derive. *"Not yet recorded"* is 16 characters against *"Not interviewed"*'s 15 — same
+slot, same pill, no layout consequence.
+
+### D-8g-2 — what must be identical is the **slot**, not the colour
+
+All three states resolve in the same position in the section heading, where `.section-count` sits today. **A
+reader's eye should land in one place to learn what state a section is in**, whichever of the three it is.
+Consistent position does more for scanning than consistent colour, and it is the thing that actually degrades
+if someone later adds a fourth state.
+
+### D-8g-3 — 🔑 correcting §8c: *"instead of the count, not beside it"* was right about **zero** and wrong as a blanket
+
+**§8c D-8c-4 is on a card and Jim is building against it. It needs amending before he does.**
+
+I ruled that the chip **replaces** the count, reasoning that *"no gaps"* and *"not interviewed"* must never be
+separately readable as two claims. **That solved the case where removing the nine drops the count to zero and
+an absent badge reads as "complete".** As a blanket rule it is wrong:
+
+> **A chip is a STATUS and a count is a QUANTITY. They are orthogonal, and conflating them is the original
+> defect** — a quantity being asked to carry a status. Suppressing the count to make room for the chip repeats
+> the mistake in the opposite direction.
+
+In the declined state there are **up to two real gaps** (`interviewDeclinedReason`, `additionalInfoFromParentCarer`
+— §8c D-8c-3), and in the null state **two** as well. **Hiding those hides live work on the screen a reviewer
+approves from.**
+
+**Amended rule, all three states:** *the chip is shown whenever the section has a status; the count is shown
+whenever it is non-zero; both may appear.* `Not interviewed · 1 not answered` reads exactly as intended —
+**this section: not interviewed, and one thing still outstanding.** The zero case I was protecting is now
+covered by the chip's presence rather than by the count's absence, which is the right place for it.
