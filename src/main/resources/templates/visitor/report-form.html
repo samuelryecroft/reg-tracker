@@ -68,7 +68,8 @@
 
     <div class="card">
         <form method="post" th:action="@{/visitor/interviews/{id}/report(id=${request.id})}" th:object="${form}" data-js="stepper"
-              th:attr="data-autosave-url=@{/visitor/interviews/{id}/report/draft(id=${request.id})}">
+              th:attr="data-autosave-url=@{/visitor/interviews/{id}/report/draft(id=${request.id})},
+                       data-saved-at=${draftSavedAt}">
             <div class="banner err" role="alert" th:if="${#fields.hasErrors('*')}">
                 <span class="ic" aria-hidden="true">▲</span>
                 <div>

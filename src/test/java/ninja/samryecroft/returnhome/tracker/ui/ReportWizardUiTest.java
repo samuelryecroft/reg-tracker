@@ -193,6 +193,47 @@ class ReportWizardUiTest extends AbstractUiTest {
      * whole point is that the redirect is followed for real by a real fetch. Nothing below the
      * browser can show this: the endpoint's own test sees the 302, never the 200 the client sees.
      */
+    /**
+     * T247, the human's report: <b>"Where is our saving on draft looks like its still not there."</b>
+     *
+     * <p>He was describing the screen, and the screen was telling him it was not there. The save
+     * worked - the row persisted, the answers came back - and the chrome said <em>"Not yet saved"</em>
+     * over the top of his own restored work. <b>Not silence: a false statement, made by the one
+     * element whose entire job is to say whether a visitor's work is safe.</b>
+     *
+     * <p>This is the test the defect needed and did not have. Every existing check watched the save
+     * happen within one page life; <b>none of them ever came back.</b> A save with no feedback is
+     * indistinguishable from no save, and a save with contradicting feedback is worse, because the
+     * user has evidence.
+     */
+    @Test
+    void reopeningASavedDraftSaysItIsSavedRatherThanThatItIsNot() {
+        login("wizard-ui-visitor", PASSWORD);
+        page.navigate(url("/visitor/interviews/" + requestId + "/report"));
+        page.waitForLoadState();
+        page.fill("#interviewLocation", "The home's quiet room");
+        page.click("button:has-text('Next')");
+        page.waitForSelector("#stepper-saved:not(.pending):not(.stopped)");
+
+        // Away and back - the trip nothing previously made.
+        page.navigate(url("/visitor/interviews"));
+        page.waitForLoadState();
+        page.navigate(url("/visitor/interviews/" + requestId + "/report"));
+        page.waitForLoadState();
+
+        assertThat(page.locator("#interviewLocation").inputValue())
+                .as("the work is restored, which is what makes the old chrome a contradiction "
+                        + "rather than merely unhelpful")
+                .isEqualTo("The home's quiet room");
+        assertThat(page.locator("#stepper-saved").textContent())
+                .as("it IS saved, and the screen must not say otherwise")
+                .startsWith("Saved ");
+        assertThat(page.locator("#stepper-saved").getAttribute("class"))
+                .as("and it must not carry the pending styling either - a visitor reads the colour "
+                        + "before the words")
+                .doesNotContain("pending");
+    }
+
     @Test
     void anExpiredSessionIsNeverReportedAsASave() {
         login("wizard-ui-visitor", PASSWORD);
