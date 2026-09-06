@@ -4252,3 +4252,124 @@ promise was made on a SUCCESS page, in the moment nobody reads carefully. That i
 there.** *A false expectation is usually set somewhere the user was happy.*
 
 **R-Q13 was not wrong. It was written before we knew the link was single-use as well as timed.**
+
+---
+
+## §7x — `heldAt`: one statutory field, four surfaces, and the invariant stated over the wrong thing
+
+**Rerouted from Pam via god (`heldat-label`).** Pam found `interview/detail.html:265` labelling the report's
+`heldAt` "Date of interview" and rendering a time under it; `fragments/report-fields.html:114` calls the same
+field "Date and time the interview was held". Kevin ruled it should pin the **invariant** — the label admits a
+time, every renderer shows one — rather than string-pinning, because 1a is a `<dt>`/`<dd>` list and
+structurally unlike report-fields' `<label>`/readonly-`<div>`.
+
+god forwarded it rather than answering, because **it is the same field as T187, failing the other way round.**
+
+| surface | before | direction of failure |
+| --- | --- | --- |
+| `.docx` (T187) | prints `heldAt` **date-only** beside a 72-hour verdict | a court or IRO **cannot verify the verdict from the record** |
+| 1a `detail.html` | shows the **time** under a label that **denies a time exists** | the label contradicts the value under it |
+| `report-fields.html` | correct | — |
+
+### D-7x-1 — the wording: reuse the existing label **verbatim**, and not for consistency's sake
+
+Pam proposed reusing the exact existing string rather than writing new copy. **Confirmed** — but the reason
+matters, because "be consistent" would not survive someone with a better short label.
+
+`detail.html`'s `<dl class="detail">` **already reuses report-fields' labels verbatim for every other
+question in it**:
+
+* "Location of this interview" — identical
+* "Was this interview offered and completed within 72 hours of return?" — identical
+* "If not, why?" — identical
+* "Consultation with home's staff to establish any new information" — identical
+
+**Only `heldAt` was shortened.** So this is not two lanes independently choosing different words; it is
+**one deviation inside a list that is otherwise a verbatim copy** — and the word dropped in the shortening is
+the one carrying the statutory clock. The screen is answering the statutory questions, so the statutory
+question wording *is* the label; "Date of interview" is the outlier in its own list before it is an outlier
+against report-fields.
+
+> **A field that has failed by carrying three vocabularies is not fixed by inventing a fourth.**
+
+Take `Date and time the interview was held` exactly. New copy here would be a fifth string for one field.
+
+**Deliberately NOT in scope:** `detail.html` formats `dd MMM yyyy HH:mm` and report-fields' readonly value
+`dd MMMM yyyy HH:mm`. **Both carry the time, so both satisfy the invariant** — the invariant is about the time
+component, not the month abbreviation, and unifying the two would be exactly the string-pinning Kevin ruled
+against. Recorded so a later builder does not "tidy" it and think they are completing this fix. Likewise
+these are `#temporals.format`, which takes the **request** locale — correct for a screen, and **not** a place
+to copy `ReportService`'s `Locale.UK` pin, which exists because a statutory document must not print its month
+names in whatever language the container defaults to.
+
+### D-7x-2 — the invariant must be stated over the ANSWER, not over the renderer
+
+god asked whether Kevin's invariant should cover the `.docx` too. **Yes — but "every renderer of `heldAt`
+shows a time component" is the wrong quantifier, and it already has a live counterexample on Jim's own
+branch.**
+
+`DocxReportGenerator:172-175` reads the **same `interviewDate` map key** to build the Word **core Title
+property** — which that method's own javadoc (D-07) describes as *"what Word shows in Recent Files and what a
+PDF conversion adopts as its document title"*. On `origin/feat/t187-72h-reading`, `ReportService:406` now sets
+that key to `reading.heldLine()`. So the title becomes:
+
+* normal case — `Return Home Interview Report - Alex B - 02 Sep 2026 14:30`
+* **no time recorded — `Return Home Interview Report - Alex B - Interview time not recorded`**
+
+**A sentence about a data gap becomes the document's name in Recent Files, and the title any PDF conversion
+adopts** — the name a court or an IRO sees in a file list before opening anything.
+
+**This is the same shape as the bug T187 exists to fix: one value, two consumers, corrected for one of them.**
+It is Jim's and my own recorded lesson recurring one level down — *a defect specced against a Java method is
+specced against one of its callers* — where this time **the caller is a map key**, and a map key hides the
+second consumer better than a method signature does.
+
+> **THE RULE.** Wherever `heldAt` is presented as **the answer to when the interview was held** — anywhere a
+> reader could use it to check the 72-hour verdict — the presentation carries the time, and the label admits
+> that it does. Where `heldAt` is used to **name** something — a document title, a filename, a list heading —
+> date-only is correct, and the label question does not arise.
+
+The discriminator is **not** "is this a renderer" but **"is this the record of the answer, or a handle on the
+document"**. That covers all three surfaces god named with one rule, and correctly *excludes* the fourth
+surface nobody was looking at.
+
+**Remedy for the title:** it must not consume the answer row. Give it its own value from
+`getHeldAt().toLocalDate()`, or drop the date from the title entirely — a decision for whoever owns #77, not
+mine. **What is mine is that the title must not be date-shaped by accident.**
+
+### D-7x-3 — why three renderers disagreed: the lossy accessor has the friendly name
+
+The mechanism, not the symptom. `InterviewReport:286`:
+
+```java
+/**
+ * The calendar date the interview was held - derived, so it can never disagree with the
+ * timestamp the compliance rate is measured from. Everything that only wants to display a date
+ * (the docx, the report view) keeps working unchanged.
+ */
+@Transient
+public LocalDate getInterviewDate() { return heldAt == null ? null : heldAt.toLocalDate(); }
+```
+
+That last sentence is a **compatibility promise from the `LocalDate` → `LocalDateTime` migration**, and it made
+truncation the **default** for every consumer that did not opt in. One field, two accessors, and the lossy one
+carries the field's friendlier name — so a renderer reaches the truncating path by writing the obvious thing.
+That is why the three surfaces drifted, and why nobody experienced it as one bug: **the export lane and the
+interview lane were not even typing the same identifier.**
+
+**Once #77 merges, `getInterviewDate()` has ZERO production call sites** — verified on
+`origin/feat/t187-72h-reading`: the declaration, one comment, one javadoc mention, and two assertions in the
+test that exists to test it.
+
+> **The enforceable version of Kevin's invariant is not a template guard. It is deleting the accessor.**
+
+With one accessor named for the field, truncation becomes something a call site writes out loud
+(`.toLocalDate()`) at the point of use, where a reviewer sees it — a **mechanism**, not a check that has to be
+remembered, and it cannot be satisfied by a string that merely looks right. It also pins Kevin's rule where
+he wanted it: on the invariant, not on any of the four strings.
+
+**Sequencing:** the deletion is a follow-up to #77, not part of it. T187 is still blocked on the human on a
+separate question; **the label swap and the title fix do not depend on that and can proceed now.**
+
+**Order:** label swap (independent, today) → #77 merges → title fix and accessor deletion together, since the
+deletion is what stops the title regressing again.
