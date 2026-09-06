@@ -35,9 +35,25 @@ jobs:
           distribution: temurin
           java-version: '21'
           cache: maven
-      # Required gate EXCLUDES the flaky-infra quarantine: a browser/Hikari/container timing flake
-      # must never block a merge. Testcontainers needs Docker, which ubuntu-latest provides.
-      - name: Build + verify (excluding flaky-infra)
+      # T212: the Playwright suite runs HERE now. WebKit's Linux shared libraries are not on the
+      # runner and Playwright downloads browsers but never the OS packages they link against, so
+      # WebkitIconSmokeUiTest fails with "Host system is missing dependencies to run browsers:
+      # libgtk-4.so.1" without this. Pinned to the same version as the Java binding in pom.xml so
+      # the two cannot drift. If a test ever launches firefox, add it here - the failure looks
+      # identical. (The quarantine lane below keeps its own copy: it must still work if a browser
+      # test is ever quarantined again.)
+      - name: Install WebKit's Linux system dependencies
+        run: npx --yes playwright@1.60.0 install-deps webkit
+      # T212: `-DexcludedGroups=flaky-infra` is KEPT even though nothing carries the tag today. It is
+      # what makes quarantining possible at all, and removing it would mean a future quarantine
+      # silently did nothing. QuarantineDisciplineGuardTest is what stops that option going stale.
+      #
+      # Until 2026-09-08 the entire browser-rendering evidence base sat outside this gate: every
+      # *UiTest inherited @Tag("flaky-infra") from AbstractUiTest. Kevin's T212 ruling: a false red
+      # is visible and self-correcting, silent non-coverage is invisible and self-perpetuating -
+      # and T116 is the proof, where admin/user-list merged green while reading a removed field
+      # because only a non-blocking Playwright test rendered it.
+      - name: Build + verify (excluding any quarantined tests)
         run: ./mvnw -B -ntp verify -DexcludedGroups=flaky-infra
       # The deployable Spring Boot jar, handed to deploy.yml. *.jar excludes the *.jar.original thin jar.
       - name: Upload deployable jar
@@ -79,8 +95,13 @@ jobs:
       # If a test ever launches firefox, add it to this line - the failure will look identical.
       - name: Install WebKit's Linux system dependencies
         run: npx --yes playwright@1.60.0 install-deps webkit
-      - name: Run only flaky-infra tests (reported, not required)
-        run: ./mvnw -B -ntp verify -Dgroups=flaky-infra
+      # T212: NOTHING carries this tag today, and -DfailIfNoSpecifiedTests=false is what keeps an
+      # empty quarantine GREEN rather than permanently red on "No tests were executed!". A lane that
+      # is always red surfaces nothing - the same argument this file already makes about the WebKit
+      # dependencies above. The lane is kept, empty, so that quarantining stays a low-friction
+      # option: make it hard and the next person under time pressure deletes the test instead.
+      - name: Run only quarantined tests (reported, not required)
+        run: ./mvnw -B -ntp verify -Dgroups=flaky-infra -DfailIfNoSpecifiedTests=false
 
   actionlint:
     name: actionlint (workflow lint)

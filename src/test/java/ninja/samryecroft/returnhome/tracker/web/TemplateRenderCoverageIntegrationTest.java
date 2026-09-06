@@ -44,9 +44,12 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
  *
  * <p>It was answered by measurement rather than by reading: an interceptor recorded every view name
  * the two CI lanes actually rendered. Of 29 page templates, the required gate rendered 15. Two more
- * (admin/user-list, admin/user-form) were rendered ONLY by Playwright tests, which run in the
- * non-blocking flaky-infra lane - so a break in them could merge green, which is exactly what
- * happened when admin/user-list kept reading the removed {@code User.home} (T116). The remaining
+ * (admin/user-list, admin/user-form) were rendered ONLY by Playwright tests, which AT THE TIME ran
+ * in the non-blocking flaky-infra lane - so a break in them could merge green, which is exactly what
+ * happened when admin/user-list kept reading the removed {@code User.home} (T116). <b>That incident
+ * is the reason T212 promoted the Playwright suite into the blocking gate on 2026-09-08</b>; the
+ * history is kept in the present tense it was written in because it is the evidence, and the
+ * "could merge green" is no longer true of those two templates. The remaining
  * twelve, and error.html, were rendered by NEITHER lane: not even the non-blocking job would have
  * reported them.
  *
