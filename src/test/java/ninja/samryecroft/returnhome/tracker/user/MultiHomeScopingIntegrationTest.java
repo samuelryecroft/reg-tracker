@@ -104,8 +104,8 @@ class MultiHomeScopingIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
 
-        assertThat(html).contains("Ada").contains("Bo");
-        assertThat(html).doesNotContain("Cai");
+        assertThat(html).contains("Ada" + suffix).contains("Bo" + suffix);
+        assertThat(html).doesNotContain("Cai" + suffix);
     }
 
     @Test
@@ -117,7 +117,7 @@ class MultiHomeScopingIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
 
-        assertThat(html).contains("Ada").contains("Bo");
+        assertThat(html).contains("Ada" + suffix).contains("Bo" + suffix);
     }
 
     @Test
@@ -130,7 +130,22 @@ class MultiHomeScopingIntegrationTest extends AbstractIntegrationTest {
         String html = mockMvc.perform(get("/children").with(asUser("mh-staff" + suffix)))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
-        assertThat(html).doesNotContain("Cai");
+        assertThat(html).doesNotContain("Cai" + suffix);
+    }
+
+    @Test
+    void aChildMarkerCannotBeSatisfiedOrDefeatedByARandomCsrfToken() {
+        // T222 regression guard. Every scoping assertion above is a substring search over a WHOLE
+        // rendered page, and that page carries a 96-character random base64url CSRF token. A bare
+        // three-letter marker collides with it about once in 2,900 renders - which is exactly how
+        // this class flaked, on a pull request that changed only a terraform comment.
+        //
+        // Pinned rather than left to the comment on saveChild, because the tempting simplification
+        // is to drop the suffix back off the fixture: the assertions still read correctly, still
+        // pass, and the flake returns at a rate far too low to connect to the edit that caused it.
+        assertThat(childInUnrelated.getLocalCaseReference())
+                .as("the marker must be unique per run, not a word a random token can contain")
+                .matches("Cai-\\d{15,}");
     }
 
     @Test
@@ -141,8 +156,8 @@ class MultiHomeScopingIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
 
-        assertThat(html).contains("Ada").contains("Bo");
-        assertThat(html).doesNotContain("Cai");
+        assertThat(html).contains("Ada" + suffix).contains("Bo" + suffix);
+        assertThat(html).doesNotContain("Cai" + suffix);
     }
 
     @Test
@@ -271,7 +286,15 @@ class MultiHomeScopingIntegrationTest extends AbstractIntegrationTest {
         // default (spec §2.5) - the case reference is the part of a masked identity that IS shown,
         // so this fixture's own marker (the first name) still appears on those pages via it,
         // rather than the scoping assertions below needing to know about masking at all.
-        child.setLocalCaseReference(firstName);
+        // T222: the marker the scoping assertions look for must be UNIQUE, not a word. It used to be
+        // the bare first name, and `doesNotContain("Cai")` was then a claim about the whole page -
+        // including the CSRF token, which is 96 random base64url characters and contains "Cai" about
+        // once in 2,900 renders. That is what made this class flake: a token of
+        // "...NfptCaizM-TDj0vyn4Hi8Ix9..." fails an assertion about a child who is correctly absent.
+        // The same collision silently WEAKENS the positive assertions - contains("Ada") could be
+        // satisfied by a token rather than by Ada's row - so a scoping regression could pass unseen.
+        // Suffixing fixes both directions at once: no random token can contain a 20-digit nanotime.
+        child.setLocalCaseReference(firstName + suffix);
         child.setDateOfBirth(LocalDate.of(2011, 3, 4));
         child.setHome(home);
         return childRepository.save(child);
