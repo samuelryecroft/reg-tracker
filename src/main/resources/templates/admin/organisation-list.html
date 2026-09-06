@@ -67,8 +67,14 @@
                     <!--/* "Empty" is the canvas's own tag for a supplier serving nobody. It is
                          information, not a fault: the platform default starts this way. */-->
                     <span class="tag tag-outline" th:if="${s.isEmpty()}">Empty</span>
+                    <!--/* Two expressions doing two jobs, as children/detail.html:67,:94,
+                         interview/detail.html:12 and reviewer/review-form.html:18 all do:
+                         th:classappend carries the CONSTANT because app.css keys .status.*
+                         modifiers on constant names, and th:text carries the words. Putting the
+                         display name in classappend yields class="status Awaiting activation" -
+                         two junk classes, silently, and no chip styling at all. */-->
                     <span class="status" th:classappend="${s.organisation().status}"
-                          th:text="${s.organisation().status}">STATUS</span>
+                          th:text="${s.organisation().status.displayName}">STATUS</span>
                 </span>
             </div>
 
@@ -83,8 +89,12 @@
                     </span>
                     <span class="case-tags">
                         <span class="tag tag-neutral">Care provider</span>
+                        <!--/* The second of the two. This template is the only one that broke the
+                             convention and it broke it TWICE, in different branches of the tree, so
+                             a half-fix is invisible: the screen looks right until an org type
+                             nobody tested renders. */-->
                         <span class="status" th:classappend="${p.organisation().status}"
-                              th:text="${p.organisation().status}">STATUS</span>
+                              th:text="${p.organisation().status.displayName}">STATUS</span>
                     </span>
                     <span class="case-action" th:if="${p.organisation().status.name() == 'PENDING'}">
                         <form method="post" th:action="@{/admin/organisations/{id}/activate(id=${p.organisation().id})}">

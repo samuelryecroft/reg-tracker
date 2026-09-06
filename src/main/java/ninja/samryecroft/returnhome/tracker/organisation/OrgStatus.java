@@ -28,18 +28,50 @@ public enum OrgStatus {
      * Created, not yet usable. No encrypted record may be created for this organisation, because
      * its per-organisation KEK is not yet confirmed to exist.
      */
-    PENDING,
+    PENDING("Awaiting activation"),
 
     /**
      * Usable. Reached only by a transition that VERIFIED the KEK exists - never by assertion. A
      * status that says everything is fine when it isn't is worse than no status at all: it is the
      * original incident with a reassurance attached.
      */
-    ACTIVE,
+    ACTIVE("Active"),
 
     /**
      * Offboarded. Out of the active surfaces, fully retained, restorable. Never a physical delete -
      * this is a safeguarding system, and the records are retained for audit and retention duties.
      */
-    ARCHIVED
+    ARCHIVED("Archived");
+
+    /**
+     * What a screen calls this state (T265). {@code ReportStatus} and {@code InterviewStatus} each
+     * carry one already; this enum had none, so the admin organisation tree rendered the CONSTANT -
+     * "PENDING" in shouting caps. That is the same finding as those two, <strong>one step
+     * earlier</strong>: nothing was bypassing the authoritative name, because there was no
+     * authoritative name to bypass. A display name is only authoritative on the paths that ask for
+     * it, and a path can fail to ask because the authority does not exist yet.
+     *
+     * <p><strong>"Awaiting activation" is settled by the row the chip sits on</strong>, not chosen:
+     * a PENDING row already carries an <em>Activate</em> button, so the state now names the action
+     * that resolves it and the label a person reads agrees with the control they press.
+     *
+     * <p><strong>"Archived" deliberately does not say "removed" or "deleted."</strong> The javadoc
+     * above is explicit that there is no DELETED, that archived is fully retained and restorable,
+     * and that removed-versus-archived is a property of the audit EVENT rather than the state. A
+     * chip reading "Removed" would re-introduce as copy the distinction this enum was designed to
+     * refuse.
+     *
+     * <p>Two of the three are the constant in sentence case, and that is not under-delivery: the
+     * value of having these is not that the words change, it is that <strong>the screen stops
+     * asking the constant.</strong> Two of three coinciding is a fact about today's names.
+     */
+    private final String displayName;
+
+    OrgStatus(String displayName) {
+        this.displayName = displayName;
+    }
+
+    public String getDisplayName() {
+        return displayName;
+    }
 }
