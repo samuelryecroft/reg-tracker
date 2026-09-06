@@ -369,9 +369,45 @@ public class AuditHistoryService {
         return parseAndFormatTimestamp(meta.get("scheduledAt"));
     }
 
+    /**
+     * The report's state, in the word the system itself uses for it.
+     *
+     * <p>This went through {@link #titleCase} - the generic formatter shared with role names - and
+     * so rendered REJECTED as "Rejected", the exact word Creed's #45 follow-up had renamed to "Sent
+     * back" because <em>"Rejected" reads as a verdict where the reality is a request for more
+     * detail</em>. The result was one row saying the event twice in two vocabularies three words
+     * apart: the headline already reads "Report sent back for revision".
+     *
+     * <p>Worth being precise about what was wrong, because it decides the shape of the fix.
+     * "Rejected" was never a decision competing with Creed's - it was titleCase over an enum
+     * constant, i.e. <strong>the absence of a vocabulary decision rather than a rival one</strong>.
+     * So the fix is to ask {@link ReportStatus} what it calls the state, not to special-case one
+     * string inside a helper that also formats roles: that would make the word right by coincidence
+     * of the formatter, and leave the next status wrong in the same way.
+     */
     private String statusDetail(Map<String, String> meta) {
         String status = meta.get("reportStatus");
-        return status == null ? null : "Status: " + titleCase(status);
+        // "none" is AuditEventRecord.Builder's rendering of a null, not a state - "Status: None"
+        // would be an absence rendered as a value.
+        if (status == null || "none".equals(status)) {
+            return null;
+        }
+        return "Status: " + reportStatusName(status);
+    }
+
+    /**
+     * Audit rows are permanent and this one may name a constant a future {@link ReportStatus} no
+     * longer has. That row still has to render, so an unrecognised value falls back to the generic
+     * formatter rather than throwing and taking the whole timeline with it. This is the historic
+     * path, not the normal one: every constant the enum currently declares goes through
+     * {@code getDisplayName}, and {@code AuditStatusVocabularyTest} asserts that for all of them.
+     */
+    private String reportStatusName(String constant) {
+        try {
+            return ReportStatus.valueOf(constant).getDisplayName();
+        } catch (IllegalArgumentException unknownToThisVersion) {
+            return titleCase(constant);
+        }
     }
 
     private String rejectionDetail(Map<String, String> meta) {
