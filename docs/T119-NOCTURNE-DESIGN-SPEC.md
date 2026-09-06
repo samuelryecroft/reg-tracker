@@ -3898,10 +3898,8 @@ impossible.
 READER does.** They just generated that export. *"…from the child's record"* remains true and actionable as
 orientation; only the link was ever impossible.
 
-**CTA: [Go to children].** `/export/download/**` is not in `SecurityConfig`'s permitAll list, so every reader
-of this page is signed in and has the shell — the button is a shortcut, not the only way out. **If a reader's
-role cannot reach the children list, omit the button rather than render a broken one** (§5f); the shell's own
-navigation is then the answer.
+**~~CTA: [Go to children].~~ CORRECTED — see D-5e-3b below. It would have 403'd for part of its own
+audience, and I wrote the condition that catches it without checking it myself.**
 
 ### The exact string, since it lives only here
 
@@ -3912,3 +3910,66 @@ This export has expired. You can generate it again from the child's record — e
 **`child's` uses an ASCII apostrophe (0x27). The dash is a real em dash (U+2014) with a space either side.**
 Recorded because this string exists in no other artefact — not the handoff README, not the canvas — which
 is itself a small argument for the copy set living somewhere a builder can reach without asking.
+## 7s · The export-expired page — exact strings, one marked adaptation, and a correction to my own CTA (Creed, 8 Sep)
+
+Jim built #120 and **held it in draft rather than merge his own copy**, because a paraphrase of approved copy
+is a change to approved copy that nobody reviewed. Second time in a day he has applied that correction
+unprompted.
+
+### D-5e-3b · CORRECTION — the CTA is `/`, not the children list. My §7r ruling was wrong.
+
+§7r said **[Go to children]**. **Export eligibility includes COORDINATOR; `/children/**` does not.** So a
+coordinator can generate an export and could not follow the link I specified — **a dead button on an error
+page, offered to someone already having a bad time.**
+
+**I wrote the escape clause and did not apply it.** §7r says *"if a reader's role cannot reach the children
+list, omit the button"* — I named the condition and left checking it to the person building it. **That is
+the failure I have flagged in three other people this week: stating a condition is not verifying it.**
+
+**CTA: `/`, labelled "Go to dashboard"** — matching `error.html`'s existing button, so this is reuse rather
+than a new decision, and `/` is already the app's per-role answer.
+
+> **Jim's generalisation, which is new and worth more than the fix: an error page's CTA has a DIFFERENT
+> AUDIENCE from the page that produced the error.** The reader arrived by failing, so the permissions that
+> got them here are not the permissions the destination requires. **Check a CTA against the audience of the
+> error, never against the audience of the happy path.**
+
+### D-5e-3c · The exact strings, and the one adaptation, marked
+
+**R-Q13 gives a sentence and a CTA. A page also needs a heading, which a table row never had.** That is the
+whole of the adaptation, and it changes no words:
+
+| Slot | String | Status |
+|---|---|---|
+| `<h1>` | **Export expired** | **ADAPTATION.** R-Q13's own row label, promoted to the heading a page requires. Not new copy — it is the state's name. |
+| Body | **You can generate it again from the child's record — each export is recorded separately.** | **R-Q13 verbatim, minus its opening clause**, which the heading now carries. No word altered, one clause relocated. |
+| CTA | **Go to dashboard** → `/` | D-5e-3b. |
+
+**Byte-exact:** `child's` is an ASCII apostrophe (0x27); the dash is a real em dash (U+2014) with a space
+either side.
+
+**Jim's second paragraph — *"…that is what makes the history reliable"* — is good writing and should not
+ship.** It is new copy on a signed-off surface, and R-Q13's *"each export is recorded separately"* already
+carries the fact. **Brevity on an error page is a virtue: the reader wants the way out, not the rationale.**
+
+### Proposed to the product owner, NOT adopted: "no longer valid" beats "has expired"
+
+Jim's body said *"This download link is no longer valid"*. **That is true in all four collapsed cases where
+"has expired" is true in one**, so it is strictly more accurate at no cost.
+
+**I am not taking it.** D-5e-1 changed an R-Q13 row because it was *wrong* — it instructed an impossible
+order. **This one is not wrong, it is improvable, and the difference decides who may change it.** Absorbing a
+better phrasing on my own authority is the same move as a builder's paraphrase winning quietly, just with a
+better ear. **Routed to god for Oscar; the shipped page uses R-Q13 until it is ruled.**
+
+### D-6e-1 · `error.html` has no shell because it CANNOT have one — a constraint, not a style choice
+
+Jim found that including the app shell in an exception-rendered view **turns a 404 into a 500**:
+`@ModelAttribute` methods on a `@ControllerAdvice` do not run for `@ExceptionHandler`, so
+`GlobalControllerAdvice#currentPath` is null and the nav fragment throws evaluating
+`#strings.startsWith(path, '/dashboard/')` on it.
+
+**This must be recorded, because §7l and §6e both specify shell-less pages and I gave only design reasons**
+(*"there is no navigation for someone not signed in"*). A design reason invites a later reviewer to overrule
+it on design grounds. **The mechanical reason does not — and someone was always going to try to "fix" the
+missing nav.**
