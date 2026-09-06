@@ -162,6 +162,42 @@ class ApprovalIsNotErasableByResubmissionIntegrationTest extends AbstractIntegra
      * against the report's own status as well as the request's transition table - resting it on the
      * two machines agreeing would make it a coincidence rather than a rule.
      */
+    /**
+     * THE SUBMIT PATH SETS submittedAt, AND THAT CONTRACT WAS UNASSERTED UNTIL NOW.
+     *
+     * <p>It is pinned here because a TEST FIXTURE relied on it while restating it. ReviewFormUiTest
+     * built a SUBMITTED report by construction and omitted this field - <strong>a state production
+     * cannot reach, since this is the only path to that status</strong> - and the missing value then
+     * produced a NullPointerException in the DOCX signature line that looked exactly like a live
+     * defect on the end of the workflow. It was not: a read-only count found ONE report, with
+     * submittedAt set, and ZERO rows in any status reached without this path.
+     *
+     * <p><strong>A fixture that constructs a state the system cannot reach manufactures defects that
+     * do not exist.</strong> Fixing the one fixture is not enough on its own, because the next one
+     * will restate the same contract from memory. So the contract is asserted HERE, where it lives,
+     * and the fixture points at this test instead of remembering a field.
+     */
+    @Test
+    void submittingSetsTheSubmittedAtThatEveryLaterStepReliesOn() throws Exception {
+        // This class seeds a report that is already SUBMITTED, so a fresh submit is refused with a
+        // 409 by design. Sending it back first is how the flow reaches a submittable state - and it
+        // is the same route a real report takes on its second round.
+        mockMvc.perform(post("/reviewer/reports/{id}/review", requestId)
+                        .with(asUser("t145-reviewer" + suffix)).with(csrf())
+                        .param("action", "reject")
+                        .param("reviewComments", "Needs more detail in section 3"))
+                .andExpect(status().is3xxRedirection());
+
+        submitReportExpecting(status().is3xxRedirection());
+
+        InterviewReport submitted = interviewReportRepository.findByInterviewRequestId(requestId).orElseThrow();
+        assertThat(submitted.getStatus()).isEqualTo(ReportStatus.SUBMITTED);
+        assertThat(submitted.getSubmittedAt())
+                .as("the document's signature line reads this without a null check, deliberately - "
+                        + "it is guaranteed by this path being the only way to reach SUBMITTED")
+                .isNotNull();
+    }
+
     @Test
     void resubmittingOverAnApprovedReportIsRefusedAndLeavesTheVerdictIntact() throws Exception {
         approve();

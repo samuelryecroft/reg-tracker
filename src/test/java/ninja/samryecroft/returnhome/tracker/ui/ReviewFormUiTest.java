@@ -104,10 +104,26 @@ class ReviewFormUiTest extends AbstractUiTest {
         request = interviewRequestRepository.save(request);
         requestId = request.getId();
 
+        // THIS FIXTURE USED TO BUILD A STATE PRODUCTION CANNOT REACH, and it manufactured a defect
+        // that did not exist. It set SUBMITTED without submittedAt; the DOCX signature line reads
+        // that field without a null check, so approving here threw a NullPointerException that
+        // looked exactly like a live failure at the end of the workflow. It was not one: a
+        // read-only count of production found ONE report, with submittedAt set, and ZERO rows in
+        // any status reached without the submit path.
+        //
+        // A FIXTURE THAT CONSTRUCTS A STATE THE SYSTEM CANNOT REACH MANUFACTURES DEFECTS THAT DO
+        // NOT EXIST. It is constructed rather than submitted because the subject here is the
+        // REVIEWER's screen, and driving a real submission would make this test depend on the
+        // whole capture form - but that choice obliges it to match what the submit path leaves
+        // behind, and submittedAt is pinned by
+        // ApprovalIsNotErasableByResubmissionIntegrationTest#submittingSetsTheSubmittedAtThatEveryLaterStepReliesOn
+        // rather than remembered here. If that contract grows a field, that test is where it is
+        // stated and this comment is where to look.
         InterviewReport report = new InterviewReport();
         report.setInterviewRequest(request);
         report.setVisitor(visitor);
         report.setStatus(ReportStatus.SUBMITTED);
+        report.setSubmittedAt(LocalDateTime.now().minusDays(1));
         report.setInterviewLocation("The home's kitchen");
         interviewReportRepository.save(report);
     }
@@ -158,12 +174,20 @@ class ReviewFormUiTest extends AbstractUiTest {
         // because the URL cannot show it: Spring's error forward keeps the request URL, so a 500
         // renders AT /review and is indistinguishable from "the button did nothing" from outside.
         assertThat(traffic).anyMatch(entry -> entry.startsWith("POST"));
-        // DELIBERATELY NOT ASSERTED HERE: that the page navigates. It does not, and that is a
-        // SECOND blocker I have not identified - no "not focusable" message, no field error on the
-        // re-render, URL unchanged. Asserting navigation would make this test fail for a reason it
-        // does not diagnose, and asserting the current (broken) navigation would pin the defect.
-        // The console assertion above is the one that discriminates the cause this change fixes.
-        // Reported to god rather than guessed at.
+        // NOW ASSERTABLE, AND IT WAS NOT BEFORE. This said "deliberately not asserted: the page
+        // does not navigate, and that is a second blocker I have not identified". The second
+        // blocker was THIS FIXTURE: it built a SUBMITTED report with no submittedAt, a state
+        // production cannot reach, and the DOCX signature line threw on it. With the fixture
+        // building what the submit path actually leaves behind, approve completes - so the end of
+        // the workflow is now covered end to end rather than up to the point my own test data broke.
+        // ENDS WITH, not "does not contain /review". THE OBVIOUS ASSERTION IS UNSATISFIABLE: the
+        // success destination is /reviewer/reports, which CONTAINS the substring "/review". So a
+        // doesNotContain check fails on the defect AND on the fix, and for a while it looked like
+        // evidence of a second blocker when it was only evidence of itself. AN ASSERTION THAT NO
+        // CORRECT BEHAVIOUR COULD SATISFY IS NOT A STRICT TEST, IT IS A BROKEN ONE.
+        assertThat(page.url())
+                .as("approve must leave the review page for the reviewer's list")
+                .endsWith("/reviewer/reports");
     }
 
     /**
