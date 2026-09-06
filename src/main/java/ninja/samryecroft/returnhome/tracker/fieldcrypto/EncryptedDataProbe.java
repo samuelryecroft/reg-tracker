@@ -27,8 +27,17 @@ public class EncryptedDataProbe {
     /**
      * Entity name to the path from it to the owning organisation's id.
      *
-     * <p>Ordered cheapest-first only as a courtesy; correctness does not depend on it, because any
-     * one match is enough to refuse.
+     * <p><b>The order these are asked in is unspecified, and nothing here depends on it</b> - any
+     * one match is enough to refuse, and this runs at most once in an organisation's life, on a path
+     * that already makes a key-vault round trip. There is nothing for an ordering to buy.
+     *
+     * <p>An earlier version of this comment claimed the entries were "ordered cheapest-first as a
+     * courtesy". <b>{@code Map.of} cannot provide that</b> - its contract states the iteration order
+     * is unspecified and may differ between runs, and Dwight measured three different orders across
+     * four JVMs with {@code Child} first in none. <b>The claim was not unlucky, it was unsupportable
+     * by construction</b>, and a comment describing a property the chosen type explicitly declines to
+     * offer is worse than no comment: the next reader adds an entry believing position means
+     * something.
      */
     private static final Map<String, String> ORGANISATION_PATHS = Map.of(
             "Child", "home.organisation.id",
