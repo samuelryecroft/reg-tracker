@@ -147,7 +147,11 @@ capture_logs_on_failure() {
     return 0
   fi
   local out="${LOG_CAPTURE_DIR}/rht-migrate-fail-${exec_name}.log"
-  local kql="ContainerAppConsoleLogs_CL | where TimeGenerated > ago(1h) | where ContainerGroupName_s startswith '${exec_name}' or ContainerAppName_s == '${JOB_NAME}' | project TimeGenerated, Log_s | order by TimeGenerated asc | take 1000"
+  # Column names VERIFIED against this workspace's ContainerAppConsoleLogs_CL (2026-09-08): a job
+  # execution's rows carry ContainerGroupName_s = "<exec_name>-<replica-suffix>", so `startswith
+  # exec_name` selects exactly this run. NB: ContainerAppName_s does NOT exist on this table - including
+  # it makes the whole query a SemanticError (SEM0100) that returns nothing, so it is deliberately absent.
+  local kql="ContainerAppConsoleLogs_CL | where TimeGenerated > ago(1h) | where ContainerGroupName_s startswith '${exec_name}' | project TimeGenerated, Log_s | order by TimeGenerated asc | take 1000"
 
   # F1: with no way to cap the network calls, do NOT run them ahead of teardown - skip straight to the
   # recipe. Refusing to capture is strictly better than risking a stranded env, and the rows are in the
