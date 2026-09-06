@@ -5005,3 +5005,104 @@ concept, so we could not vary it by age even if we wanted to.**
 
 *Swept on `origin/main`; verified `children's home` absent from templates and Java; verified the nav literals
 in `GlobalControllerAdvice`.*
+
+---
+
+## §8e — T248: the supplier dashboard **already exists**, and the real gap is not a missing screen
+
+Flagged to think about, not to begin. **Thinking first produced a correction to the brief.**
+
+### D-8e-1 — 🔑 the premise is stale, and the risk is losing work that is already right
+
+> *"There is no supplier dashboard; the 2.3 dashboard was built for a care org's view of its own homes."*
+
+On `origin/main` (`7ecfac5`) there are **two** dashboard templates, and `DashboardController:43` renders
+`dashboard/supplier.html` for every non-care-provider audience. **The screen exists, is routed, and already
+answers most of Oscar's definition:**
+
+| Oscar's definition | on `dashboard/supplier.html` today |
+| --- | --- |
+| 72-hour performance | **Zone 2 "Our performance"** — `overallRate()`, per-provider table with *Completed / Within 72h / Excluded / Overdue now* |
+| fewer-than-five threshold before any percentage | **built** — `Not enough data yet` in place of the number, plus a separate **"Too few to report — below the minimum base, shown, not ranked"** table |
+| *not measurable* where return time is absent | **built** — an `Excluded` column, and a live tile *"No return time recorded — no clock can start"* |
+| broken down per client org | **built** — `careProviderId` drill-down; headings and captions switch between *By care provider* and *By home* |
+| recurrence as a count, not a list | **built** — Zone 3 rows are homes carrying a count |
+| no names at all | **honoured** — see D-8e-4 |
+
+**T248 is a redesign, not a new build, and that changes what the risk is.** A brief that says the screen does
+not exist invites designing from the definition and discovering the existing reasoning by collision. The
+minimum-base handling in particular is exactly the kind of considered decision a from-scratch redesign
+silently drops — *"shown, not ranked"* is a real judgement about not shaming a small provider for a 33%
+computed from three interviews, and it is already made.
+
+> **A definition of what a screen should answer is not evidence about what it answers today.** Both Oscar and I
+> were reasoning from the definition; neither of us opened the template until the row-unit question sent me
+> there.
+
+### D-8e-2 — 🔑 the genuine gap: the dashboard has no concept of **how long**
+
+Oscar's second tile — *what is stuck and for how long* — is **the one thing not there in any form**, and the
+reason is structural rather than an omission. Every live tile today is **deadline-derived**:
+
+* *Overdue now — across every care provider we serve*
+* *Due in next 24h — interview not yet held*
+* *No return time recorded — no clock can start*
+* *Consent not confirmed — already allocated to a visitor*
+
+**These answer "what is late?". Oscar asks "what is stuck, and who has to move?"** They are different
+questions and the second is not derivable from the first:
+
+* a request can sit **unallocated for six days** and appear on **no** tile, if its 72-hour clock has not
+  started or its deadline is still ahead;
+* *"7 overdue"* tells a supplier they are late but **not where the seven are stuck**, so it names no one to
+  chase.
+
+> **A deadline metric reports; a stage-duration metric assigns.** *Unallocated / allocated-not-scheduled /
+> awaiting review* each **name the person who must act next** — the coordinator, the visitor, the reviewer.
+> That is why Oscar calls it the operational heart and everything else *"reporting after the fact"*, and the
+> current tiles are precisely the "after the fact" half.
+
+**Design consequence: the unit on this tile is time-in-stage, not a count.** A bare count of unallocated
+requests is another deadline-shaped number. The tile has to carry **the age of the oldest item in each
+bucket** — *"4 unallocated · oldest 6 days"* — because **the count says how much work there is and the age
+says whether anything has been abandoned**, and only the second is actionable at a glance.
+
+### D-8e-3 — Oscar's row-unit constraint, applied to what is there
+
+> *"If a row is an interview, no arrangement of it becomes a population list; if a row is a young person, no
+> amount of careful design stops it becoming one — a filter and a sort are all it takes."*
+
+Nothing on the screen has a young person as its row unit today. Zone 2's rows are **care providers** (or
+homes); Zone 3's are **homes**. Those are aggregates *over* interviews, which the constraint permits — the
+constraint bites on **list-shaped** views, and the rule to carry into the redesign is that **the stuck tile
+must drill through to interviews, never to the people they concern.**
+
+### D-8e-4 — a verified negative, recorded rather than left as a plausible worry
+
+**"No names at all" is honoured today.** `dashboard/supplier.html` renders no child name; Zone 3 carries only
+counts, and the file says so at `:167` — *"Home-level counts only. Children are named on the existing per-home
+request list, one click away — nothing new is disclosed by following the link."* That defence is sound: the
+link's audience is gated by role, not by this screen.
+
+**But the shared-monitor argument has a consequence Oscar did not draw.** If a dashboard is *"the screen most
+likely to be open on a shared or overlooked monitor"*, then the exposure surface is not only what the screen
+shows at rest — it is **what the screen invites someone to click**. *"Homes with at least one flagged child,
+most flagged first"* beside a link is the one control on the page that converts a resting dashboard into a
+named list in a single click.
+
+**Not a defect, and not a reason to remove it.** But it is currently an *inherited* arrangement rather than a
+decided one, and the redesign is where it should be decided deliberately.
+
+### D-8e-5 — three tiles is a **reduction** target, and that is the hard part
+
+The definition says three tiles. The screen has **four live tiles, two performance tiles, two ranked tables
+and a recurrence table.** So T248 is mostly **subtraction**, and subtraction is where considered decisions get
+lost — every one of those elements was put there for a reason that is still in the file.
+
+**The order I would work in, when it starts:** read the existing reasoning first and list what each element
+was for; build the stage-duration tile, which is genuinely new; then remove only what the three tiles
+demonstrably replace, and say in the PR what each removal was replaced *by*. **Anything that cannot be named
+as replaced is being dropped, not consolidated.**
+
+*Verified on `origin/main` `7ecfac5`. Not yet rendered — the layout claims here are read off source, which is
+the failure mode this floor has form for, and I will look at it before any of this is built.*
