@@ -17,6 +17,7 @@ import java.util.stream.Collectors;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewRequest;
 import ninja.samryecroft.returnhome.tracker.report.InterviewReport;
 import ninja.samryecroft.returnhome.tracker.report.InterviewReportRepository;
+import ninja.samryecroft.returnhome.tracker.report.ReportStatus;
 import org.springframework.stereotype.Service;
 
 /**
@@ -80,7 +81,14 @@ public class AuditHistoryService {
                 auditEventRepository.findByTargetTypeAndTargetIdOrderByOccurredAtDesc("InterviewRequest", request.getId()));
         interviewReportRepository.findByInterviewRequestId(request.getId()).ifPresent(report ->
                 events.addAll(auditEventRepository.findByTargetTypeAndTargetIdOrderByOccurredAtDesc("InterviewReport", report.getId())));
-        return groupByDay(toEntries(events, WhenStyle.TIME));
+        // Each finder returns its own rows newest-first, but CONCATENATING two sorted lists does not
+        // produce a sorted one: every request event lands ahead of every report event whatever the
+        // clock said. caseHistoryFor has always re-sorted after the same concatenation and this
+        // method never did. T177 is what makes that load-bearing rather than cosmetic - "consecutive
+        // draft saves" is a claim about time order, so a run computed over an unsorted list is not
+        // the run the reader is looking at.
+        events.sort(Comparator.comparing(AuditEvent::getOccurredAt).reversed());
+        return groupByDay(events, WhenStyle.TIME);
     }
 
     /** Cross-request "case history": every request raised for this child, each its own section. */
@@ -177,22 +185,108 @@ public class AuditHistoryService {
                 .stream()
                 .filter(e -> !EXCLUDED_FROM_USER_HISTORY.contains(e.getEventType()))
                 .toList();
-        return groupByDay(toEntries(events, WhenStyle.TIME));
+        return groupByDay(events, WhenStyle.TIME);
     }
 
+    /**
+     * Maps one section's events to rows, collapsing each run of consecutive ordinary draft saves
+     * into a single row (T177).
+     *
+     * <p><strong>The rule is DRAFT &rarr; DRAFT only; a transition is never collapsed.</strong>
+     * With T174's per-step autosave there is a REPORT_DRAFT_SAVED for every step of every report,
+     * so the naive rule - collapse consecutive REPORT_DRAFT_SAVED - would fold the
+     * REJECTED &rarr; DRAFT save into the run above it. That save is the moment a visitor began
+     * reworking a report a reviewer sent back: the one draft save anybody ever goes looking for,
+     * and the reason #67 put {@code statusBefore} on the event in the first place.
+     *
+     * <p>A run also breaks on a change of actor role. Folding a home-staff save into an admin's
+     * would silently restate <em>who</em> did something, and the only thing this projection is for
+     * is that a row's facts are its event's facts.
+     *
+     * <p><strong>Display-only and reversible.</strong> Nothing is dropped and nothing is filtered:
+     * the rows underneath are untouched and still answer "how many times was this revised, and
+     * when" for a DPO or a court - and so does the collapsed row itself, which carries the count
+     * and the span rather than hiding them behind an affordance.
+     */
     private List<AuditHistoryEntry> toEntries(List<AuditEvent> events, WhenStyle whenStyle) {
-        return events.stream().map(event -> toEntry(event, whenStyle)).toList();
+        List<AuditHistoryEntry> entries = new ArrayList<>();
+        int i = 0;
+        while (i < events.size()) {
+            int end = endOfDraftSaveRun(events, i);
+            entries.add(end - i > 1 ? collapsedDraftSaves(events.subList(i, end), whenStyle)
+                    : toEntry(events.get(i), whenStyle));
+            i = end;
+        }
+        return entries;
     }
 
-    private List<AuditHistorySection> groupByDay(List<AuditHistoryEntry> entries) {
-        Map<LocalDate, List<AuditHistoryEntry>> byDay = new LinkedHashMap<>();
-        for (AuditHistoryEntry entry : entries) {
-            byDay.computeIfAbsent(entry.occurredAt().toLocalDate(), d -> new ArrayList<>()).add(entry);
+    /** Exclusive end of the run starting at {@code from}, or {@code from + 1} if none starts there. */
+    private int endOfDraftSaveRun(List<AuditEvent> events, int from) {
+        AuditEvent first = events.get(from);
+        if (!isOrdinaryDraftSave(first)) {
+            return from + 1;
+        }
+        int end = from + 1;
+        while (end < events.size() && isOrdinaryDraftSave(events.get(end))
+                && Objects.equals(first.getActorRolesAtTime(), events.get(end).getActorRolesAtTime())) {
+            end++;
+        }
+        return end;
+    }
+
+    /**
+     * A draft save that overwrote a draft - the only kind that may be collapsed.
+     *
+     * <p>Everything else is a beginning and stands on its own row: REJECTED means the rework of a
+     * sent-back report started here, and an absent {@code statusBefore} (the builder writes
+     * {@code "none"} for a null) means this save CREATED the report. Written as "is it DRAFT"
+     * rather than "is it not REJECTED" on purpose - a status added to ReportStatus later is then
+     * excluded until somebody decides it should not be, which is the direction that fails safe.
+     */
+    private boolean isOrdinaryDraftSave(AuditEvent event) {
+        return event.getEventType() == AuditEventType.REPORT_DRAFT_SAVED
+                && ReportStatus.DRAFT.name().equals(parseMetadata(event.getMetadata()).get("statusBefore"));
+    }
+
+    /**
+     * One row standing for a whole run. {@code run} is newest-first, like everything else here.
+     *
+     * <p>It takes the newest save's id and instant, so it sits where the run's most recent event
+     * sat and a reader following the id lands on that event rather than on an arbitrary member.
+     */
+    private AuditHistoryEntry collapsedDraftSaves(List<AuditEvent> run, WhenStyle whenStyle) {
+        AuditEvent latest = run.get(0);
+        String from = display(run.get(run.size() - 1), whenStyle);
+        String to = display(latest, whenStyle);
+        // Null when both ends render the same - several saves inside one minute, or (on the child
+        // page, whose column is date-only) inside one day. The WHEN column already says it, and a
+        // detail reading "09:14 - 09:14" is noise wearing the clothes of information.
+        String span = from.equals(to) ? null : from + " – " + to;
+        return new AuditHistoryEntry(latest.getId(), "Draft saved (" + run.size() + " times)",
+                latest.getOccurredAt(), to, formatRoles(latest.getActorRolesAtTime()), span, "");
+    }
+
+    private String display(AuditEvent event, WhenStyle whenStyle) {
+        return whenStyle == WhenStyle.TIME ? event.getOccurredAt().format(TIME)
+                : event.getOccurredAt().format(SHORT_DATE);
+    }
+
+    /**
+     * Days are cut from the EVENTS, before {@link #toEntries} collapses anything, so a run that
+     * spans midnight collapses into one row per day rather than one row filed under whichever day
+     * happened to be first. A day heading that has rows under it the day did not contain is a
+     * worse defect than the noise this card exists to remove.
+     */
+    private List<AuditHistorySection> groupByDay(List<AuditEvent> events, WhenStyle whenStyle) {
+        Map<LocalDate, List<AuditEvent>> byDay = new LinkedHashMap<>();
+        for (AuditEvent event : events) {
+            byDay.computeIfAbsent(event.getOccurredAt().toLocalDate(), d -> new ArrayList<>()).add(event);
         }
         LocalDate today = LocalDate.now();
         List<AuditHistorySection> sections = new ArrayList<>();
-        for (Map.Entry<LocalDate, List<AuditHistoryEntry>> dayEntry : byDay.entrySet()) {
-            sections.add(new AuditHistorySection(dayLabel(dayEntry.getKey(), today), dayEntry.getValue()));
+        for (Map.Entry<LocalDate, List<AuditEvent>> dayEntry : byDay.entrySet()) {
+            sections.add(new AuditHistorySection(dayLabel(dayEntry.getKey(), today),
+                    toEntries(dayEntry.getValue(), whenStyle)));
         }
         return sections;
     }
@@ -226,7 +320,7 @@ public class AuditHistoryService {
     private AuditHistoryEntry toEntry(AuditEvent event, WhenStyle whenStyle) {
         Map<String, String> meta = parseMetadata(event.getMetadata());
         String role = formatRoles(event.getActorRolesAtTime());
-        String when = whenStyle == WhenStyle.TIME ? event.getOccurredAt().format(TIME) : event.getOccurredAt().format(SHORT_DATE);
+        String when = display(event, whenStyle);
         return switch (event.getEventType()) {
             case INTERVIEW_REQUEST_CREATED -> entry("Interview requested", event, when, role, null, "info");
             case INTERVIEW_REQUEST_ALLOCATED -> entry("Visitor allocated", event, when, role, transition(meta), "info");
