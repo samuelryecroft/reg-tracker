@@ -233,6 +233,14 @@ direct-deploy fallback with redeploy-previous-artifact rollback). ACR adds ~£4/
 
 ### Ephemeral migration env (T180) — the LIVE migration path
 
+> **⚠️ FIRST, CHECK FOR A V-FILE — a release that carries one is NOT a jar-only deploy.** If the
+> release adds a new `src/main/resources/db/migration/V*.sql` (**release 3 = V20 is the first**), its
+> recipe is **THIS ACA-runner path**: the ephemeral migration runs **FIRST**, and the jar goes live
+> only on a clean exit. Do **NOT** reach for the jar-only manual recipe (build → `az webapp deploy`
+> → restart) — that path skips the migration entirely. A jar-only deploy is correct **only** when the
+> tree diff since the deployed baseline touches **no** `V*.sql`. This banner exists because the
+> failure mode of the week has been a step that reads as routine when it is not.
+
 **The GitHub Actions `deploy.yml` above has never completed a deploy** (no `prod` Environment, no
 OIDC identities/secrets provisioned; `deploy` job guarded to `main`). Go-live is a **manual** deploy,
 and this is the migration procedure it runs.
