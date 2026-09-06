@@ -25,8 +25,14 @@
                  that said what was actually happening. */-->
             <span class="expires"><svg class="icon" aria-hidden="true"><use th:href="@{/icons/phosphor.svg} + '#ph-clock-countdown'"></use></svg><span th:text="${'Link expires in ' + expiresInMinutes + ' minutes'}">Expires</span></span>
         </p>
-        <p class="hint" style="margin-top:14px">Re-downloading after expiry means generating again — which writes a
-            second row in the audit trail. Every extraction being separately recorded is the feature, not a limitation.</p>
+        <!--/* T223 / spec §7w: this and the countdown badge above are a PAIR, not two independent
+             facts. The link has two independent limits - single-use and time-limited - and copy
+             that names only the timing limit tells the reader the other one does not exist (the
+             old wording here read as permission to re-download early). Do not delete this sentence
+             in a tidy-up: the badge alone is a strong affordance for "valid until then", and
+             becomes the same defect the moment nothing beneath it says otherwise. Byte-exact per
+             ExpiredSuccessCopyGuardTest. */-->
+        <p class="hint" style="margin-top:14px">This link works once, and only for you. If you need the file again, create a new export; if a colleague needs it, they should create their own. Each one writes its own row in the audit trail, which is the point.</p>
     </div>
 
     <a class="btn ghost" href="/audit">Back to case activity</a>
