@@ -109,19 +109,25 @@ class EncryptedDataProbeFindsEachEntityTest extends AbstractIntegrationTest {
     }
 
     private void assertFoundUnderItsOwner(EncryptedEntity entity) {
+        String entityName = entity.getClass().getSimpleName();
         Long owningOrganisationId = entity.owningOrganisationId();
         assertThat(owningOrganisationId)
                 .as("the entity must be able to name its own organisation, or this test has no "
                         + "oracle and proves nothing")
                 .isEqualTo(owner.getId());
 
-        assertThat(probe.organisationHoldsEncryptedRows(owningOrganisationId))
-                .as("the probe's path for %s must reach the organisation the entity itself names - "
-                        + "a path to the wrong association leaves the coverage check passing and "
-                        + "the guard fail-open", entity.getClass().getSimpleName())
+        // Asked of THIS path by name, never through organisationHoldsEncryptedRows. That method
+        // short-circuits on the first match, so a Child row would answer "yes" whatever the
+        // report's path said - and the first version of this test did exactly that, passing while
+        // the report's path pointed at the supplier organisation instead of the care provider.
+        // A test that cannot attribute its own "yes" is not a correctness check.
+        assertThat(probe.holdsRowsOf(entityName, owningOrganisationId))
+                .as("%s's path must reach the organisation the entity itself names - a path to the "
+                        + "wrong association leaves the coverage check passing and the guard "
+                        + "fail-open", entityName)
                 .isTrue();
 
-        assertThat(probe.organisationHoldsEncryptedRows(stranger.getId()))
+        assertThat(probe.holdsRowsOf(entityName, stranger.getId()))
                 .as("and it must not find this row under an unrelated organisation - a path that "
                         + "resolved to 'anyone with data' would satisfy the assertion above for "
                         + "every entity and still be useless")

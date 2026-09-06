@@ -57,17 +57,30 @@ public class EncryptedDataProbe {
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
     public boolean organisationHoldsEncryptedRows(long organisationId) {
-        for (Map.Entry<String, String> entity : ORGANISATION_PATHS.entrySet()) {
-            Long found = entityManager
-                    .createQuery("select count(e) from " + entity.getKey() + " e where e."
-                            + entity.getValue() + " = :organisationId", Long.class)
-                    .setParameter("organisationId", organisationId)
-                    .setMaxResults(1)
-                    .getSingleResult();
-            if (found != null && found > 0) {
+        for (String entityName : ORGANISATION_PATHS.keySet()) {
+            if (holdsRowsOf(entityName, organisationId)) {
                 return true;
             }
         }
         return false;
+    }
+
+    /**
+     * One entity's path, asked on its own.
+     *
+     * <p>Package-private for the correctness test, and the granularity is the point rather than a
+     * convenience. {@link #organisationHoldsEncryptedRows} short-circuits on the first match, so a
+     * test that only asks the public method <b>cannot attribute a "yes" to the path under
+     * examination</b> - a Child row satisfies it whatever the report's path says, and a wrong path
+     * passes unnoticed. A correctness check has to ask each path by name.
+     */
+    boolean holdsRowsOf(String entityName, long organisationId) {
+        Long found = entityManager
+                .createQuery("select count(e) from " + entityName + " e where e."
+                        + ORGANISATION_PATHS.get(entityName) + " = :organisationId", Long.class)
+                .setParameter("organisationId", organisationId)
+                .setMaxResults(1)
+                .getSingleResult();
+        return found != null && found > 0;
     }
 }
