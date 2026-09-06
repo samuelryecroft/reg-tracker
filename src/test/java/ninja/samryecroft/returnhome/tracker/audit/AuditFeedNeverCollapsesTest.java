@@ -15,6 +15,8 @@ import ninja.samryecroft.returnhome.tracker.report.InterviewReport;
 import ninja.samryecroft.returnhome.tracker.report.InterviewReportRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
  * The org-wide case-activity feed does not collapse anything, and this is here so that stays a
@@ -33,6 +35,7 @@ import org.junit.jupiter.api.Test;
  * them split for the case history. It is not asserting that collapsing the feed is wrong. It is
  * asserting that collapsing it silently, for both consumers at once, cannot happen by omission.
  */
+@ExtendWith(MockitoExtension.class)
 class AuditFeedNeverCollapsesTest {
 
     private static final long ORG_ID = 3L;

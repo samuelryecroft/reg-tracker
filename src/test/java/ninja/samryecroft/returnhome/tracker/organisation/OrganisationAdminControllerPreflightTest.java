@@ -13,6 +13,8 @@ import ninja.samryecroft.returnhome.tracker.home.HomeRepository;
 import ninja.samryecroft.returnhome.tracker.user.UserRepository;
 import ninja.samryecroft.returnhome.tracker.theme.ThemeService;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.ui.ExtendedModelMap;
 import org.springframework.ui.Model;
 import org.springframework.validation.BeanPropertyBindingResult;
@@ -28,6 +30,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
  * pure-read {@link KeyProvider#keyExists} (T168(b)), which never mints, so it runs in every
  * configuration - there is no auto-create guard any more.
  */
+@ExtendWith(MockitoExtension.class)
 class OrganisationAdminControllerPreflightTest {
 
     private final OrganisationRepository repository = mock(OrganisationRepository.class);

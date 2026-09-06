@@ -23,7 +23,9 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -37,6 +39,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
  * is shared across test classes, so asserting "no admin row exists" against it would depend on
  * which other test class seeded one first.
  */
+@ExtendWith(MockitoExtension.class)
 class AdminUserSeederTest {
 
     private final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();

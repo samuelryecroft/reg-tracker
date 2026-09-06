@@ -23,8 +23,10 @@ import ninja.samryecroft.returnhome.tracker.theme.ThemeSettingsRepository;
 import ninja.samryecroft.returnhome.tracker.user.User;
 import ninja.samryecroft.returnhome.tracker.user.UserRepository;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
 import org.mockito.Mockito;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -39,6 +41,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
  * test classes, so actually running the seeder here would leave a whole demo tenancy behind for
  * every later test to trip over.
  */
+@ExtendWith(MockitoExtension.class)
 class DemoDataSeederTest {
 
     // --- the profile gate: the only thing keeping this out of a real deployment ---
@@ -187,7 +190,9 @@ class DemoDataSeederTest {
         }
 
         DemoDataSeeder seeder() {
-            Mockito.when(lifecycle.activate(Mockito.any(Organisation.class), Mockito.isNull()))
+            // lenient: seeder() builds the seeder for every test, but the four "is it already
+            // seeded?" tests return before anything is activated. The tests that do seed use it.
+            Mockito.lenient().when(lifecycle.activate(Mockito.any(Organisation.class), Mockito.isNull()))
                     .thenAnswer(invocation -> invocation.getArgument(0));
             return new DemoDataSeeder(organisations, lifecycle, themes, homes, children, users, requests,
                     reports, interviewRequestService, reportService, audit, passwordEncoder,
