@@ -36,12 +36,17 @@ public class Organisation {
     /**
      * T168(b). Initialised to PENDING, and that initialiser is load-bearing rather than tidy.
      *
-     * <p>V19 drops the column's DB default after backfilling, so an insert that forgets to set a
-     * status fails NOT NULL loudly instead of quietly becoming ACTIVE. But that only catches inserts
-     * which BYPASS this entity - and essentially nothing does, so without this initialiser the
-     * hardening would cover the path nobody uses while the ordinary path defaulted to whatever the
-     * field happened to hold. PENDING is also simply true: a newly created organisation has no
-     * confirmed KEK yet.
+     * <p>V20 drops the column's DB default, so an insert that forgets to set a status fails NOT NULL
+     * loudly instead of quietly landing PENDING. But that only catches inserts which BYPASS this
+     * entity - and essentially nothing does, so without this initialiser the hardening would cover
+     * the path nobody uses while the ordinary path defaulted to whatever the field happened to hold.
+     * PENDING is also simply true: a newly created organisation has no confirmed KEK yet.
+     *
+     * <p>(This paragraph said "V19 drops the default" until T172, and V19 never did - it set the
+     * default to PENDING and said in its own comment that the drop belonged in a later release. The
+     * plan changed during T168(b) and this description was written from the earlier one. Corrected
+     * here rather than quietly, because for two releases the entity claimed a hardening the schema
+     * did not have, and this initialiser is the only reason that gap was harmless.)
      */
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)

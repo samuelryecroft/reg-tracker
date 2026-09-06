@@ -233,6 +233,14 @@ direct-deploy fallback with redeploy-previous-artifact rollback). ACR adds ~£4/
 
 ### Ephemeral migration env (T180) — the LIVE migration path
 
+> **⚠️ FIRST, CHECK FOR A V-FILE — a release that carries one is NOT a jar-only deploy.** If the
+> release adds a new `src/main/resources/db/migration/V*.sql` (**release 3 = V20 is the first**), its
+> recipe is **THIS ACA-runner path**: the ephemeral migration runs **FIRST**, and the jar goes live
+> only on a clean exit. Do **NOT** reach for the jar-only manual recipe (build → `az webapp deploy`
+> → restart) — that path skips the migration entirely. A jar-only deploy is correct **only** when the
+> tree diff since the deployed baseline touches **no** `V*.sql`. This banner exists because the
+> failure mode of the week has been a step that reads as routine when it is not.
+
 **The GitHub Actions `deploy.yml` above has never completed a deploy** (no `prod` Environment, no
 OIDC identities/secrets provisioned; `deploy` job guarded to `main`). Go-live is a **manual** deploy,
 and this is the migration procedure it runs.
@@ -248,9 +256,11 @@ identity (`rht-cd-prod`, with KV Secrets User + AcrPull), the digest-pinned DB-p
 and a **dedicated `snet-ca-migrate` /23** (`module.network.migrate_subnet_id` — a bare delegated
 subnet carries no LB). Ephemeral (created out-of-band by the procedure via `az`, **never** in
 Terraform state): the Container Apps **environment + job**. Two envs cannot share one delegated
-subnet, which is why `snet-ca-migrate` is separate from `containerapps` (the latter holds the
-standing `modules/migrator_job` env, **kept as the fallback** until this path is proven in a real
-deploy, then removed).
+subnet, which is why `snet-ca-migrate` is separate from `containerapps` (the latter held the
+standing `modules/migrator_job` env). **That standing env + its idle LB were DELETED in release 2**,
+after the ephemeral path was proven end-to-end — but on a **no-op** migration (nothing pending). So
+`containerapps` is now an empty delegated subnet with no fallback env behind it, and **release 3 (V20)
+is the FIRST real migration to run through the ephemeral path** — see the Flyway note below.
 
 **Procedure (per deploy), BEFORE the jar goes live** — one committed script, not a checklist:
 
@@ -263,7 +273,8 @@ deploy, then removed).
    **create** the internal env in `snet-ca-migrate` → **create** the job (same digest-pinned image,
    `rht-cd-prod` managed identity, same env as `modules/migrator_job`) → **start + poll to
    `Succeeded`**, exit non-zero on `Failed` (same WS-G ordering guarantee: `01 → Flyway → 02` before
-   the jar) → **always-teardown**.
+   the jar) → **on any failure, capture the execution's console logs BEFORE teardown** (see
+   *capture-logs-on-failure* below) → **always-teardown**.
 3. Deploy the jar on **exit 0** (migration succeeded, teardown confirmed). On **exit 1** the migration
    failed — do not deploy. **Exit 3** is distinct on purpose: the migration succeeded but teardown
    could not be confirmed — you may deploy the jar, but you MUST then check the platform-managed
@@ -278,8 +289,42 @@ refuses while the job exists), and the subnet is **permanent** precisely to avoi
 trap where a per-run subnet cannot be removed until the env's managed LB releases its frontend IP.
 
 This preserves the Kevin-T89 guarantees exactly (managed identity **in the VNet** + KV read; **ACI is
-still ruled out** — it cannot do MI-in-VNet without a stored credential). It is proven end-to-end on
-a real migration before the standing `cae-<prefix>` env + its LB are deleted.
+still ruled out** — it cannot do MI-in-VNet without a stored credential). The path was proven
+end-to-end in release 2 (on a **no-op** migration) and the standing `cae-<prefix>` env + its idle LB
+were then deleted; **release 3 (V20) is the first run that applies real DDL through it.**
+
+**capture-logs-on-failure (release-3 precondition).** On a **failed** migration the script keeps the
+env alive and RETRIES pulling the failed execution's console logs (up to ~5 min, `LOG_CAPTURE_MAX`)
+before it tears the env down. The point is **not** that a failure's logs are lost — they do land in the
+standing workspace within the ingestion lag (1–3 min; verified — a prior run's logs were still there
+with its env long gone). It is that at teardown time they are **not yet queryable**, so on a FAILING
+run the failure would not be legible **when it happens, during an incident** — only after a later
+re-query of a workspace the operator has to know exists — and a teardown racing the log agent's final
+flush can truncate the un-flushed tail. The retry is the fix: the env keeps shipping while it is up, so
+the failure is captured at failure time. Captured logs go to
+stdout **and** `${LOG_CAPTURE_DIR:-$TMPDIR}/rht-migrate-fail-<exec>.log`. If nothing surfaces inside
+the budget the script STILL tears down (teardown-is-the-point is never weakened) and prints an exact
+`az monitor log-analytics query` recipe — already-ingested rows persist in the **standing** workspace
+after the env is gone, so they can be pulled once ingestion catches up. Two sources are tried (`az
+containerapp job logs show` against the pinned `migrate` container, then a direct KQL only if the
+`log-analytics` extension is already installed, so it never triggers a dynamic-install prompt); neither
+can block teardown.
+
+**Flyway on the PROD database is INCREMENTAL — do not reason from the fresh-DB case.** A fresh database
+runs `V1..Vn` in order, and the `organisations.status` story is immune *by ordering*: `V5` seeds two
+organisations before the column exists and `V19` (`ADD COLUMN status ... DEFAULT 'ACTIVE'`) backfills
+them. **Prod is not that database.** Prod already has `V19` applied, every row already carries a
+`status`, and Flyway reads `flyway_schema_history` and applies **only what is pending** — for release 3
+that is **V20 alone** (`ALTER TABLE organisations ALTER COLUMN status DROP DEFAULT`: metadata-only on
+Postgres — no table rewrite, no backfill, a sub-millisecond catalog lock). So prod-safety does **not**
+rest on the fresh-DB ordering argument; it rests on three things: V19 is already applied (V20 is the
+sole pending migration), all rows are already populated, and the application **always sets `status`**
+through the entity (the dropped default was a safety net, never load-bearing). Confirm the run applied
+**exactly one** migration — Flyway logs `Migrating schema "public" to version "20 …"` and `Successfully
+applied 1 migration` (not 20) — which is now legible precisely because of capture-logs-on-failure. If
+prod were somehow behind V19, Flyway would attempt the intervening versions and **fail loudly on its
+own terms** — and the log capture is what makes that failure legible **at failure time** rather than
+only after ingestion catches up in the standing workspace.
 
 ## Restoring the database and Key Vault is a COUPLED operation (field encryption)
 

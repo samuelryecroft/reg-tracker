@@ -305,6 +305,34 @@
     --shadow-md: 0 0 0 1px oklch(0.90 0.016 265), 0 6px 18px oklch(0.28 0.014 265 / 0.10);
     --shadow-lg: 0 0 0 1px oklch(0.86 0.02 265), 0 16px 40px oklch(0.28 0.014 265 / 0.16);
 
+    /* T234: the legacy bridge aliases (dark block's --ink through --tint) were declared ONLY
+       there, whose selector list is ":root, .theme-preview[data-appearance=\"dark\"]". The plain
+       ":root" half made every OUTER page self-heal regardless of appearance (--accent's own value
+       is just the token "var(--color-accent)", and var() resolves PER ELEMENT - so on the real
+       root, re-evaluating it against the root's own --color-accent already gives the right
+       answer, appearance included). But ".theme-preview[data-appearance=\"light\"]" was never in
+       that selector list, so the light preview pane never got its OWN --accent/--surface/etc.
+       declared on itself - it fell through to INHERITING the already-resolved value from the page
+       root instead, frozen at whatever hue/appearance the root happened to be, never the pane's
+       own forced light appearance or its own live --brand-hue. The dark pane looked fine only
+       because dark's selector list happens to already cover it; light's never did. Same defect
+       shape as T186 (a bridge alias reachable by one appearance and not the other), recurring on
+       a NESTED forced-appearance element rather than the root T186 fixed. Declaring the identical
+       aliases here (matching the dark block's list exactly) gives the light pane the same
+       self-healing per-element resolution the root already had - still pure var() aliases, never
+       a resolved colour (D-3a-1 stays satisfied). Verified with a real browser: before this, the
+       theme-form's light-mode preview button was stuck on the platform default hue no matter what
+       the picker was set to; after, it tracks live like the dark pane always did. */
+    --ink: var(--color-text);
+    --surface: var(--color-surface);
+    --border: var(--color-divider);
+    --control-border: var(--color-control-border);
+    --muted: var(--color-text-muted);
+    --accent: var(--color-accent);
+    --accent-ink: var(--color-bg);
+    --accent-dark: var(--color-accent-300);
+    --tint: var(--color-accent-900);
+
     /* The shipped, already-WCAG-checked light semantics - unchanged, and read by
        DocxReportGenerator, so don't "tidy" these into the dark set's numbers. */
     --error: #B91C1C; --error-bg: #FEE2E2;
@@ -365,6 +393,18 @@
         --shadow-sm: 0 0 0 1px oklch(0.86 0.02 265);
         --shadow-md: 0 0 0 1px oklch(0.90 0.016 265), 0 6px 18px oklch(0.28 0.014 265 / 0.10);
         --shadow-lg: 0 0 0 1px oklch(0.86 0.02 265), 0 16px 40px oklch(0.28 0.014 265 / 0.16);
+
+        /* T234: mirrors the [data-appearance="light"] block above, byte-for-byte per this file's
+           own rule (FrontendSourceGuardTest) - see that block's comment for why these nine exist. */
+        --ink: var(--color-text);
+        --surface: var(--color-surface);
+        --border: var(--color-divider);
+        --control-border: var(--color-control-border);
+        --muted: var(--color-text-muted);
+        --accent: var(--color-accent);
+        --accent-ink: var(--color-bg);
+        --accent-dark: var(--color-accent-300);
+        --tint: var(--color-accent-900);
 
         --error: #B91C1C; --error-bg: #FEE2E2;
         --ok: #166534; --ok-bg: #DCFCE7;
@@ -956,7 +996,24 @@ fieldset.checkbox-fieldset > legend {
 .btn.sent-back:hover { background: var(--sent-back-bg); }
 .btn.block { width: 100%; }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-.btn-row { display: flex; gap: var(--s3); flex-wrap: wrap; align-items: center; }
+/* T235 / spec §8a (Creed, b5902ab): a button's external margin is a property of WHERE IT SITS,
+   not of what it is. Legacy .btn (:930-ish, "margin-top: var(--s5)") carries the spacing between
+   a form and its actions - but .btn-row rightly zeroes each child's own margin-top below (a flex
+   row owns its own gap, and a stray top margin per child would misalign them), and until now
+   never put the relationship back. So wrapping actions in the one container that spaces buttons
+   correctly against EACH OTHER silently deleted their spacing against the form ABOVE them - the
+   exact "no padding"/"sits flush against the input" the human reported on login, save-changes,
+   and every add-home/add-child form. Not a new number: --s5 (24px) is what a lone .btn already
+   said for this relationship, merely unreachable from inside .btn-row until now. It is also the
+   BLOCK-AFTER-CONTENT rhythm elsewhere in this file (.table-wrap, .stack, two more) - --s4/16px is
+   the WITHIN-FORM field-to-field rhythm (label), and an actions block must read as more separated
+   than one more field. No double-spacing either path: a bare .btn outside a row keeps its own
+   --s5; .btn-row .btn below zeroes it inside a row; both land on the same 24px. The two existing
+   overrides (.srow .act .btn-row, .theme-preview .btn-row) already opt out the only two contexts
+   that would be wrong under this rule - checked, still correct, left untouched.
+   WHEN LEGACY .btn RETIRES: delete its margin-top rather than porting it - Nocturne's .btn has no
+   external margin at all, correctly, and this rule is where the job lives from then on. */
+.btn-row { display: flex; gap: var(--s3); flex-wrap: wrap; align-items: center; margin-top: var(--s5); }
 .btn-row .btn { margin-top: 0; margin-right: 0; }
 
 /* ============================== status / due / banners ============================== */

@@ -11,6 +11,10 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import ninja.samryecroft.returnhome.tracker.security.LoginFailureHandler;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import ninja.samryecroft.returnhome.tracker.security.LockedAccountFilter;
+import ninja.samryecroft.returnhome.tracker.security.LoginAttemptService;
+import org.springframework.context.ApplicationEventPublisher;
 
 @Configuration
 @EnableMethodSecurity
@@ -23,7 +27,14 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http,
-            LoginFailureHandler loginFailureHandler) throws Exception {
+            LoginFailureHandler loginFailureHandler,
+            LoginAttemptService loginAttemptService,
+            ApplicationEventPublisher eventPublisher) throws Exception {
+        // Constructed here rather than injected as a bean: Boot auto-registers Filter BEANS into the
+        // servlet chain as well, which would place this ahead of Spring Security's chain entirely and
+        // make its real position differ from the one addFilterBefore states. See LockedAccountFilter.
+        LockedAccountFilter lockedAccountFilter =
+                new LockedAccountFilter(loginAttemptService, loginFailureHandler, eventPublisher);
         http
                 .authorizeHttpRequests(auth -> auth
                         // T119: /fonts/** and /icons/** are static assets the login page itself
@@ -77,7 +88,23 @@ public class SecurityConfig {
                         .permitAll())
                 .logout(logout -> logout
                         .logoutSuccessUrl("/login?logout")
-                        .permitAll());
+                        .permitAll())
+                // T221: BEFORE the authentication filter, and the position is the entire point.
+                // NOT a fix for a timing oracle - there isn't one. This comment used to say a locked
+                // real account paid no hash while a locked unknown one paid a full BCrypt, ~53ms
+                // apart; spring-security-core 7.1.0 does NOT do that. performPreCheck catches the
+                // LockedException and runs additionalAuthenticationChecks anyway, because the
+                // constructor sets alwaysPerformAdditionalChecksOnUser = true - a deliberate
+                // timing-equalisation mitigation, on by default. Both locked paths already cost one
+                // hash (measured: 76ms vs 87ms).
+                // What this buys is defence in depth: that setter is public and one call from off,
+                // and nothing here sets it, so the equalisation is a default we INHERIT rather than
+                // a property we ASSERT. Rejecting here makes it ours, costs zero hashes instead of
+                // one wasted one, and LockedAccountTimingGuardTest would catch the default flipping.
+                // It cannot live in LoginFailureHandler: by the time a failure handler runs, the
+                // hash has already happened or already been skipped.
+                // Full disassembly and the two rejected alternatives: see LockedAccountFilter.
+                .addFilterBefore(lockedAccountFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }

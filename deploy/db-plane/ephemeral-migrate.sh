@@ -54,7 +54,31 @@ REPLICA_TIMEOUT="${REPLICA_TIMEOUT:-1800}"                                    # 
 MIGRATE_POLL_MAX="${MIGRATE_POLL_MAX:-$(((REPLICA_TIMEOUT + 300) / POLL_SLEEP))}"  # job timeout + 5 min margin
 TEARDOWN_POLL_MAX="${TEARDOWN_POLL_MAX:-80}"                                  # env delete ~10-20 min: 80*15s = 20 min
 
+# Log-capture budget (capture-logs-on-failure; release-3 PRECONDITION - V20 is the first REAL migration
+# through this path, so the first run where a loud DDL failure must not be torn down before its evidence
+# lands). SEPARATE knob from the migrate/teardown budgets: on a FAILED migration the env is kept alive
+# just long enough for Log Analytics to INGEST the container's console output (typ. 1-3 min) - the retry
+# is the actual fix for the flush race, because the env keeps shipping to the workspace while it is up.
+# ~5 min comfortably clears the latency; if nothing surfaces we STILL tear down and print an exact
+# post-hoc retrieval recipe (already-ingested rows persist in the STANDING workspace after the env is
+# gone - it is only the un-flushed tail that keeping the env up protects).
+LOG_CAPTURE_MAX="${LOG_CAPTURE_MAX:-$(((300 + POLL_SLEEP - 1) / POLL_SLEEP))}"   # ceil(5min / POLL_SLEEP)
+LOG_CAPTURE_DIR="${LOG_CAPTURE_DIR:-${TMPDIR:-/tmp}}"
+CONTAINER_NAME="migrate"    # pinned so `job logs show --container` is deterministic (not a generated name)
+
+# F1 (Kevin): capture runs BEFORE teardown on the failure path, and LOG_CAPTURE_MAX bounds ITERATIONS,
+# not wall-clock. `|| true` only catches a call that RETURNS; a HUNG az (token refresh, throttle, network
+# black-hole) never returns, so an uncapped network call in capture would block on_exit before
+# destroy_env and strand the env - the exact idle-LB leak T180 removes, now on the path that by
+# definition runs when something is already wrong. So every capture az call runs under a hard per-call
+# wall-clock cap; a hang becomes rc 124 = the empty result the callers already handle. `timeout` is
+# coreutils; macOS ships it as `gtimeout` (brew install coreutils). If NEITHER is present we refuse to
+# run an uncapped network call ahead of teardown and degrade to the printed retrieval recipe instead.
+TIMEOUT_BIN="$(command -v timeout || command -v gtimeout || true)"
+CAPTURE_CALL_TIMEOUT="${CAPTURE_CALL_TIMEOUT:-60}"   # seconds, hard cap per az call inside capture
+
 TEARDOWN_UNCONFIRMED=0
+exec_name=""   # set once the job starts; stays empty if we fail earlier, so capture_logs_on_failure no-ops safely
 
 # env_present: 0 = present, 1 = CONFIRMED absent, 2 = could-not-determine. `env list ... length(@)`
 # exits 0 and prints 0/1 on success, so a CLI failure (throttle/token/network) exits non-zero and
@@ -88,6 +112,108 @@ destroy_env() {
        "group - a stranded internal LB is the invisible-cost failure this control exists to catch." >&2
 }
 
+# capture-logs-on-failure: pull the failed execution's console logs to stdout + a file BEFORE teardown.
+# WHY it is here and not in the poll loop: teardown deletes the env (and its log-forwarding agent), so a
+# loud DDL failure printed by Flyway can be gone before Log Analytics ingests it - "loud into a log
+# stream that is torn down before it flushes is not loud" (god, release-3 precondition). The RETRY LOOP
+# is the fix: the env is kept up, still shipping, until the rows land or the budget expires.
+# It is best-effort and FULLY guarded so it can NEVER abort before destroy_env: teardown-is-the-point
+# outranks evidence. That guard has TWO halves, because they fail differently (F1, Kevin): `|| true`
+# handles a call that ERRORS, and `capped_az` (a hard per-call timeout) handles a call that HANGS - a
+# hang never returns, so `|| true` alone would let a stalled az strand the env. Two sources, since neither
+# is guaranteed: (a) `az containerapp job logs show` (the containerapp extension is already used
+# throughout, so it is present; --container is pinned to a KNOWN name via job create); (b) a direct KQL
+# over the workspace we already hold (LOG_WS_ID), which survives (a) misbehaving. If BOTH stay empty we
+# still tear down and hand the operator an exact recipe against the STANDING workspace, where the rows
+# persist after the env is gone.
+# capped_az: run an az call under a HARD wall-clock cap (F1). A hang becomes rc 124 = the empty result
+# the callers already treat as "no logs". If no timeout binary was found we return 125 WITHOUT running -
+# we never run an uncapped network call ahead of teardown.
+capped_az() {
+  [ -n "$TIMEOUT_BIN" ] || return 125
+  "$TIMEOUT_BIN" "$CAPTURE_CALL_TIMEOUT" "$@"
+}
+
+# print_recipe: the post-hoc retrieval command, printed whenever in-band capture does not surface logs.
+# The rows persist in the STANDING workspace after the env is gone, so this always points at a live target.
+print_recipe() {  # $1 = kql
+  echo "  az monitor log-analytics query -w ${LOG_WS_ID} --analytics-query \\" >&2
+  echo "    \"$1\" -o table" >&2
+}
+
+capture_logs_on_failure() {
+  if [ -z "${exec_name:-}" ]; then
+    echo ">> capture-logs: no job execution was started (failure was pre-migration); nothing to capture." >&2
+    return 0
+  fi
+  local out="${LOG_CAPTURE_DIR}/rht-migrate-fail-${exec_name}.log"
+  # Column names VERIFIED against this workspace's ContainerAppConsoleLogs_CL (2026-09-08): a job
+  # execution's rows carry ContainerGroupName_s = "<exec_name>-<replica-suffix>", so `startswith
+  # exec_name` selects exactly this run. NB: ContainerAppName_s does NOT exist on this table - including
+  # it makes the whole query a SemanticError (SEM0100) that returns nothing, so it is deliberately absent.
+  local kql="ContainerAppConsoleLogs_CL | where TimeGenerated > ago(1h) | where ContainerGroupName_s startswith '${exec_name}' | project TimeGenerated, Log_s | order by TimeGenerated asc | take 1000"
+
+  # F1: with no way to cap the network calls, do NOT run them ahead of teardown - skip straight to the
+  # recipe. Refusing to capture is strictly better than risking a stranded env, and the rows are in the
+  # standing workspace regardless.
+  if [ -z "$TIMEOUT_BIN" ]; then
+    echo "WARN: no 'timeout'/'gtimeout' on PATH (coreutils; 'brew install coreutils' on macOS). Skipping" \
+         "in-band log capture rather than risk an UNCAPPED az call stranding the env ahead of teardown." \
+         "Retrieve ${exec_name}'s logs from the standing Log Analytics workspace:" >&2
+    print_recipe "$kql"
+    return 0
+  fi
+
+  echo ">> migration FAILED - capturing console logs for ${exec_name} BEFORE teardown (env kept up so Log" \
+       "Analytics can flush; budget ${LOG_CAPTURE_MAX} x ${POLL_SLEEP}s, ${CAPTURE_CALL_TIMEOUT}s cap/call)" >&2
+  local i logs n
+  for i in $(seq 1 "$LOG_CAPTURE_MAX"); do
+    logs="$(capped_az az containerapp job logs show -g "$RG" -n "$JOB_NAME" \
+              --job-execution-name "$exec_name" --container "$CONTAINER_NAME" \
+              --type console --follow false --tail 500 2>/dev/null)" || logs=""
+    # Fallback ONLY if the log-analytics extension is already present - never trigger a dynamic-install
+    # prompt, which would hang an interactive runbook operator (the primary above needs no extra extension).
+    if [ -z "$logs" ] && az extension show -n log-analytics >/dev/null 2>&1; then
+      logs="$(capped_az az monitor log-analytics query -w "$LOG_WS_ID" --analytics-query "$kql" -o tsv 2>/dev/null)" || logs=""
+    fi
+    if [ -n "$logs" ]; then
+      n="$(printf '%s\n' "$logs" | wc -l | tr -d ' ')"
+      if printf '%s\n' "$logs" >"$out" 2>/dev/null; then          # F3: only claim the file if the write succeeded
+        echo ">> capture-logs: captured ${n} line(s) to ${out}" >&2
+      else
+        echo ">> capture-logs: captured ${n} line(s) (could NOT write ${out}; stdout only below)" >&2
+      fi
+      echo "---- BEGIN ${exec_name} console logs ----" >&2
+      printf '%s\n' "$logs" >&2
+      echo "---- END ${exec_name} console logs ----" >&2
+      return 0
+    fi
+    sleep "$POLL_SLEEP" || true
+  done
+
+  # Nothing surfaced within the budget. F2: do ONE diagnostic attempt that KEEPS stderr, so the operator
+  # can tell a real error (wrong KQL columns, auth, extension) from "not ingested yet" - the loop swallowed
+  # stderr into logs="" and made those two byte-identical (same WARN, same recipe, same maybe-wrong query).
+  local diag=""
+  if az extension show -n log-analytics >/dev/null 2>&1; then
+    diag="$(capped_az az monitor log-analytics query -w "$LOG_WS_ID" --analytics-query "$kql" -o tsv 2>&1 >/dev/null || true)"
+  fi
+  [ -n "$diag" ] || diag="$(capped_az az containerapp job logs show -g "$RG" -n "$JOB_NAME" \
+      --job-execution-name "$exec_name" --container "$CONTAINER_NAME" --type console --follow false --tail 1 2>&1 >/dev/null || true)"
+  echo "WARN: capture-logs could not surface console logs for ${exec_name} within its" \
+       "${LOG_CAPTURE_MAX}-attempt budget (>= $((LOG_CAPTURE_MAX * POLL_SLEEP))s of sleeps, plus per-call" \
+       "time). Teardown proceeds anyway." >&2
+  if [ -n "$diag" ]; then
+    echo "      A query returned an ERROR (so this is NOT just ingestion lag - fix it before trusting the recipe):" >&2
+    printf '        %s\n' "$diag" >&2
+  else
+    echo "      No query error surfaced - the logs are most likely just not ingested yet." >&2
+  fi
+  echo "      Rows persist in the STANDING workspace (teardown deletes the env, NOT the workspace) - retrieve them:" >&2
+  print_recipe "$kql"
+  return 0
+}
+
 # always-teardown, and a DISTINCT exit code (Dwight #116-3) so "migration fine but env possibly
 # leaked" is an actionable signal to the caller rather than a WARN buried at the tail of the poll log:
 #   0 = migration succeeded AND teardown confirmed
@@ -96,6 +222,10 @@ destroy_env() {
 #       caller must verify the ME_* group; this survives into deploy.yml when that step is rewritten.
 on_exit() {
   local rc=$?
+  # On ANY failure exit, salvage evidence BEFORE teardown. `|| true` so a capture hiccup can never skip
+  # teardown - that is the one invariant this script exists to hold (an env that survives is the cost we
+  # are removing, only invisible). Skipped on rc 0 (success): no failure to evidence, tear down fast.
+  [ "$rc" -ne 0 ] && { capture_logs_on_failure || true; }
   destroy_env
   if [ "$rc" -eq 0 ] && [ "$TEARDOWN_UNCONFIRMED" -eq 1 ]; then
     exit 3
@@ -123,6 +253,7 @@ echo ">> create job ${JOB_NAME} (CD managed identity in-VNet; digest-pinned imag
 az containerapp job create -g "$RG" -n "$JOB_NAME" --environment "$ENV_NAME" \
   --trigger-type Manual --replica-timeout "$REPLICA_TIMEOUT" --replica-retry-limit 0 \
   --parallelism 1 --replica-completion-count 1 \
+  --container-name "$CONTAINER_NAME" \
   --image "${ACR_LOGIN_SERVER}/${DB_PLANE_IMAGE}" --cpu 0.5 --memory 1Gi \
   --mi-user-assigned "$CD_IDENTITY_ID" \
   --registry-server "$ACR_LOGIN_SERVER" --registry-identity "$CD_IDENTITY_ID" \

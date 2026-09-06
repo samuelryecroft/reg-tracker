@@ -5,8 +5,6 @@ import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
-import ninja.samryecroft.returnhome.tracker.child.ChildIdentities;
-import ninja.samryecroft.returnhome.tracker.child.ChildIdentity;
 import ninja.samryecroft.returnhome.tracker.child.NameRevealService;
 import ninja.samryecroft.returnhome.tracker.interview.dto.AllocateAndScheduleForm;
 import ninja.samryecroft.returnhome.tracker.user.AppUserPrincipal;
@@ -75,7 +73,7 @@ public class CoordinatorController {
         // the page must not claim a filtered view either (QueueFilter#byKey).
         model.addAttribute("filter", selected);
         model.addAttribute("childIdentities",
-                ChildIdentities.mapOf(requests, InterviewRequest::getChild, nameRevealService.isRevealed()));
+                nameRevealService.identitiesFor(requests, InterviewRequest::getChild));
         return "coordinator/requests";
     }
 
@@ -83,7 +81,7 @@ public class CoordinatorController {
     public String allocateForm(@PathVariable Long id, @AuthenticationPrincipal AppUserPrincipal principal, Model model) {
         InterviewRequest request = interviewRequestService.getAuthorized(id, principal);
         model.addAttribute("request", request);
-        model.addAttribute("childIdentity", ChildIdentity.of(request.getChild(), nameRevealService.isRevealed()));
+        model.addAttribute("childIdentity", nameRevealService.identityFor(request.getChild()));
         model.addAttribute("form", new AllocateAndScheduleForm());
         model.addAttribute("visitors", visitorsFor(principal));
         return "coordinator/allocate-form";
@@ -95,7 +93,7 @@ public class CoordinatorController {
         if (bindingResult.hasErrors()) {
             InterviewRequest request = interviewRequestService.getAuthorized(id, principal);
             model.addAttribute("request", request);
-            model.addAttribute("childIdentity", ChildIdentity.of(request.getChild(), nameRevealService.isRevealed()));
+            model.addAttribute("childIdentity", nameRevealService.identityFor(request.getChild()));
             model.addAttribute("visitors", visitorsFor(principal));
             return "coordinator/allocate-form";
         }
