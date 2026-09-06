@@ -259,37 +259,46 @@ class OrganisationActivationGuardIntegrationTest extends AbstractIntegrationTest
     }
 
     /**
-     * The surviving column default is the SAFE value, and the database agrees with the entity.
+     * There is no column default any more, so an insert that bypasses the entity fails LOUDLY.
      *
-     * <p>V19 backfills existing organisations to ACTIVE - they are in use - and then sets the
-     * default for FUTURE inserts to PENDING. That second statement exists because of a real deploy
-     * window: {@code deploy.yml} runs the DB-plane job to Succeeded before the new jar is live, so
-     * an old jar briefly writes to this schema without knowing the column. With no default that is a
-     * NOT NULL violation; with a default of ACTIVE it would silently produce a usable organisation
-     * whose key was never verified. PENDING is the only value that is both survivable and correct.
+     * <p><b>This assertion is the flip V19 and this test both said would come.</b> The previous
+     * version pinned the default to PENDING and said so explicitly: "the end state we still want is
+     * no default at all... that ships in a later release once no old jar can be running, and this
+     * assertion flips to null then. A test that must be edited when the schema intentionally changes
+     * is working correctly." T172 established the precondition and V20 did the drop, so it has.
      *
-     * <p>Asserted as "contains PENDING and not ACTIVE" rather than string-equal to Postgres's
-     * rendering ({@code 'PENDING'::character varying}), because the claim being pinned is WHICH
-     * VALUE a forgotten insert gets - not how the catalogue formats it.
+     * <p><b>Why the default was there at all</b>, because this test is now the only place in the
+     * test tree that would tell a reader: the DB-plane job runs Flyway before the new jar is live,
+     * so an old jar briefly writes to the new schema without knowing the column. With no default
+     * that is a NOT NULL violation - an admin's org-create 500s mid-onboarding. V19 chose PENDING
+     * over ACTIVE for that window so a row from an unaware jar lands safe and still goes through the
+     * KEK gate. <b>That reasoning is not obsolete; it is the reason a default must never come back
+     * as ACTIVE if one is ever needed again.</b>
      *
-     * <p>The end state we still want is no default at all, so a bypassing insert fails LOUDLY rather
-     * than merely landing safe. That ships in a later release once no old jar can be running, and
-     * this assertion flips to null then. A test that must be edited when the schema intentionally
-     * changes is working correctly.
+     * <p>What changes is only loudness. The safety never rested on the default -
+     * {@code Organisation.status} initialises to PENDING in Java and every write goes through the
+     * entity - so removing it converts a silent safe landing into a visible failure, which is the
+     * whole of the gain.
+     *
+     * <p>Asserted as null rather than by string, for the same reason the old version avoided
+     * string-equality: the claim is that a forgotten insert gets NOTHING and fails, not how the
+     * catalogue renders an absence.
      */
     @Test
-    void theSurvivingColumnDefaultIsPendingSoAForgottenInsertLandsSafeRatherThanUsable() {
+    void thereIsNoColumnDefaultSoAnInsertBypassingTheEntityFailsLoudly() {
         String columnDefault = jdbcTemplate.query(
                 "select column_default from information_schema.columns "
                         + "where table_name = 'organisations' and column_name = 'status'",
                 rs -> rs.next() ? rs.getString(1) : "COLUMN MISSING");
 
         assertThat(columnDefault)
-                .as("an insert that omits status - an old jar mid-deploy, or any future path that "
-                        + "bypasses the entity - must land PENDING and go through the KEK gate, "
-                        + "never ACTIVE")
-                .contains("PENDING")
-                .doesNotContain("ACTIVE");
+                .as("the column must still exist - a null here from a MISSING column would look "
+                        + "identical to a dropped default, and they are not the same thing")
+                .isNotEqualTo("COLUMN MISSING");
+        assertThat(columnDefault)
+                .as("no default: an insert that omits status - any path bypassing the entity - must "
+                        + "fail NOT NULL rather than quietly landing PENDING")
+                .isNull();
     }
 
     private RequestPostProcessor asUser(String username) {

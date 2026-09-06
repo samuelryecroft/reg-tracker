@@ -1,0 +1,41 @@
+-- T172: drop the column default on organisations.status. V19 always intended this to be a separate,
+-- later migration ("THE END STATE WE STILL WANT is no default at all... That belongs in a later
+-- release, once no old jar can be running"). This is that release.
+--
+-- WHY THE DEFAULT EXISTED, kept here because dropping it removes the only place the reason was
+-- written down. The DB-plane job runs Flyway to completion BEFORE the new jar goes live, so for a
+-- few minutes the OLD jar talks to the NEW schema. A jar that predates T168(b) knows nothing about
+-- `status` and omits it from an organisation INSERT; against a NOT NULL column with no default that
+-- is a constraint violation, and an admin's org-create 500s mid-onboarding. V19 chose PENDING for
+-- that window rather than ACTIVE, so a row written by an unaware jar lands in the safe state and
+-- goes through the KEK gate like any other. None of that reasoning is obsolete - it is the reason
+-- this migration could not have been part of V19, and it is why it must not be reintroduced as
+-- ACTIVE if a default is ever needed again.
+--
+-- WHY IT IS SAFE TO DROP NOW. The precondition V19 named is "no old jar can be running", meaning no
+-- jar that omits `status` on insert. Checked rather than assumed:
+--
+--   * The deployed baseline the release line diff-gates against (3ec83f3) already contains V19 and
+--     Organisation.status's PENDING field initialiser, as do release 1 and release 2 (32aa95b).
+--     Every artifact a rollback could redeploy therefore sets `status` explicitly, so the drop
+--     survives both the deploy window and a redeploy-previous-artifact rollback.
+--   * V5 seeds two organisations without `status`, which is fine and stays fine: on a fresh database
+--     V5 runs long before the column exists, and V19's ADD COLUMN ... DEFAULT 'ACTIVE' backfills
+--     those rows. Ordering makes that insert immune rather than lucky.
+--   * Nothing else writes this table outside the entity - the seed above is the only INSERT INTO
+--     organisations in the tree, Organisation.setStatus is package-private, and every transition
+--     goes through OrganisationLifecycleService.
+--
+-- WHAT THIS BUYS. Only loudness, and that is the whole point: an insert that bypasses the entity now
+-- fails NOT NULL instead of quietly landing PENDING. V19 deliberately made forgetting harmless; this
+-- makes it visible. The safety was never resting on the default, which is exactly why removing it is
+-- a small change rather than a risky one.
+--
+-- NOT VERIFIED FROM HERE: nobody queried the production database. That V19 has been applied is
+-- inferred - the running jar maps `status` as a non-null column and every organisation read selects
+-- it, so the application could not be serving if the column were absent, and Flyway applies V19's
+-- two statements atomically. If that inference is wrong the column does not exist and this migration
+-- fails loudly on its own terms, which is the correct failure.
+
+ALTER TABLE organisations
+    ALTER COLUMN status DROP DEFAULT;
