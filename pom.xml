@@ -252,16 +252,20 @@
                     <!-- A build outside a git checkout (a source tarball, a release rebuild) must
                          still produce a jar. It then carries no commit, which is honest: the answer
                          "this build does not know" is correct and different from a stale one. -->
-                    <!-- Shell out to the git binary instead of the bundled jgit. NOT a preference:
-                         jgit reads .git and, when this is a LINKED WORKTREE (where .git is a FILE
-                         reading "gitdir: ..."), resolves to the MAIN repository and stamps ITS head.
-                         Measured here: the jar claimed 489e8d4 - the shared checkout's detached HEAD -
-                         while the build was of 7b87033. That is the one failure a provenance stamp
-                         must not have: not absent, but CONFIDENTLY WRONG, and silent. Several agents
-                         on this repo build from worktrees, so it is not a corner case for us.
-                         The binary is present wherever a checkout is, and a build with no .git at
-                         all is covered by the two failOn... flags below. -->
-                    <useNativeGit>true</useNativeGit>
+                    <!-- KNOWN LIMITATION, measured rather than assumed, and recorded here because
+                         the next person will hit it and think the stamp is fine.
+                         IN A LINKED GIT WORKTREE (where .git is a FILE reading "gitdir: ...") this
+                         plugin resolves to the MAIN repository and stamps ITS head. Measured: a
+                         build of 7b87033 in a worktree produced git.commit.id=489e8d4, the shared
+                         checkout's unrelated detached HEAD. Setting useNativeGit=true does NOT fix
+                         it - tried, same wrong id - so it is deliberately not set here; an option
+                         that costs a dependency on the git binary and buys nothing is worse than
+                         no option.
+                         A PLAIN CHECKOUT IS CORRECT, verified by cloning this branch and running
+                         the real lifecycle build: git.commit.id equalled HEAD, and the allow-list
+                         below held. CI and every release build are plain checkouts, so THE
+                         DEPLOYED ARTEFACT'S STAMP IS RIGHT; only a developer building from a
+                         worktree gets a wrong one, and it is wrong SILENTLY. -->
                     <failOnNoGitDirectory>false</failOnNoGitDirectory>
                     <failOnUnableToExtractRepoInfo>false</failOnUnableToExtractRepoInfo>
                     <!-- ALLOW-LIST, not the plugin's default set, and this is the load-bearing line.

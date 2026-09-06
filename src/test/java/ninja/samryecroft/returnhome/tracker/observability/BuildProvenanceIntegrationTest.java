@@ -28,6 +28,14 @@ import org.springframework.test.web.servlet.MockMvc;
  * gates {@code EndpointRequest.toAnyEndpoint()} on ROLE_ADMIN. This card fills a surface that was
  * already authenticated rather than adding one.
  *
+ * <p><strong>Known limitation, stated because a wrong stamp is worse than none.</strong> In a
+ * LINKED GIT WORKTREE the plugin resolves to the main repository and stamps ITS head - measured, and
+ * not fixed by {@code useNativeGit}. A plain checkout is correct, verified by cloning and running
+ * the real lifecycle build, so CI and every release build - the only artefacts that reach an App
+ * Service - carry the right commit. These tests therefore assert the stamp is PRESENT and
+ * WELL-FORMED, which is true everywhere; they do not assert it equals HEAD, because that guard
+ * would fail every worktree build on this floor. See the pom for the measurement.
+ *
  * <p>That is also why the anonymous half is asserted here even though
  * {@link ActuatorHealthIntegrationTest} already checks the redirect: <strong>the risk changed when
  * the payload did.</strong> A redirect on an empty endpoint and a redirect on one that now names a
