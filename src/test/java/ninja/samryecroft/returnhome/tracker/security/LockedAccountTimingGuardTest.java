@@ -29,30 +29,53 @@ import org.springframework.test.web.servlet.MockMvc;
 
 /**
  * T221: while a lockout holds, <b>neither</b> a real account nor an unknown username may cause a
- * password hash to be computed - because the hash is where the ~53ms difference between them came
- * from.
+ * password hash to be computed.
+ *
+ * <h2>What this guard is NOT asserting, corrected after it was believed</h2>
+ *
+ * <p>It was written to catch a ~53ms timing oracle: a locked real account supposedly short-circuiting
+ * before any compare while an unknown username paid a full BCrypt. <b>That asymmetry does not exist on
+ * spring-security-core 7.1.0.</b> {@code AbstractUserDetailsAuthenticationProvider.performPreCheck}
+ * catches the {@code LockedException} and runs {@code additionalAuthenticationChecks} anyway when
+ * {@code alwaysPerformAdditionalChecksOnUser} is set - and the constructor sets it {@code true}. It is
+ * a deliberate timing-equalisation mitigation, on by default. See {@code LockedAccountFilter} for the
+ * disassembly.
+ *
+ * <p><b>So this guard asserts a property of OUR code, not the absence of a framework hole:</b> that no
+ * hash is computed on either locked path, because {@code LockedAccountFilter} rejects before the
+ * provider is reached. <b>It would fail if that framework default were ever flipped off</b>, which is
+ * the thing worth having a test for - the equalisation is one public setter from gone.
+ *
+ * <h2>The lesson this test taught, which is worth more than the test</h2>
+ *
+ * <p>It reported symmetric counts twice, and <b>both times it was right</b> - the paths genuinely are
+ * symmetric. It was disbelieved twice: once against a pre-committed rule that symmetry meant the filter
+ * was not running, and once as an unexplained anomaly. <b>Neither reading reached the simplest
+ * explanation, that it was symmetric because there was never an asymmetry to restore.</b>
+ *
+ * <p><b>A negative control reporting a false premise is the one thing a negative control is least
+ * likely to be believed about</b> - because the premise is what everyone is measuring against.
  *
  * <h2>Why this counts hashes instead of measuring time</h2>
  *
- * <p>The defect is a timing difference, so the obvious guard is a stopwatch. <b>A stopwatch
- * assertion would be the wrong test</b>: it is flaky on shared CI hardware, its threshold is a
- * number nobody can defend, and the usual response to it going red is to widen the threshold until
- * it stops - which ends with a guard that cannot fail.
+ * <p>The defect was a timing difference, so the obvious guard is a stopwatch. <b>A stopwatch assertion
+ * would be the wrong test</b>: flaky on shared CI, with a threshold nobody can defend, and the usual
+ * response to it going red is to widen it until it stops - ending in a guard that cannot fail.
  *
- * <p>So this asserts the <b>cause</b> rather than the symptom. The difference existed because
- * {@code mitigateAgainstTimingAttack} runs one full BCrypt for an unknown username while a locked
- * real account short-circuits before any compare. <b>Counting invocations of the
- * {@link PasswordEncoder} measures exactly that, and it is deterministic</b> - the count is 0 or it
- * is not, on any hardware, with no threshold to argue about.
+ * <p>Counting {@link PasswordEncoder} invocations asserts the <b>cause</b> rather than the symptom, and
+ * is deterministic: the count is 0 or it is not, on any hardware, with no threshold to argue about.
  *
  * <h2>Armed by reverting the fix, not by a synthetic mutation</h2>
  *
- * <p>Remove {@code .addFilterBefore(lockedAccountFilter, ...)} from {@code SecurityConfig} and the
- * locked request reaches {@code DaoAuthenticationProvider} again: the unknown username pays its
- * mitigation hash, the count becomes 1, and {@code neitherLockedCaseComputesAPasswordHash} fails on
- * the unknown case while still passing on the real one. <b>That asymmetry in the failure is the
- * oracle itself</b>, which is what makes this guard a real one rather than a restatement of the
- * implementation.
+ * <p>Remove {@code .addFilterBefore(lockedAccountFilter, ...)} from {@code SecurityConfig} and both
+ * locked cases reach the provider again, each paying one hash:
+ * {@code neitherLockedCaseComputesAPasswordHash} fails with {@code [afterReal=1, afterUnknown=1]}.
+ * <b>Symmetric is the correct armed result</b>, and the first assertion (the two counts being equal)
+ * still passes - it is the second, requiring them to be ZERO, that catches the revert.
+ *
+ * <p><b>An arming edit that does not compile proves nothing</b>, and fails in a direction that
+ * superficially resembles a red test. Comment the line out rather than deleting it, and check the call
+ * is genuinely gone before trusting the run.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
