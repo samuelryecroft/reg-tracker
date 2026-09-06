@@ -53,8 +53,16 @@ public final class ReportQuestions {
     private ReportQuestions() {
     }
 
-    /** Asked of every report. True for 26 of the 27 - see ifNotWhyLate for the exception. */
+    /** Blank means the question was not answered. True for 25 of the 27; see the two exceptions. */
     private static final Predicate<InterviewReport> ALWAYS = report -> true;
+
+    /**
+     * Blank is an answer here, not an absence of one. Used by {@code dateReportShared}, where the
+     * capture screen instructs the user to leave the field empty if the report has not been shared
+     * yet - so counting it as unanswered reports someone as having declined to answer a question the
+     * system told them not to answer.
+     */
+    private static final Predicate<InterviewReport> BLANK_IS_AN_ANSWER = report -> false;
 
     /**
      * Every question, in the order asked. Grouped by section for readability only - the sections
@@ -177,7 +185,7 @@ public final class ReportQuestions {
                     LONG_TEXT, false, InterviewReport::getConductedByStatement),
             new ReportQuestion("dateReportShared", DECLARATION,
                     "Date report shared with relevant professionals (leave blank if not yet shared)",
-                    null, DATE, false, "Not shared yet", "dateReportShared", ALWAYS,
+                    null, DATE, false, "Not yet shared", "dateReportShared", BLANK_IS_AN_ANSWER,
                     InterviewReport::getDateReportShared));
 
     private static ReportQuestion q(String id, ReportSection section, String label, String hint,
@@ -223,14 +231,14 @@ public final class ReportQuestions {
      * How many questions the given section leaves unanswered - the "N not answered" badge on both
      * read-only screens.
      *
-     * <p><b>A question that does not apply is not unanswered.</b> Both screens used to count every
+     * <p><b>A blank is not always an absence of an answer.</b> Both screens used to count every
      * blank, so a fully completed, on-time interview showed "1 not answered" on the screen a
-     * reviewer approves from: a compliance-shaped number counting a question nobody was owed.
+     * reviewer approves from: a compliance-shaped number counting a question nobody was owed
+     * (ifNotWhyLate, T233) and another the system had told the user to leave empty
+     * (dateReportShared).
      */
     public static int unansweredIn(ReportSection section, InterviewReport report) {
-        return (int) of(section).stream()
-                .filter(q -> q.isApplicableTo(report) && !q.isAnsweredOn(report))
-                .count();
+        return (int) of(section).stream().filter(q -> q.isAGapOn(report)).count();
     }
 
     /**

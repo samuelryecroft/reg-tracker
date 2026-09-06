@@ -449,8 +449,21 @@
             <dt>Signed</dt>
             <dd th:text="${report.visitor.fullName + ' on ' + #temporals.format(report.submittedAt, 'dd MMM yyyy HH:mm')}">—</dd>
 
+            <!--/*
+              A blank here is an ANSWER, not a gap: it means the report has not been shared yet, and
+              the capture screen literally instructs the user to leave the field empty in that case.
+              It used to carry the 'unanswered' styling anyway - the system marking as a hole the
+              very thing it had told someone to leave empty. Same mistake as the 72-hour reason from
+              a different direction, which is why both are one concept on ReportQuestions rather
+              than two flags that would drift apart.
+
+              The wording is unified too. This screen said "Not yet shared" and the capture/review
+              fragment said "Not shared yet" - one state, two strings, neither wrong and only one of
+              them ever read by any given person. "Not yet shared" wins because it matches the
+              guidance the form itself gives.
+            */-->
             <dt>Date report shared with relevant professionals</dt>
-            <dd th:classappend="${report.dateReportShared == null} ? 'unanswered'" th:text="${report.dateReportShared} != null ? ${#temporals.format(report.dateReportShared, 'dd MMM yyyy')} : 'Not yet shared'">—</dd>
+            <dd th:text="${report.dateReportShared} != null ? ${#temporals.format(report.dateReportShared, 'dd MMM yyyy')} : 'Not yet shared'">—</dd>
         </dl>
     </div>
 

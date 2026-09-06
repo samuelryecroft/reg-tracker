@@ -335,8 +335,14 @@
     <textarea id="conductedByStatement" th:field="*{conductedByStatement}" th:unless="${readonly}"></textarea>
 
     <label th:id="${readonly} ? 'dateReportShared-label' : null" th:for="${readonly} ? null : 'dateReportShared'">Date report shared with relevant professionals (leave blank if not yet shared)</label>
-    <div class="readonly-val" th:classappend="${form.dateReportShared == null} ? ' empty' : ''" role="group" aria-labelledby="dateReportShared-label"
-         th:if="${readonly}" th:text="${form.dateReportShared != null} ? ${#temporals.format(form.dateReportShared, 'dd MMMM yyyy')} : 'Not shared yet'">Date</div>
+    <!--/*
+      A blank here is an ANSWER - "not yet shared" - and the label above tells the user to leave it
+      empty in exactly that case. The 'empty' styling that used to be applied marked as a hole the
+      thing the form asked for. Wording unified with the record screen, which said "Not yet shared";
+      one state must not have two strings, however reasonable each is on its own.
+    */-->
+    <div class="readonly-val" role="group" aria-labelledby="dateReportShared-label"
+         th:if="${readonly}" th:text="${form.dateReportShared != null} ? ${#temporals.format(form.dateReportShared, 'dd MMMM yyyy')} : 'Not yet shared'">Date</div>
     <input type="date" id="dateReportShared" th:field="*{dateReportShared}" th:unless="${readonly}"/>
 </th:block>
 </body>

@@ -92,10 +92,42 @@ class ReportSectionCountGuardTest {
                         + "on the screen a reviewer approves from")
                 .isEqualTo(ReportQuestions.unansweredIn(ReportSection.DETAILS, late) - 1);
 
-        assertThat(ReportQuestions.byId("ifNotWhyLate").orElseThrow().isApplicableTo(onTime))
+        assertThat(ReportQuestions.byId("ifNotWhyLate").orElseThrow().isAGapOn(onTime))
                 .as("the condition belongs to the question, not to whichever renderer is asking")
                 .isFalse();
-        assertThat(ReportQuestions.byId("ifNotWhyLate").orElseThrow().isApplicableTo(late)).isTrue();
+        assertThat(ReportQuestions.byId("ifNotWhyLate").orElseThrow().isAGapOn(late)).isTrue();
+    }
+
+    /**
+     * The second question whose blank is not a gap, and the one this change was nearly shipped
+     * without.
+     *
+     * <p>{@code dateReportShared} is always asked, and its blank is an <em>answer</em>: "not yet
+     * shared". The capture screen instructs the user to leave it empty in that case. Counting it as
+     * unanswered is <b>the system reporting a person as having declined to answer a question it told
+     * them not to answer</b> - the same mistake as ifNotWhyLate arriving from a different direction,
+     * which is why both are one concept on the model rather than two flags.
+     *
+     * <p>It went unnoticed for as long as it did because the Declaration section had no badge at
+     * all. Giving every section a count is what made it visible - <b>a fix that reveals a defect it
+     * did not cause still has to carry it.</b>
+     */
+    @Test
+    void aBlankThatTheFormAsksForIsNotAGap() {
+        InterviewReport notYetShared = report(RETURNED.plusHours(10), null);
+        // The section's OTHER question is answered, so a non-zero count below could only be
+        // dateReportShared. Leaving both blank would have made this assertion pass or fail for
+        // reasons it does not name.
+        notYetShared.setConductedByStatement("Conducted by A. Visitor");
+
+        assertThat(ReportQuestions.byId("dateReportShared").orElseThrow().isAGapOn(notYetShared))
+                .as("blank here means 'not yet shared', which is a fact about the report rather "
+                        + "than a hole in it")
+                .isFalse();
+        assertThat(ReportQuestions.unansweredIn(ReportSection.DECLARATION, notYetShared))
+                .as("an approved report that simply has not been shared yet must not show a "
+                        + "compliance-shaped number on the screen a reviewer approves from")
+                .isZero();
     }
 
     @Test
