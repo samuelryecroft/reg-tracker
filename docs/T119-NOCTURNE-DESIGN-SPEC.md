@@ -4780,3 +4780,103 @@ safeguarding record that wants to show an interview did not take place, and it i
 a reviewer needs to see. **Raised, not decided.**
 
 *Verified on `origin/feat/t185-section-counts-from-model`, not on `main`.*
+
+---
+
+## §8c — the declined-interview nine: Oscar's ruling, verified, plus the count arithmetic and how it surfaces
+
+I held D-8b-4 on scale and Oscar ruled it. **Once at section level, replacing the nine rows — not nine
+annotated rows:**
+
+> **"The young person was not interviewed, so these questions were not asked. The reason is recorded above."**
+
+Record view and council-facing document alike. The nine rows do not appear.
+
+**Why not per-row, which is the transferable half:** the significant fact is not that nine questions are
+inapplicable — it is that **a missing child was not spoken to**, itself a safeguarding event and arguably the
+most important thing on the record. Nine identical annotations distribute that fact across nine lines and
+bury it.
+
+> **Said once it is a statement; said nine times it is furniture.** A court reading nine *"not applicable"*
+> lines learns nothing nine times.
+
+The copy does **not** say *declined* or assert why — `interviewAccepted` is a No, and the cause may be refusal,
+unavailability or something else. **Same rule as the export pages: the reason field carries the why, the
+section states only the fact.**
+
+### D-8c-1 — the three states are T231's rule again, not a new one
+
+> **A blank is only a gap if the system was in a position to ask the question.**
+
+| `interviewAccepted` | the nine | `interviewDeclinedReason` |
+| --- | --- | --- |
+| **Yes** | live; a blank is a real gap | not owed (D-8b-3) |
+| **No** | not rendered; one section-level statement | owed |
+| **unanswered** | not counted | not owed |
+
+**One dropdown governs ten other questions through two opposite predicates, and `null` makes both false** —
+leaving the dropdown itself as the thing to answer. *One unanswered question must not generate ten.*
+
+### D-8c-2 — VERIFIED: section 2 has **twelve** questions, and Oscar's boundary is exact
+
+He warns that the fieldset has **ten fields, not nine**, and that nothing may operate on `data-step="2"` as a
+whole. Checked against the model on `origin/feat/t185-section-counts-from-model` — **he is exactly right, to
+the field:**
+
+* `interviewAccepted` — the condition
+* `interviewDeclinedReason` — owed when No
+* **the nine:** `whereWereYouWhileMissing`, `whoWereYouWithWhileMissing`, `whatMadeYouGoMissing`,
+  `whatCanBeDoneToAddressReasons`, `consideredSelfMissing`, `whatDidYouDoWhileMissing`,
+  `whatHappenedWhenReturned`, `preventFutureMissingSuggestions`, `additionalCommentsFromYoungPerson` —
+  precisely the range he named
+* **`additionalInfoFromParentCarer` — the twelfth, and it STAYS LIVE.** Not a child's-answer question. A
+  visitor can still speak to a parent or carer, and **on a declined interview that may be the only account of
+  the episode anyone obtains.**
+
+> A section is a **layout** grouping. The condition here is *whose answer this is*, and that cuts across it.
+> **Selecting by container is selecting by the wrong property** — which is why `data-step="2"` is the trap.
+
+### D-8c-3 — his boundary and his count sentence must be read together, or a builder implements the wrong number
+
+Oscar writes that on an unanswered dropdown *"the single real gap is that dropdown"*. **His own boundary makes
+it two:** `additionalInfoFromParentCarer` is live in all three states, so a fresh report shows **two** gaps in
+section 2, not one.
+
+Not a contradiction — his sentence is about the nine collapsing, not a claim about the section total. **But a
+builder will implement "exactly 1" and pin it in a test.** The count per state, so nobody has to derive it:
+
+| `interviewAccepted` | possible gaps in section 2 |
+| --- | --- |
+| Yes | up to **10** (nine + parent/carer) |
+| No | up to **2** (`interviewDeclinedReason` + parent/carer) |
+| unanswered | **2** (`interviewAccepted` + parent/carer) |
+
+### D-8c-4 — 🔑 the trap Oscar flagged, and the mechanism is mine
+
+> *"Removing nine false gaps must not also remove the true signal. If a declined report simply shows no gaps
+> it looks identical to a complete one — **fixing a false alarm by deleting the alarm.** Not accepted has to
+> surface POSITIVELY, not as an absence of red."*
+
+**A count cannot carry this, and the reason is in the token.** `.section-count` is deliberately quiet —
+`font-weight: 400`, `color: var(--muted)`, regular letter-spacing. It is built to recede, because its normal
+job is to annotate. **A state that must be noticed cannot be expressed in the vocabulary designed to be
+skimmed past** — and a *lower* number in a quiet grey annotation is the least noticeable change a screen can
+make.
+
+**Ruling — no new component:** the section heading carries a state chip **in the slot the count occupies, and
+instead of it**:
+
+```html
+<span class="tag tag-semantic-neutral">Not interviewed</span>
+```
+
+* **`.tag`, not `.section-count`** — a state, not a quantity. The count vocabulary cannot carry it.
+* **`tag-semantic-neutral`, not `tag-error` or `tag-warn`.** It must be *visible*, not *blamed*: **a child not
+  being spoken to is a fact to notice, not a failure to attribute to the visitor.** Red would read as a
+  rebuke, which is R-Q13's own principle and the reason *"is not valid"* was rejected in §7t.
+* **Instead of the count, not beside it** — *"no gaps"* and *"not interviewed"* must never be separately
+  readable as two claims about the same section.
+
+### Flagged onward by Oscar, not part of this ruling
+A child who declines should ordinarily be **offered again**, and **the record has nowhere to say whether they
+were.** With god as a card.
