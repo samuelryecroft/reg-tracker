@@ -51,13 +51,21 @@ class BreakGlassAlertMarkerGuardTest {
     }
 
     /**
-     * The other half of the fail-open: gating the alert on {@code entra_enabled} would destroy it
-     * exactly when the §5 rollback - disable Entra, return to form login - makes break-glass the
-     * primary way in. That rollback is written into the plan as something we might deliberately do,
-     * so this is a reachable state rather than a hypothetical one.
+     * The other half of the fail-open: the alert must be created unconditionally.
+     *
+     * <p>It was written against {@code entra_enabled} specifically, because the §5 rollback -
+     * disable Entra, return to form login - would have destroyed the alert at exactly the moment
+     * break-glass became the primary way in. <b>Entra is gone, so that variable no longer exists
+     * and the assertion naming it could never fail again.</b> It has been removed rather than kept:
+     * an assertion that cannot fail is not a guard, and leaving it would have said this property
+     * was verified when nothing was checking it.
+     *
+     * <p>The {@code count}/{@code for_each} check below is the one that was doing the work all
+     * along, and it is untouched - it catches a conditional gate on this resource whatever variable
+     * a future author reaches for, which is strictly more than the string check ever did.
      */
     @Test
-    void theAlertIsNotConditionalOnEntraBeingEnabled() throws IOException {
+    void theAlertIsNotConditionallyCreated() throws IOException {
         String terraform = Files.readString(ALERT, StandardCharsets.UTF_8);
         int resourceAt = terraform.indexOf("resource \"azurerm_monitor_scheduled_query_rules_alert_v2\" \"break_glass_login\"");
         String resource = terraform.substring(resourceAt);
@@ -67,12 +75,10 @@ class BreakGlassAlertMarkerGuardTest {
         // aggregation method and a substring check would fail on the working resource, which is the
         // kind of guard that gets deleted rather than fixed.
         assertThat(body.lines().map(String::strip).toList())
-                .as("no count/for_each gate on the break-glass alert - it must survive the Entra "
-                        + "rollback that makes break-glass the way in")
+                .as("no count/for_each gate on the break-glass alert - an emergency-access alert "
+                        + "that can be switched off by configuration is one that will be off when "
+                        + "it is needed")
                 .noneMatch(line -> line.startsWith("count ") || line.startsWith("count=")
                         || line.startsWith("for_each ") || line.startsWith("for_each="));
-        assertThat(body)
-                .as("the alert must not reference the Entra flag in any form")
-                .doesNotContain("entra_enabled");
     }
 }

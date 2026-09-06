@@ -291,6 +291,74 @@ class FrontendSourceGuardTest {
      * "themed" - any {@code var(--...)} background is theme-aware by construction (that is the
      * entire point of a custom-property token), so the match is not narrowed to a suffix.
      */
+    /**
+     * The CONVERSE of the check above, and the reason it is a separate one: that check finds a
+     * themed background under a hard-coded ink, and this finds a hard-coded background under an
+     * ink that is free to move. Both produce the same failure - a pair where one half follows the
+     * appearance and the other does not - but only this one catches a rule that sets NO colour at
+     * all, which is exactly how the live 2c defect survived two clean sweeps.
+     *
+     * <p>{@code .tile.urgent} and {@code .tile.warn} fixed a light fill ({@code #FFFAFA},
+     * {@code #FFFDF6}) and left the ink inherited. On dark that put near-white text on near-white:
+     * the 30px count on the "needs attention" tiles measured 1.17:1, so the overdue number was the
+     * one that had gone invisible. The other check could not see it, because there was no
+     * {@code color} declaration in the rule for it to read - the bug is the ABSENCE of one.
+     *
+     * <p>Searching the shape rather than those two found four more live instances, including
+     * {@code input.is-invalid}, which is every invalid field on every form in the app.
+     *
+     * <p>So the rule this pins is the general one: <b>a background is half of a contrast pair
+     * whose other half follows the appearance, so it must come from a token.</b> Print is the one
+     * exemption and it is a real one rather than a carve-out for awkward cases - paper is white in
+     * both appearances, so a fixed white there is a statement of fact.
+     */
+    @Test
+    void noBackgroundIsAHardcodedColourExceptWherePrintMakesItAFact() throws IOException {
+        List<String> violations = new ArrayList<>();
+        for (Path file : sourceFilesUnder(CSS_DIR)) {
+            violations.addAll(hardcodedBackgroundsOutsidePrint(
+                    Files.readString(file, StandardCharsets.UTF_8), file.toString()));
+        }
+
+        assertThat(violations)
+                .as("a hard-coded background is half of a contrast pair whose other half follows "
+                        + "the appearance - take the fill from a token, and where the ink is "
+                        + "inherited, let it stay inherited")
+                .isEmpty();
+    }
+
+    /**
+     * Backgrounds set to a colour literal, ignoring anything inside a {@code @media print} block.
+     *
+     * <p>The print block is found by brace depth rather than by a line range, so it keeps working
+     * when rules are added to it - a range would silently stop covering the block's tail.
+     */
+    private static List<String> hardcodedBackgroundsOutsidePrint(String css, String name) {
+        String stripped = css.replaceAll("(?s)/\\*.*?\\*/", "");
+        Pattern literalBackground =
+                Pattern.compile("background(-color)?:\\s*(#[0-9A-Fa-f]{3,8}|rgba?\\(|hsla?\\()");
+        List<String> violations = new ArrayList<>();
+        int depth = 0;
+        int printBlockDepth = -1;
+        for (String line : stripped.split("\n")) {
+            if (line.contains("@media") && line.contains("print")) {
+                printBlockDepth = depth;
+            }
+            if (printBlockDepth < 0 && literalBackground.matcher(line).find()) {
+                violations.add(name + ": " + line.trim());
+            }
+            depth += count(line, '{') - count(line, '}');
+            if (printBlockDepth >= 0 && depth <= printBlockDepth) {
+                printBlockDepth = -1;
+            }
+        }
+        return violations;
+    }
+
+    private static int count(String line, char c) {
+        return (int) line.chars().filter(ch -> ch == c).count();
+    }
+
     private static List<String> themedBackgroundsWithHardcodedInk(String css) {
         String stripped = css.replaceAll("(?s)/\\*.*?\\*/", "");
         List<String> offendingRules = new ArrayList<>();
@@ -419,5 +487,176 @@ class FrontendSourceGuardTest {
             index += needle.length();
         }
         return count;
+    }
+
+    /**
+     * T211 (Creed): a template may assign an appearance-neutral INPUT, and never a resolved OUTPUT.
+     *
+     * <p>A hue means the same thing in both appearances. A colour is an ANSWER that is only right in
+     * one of them. That is the whole rule, and it is stated as a reason rather than as a list of
+     * token names so that it stays correct as new tokens appear.
+     *
+     * <p>A custom property set from a template - in a {@code <style>} block or a {@code style=}
+     * attribute - is ONE server-rendered value. An appearance-varying token needs two: app.css
+     * declares the dark value on {@code :root} and the light one in the appearance-conditioned
+     * blocks, and a template cannot participate in that because the server does not know which
+     * appearance the browser will resolve to. So the assignment is appearance-blind BY
+     * CONSTRUCTION - not blind depending on the value, or on which org is loaded, or on whether the
+     * branch is taken.
+     *
+     * <p>That is deliberately what this fires on: the ASSIGNMENT EXISTING, not the branch running.
+     * It would have caught the legacy per-org block (T186) while Creed's and Kevin's accounts of
+     * that defect still disagreed about which branch executed, because under either account the
+     * assignment was there.
+     *
+     * <p><strong>Why an allowlist of inputs, and not a list of colour names.</strong> Named as
+     * colour families - {@code --accent} / {@code --color-*} / {@code --tint} - the rule would be
+     * scoped by the NAMING of the instances it was built from, which is the exact amendment this
+     * floor adopted after the T163 sweep: a guard that matched only backgrounds whose token ended in
+     * {@code -bg} was structurally unable to see the accent family. So the default is that every
+     * custom-property assignment in a template is an OUTPUT and therefore a violation, and only a
+     * property demonstrably on the INPUT side of that line is permitted. A newly-invented colour
+     * token is then caught with nobody remembering to add it here.
+     *
+     * <p>The allowlist holds one entry, and it is checked rather than asserted. {@code --brand-hue}
+     * is a hue ANGLE: declared once in app.css ({@code --brand-hue: 289}) and consumed as
+     * {@code oklch(L C var(--brand-hue))} at every step of the accent ramp. The ramp mirrors
+     * LIGHTNESS and chroma between appearances; the hue is the same number in both. It is an input
+     * the ramp resolves per appearance, not an answer, so one server-rendered value is correct.
+     *
+     * <p><strong>This must not condemn the fix.</strong> {@code fragments/layout.html} assigns
+     * {@code --brand-hue} five lines below the block that caused all this, and that hue-only
+     * assignment is exactly what T186 LEAVES BEHIND. A guard that caught the defect and also failed
+     * the remedy would be worse than no guard, so "does not fire on the hue block" is pinned as a
+     * test against the real template tree below, not left to the allowlist's good intentions.
+     *
+     * <p><strong>Complements {@code AccentTintMirrorsBetweenAppearancesUiTest}, and does not
+     * replace it - do not delete either as a duplicate of the other.</strong> Kevin's test asserts
+     * the SYMPTOM at render: that a branded org's {@code --accent}/{@code --tint} actually differ
+     * between light and dark in a real browser. It is a {@code *UiTest}, so it inherits
+     * {@code @Tag("flaky-infra")} and runs in the non-blocking lane - it can observe the defect
+     * returning but cannot fail a merge. This one reads source, needs no browser, and runs in the
+     * blocking gate: it catches the CAUSE and can stop it landing. Symptom-at-render and
+     * cause-in-source are different evidence, and the one that can block is not the one that can
+     * prove the pixels.
+     */
+    @Test
+    void noTemplateAssignsAnAppearanceVaryingCustomProperty() throws IOException {
+        List<String> violations = new ArrayList<>();
+        for (Path file : sourceFilesUnder(TEMPLATES_DIR)) {
+            List<String> lines = Files.readAllLines(file, StandardCharsets.UTF_8);
+            for (int i = 0; i < lines.size(); i++) {
+                Matcher m = CUSTOM_PROPERTY_ASSIGNMENT.matcher(lines.get(i));
+                while (m.find()) {
+                    String property = m.group(1);
+                    if (!APPEARANCE_NEUTRAL_INPUTS.contains(property)) {
+                        violations.add(file.getFileName() + ":" + (i + 1) + "  " + property);
+                    }
+                }
+            }
+        }
+
+        assertThat(violations)
+                .describedAs("A template renders ONE value; an appearance-varying custom property "
+                        + "needs two. Declare it in app.css beside its light counterpart instead - "
+                        + "or, if it genuinely cannot vary by appearance, add it to "
+                        + "APPEARANCE_NEUTRAL_INPUTS with the reason.")
+                .isEmpty();
+    }
+
+    /**
+     * Matches an assignment, not a reference: {@code --accent: ...} but never {@code var(--accent)}.
+     * The negative lookbehind for {@code -} keeps a longer property name from matching as a shorter
+     * one, and requiring the colon rules out a bare mention in prose.
+     */
+    private static final Pattern CUSTOM_PROPERTY_ASSIGNMENT =
+            Pattern.compile("(?<![-\\w])(--[a-zA-Z][a-zA-Z0-9-]*)\\s*:");
+
+    /**
+     * Custom properties a template MAY set: appearance-neutral INPUTS, where one value is correct
+     * in every appearance. Each entry needs a reason checkable against app.css rather than merely
+     * asserted - see the javadoc above for {@code --brand-hue}'s. Anything that is a resolved
+     * OUTPUT belongs in app.css beside its light counterpart.
+     */
+    private static final Set<String> APPEARANCE_NEUTRAL_INPUTS = Set.of("--brand-hue");
+
+    /**
+     * The detector's own negative control. A check that matched every {@code --} it saw would flag
+     * {@code var(--accent)} references and the hue-only block T186 leaves behind, and would then be
+     * a guard that fights the fix it exists to protect; one that matched too little would pass over
+     * the very block it was written from. Neither failure is visible on a tree that happens to be
+     * clean, so both are pinned here.
+     */
+    @Test
+    void theCustomPropertyCheckReadsAnAssignmentAndNotAReference() {
+        assertThat(assignedProperties("<style>:root { --accent: #F36E2A; }</style>"))
+                .containsExactly("--accent");
+        assertThat(assignedProperties("th:text=\"':root { --accent: ' + theme.primaryColor + '; "
+                + "--accent-dark: ' + theme.primaryColorDark + '; }'\""))
+                .containsExactly("--accent", "--accent-dark");
+        assertThat(assignedProperties("<div style=\"--tint: #eee\">"))
+                .containsExactly("--tint");
+
+        // References are not assignments - the whole estate is built on them.
+        assertThat(assignedProperties("background: var(--color-accent);")).isEmpty();
+        assertThat(assignedProperties("oklch(0.66 0.125 var(--brand-hue))")).isEmpty();
+
+        // The allowlisted scalar, and the shape T186 leaves behind, must both stay legal.
+        assertThat(allowed("<style th:text=\"':root { --brand-hue: ' + theme.brandHue + '; }'\">"))
+                .isTrue();
+    }
+
+    private static List<String> assignedProperties(String line) {
+        List<String> found = new ArrayList<>();
+        Matcher m = CUSTOM_PROPERTY_ASSIGNMENT.matcher(line);
+        while (m.find()) {
+            found.add(m.group(1));
+        }
+        return found;
+    }
+
+    private static boolean allowed(String line) {
+        return assignedProperties(line).stream().allMatch(APPEARANCE_NEUTRAL_INPUTS::contains);
+    }
+
+    /**
+     * The half that matters more than catching the defect: this guard must not condemn the remedy.
+     *
+     * <p>{@code fragments/layout.html} assigns {@code --brand-hue} from the server, five lines below
+     * the block that caused T186 - and that hue-only assignment is what T186 leaves behind. Asserted
+     * against the REAL template tree rather than a synthetic line, because the thing worth pinning
+     * is that the shipped remedy passes, not that a string I wrote passes.
+     *
+     * <p>The floor is deliberate too: if the tree ever stops assigning {@code --brand-hue} at all,
+     * this fails rather than passing vacuously, and someone has to notice that the allowlist entry
+     * no longer corresponds to anything real.
+     */
+    @Test
+    void theHueOnlyBlockThatT186LeavesBehindStaysLegal() throws IOException {
+        List<String> hueAssignments = new ArrayList<>();
+        List<String> flagged = new ArrayList<>();
+        for (Path file : sourceFilesUnder(TEMPLATES_DIR)) {
+            List<String> lines = Files.readAllLines(file, StandardCharsets.UTF_8);
+            for (int i = 0; i < lines.size(); i++) {
+                for (String property : assignedProperties(lines.get(i))) {
+                    String where = file.getFileName() + ":" + (i + 1) + "  " + property;
+                    if (property.equals("--brand-hue")) {
+                        hueAssignments.add(where);
+                        if (!APPEARANCE_NEUTRAL_INPUTS.contains(property)) {
+                            flagged.add(where);
+                        }
+                    }
+                }
+            }
+        }
+
+        assertThat(hueAssignments)
+                .describedAs("no template assigns --brand-hue any more - either the remedy changed "
+                        + "shape, or this allowlist entry is now dead and should go")
+                .isNotEmpty();
+        assertThat(flagged)
+                .describedAs("the server-rendered hue is an appearance-neutral INPUT and must stay "
+                        + "legal - a guard that fails the fix is worse than no guard")
+                .isEmpty();
     }
 }

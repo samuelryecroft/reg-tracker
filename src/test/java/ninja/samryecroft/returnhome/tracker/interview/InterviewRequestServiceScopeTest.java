@@ -13,6 +13,7 @@ import ninja.samryecroft.returnhome.tracker.audit.AuditEventPublisher;
 import ninja.samryecroft.returnhome.tracker.child.ChildRepository;
 import ninja.samryecroft.returnhome.tracker.home.HomeRepository;
 import ninja.samryecroft.returnhome.tracker.organisation.OrgType;
+import ninja.samryecroft.returnhome.tracker.report.InterviewReportRepository;
 import ninja.samryecroft.returnhome.tracker.organisation.Organisation;
 import ninja.samryecroft.returnhome.tracker.organisation.OrganisationAccessService;
 import ninja.samryecroft.returnhome.tracker.organisation.OrganisationRepository;
@@ -37,7 +38,7 @@ import org.springframework.test.util.ReflectionTestUtils;
  * unscoped when the answer is empty. Only the second can regress here.
  *
  * <p>The regression it guards is specific rather than hypothetical. {@code .orElseGet(List::of)} is
- * right; {@code .orElseGet(() -> repository.findByStatusExcludingReportsAuthoredBy(...))} would compile,
+ * right; {@code .orElseGet(() -> repository.findByStatusWithCaseDetails(...))} would compile,
  * read perfectly reasonably, and silently restore the old exposure. An empty-list assertion alone
  * would not catch it either - the unfixed code returned an empty list too, for the wrong reason. So
  * these assert that the repository is never asked, which is the same shape as
@@ -61,11 +62,13 @@ class InterviewRequestServiceScopeTest {
     private OrganisationRepository organisationRepository;
     @Mock
     private AuditEventPublisher auditEventPublisher;
+    @Mock
+    private InterviewReportRepository interviewReportRepository;
 
     private InterviewRequestService service() {
         return new InterviewRequestService(interviewRequestRepository, childRepository, userRepository,
                 homeRepository, new OrganisationAccessService(organisationRepository, userRepository),
-                auditEventPublisher);
+                auditEventPublisher, interviewReportRepository);
     }
 
     @Test
@@ -78,20 +81,21 @@ class InterviewRequestServiceScopeTest {
         assertThat(service().listPendingReview(reviewer)).isEmpty();
 
         verify(interviewRequestRepository, never())
-                .findByStatusAndHomeOrganisationSupplierOrganisationIdExcludingReportsAuthoredBy(any(), any(), any());
+                .findByStatusAndSupplierOrganisationIdWithCaseDetails(any(), any());
         // And specifically not the unscoped query the ADMIN branch uses - the fallback a wrong
         // orElseGet would reach for.
-        verify(interviewRequestRepository, never()).findByStatusExcludingReportsAuthoredBy(any(), any());
+        verify(interviewRequestRepository, never()).findByStatusWithCaseDetails(any());
     }
 
     @Test
     void listPendingReviewStillScopesToASupplierSideReviewersOwnOrganisation() {
         AppUserPrincipal reviewer = principal(Set.of(Role.REVIEWER), organisation(7L, OrgType.SUPPLIER));
         InterviewRequest pending = new InterviewRequest();
-        when(interviewRequestRepository.findByStatusAndHomeOrganisationSupplierOrganisationIdExcludingReportsAuthoredBy(
-                InterviewStatus.REPORT_SUBMITTED, 7L, reviewer.getUserId())).thenReturn(List.of(pending));
+        when(interviewRequestRepository.findByStatusAndSupplierOrganisationIdWithCaseDetails(
+                InterviewStatus.REPORT_SUBMITTED, 7L)).thenReturn(List.of(pending));
+        when(interviewReportRepository.findByInterviewRequestIdIn(any())).thenReturn(List.of());
 
-        assertThat(service().listPendingReview(reviewer)).containsExactly(pending);
+        assertThat(service().pendingReviewFor(reviewer).reviewable()).containsExactly(pending);
     }
 
     @Test

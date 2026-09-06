@@ -1,10 +1,5 @@
 package ninja.samryecroft.returnhome.tracker.config;
 
-import ninja.samryecroft.returnhome.tracker.auth.EntraOidcUserService;
-import org.springframework.security.oauth2.client.oidc.web.logout.OidcClientInitiatedLogoutSuccessHandler;
-import ninja.samryecroft.returnhome.tracker.auth.EntraAwareLogoutSuccessHandler;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.health.actuate.endpoint.HealthEndpoint;
 import org.springframework.boot.security.autoconfigure.actuate.web.servlet.EndpointRequest;
 import org.springframework.context.annotation.Bean;
@@ -14,7 +9,7 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
+import ninja.samryecroft.returnhome.tracker.security.LoginFailureHandler;
 import org.springframework.security.web.SecurityFilterChain;
 
 @Configuration
@@ -26,18 +21,9 @@ public class SecurityConfig {
         return new BCryptPasswordEncoder();
     }
 
-    /**
-     * Entra sign-in, off unless the {@code entra} profile turns it on. See
-     * {@code ENTRA-AUTH-DESIGN.md} §6 P3: both authentication paths exist in code, only form login
-     * is live, and the build is deployable at any point in between.
-     */
-    @Value("${app.auth.entra.enabled:false}")
-    private boolean entraEnabled;
-
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http,
-            ObjectProvider<ClientRegistrationRepository> clientRegistrations,
-            ObjectProvider<EntraOidcUserService> entraOidcUserService) throws Exception {
+            LoginFailureHandler loginFailureHandler) throws Exception {
         http
                 .authorizeHttpRequests(auth -> auth
                         // T119: /fonts/** and /icons/** are static assets the login page itself
@@ -84,99 +70,15 @@ public class SecurityConfig {
                 .formLogin(form -> form
                         .loginPage("/login")
                         .defaultSuccessUrl("/", false)
+                        // T215: without this, EVERY AuthenticationException lands on /login?error
+                        // and a locked-out user is told to check their password - the one thing
+                        // that cannot work - on every attempt for the whole window.
+                        .failureHandler(loginFailureHandler)
                         .permitAll())
                 .logout(logout -> logout
                         .logoutSuccessUrl("/login?logout")
                         .permitAll());
 
-        if (entraEnabled) {
-            configureEntraLogin(http, clientRegistrations, entraOidcUserService);
-        }
         return http.build();
-    }
-
-    /**
-     * Adds OIDC sign-in alongside form login, which stays live: the cutover sequence depends on
-     * proving an ADMIN can get in through Entra <em>before</em> the local path is removed, and
-     * removing it is P8, after cutover has been lived with.
-     *
-     * <p>Authorization is untouched by this. Entra answers who you are; which organisation you
-     * belong to, what you may do and which homes you may see all stay in our own database, so
-     * {@code OrganisationAccessService} and every rule above continue to be the only thing deciding
-     * access (§3). That is what makes this phase inert rather than merely disabled.
-     *
-     * <p>The account link itself is P4 and does not exist yet, so with this on today a successful
-     * Entra authentication produces a principal with no application user behind it. That is why
-     * the flag is off by default and why nothing sets the {@code entra} profile.
-     */
-    private void configureEntraLogin(HttpSecurity http,
-            ObjectProvider<ClientRegistrationRepository> clientRegistrations,
-            ObjectProvider<EntraOidcUserService> entraOidcUserService) throws Exception {
-        ClientRegistrationRepository registrations = requireClientRegistrations(clientRegistrations.getIfAvailable());
-
-        // PKCE is not configured here because Spring Security 7 applies it to every client,
-        // confidential ones included - an explicit customizer was measurably a no-op. It still
-        // matters: it closes authorization-code interception at the redirect, which lands in a
-        // browser on a shared device in a care home (§5 D1). EntraLoginEnabledTest asserts the
-        // code_challenge is really on the wire, so a downgrade or a future default change shows up
-        // as a failing test rather than as a quietly weaker flow.
-        // RP-initiated logout, branched: see EntraAwareLogoutSuccessHandler for why an
-        // unconditional one would break sign-out for form-login users while both paths are live.
-        //
-        // {baseUrl} rather than a literal host, matching the redirect-uri in
-        // application-entra.properties and for the same reason recorded there - a custom domain is
-        // expected (WS-I), and hardcoding here would leave sign-IN surviving that move while
-        // sign-OUT quietly stopped matching what the tenant has registered.
-        OidcClientInitiatedLogoutSuccessHandler oidcLogout =
-                new OidcClientInitiatedLogoutSuccessHandler(registrations);
-        oidcLogout.setPostLogoutRedirectUri("{baseUrl}/login?logout");
-        http.logout(logout -> logout
-                .logoutSuccessHandler(new EntraAwareLogoutSuccessHandler(oidcLogout, "/login?logout"))
-                .permitAll());
-
-        http.oauth2Login(oauth2 -> oauth2
-                // The same page as form login, so there is one place a signed-out user lands
-                // whichever path is live.
-                .loginPage("/login")
-                // P4: without this the stock OidcUserService returns a DefaultOidcUser, which is not
-                // an AppUserPrincipal - and the resulting failure is silent rather than loud. See
-                // EntraUserPrincipal's javadoc: 50 @AuthenticationPrincipal parameters would be
-                // injected null, and AuthenticationAuditListener would stop writing LOGIN_SUCCESS
-                // without anything throwing.
-                .userInfoEndpoint(userInfo -> userInfo.oidcUserService(requireOidcUserService(entraOidcUserService)))
-                .defaultSuccessUrl("/", false));
-    }
-
-    /**
-     * Fail fast rather than fall back. A deployment that asked for Entra and did not get it would
-     * otherwise start, serve form login, and look healthy - so the misconfiguration would be
-     * reported by whoever could not sign in, which for a front door is the worst possible channel.
-     * Mirrors {@code DocumentStorageConfig} refusing to start on a production misconfiguration.
-     */
-    static ClientRegistrationRepository requireClientRegistrations(ClientRegistrationRepository registrations) {
-        if (registrations == null) {
-            throw new IllegalStateException(
-                    "app.auth.entra.enabled is true but no OAuth2 client registration is configured. "
-                            + "Activate the 'entra' profile (application-entra.properties), which supplies "
-                            + "spring.security.oauth2.client.registration.entra.*, or set the flag back to false.");
-        }
-        return registrations;
-    }
-
-    /**
-     * Same fail-fast reasoning as {@link #requireClientRegistrations}: without our user service the
-     * OIDC path would silently fall back to a DefaultOidcUser, which is not an AppUserPrincipal -
-     * and that failure does not throw. It injects null into every controller and stops the audit
-     * listener writing sign-in rows. Refusing to start beats starting into that.
-     */
-    static EntraOidcUserService requireOidcUserService(ObjectProvider<EntraOidcUserService> provider) {
-        EntraOidcUserService service = provider.getIfAvailable();
-        if (service == null) {
-            throw new IllegalStateException(
-                    "app.auth.entra.enabled is true but no EntraOidcUserService is available. Without it "
-                            + "a successful Entra sign-in would produce a principal with no application user "
-                            + "behind it, injected as null rather than failing.");
-        }
-        return service;
     }
 }

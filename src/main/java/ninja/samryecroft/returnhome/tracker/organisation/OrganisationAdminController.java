@@ -1,7 +1,12 @@
 package ninja.samryecroft.returnhome.tracker.organisation;
 
 import jakarta.validation.Valid;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
 import ninja.samryecroft.returnhome.tracker.document.KeyProvider;
+import ninja.samryecroft.returnhome.tracker.home.HomeRepository;
+import ninja.samryecroft.returnhome.tracker.user.UserRepository;
 import ninja.samryecroft.returnhome.tracker.document.KeyUnavailableException;
 import ninja.samryecroft.returnhome.tracker.organisation.dto.CreateOrganisationForm;
 import ninja.samryecroft.returnhome.tracker.user.AppUserPrincipal;
@@ -26,18 +31,59 @@ public class OrganisationAdminController {
     private final ThemeService themeService;
     private final KeyProvider keyProvider;
     private final OrganisationLifecycleService lifecycleService;
+    private final HomeRepository homeRepository;
+    private final UserRepository userRepository;
 
     public OrganisationAdminController(OrganisationRepository organisationRepository, ThemeService themeService,
-            KeyProvider keyProvider, OrganisationLifecycleService lifecycleService) {
+            KeyProvider keyProvider, OrganisationLifecycleService lifecycleService,
+            HomeRepository homeRepository, UserRepository userRepository) {
         this.organisationRepository = organisationRepository;
         this.themeService = themeService;
         this.keyProvider = keyProvider;
         this.lifecycleService = lifecycleService;
+        this.homeRepository = homeRepository;
+        this.userRepository = userRepository;
     }
 
+    /**
+     * T119 4e: one tree, in creation order - supplier, its care providers, their homes.
+     *
+     * <p><b>Four queries, and the joining is done in memory.</b> Walking the tree to fetch each
+     * provider's homes would be the obvious shape and an N+1 on the one screen that renders every
+     * organisation on the platform. The assembly itself lives in {@link OrganisationTree#from} as a
+     * pure function so it can be unit-tested without a database.
+     *
+     * <p>The flat list is NOT published to the model. It was, with a note saying the activation
+     * banners might read it - which Dwight questioned, correctly: those banners read
+     * {@code kekWarning}, {@code activationMessage} and {@code activationError}, so the reason I
+     * gave was never true. The attribute itself was genuinely consumed, though, by the empty-state
+     * check - which is the part the review missed, because the usage is
+     * {@code ${#lists.isEmpty(organisations)}} rather than a bare {@code ${organisations}}.
+     *
+     * <p>So the fix is neither "keep it" nor "drop it": the empty state now tests the TREE, which
+     * is what the page actually renders. A page that decides its empty state from a different
+     * collection than the one it draws can say "No organisations yet" above a populated tree. With
+     * that gone the attribute has no consumer at all, so it goes too.
+     */
     @GetMapping
     public String list(Model model) {
-        model.addAttribute("organisations", organisationRepository.findAllWithSupplier());
+        var organisations = organisationRepository.findAllWithSupplier();
+
+        Map<Long, Integer> userCounts = new HashMap<>();
+        for (Object[] row : userRepository.countByOrganisation()) {
+            userCounts.put((Long) row[0], ((Number) row[1]).intValue());
+        }
+
+        // "Branding set" means someone CHOSE a colour, not that a theme row exists. My first
+        // version used the row, documented the choice, and was wrong for a reason the comment
+        // itself should have caught: ensureThemeExistsFor gives every supplier a default-coloured
+        // row at creation, so the flag was true for all of them and the line said nothing in the
+        // one slot meant to tell an admin whether a supplier is set up. The predicate lives in
+        // ThemeService, next to the default it compares against.
+        Set<Long> branded = themeService.organisationIdsWithChosenBranding();
+
+        model.addAttribute("tree", OrganisationTree.from(organisations,
+                homeRepository.findAllWithOrganisation(), userCounts, branded));
         return "admin/organisation-list";
     }
 

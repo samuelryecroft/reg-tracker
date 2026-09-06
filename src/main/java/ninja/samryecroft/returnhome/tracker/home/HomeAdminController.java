@@ -65,7 +65,11 @@ public class HomeAdminController {
         }
         model.addAttribute("form", new CreateHomeForm());
         if (principal.hasRole(Role.ADMIN)) {
-            model.addAttribute("organisations", organisationRepository.findByTypeOrderByName(OrgType.CARE_PROVIDER));
+            // ...WithSupplier: 6d's option labels name each provider's supplier, and
+            // open-in-view is false, so the association is fetched here or the render throws.
+            // BOTH call sites matter - this one and the validation re-render below - or the form
+            // works until the first time someone gets it wrong.
+            model.addAttribute("organisations", organisationRepository.findByTypeWithSupplier(OrgType.CARE_PROVIDER));
         }
         return "admin/home-form";
     }
@@ -109,7 +113,7 @@ public class HomeAdminController {
 
         if (bindingResult.hasErrors()) {
             if (principal.hasRole(Role.ADMIN)) {
-                model.addAttribute("organisations", organisationRepository.findByTypeOrderByName(OrgType.CARE_PROVIDER));
+                model.addAttribute("organisations", organisationRepository.findByTypeWithSupplier(OrgType.CARE_PROVIDER));
             }
             return "admin/home-form";
         }

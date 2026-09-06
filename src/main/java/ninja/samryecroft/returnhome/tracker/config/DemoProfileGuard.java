@@ -2,6 +2,7 @@ package ninja.samryecroft.returnhome.tracker.config;
 
 import java.util.Arrays;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import org.springframework.boot.context.event.ApplicationEnvironmentPreparedEvent;
@@ -29,8 +30,6 @@ public class DemoProfileGuard implements ApplicationListener<ApplicationEnvironm
 
     public static final String DEMO_PROFILE = "demo";
 
-    /** Profiles that mean "this is a real deployed environment". */
-    private static final Set<String> PRODUCTION_PROFILES = Set.of("prod", "production", "staging");
 
     /**
      * Properties naming the deployment tier outside the profile system, so a pipeline that sets
@@ -39,7 +38,6 @@ public class DemoProfileGuard implements ApplicationListener<ApplicationEnvironm
      */
     private static final Set<String> ENVIRONMENT_PROPERTIES = Set.of("app.env", "APP_ENV");
 
-    private static final Set<String> PRODUCTION_ENVIRONMENT_VALUES = Set.of("prod", "production", "staging");
 
     @Override
     public void onApplicationEvent(ApplicationEnvironmentPreparedEvent event) {
@@ -54,18 +52,15 @@ public class DemoProfileGuard implements ApplicationListener<ApplicationEnvironm
         if (!containsIgnoringCase(activeProfiles, DEMO_PROFILE)) {
             return;
         }
-        Set<String> markers = new LinkedHashSet<>();
-        for (String profile : activeProfiles) {
-            if (PRODUCTION_PROFILES.contains(normalise(profile))) {
-                markers.add("profile '" + profile + "'");
-            }
-        }
-        for (String property : ENVIRONMENT_PROPERTIES) {
-            String value = environment.getProperty(property);
-            if (value != null && PRODUCTION_ENVIRONMENT_VALUES.contains(normalise(value))) {
-                markers.add(property + "=" + value);
-            }
-        }
+        // One answer to "is this deployed", shared with DatabasePasswordGuard and
+        // DocumentStorageConfig. This class previously held that set TWICE - once for profiles and
+        // once for app.env, byte-identical, four lines apart - and neither copy contained 'azure',
+        // the profile production actually runs on. So this guard never fired there, and
+        // SPRING_PROFILES_ACTIVE=azure,demo would have started the seeder that writes fictional
+        // children's records. The pipeline asserts the profile is exactly 'azure', but App Service
+        // settings can be changed in the portal without the pipeline running at all - which is
+        // precisely the case this guard is the defence in depth for, and precisely where it failed.
+        List<String> markers = DeployedEnvironment.markersIn(environment);
         if (markers.isEmpty()) {
             return;
         }

@@ -2,14 +2,86 @@
 <html xmlns:th="http://www.thymeleaf.org" lang="en" th:attr="data-appearance=${#strings.toLowerCase(appearancePreference)}">
 <head>
     <meta charset="UTF-8"/>
-    <title>Error — Return Home Tracker</title>
+    <title th:text="${status != null and status == 404} ? 'Page not found — Return Home Tracker' : 'Something went wrong — Return Home Tracker'">Error — Return Home Tracker</title>
     <th:block th:replace="~{fragments/layout :: styles}"></th:block>
 </head>
 <body>
-<main id="main" class="narrow">
-    <h1 th:text="${status} ?: 'Error'">Error</h1>
-    <p class="error" th:text="${message} ?: 'Something went wrong.'">Message</p>
-    <a class="btn secondary" href="/">Back home</a>
+<main id="main" class="error-page">
+    <!--/* 6e (FE-19). The heading was th:text="${status} ?: 'Error'", i.e. the raw HTTP status as
+         the page's <h1> - "404" as the first and largest thing a person reads, and the only thing
+         a screen reader announces for the document's main heading. A status code is a fact about
+         the response, not a description of what happened to the person.
+
+         THE CANVAS ONLY DRAWS NOT-FOUND, AND THIS TEMPLATE SERVES EVERY ERROR. Spring's
+         BasicErrorController renders it for 403, 500 and the rest as well, so taking the canvas
+         copy unconditionally would tell someone who hit a server fault that the page they asked
+         for does not exist - a confident, specific and wrong answer, which sends them to look for
+         a broken link that was never the problem. So 404 gets the canvas wording and everything
+         else gets a truthful sibling in the same voice.
+
+         The status is kept, in small text, because it is what someone quotes when they report the
+         problem. Demoted from heading to supporting detail, not deleted. */-->
+    <div class="error-card">
+        <svg class="icon error-icon" aria-hidden="true"><use th:href="@{/icons/phosphor.svg} + '#ph-compass'"></use></svg>
+
+        <th:block th:if="${status != null and status == 404}">
+            <h1>We can't find that page</h1>
+            <p class="error-body">It may have moved, or you may not have access to it. If you were
+                sent a link, ask your administrator to check it.</p>
+            <!--/* The message IS printed on 404 and is NOT printed on the generic branch, and the
+                 asymmetry is the point. A 404 from this application is raised by our own code
+                 about a thing the person just asked for by name - "No such child: 987654321" -
+                 so it identifies which link is broken, which is the one fact that makes the page
+                 actionable. The generic branch catches unhandled exceptions, where Spring's
+                 default message is the exception's own text: an internal type, or an identifier
+                 out of a safeguarding record, shown to whoever happened to trip it.
+                 TemplateRenderCoverageIntegrationTest#errorPageRenders asserts the 404 half, and
+                 it was right to - the first version of this screen dropped the message from both
+                 branches and lost real information to a concern that only applies to one. */-->
+            <p class="error-detail" th:if="${message != null and !#strings.isEmpty(message)}"
+               th:text="${message}">No such child: 987654321</p>
+        </th:block>
+
+        <th:block th:unless="${status != null and status == 404}">
+            <h1>Something went wrong</h1>
+            <!--/* Deliberately does NOT print ${message}. Spring's default message for an
+                 unhandled exception is the exception's own text, which on this application can
+                 name an internal type or an identifier from a safeguarding record. The person
+                 cannot act on it either way, and the server log is where it belongs. */-->
+            <!--/* "Nothing you had entered has been submitted" was a promise this page CANNOT
+                 KEEP, and Creed caught it. error.html renders for every unhandled failure,
+                 including one thrown AFTER a POST's transaction has committed - a view-render
+                 fault, or anything post-commit, and this application drives its audit trail from
+                 @TransactionalEventListener(AFTER_COMMIT). In that case the work WAS saved and
+                 the page said it was not.
+
+                 The harm is concrete rather than theoretical: told nothing was saved, a worker
+                 saves again, and a duplicate safeguarding record is the exact harm flagged at 5d
+                 and again in D-6c-3. "Could not be loaded" was wrong for a failed save too -
+                 nothing was being loaded.
+
+                 So the copy now says what is actually known, which is less than I wanted it to
+                 say. A page that cannot tell whether the write landed must send the reader to
+                 look, not reassure them. */-->
+            <p class="error-body">Something went wrong and the page couldn't be shown. If you were
+                saving something, check the record before trying again — it may or may not have
+                gone through. If it keeps happening, tell your administrator.</p>
+        </th:block>
+
+        <div class="error-actions">
+            <a class="btn" href="/">Go to dashboard</a>
+            <!--/* Hidden until a script reveals it: it needs history.back(), so on the one page
+                 most likely to be reached in a degraded state, offering it unconditionally would
+                 be offering a control that may do nothing. "Go to dashboard" is the unconditional
+                 one and is therefore the primary. Wired from an external script rather than an
+                 inline handler so it survives the CSP in T129. */-->
+            <button type="button" class="btn secondary" data-history-back hidden>Go back</button>
+        </div>
+
+        <p class="error-status" th:if="${status != null}"
+           th:text="'Error ' + ${status} + ' — quote this if you report it'">Error 404</p>
+    </div>
 </main>
+<script th:src="@{/js/error-actions.js}" defer></script>
 </body>
 </html>

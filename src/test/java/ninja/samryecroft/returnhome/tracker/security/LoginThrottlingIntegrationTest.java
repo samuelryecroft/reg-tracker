@@ -79,10 +79,15 @@ class LoginThrottlingIntegrationTest extends AbstractIntegrationTest {
 
         // The point of a lockout: even the RIGHT password is refused while it holds, so guessing
         // cannot simply continue at speed.
+        //
+        // T215 changed WHICH error page that refusal lands on, not whether it is refused. This
+        // asserted "/login?error" because that was the only failure URL that existed - the whole
+        // defect being that a locked user got the generic "check your password" advice, i.e. was
+        // told to do the one thing that cannot work. The assertion's intent, refusal, is unchanged.
         mockMvc.perform(post("/login").with(csrf())
                         .param("username", username)
                         .param("password", PASSWORD))
-                .andExpect(redirectedUrl("/login?error"));
+                .andExpect(redirectedUrl("/login?error=locked"));
     }
 
     @Test

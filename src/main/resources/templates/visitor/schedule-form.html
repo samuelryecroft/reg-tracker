@@ -21,10 +21,37 @@
                 </div>
             </div>
 
+            <!--/*
+              D-5b-1 (spec §7d): the clock this choice is measured against, factual and never a
+              banner - "a visitor scheduling on day three is working, not failing" (T187's rule
+              applies unchanged). Deadline reuses DeadlineTracker.RETURN_WINDOW server-side rather
+              than restating 72h; the remaining-time text is DueStateCopy's own words via the same
+              badgeFor path the queue uses, quoted verbatim, never re-worded here.
+            */-->
+            <dl class="detail">
+                <dt>Child returned</dt>
+                <dd th:text="${#temporals.format(request.returnedAt, 'dd MMM yyyy HH:mm')}">Returned</dd>
+                <dt>72-hour deadline</dt>
+                <dd th:text="${#temporals.format(deadline, 'dd MMM yyyy HH:mm')}">Deadline</dd>
+                <dt>Time remaining</dt>
+                <dd th:text="${timeRemaining}">Time remaining</dd>
+            </dl>
+
             <label for="scheduledAt">Scheduled visit date/time <span class="req" aria-hidden="true">*</span></label>
-            <input type="datetime-local" id="scheduledAt" th:field="*{scheduledAt}" required
+            <!--/*
+              D-5b-2: min is the cheapest correct constraint available - server-set to the request's
+              own return time, needs no script, degrades to the server-side check below if bypassed.
+              D-5b-3 (load-bearing): deliberately NO max. A visit outside the 72-hour window is a
+              legitimate, recordable fact - capping the picker at the deadline would make the system
+              refuse to record a missed duty instead of evidencing one.
+            */-->
+            <input type="datetime-local" id="scheduledAt" th:field="*{scheduledAt}" required th:min="${scheduledAtMin}"
                    th:errorclass="is-invalid" th:aria-invalid="${#fields.hasErrors('scheduledAt')}" aria-describedby="scheduledAt-error"/>
             <div th:replace="~{fragments/layout :: fieldError('scheduledAt')}"></div>
+
+            <!--/* D-5b-5: said once, here, unconditionally - it does not react to the picker. Forward
+                 notice costs a sentence; finding out at report submission costs a re-plan. */-->
+            <p class="muted">If the visit happens outside the 72-hour window, the report will ask why.</p>
 
             <div class="btn-row">
                 <button type="submit" class="btn">Confirm</button>

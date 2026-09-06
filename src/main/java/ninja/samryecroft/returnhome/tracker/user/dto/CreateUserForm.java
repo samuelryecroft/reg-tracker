@@ -15,9 +15,15 @@ public class CreateUserForm {
     private String username;
 
     /**
-     * Optional: an account created for Entra sign-in has no local credential at all. Still length-
-     * checked when one is supplied, so the only thing that changed is that absent is now allowed -
-     * a short password is as invalid as it ever was.
+     * Optional, and length-checked only when supplied - a short password is as invalid as it ever
+     * was.
+     *
+     * <p><b>The reason it is optional has gone, and the rule has deliberately been left alone.</b>
+     * It was optional because an account created for Entra sign-in had no local credential at all.
+     * With Entra removed, form login is the only way in, so an account saved without a password
+     * cannot sign in by any route. Making it mandatory is a behaviour change to live account
+     * creation and is out of scope here; it is recorded rather than silently made, because the
+     * justification above it no longer holds and a reader would otherwise inherit it as current.
      */
     @Size(min = 8, message = "Password must be at least 8 characters")
     private String password;
@@ -48,15 +54,6 @@ public class CreateUserForm {
      */
     @Size(max = 30, message = "Contact phone must be 30 characters or fewer")
     private String contactPhone;
-
-
-    /**
-     * The person's Entra <b>Directory object ID</b> - optional, because an account can be created
-     * before anyone has looked it up, and because the break-glass admin (D5) has no directory
-     * identity at all. Sign-in matches on this and nothing else.
-     */
-    @Pattern(regexp = UserFormPatterns.OBJECT_ID, message = UserFormPatterns.OBJECT_ID_MESSAGE)
-    private String idpSubject;
 
     @NotEmpty(message = "Select at least one role")
     private Set<Role> roles = new HashSet<>();
@@ -142,13 +139,6 @@ public class CreateUserForm {
 
     public void setHomeIds(Set<Long> homeIds) {
         this.homeIds = homeIds;
-    }
-    public String getIdpSubject() {
-        return idpSubject;
-    }
-
-    public void setIdpSubject(String idpSubject) {
-        this.idpSubject = idpSubject;
     }
 
 }

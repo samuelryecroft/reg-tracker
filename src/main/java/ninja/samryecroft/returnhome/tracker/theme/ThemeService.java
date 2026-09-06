@@ -1,6 +1,8 @@
 package ninja.samryecroft.returnhome.tracker.theme;
 
 import java.time.LocalDateTime;
+import java.util.Set;
+import java.util.HashSet;
 import ninja.samryecroft.returnhome.tracker.home.HomeRepository;
 import ninja.samryecroft.returnhome.tracker.organisation.Organisation;
 import ninja.samryecroft.returnhome.tracker.organisation.OrganisationRepository;
@@ -71,18 +73,62 @@ public class ThemeService {
         return toView(resolveForViewing(editableOrganisationId(principal)));
     }
 
+    /**
+     * D-3a-5 (spec §7j): the consequence of changing this colour, as a number rather than the
+     * vague plural it replaces - "and for every Care Provider org you serve" said nothing about
+     * how many. Meaningless for the platform default (there is no supplier org to count care
+     * providers under), so callers must gate this on {@code !platformWide} themselves; the count
+     * for a platform-admin editing session ({@code editableOrganisationId} returning null) is 0.
+     */
+    public int careProviderCountFor(AppUserPrincipal principal) {
+        requireCanEditOwnTheme(principal);
+        Long organisationId = editableOrganisationId(principal);
+        return organisationId == null ? 0
+                : organisationRepository.findBySupplierOrganisationIdOrderByName(organisationId).size();
+    }
+
     @Transactional
     public void updateFor(AppUserPrincipal principal, UpdateThemeForm form) {
         requireCanEditOwnTheme(principal);
         ThemeSettings settings = resolveOrCreateForEditing(editableOrganisationId(principal));
         settings.setPrimaryColor(form.getPrimaryColor());
-        settings.setSecondaryColor(form.getSecondaryColor());
+        // T186: the secondary colour is no longer collected or read, so it is not written here.
+        // This is an UPDATE of a row that already satisfies the NOT NULL column; the INSERT paths
+        // (ensureThemeExistsFor below, DemoDataSeeder) still set it and must keep doing so.
         settings.setUpdatedAt(LocalDateTime.now());
         themeSettingsRepository.save(settings);
     }
 
     /** Called when a new Supplier org is created, so it starts with its own (default-coloured) theme. */
     @Transactional
+    /**
+     * The suppliers whose brand colour someone has actually CHOSEN, for 4e's tree.
+     *
+     * <p><b>Not "has a theme row".</b> That was 4e's first predicate and it is true of every
+     * supplier ever created through the app, because {@link #ensureThemeExistsFor} gives each one
+     * a default-coloured row the moment it exists. So the tree's "branding set" line rendered for
+     * everybody and <b>a label that is true in every state is not a weak signal, it is not a
+     * signal</b> - it occupied the one slot on that row meant to tell a platform admin whether a
+     * supplier has been set up. Creed's ruling, and the fix is the predicate rather than the
+     * wording.
+     *
+     * <p>Lives here rather than in the controller so it can compare against {@code DEFAULT_PRIMARY}
+     * without that constant leaving this class - the definition of "default" and the test for
+     * "not default" belong together, or the next person changing the default silently changes what
+     * the tree claims.
+     */
+    public Set<Long> organisationIdsWithChosenBranding() {
+        Set<Long> chosen = new HashSet<>();
+        for (ThemeSettings settings : themeSettingsRepository.findAll()) {
+            if (settings.getOrganisation() != null
+                    && settings.getPrimaryColor() != null
+                    && !DEFAULT_PRIMARY.equalsIgnoreCase(settings.getPrimaryColor())) {
+                chosen.add(settings.getOrganisation().getId());
+            }
+        }
+        return chosen;
+    }
+
     public void ensureThemeExistsFor(Organisation supplierOrganisation) {
         if (themeSettingsRepository.findByOrganisationId(supplierOrganisation.getId()).isPresent()) {
             return;
@@ -155,39 +201,17 @@ public class ThemeService {
 
     private ThemeView toView(ThemeSettings settings) {
         String primary = settings.getPrimaryColor();
-        String tint = settings.getSecondaryColor();
         // The brand hue is derived once, here, and the integer is what travels - see
         // AccentRamp.hueFrom. Pam's CSS half reads the same primaryColor for --brand-hue, so
         // rounding in two places would let the document and the screen differ by a degree.
+        //
+        // T186: settings.getSecondaryColor() is deliberately not read. The column still exists and
+        // is still written on insert (it is NOT NULL), but nothing derives anything from it any
+        // more - see ThemeSettings.getSecondaryColor.
         int brandHue = AccentRamp.hueFrom(primary);
-        return new ThemeView(primary, darken(primary, tint), tint, readableForegroundOn(primary),
-                brandHue,
+        return new ThemeView(primary, brandHue,
                 AccentRamp.step(brandHue, AccentRamp.TINT_STEP),
                 AccentRamp.step(brandHue, AccentRamp.DOC_ACCENT_STEP));
-    }
-
-    /**
-     * FE-01. Was a fixed {@code x0.8} multiply with no contrast guarantee - a supplier picking a pale
-     * colour got an unreadable table header. Instead: hold the hue and saturation of the supplier's
-     * brand colour and walk the lightness down, one step at a time, until the result reads at 4.5:1
-     * or better against <em>both</em> {@code --surface} (white) and {@code --tint}, and stop at the
-     * first value that clears both - the lightest, and so most recognisably-branded, compliant shade.
-     * Used for table headers, card headings and secondary-button text (both here and in the generated
-     * .docx via {@link ThemeView#primaryColorDark()}), so fixing this one method fixes both surfaces.
-     */
-    static String darken(String hexColor, String tintColor) {
-        double[] hsl = toHsl(hexColor);
-        double tintLuminance = relativeLuminance(hexToRgb(tintColor));
-        double whiteLuminance = relativeLuminance(hexToRgb(WHITE));
-        for (int lightness = (int) Math.round(hsl[2]); lightness >= 0; lightness--) {
-            String candidate = fromHsl(hsl[0], hsl[1], lightness);
-            double candidateLuminance = relativeLuminance(hexToRgb(candidate));
-            if (contrastRatio(candidateLuminance, whiteLuminance) >= MIN_CONTRAST
-                    && contrastRatio(candidateLuminance, tintLuminance) >= MIN_CONTRAST) {
-                return candidate;
-            }
-        }
-        return "#000000";
     }
 
     /**
@@ -300,15 +324,18 @@ public class ThemeService {
     }
 
     /**
-     * @param primaryColor     the supplier's stored brand colour, and the source of {@link #brandHue}
-     * @param primaryColorDark retiring (spec Q7), still read by screens not yet on the ramp
-     * @param secondaryColor   retiring (spec Q7 / R-Q7); no longer feeds the document
-     * @param primaryColorInk  readable foreground on the brand colour; survives the ramp (R-Q7)
-     * @param brandHue         the one number per-supplier branding actually stores, in degrees
-     * @param accentTint       ramp step 100 - the document's band fill, replacing secondaryColor
-     * @param docAccent        ramp step 700 - the document's heading colour, replacing primaryColorDark
+     * T186 removed three components - {@code primaryColorDark}, {@code secondaryColor} and
+     * {@code primaryColorInk}. All three existed to feed the per-org inline {@code <style>} block in
+     * {@code fragments/layout.html}, which was their only consumer; deleting that block left them
+     * with none. {@code readableForegroundOn}, which produced {@code primaryColorInk}, is
+     * <b>kept</b>: {@code DocxReportGenerator} calls it statically and the generated report's header
+     * contrast depends on it.
+     *
+     * @param primaryColor the supplier's stored brand colour, and the source of {@link #brandHue}
+     * @param brandHue     the one number per-supplier branding actually stores, in degrees
+     * @param accentTint   ramp step 100 - the document's band fill, replacing secondaryColor
+     * @param docAccent    ramp step 700 - the document's heading colour, replacing primaryColorDark
      */
-    public record ThemeView(String primaryColor, String primaryColorDark, String secondaryColor,
-            String primaryColorInk, int brandHue, String accentTint, String docAccent) {
+    public record ThemeView(String primaryColor, int brandHue, String accentTint, String docAccent) {
     }
 }

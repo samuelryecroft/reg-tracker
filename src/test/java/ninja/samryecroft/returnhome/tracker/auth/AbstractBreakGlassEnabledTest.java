@@ -18,12 +18,12 @@ import org.springframework.test.context.TestPropertySource;
  * <p>Everything that needs the path open lives behind this class so that however many such tests
  * there end up being, they cost one pool between them.
  *
- * <p><b>The Entra flag is left at its default of false</b>, and that is the point rather than an
- * omission. Break-glass exists for the case where single sign-on is off or broken - §5's rollback is
- * literally "disable Entra, go back to form login" - so this is the honest configuration for the
- * emergency path. It is also a structural proof: a WARN line or audit event accidentally gated
- * behind {@code if (entraEnabled)}, which is where someone tidying Entra code would put it, cannot
- * pass a test that runs with Entra off.
+ * <p>This used to note that the Entra flag was left at its default of false, and that running with
+ * it off was a structural proof that no WARN line or audit event had been gated behind
+ * {@code if (entraEnabled)}. <b>Entra has been removed, so there is no flag and that proof no
+ * longer proves anything</b> - recorded rather than deleted, because the property it protected is
+ * still the one that matters: break-glass exists for when the ordinary way in does not work, so
+ * nothing about it may be conditional on the ordinary way in being available.
  */
 @SpringBootTest
 @AutoConfigureMockMvc

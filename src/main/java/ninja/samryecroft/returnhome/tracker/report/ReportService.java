@@ -7,6 +7,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
@@ -68,6 +69,27 @@ public class ReportService {
 
     /** The Visitor's or Reviewer's form, prefilled from an existing draft/rejected/submitted report
      * if one exists, or blank defaults if this is the very first save for this request. */
+    /**
+     * The reports for a page of requests, keyed by request id - one query for the whole list, not
+     * one per row. Screen 2d needs each card's submission time, which lives on the report rather
+     * than the request; resolving it per card is an N+1 across a queue.
+     *
+     * <p>A request with no report row is simply absent from the map. That is the honest shape for
+     * a screen: a missing report is missing, not a zero or an epoch date that would render as a
+     * real submission nobody made.
+     */
+    public Map<Long, InterviewReport> reportsByRequestId(List<InterviewRequest> requests) {
+        Map<Long, InterviewReport> byRequestId = new HashMap<>();
+        if (requests.isEmpty()) {
+            return byRequestId;
+        }
+        for (InterviewReport report : interviewReportRepository
+                .findByInterviewRequestIdIn(requests.stream().map(InterviewRequest::getId).toList())) {
+            byRequestId.put(report.getInterviewRequest().getId(), report);
+        }
+        return byRequestId;
+    }
+
     public SubmitReportForm formFor(Long requestId, AppUserPrincipal principal) {
         interviewRequestService.getAuthorized(requestId, principal);
         return interviewReportRepository.findByInterviewRequestId(requestId)

@@ -15,6 +15,7 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import ninja.samryecroft.returnhome.tracker.config.DeployedEnvironment;
 import ninja.samryecroft.returnhome.tracker.organisation.OrganisationRepository;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -37,7 +38,7 @@ import org.springframework.core.env.Environment;
 public class DocumentStorageConfig {
 
     private static final Logger log = LoggerFactory.getLogger(DocumentStorageConfig.class);
-    private static final List<String> PRODUCTION_MARKERS = List.of("prod", "production");
+
 
     @Bean
     StorageProvider storageProvider(DocumentStorageProperties properties, Environment environment,
@@ -112,12 +113,13 @@ public class DocumentStorageConfig {
     @ConditionalOnProperty(prefix = "app.documents.key-vault", name = "warm-keys-on-startup",
             havingValue = "true", matchIfMissing = true)
     ApplicationRunner keyWarmupRunner(DocumentStorageProperties properties, KeyProvider keyProvider,
-            OrganisationRepository organisationRepository) {
+            OrganisationRepository organisationRepository, TokenCredential credential) {
         if (properties.getKeys() != DocumentStorageProperties.KeyBackend.KEY_VAULT) {
             return args -> { };
         }
         return new KeyWarmupRunner(keyProvider, organisationRepository,
-                properties.getKeyVault().getWarmupTimeout());
+                properties.getKeyVault().getWarmupTimeout(), credential,
+                properties.getKeyVault().getTokenScope());
     }
 
     @Bean
@@ -169,12 +171,15 @@ public class DocumentStorageConfig {
      * so a deployment that forgets to set it fails the {@code prod} checks loudly in staging rather
      * than silently passing them in production.
      */
+    /**
+     * Delegated to {@link DeployedEnvironment}, the single answer to this question.
+     *
+     * <p>This held its own {@code {prod, production}} and had therefore never fired in production,
+     * where the profile is {@code azure} - so all three checks that key off it were inert: the
+     * credential source, and the refusals of local keys and local storage.
+     */
     private boolean isProduction(Environment environment) {
-        if (PRODUCTION_MARKERS.contains(String.valueOf(environment.getProperty("app.env")).toLowerCase())) {
-            return true;
-        }
-        return Arrays.stream(environment.getActiveProfiles())
-                .anyMatch(profile -> PRODUCTION_MARKERS.contains(profile.toLowerCase()));
+        return DeployedEnvironment.isDeployed(environment);
     }
 
     private String require(String value, String property) {

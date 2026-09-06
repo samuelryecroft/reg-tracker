@@ -125,7 +125,15 @@ public class ExportController {
         }
     }
 
-    /** Spends the token and streams the pack. A second attempt gets a 404, by design. */
+    /**
+     * Spends the token and streams the pack. A second attempt gets a 404, by design.
+     *
+     * <p>T218: the 404 now renders a page rather than an empty body, because there was real copy
+     * for this and nowhere to put it. <b>The response is identical for all four ways a redeem can
+     * fail</b> - unknown token, expired, already spent, another user's - because
+     * {@link ExportLinkService#redeem} collapses them into one empty Optional before this method
+     * sees anything. That is structural, not a convention this method maintains.
+     */
     @GetMapping("/export/download/{token}")
     public ResponseEntity<Resource> download(@PathVariable String token,
             @AuthenticationPrincipal AppUserPrincipal principal) {
@@ -136,7 +144,7 @@ public class ExportController {
                                 "attachment; filename=\"" + pack.filename() + "\"")
                         .contentLength(pack.content().length)
                         .body((Resource) new ByteArrayResource(pack.content())))
-                .orElseGet(() -> ResponseEntity.notFound().build());
+                .orElseThrow(ExportLinkUnavailableException::new);
     }
 
     /**

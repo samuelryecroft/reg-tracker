@@ -9,41 +9,49 @@
 <main id="main" class="narrow">
     <h1>Return Home Tracker</h1>
     <p class="sub">Sign in to raise, allocate or complete a return home interview.</p>
-    <div class="banner err" role="alert" th:if="${param.error}">
-        <span class="ic" aria-hidden="true">▲</span>
+    <!--/* D-4c-3 (spec §7l): the glyph literals become vendored Phosphor, per §5j - a character is
+         not a state, and both sat in aria-hidden spans doing decorative work an icon should do
+         properly. D-4c-1's own lockout banner is deliberately NOT built here - carded as T215,
+         gated on Kevin's ruling on whether the attempt counter tracks unknown usernames too (a
+         distinct message on real accounts only is a username enumeration oracle). */-->
+    <!--/* T215 / D-4c-1. TWO banners, and the generic one is now EXCLUSIVE: `?error=locked` also
+         satisfies `${param.error}`, so without the second test both would render and the reader
+         would be told to try again directly underneath being told that trying again is paused.
+
+         COPY IS CREED'S, VERBATIM, AND NAMES THE STATE NEVER THE ACCOUNT. It does not say whose
+         account, does not say whether one exists, and DELIBERATELY DOES NOT STATE THE REMAINING
+         TIME - a countdown lets an attacker schedule.
+
+         The wording is not what makes this safe, though. Which code path can reach it is: a
+         perfectly vague message that appears for real accounts and not for unknown ones discloses
+         exactly as much as a blunt one, because its PRESENCE is the signal. That is why the
+         selection is made by asking LoginAttemptService.isLocked and never by exception type -
+         see LoginFailureHandler. */-->
+    <div class="banner err" role="alert" th:if="${param.error != null and param.error[0] != 'locked'}">
+        <svg class="icon" aria-hidden="true"><use th:href="@{/icons/phosphor.svg} + '#ph-warning-circle'"></use></svg>
         <div><strong>We couldn't sign you in</strong><p>Check your username and password and try again.</p></div>
     </div>
+    <div class="banner err" role="alert" th:if="${param.error != null and param.error[0] == 'locked'}">
+        <svg class="icon" aria-hidden="true"><use th:href="@{/icons/phosphor.svg} + '#ph-warning-circle'"></use></svg>
+        <div><strong>Too many sign-in attempts</strong><p>For security, sign-in is paused for a short time.</p></div>
+    </div>
     <div class="banner ok" role="status" th:if="${param.logout}">
-        <span class="ic" aria-hidden="true">✓</span>
+        <svg class="icon" aria-hidden="true"><use th:href="@{/icons/phosphor.svg} + '#ph-check-circle'"></use></svg>
         <div><strong>You've been signed out</strong></div>
     </div>
     <div class="card">
+        <!--/* D-4c-5: required on both fields - the server-rendered banner above stays the
+             authority (the no-JS path still produces it on an empty POST), this only saves the
+             round trip the browser can catch for free. No summary panel: two fields, one generic
+             outcome - the floor pattern earns its keep on a form with groups to distinguish, not
+             a two-field card. */-->
         <form method="post" th:action="@{/login}">
             <label for="username">Username</label>
-            <input type="text" id="username" name="username" autocomplete="username" autofocus="autofocus"/>
+            <input type="text" id="username" name="username" autocomplete="username" autofocus="autofocus" required/>
             <label for="password">Password</label>
-            <input type="password" id="password" name="password" autocomplete="current-password"/>
+            <input type="password" id="password" name="password" autocomplete="current-password" required/>
             <div class="btn-row"><button type="submit" class="btn block">Log in</button></div>
         </form>
-    </div>
-    <!--/*
-      Parser-level comment: it is stripped before rendering, unlike a plain HTML comment. This page
-      is served to unauthenticated visitors, so notes about which endpoints exist behind which flag
-      do not belong in what the browser receives.
-
-      The block below renders only while the Entra path is actually wired (app.auth.entra.enabled).
-      With the flag off that authorization endpoint does not exist, so showing the button would offer
-      a dead control on the one page where the person cannot tell whether the fault is theirs.
-
-      A plain link rather than a form: this is a GET that starts the authorization-code flow against
-      Spring Security's own endpoint. No CSRF token, because there is nothing yet to protect - no
-      session and no authenticated identity.
-    */-->
-    <div class="card" th:if="${entraLoginEnabled}" style="margin-top:16px">
-        <p class="sub" style="margin-top:0">Or use your organisation account.</p>
-        <div class="btn-row">
-            <a class="btn block" th:href="@{/oauth2/authorization/entra}">Sign in with Entra</a>
-        </div>
     </div>
     <p class="sub" style="margin-top:16px">Trouble signing in? Contact your organisation's administrator.</p>
 </main>

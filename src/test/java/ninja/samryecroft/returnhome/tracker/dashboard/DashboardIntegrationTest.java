@@ -244,6 +244,12 @@ class DashboardIntegrationTest extends AbstractIntegrationTest {
         int home1Idx = html.indexOf(homeA1.getName());
         assertThat(home2Idx).isGreaterThan(tooFewHeadingIdx); // homeA2 (3 completed) only appears in the too-few block
         assertThat(home1Idx).isPositive().isLessThan(tooFewHeadingIdx); // homeA1 (6 completed) is ranked, above that heading
+        // D-2c-1 (spec §7b, 6b - same rulings as 2c): homeA1 is ranked (100%, 6 of 6), so its row
+        // carries the compliance bar - a CSS width on top of the value already in the row as text,
+        // never the only encoding of the number.
+        assertThat(html).contains("class=\"rate\"");
+        assertThat(html).contains("class=\"bar-fill\"");
+        assertThat(html).contains("width:100%");
     }
 
     @Test

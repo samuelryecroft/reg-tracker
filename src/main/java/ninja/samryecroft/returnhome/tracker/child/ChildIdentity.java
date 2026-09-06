@@ -40,7 +40,7 @@ package ninja.samryecroft.returnhome.tracker.child;
  * this precisely rather than letting "names are masked" be read as hiding identity from everyone
  * who can see the screen.
  */
-public record ChildIdentity(String avatar, String label) {
+public record ChildIdentity(String avatar, String label, String besideAvatar) {
 
     private static final String MIDDLE_DOT = " · ";
 
@@ -51,9 +51,9 @@ public record ChildIdentity(String avatar, String label) {
      */
     public static ChildIdentity of(Child child, boolean revealed) {
         if (revealed) {
-            return new ChildIdentity(rawInitials(child), child.getFullName());
+            return new ChildIdentity(rawInitials(child), child.getFullName(), child.getFullName());
         }
-        return new ChildIdentity(punctuatedInitials(child), maskedLabel(child));
+        return new ChildIdentity(punctuatedInitials(child), maskedLabel(child), besideAvatarLabel(child));
     }
 
     /** "AB" - no punctuation, so it reads as initials rather than an abbreviation of something. */
@@ -79,6 +79,32 @@ public record ChildIdentity(String avatar, String label) {
         return reference == null || reference.isBlank()
                 ? child.getInitials()
                 : child.getInitials() + MIDDLE_DOT + reference;
+    }
+
+    /**
+     * The label for a card that ALREADY shows {@link #avatar()} in an initials disc (S-1).
+     *
+     * <p>Masked, {@link #label()} is "A.B. · CH-0041" - which beside a disc reading "A.B" is the
+     * initials twice, in the state almost everyone sees almost all the time. So a card takes the
+     * case reference alone and lets the disc carry the initials: same information, said once, and
+     * it promotes the reference staff actually quote to each other and into the audit.
+     *
+     * <p>This is a SECOND projection, not a replacement - {@link #label()} stays exactly as it was
+     * for the screens that show a name without a disc beside it (an interview record's {@code h1}
+     * reading only "CH-0041" would be a regression, not a refinement).
+     *
+     * <p>The disc is real text rather than a decorative graphic, so the initials still reach a
+     * screen reader through it; put both inside the same link and the accessible name is
+     * "A.B CH-0041" - the same information {@code label()} carries today, with nothing lost to a
+     * non-visual reader by moving where it is drawn.
+     *
+     * <p>Falls back to {@link #label()}'s own masked form when no case reference is recorded: a
+     * child can exist here before intake assigns one, and a card whose only text is a disc would
+     * name nobody. Revealed, this and {@code label()} are the same full name.
+     */
+    private static String besideAvatarLabel(Child child) {
+        String reference = child.getLocalCaseReference();
+        return reference == null || reference.isBlank() ? maskedLabel(child) : reference;
     }
 
     private static String nullToEmpty(String s) {

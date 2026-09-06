@@ -49,7 +49,15 @@
    card floating on this file's new dark --color-bg would be broken
    regardless of whether anyone had "migrated" it yet.
    ══════════════════════════════════════════════════════════════════════ */
-:root {
+/* D-3a-6 (spec §7k): 3a's two-up branding preview forces one pane to each appearance regardless
+   of the viewer's own setting, so it needs this whole dark-appearance token set on a NON-root
+   element. Extending the selector list rather than copying the declarations - every value below
+   that reads var(--brand-hue) (the whole accent ramp) re-derives PER ELEMENT against whichever
+   --brand-hue is in scope, so a pane needs nothing but its own --brand-hue and this selector to
+   render the entire dark palette correctly; a second copy of this block would be the exact
+   duplication FrontendSourceGuardTest's lightAndAutoAppearanceBlocksStayDeclarationIdentical
+   exists to catch on the light/auto pair, one file section down. */
+:root, .theme-preview[data-appearance="dark"] {
     color-scheme: dark;
 
     --color-bg: #161826;
@@ -248,7 +256,10 @@
    lightness, hue still free, verified >=4.5:1 (text) and >=3:1 (the focus
    ring) at every hue an admin can pick. Everything else mirrors dark step
    N <-> step (1000-N) at the ground's own hue. */
-:root[data-appearance="light"] {
+/* D-3a-6 (spec §7k): same reasoning as the dark block's own comment above - extending the
+   selector list, never copying the declarations, so 3a's forced-light preview pane gets this
+   whole token set re-derived against its own --brand-hue for free. */
+:root[data-appearance="light"], .theme-preview[data-appearance="light"] {
     color-scheme: light;
     /* THE FIX (D-Q1). Not the mirrored ramp: on a light ground the mirrored 600/700
        come out LIGHTER than the base and measure 1.84:1. Fixed lightness, hue free.
@@ -489,13 +500,16 @@ textarea.input { min-height: 90px; resize: vertical; }
     display: flex; justify-content: space-between; width: 100%; min-height: 44px;
     padding: var(--s3) var(--s4); border: 1px solid var(--control-border); border-radius: 8px;
 }
-/* Creed's #75 review: --accent-dark/--tint are two of the four bridge tokens a legacy per-org
-   inline <style> overrides for a branded organisation (T186, §0's known-unsafe ground) - and
-   --tint is the specific token whose cream-in-dark-mode behaviour started that whole thread, so on
-   a branded org in dark mode the selected row would get a cream fill on the exact screen recording
-   the allocation decision. Fixed to the long ramp names T186 doesn't touch: --color-accent (border,
-   4.58:1 dark / 5.68:1 light on --color-surface) and --color-accent-900 (background - mirrors
-   properly, deep in dark/pale in light, which --tint currently can't do). */
+/* Creed's #75 review moved these off --accent-dark/--tint, which a legacy per-org inline <style>
+   then overrode with fixed values for a branded organisation - so on a branded org in dark mode the
+   selected row got a cream fill on the exact screen recording the allocation decision.
+
+   T186 DELETED THAT BLOCK. The short tokens are no longer overridden and now mirror between
+   appearances like everything else, so the reason this rule was moved has gone. The long names stay
+   because they are equivalent here and churn is worse than nothing - NOT because --accent-dark or
+   --tint are unsafe. Do not read this as a reason to avoid them, and do not spread the pattern:
+   --color-accent (border, 4.58:1 dark / 5.68:1 light on --color-surface) and --color-accent-900
+   (background) are simply the explicit ramp names. */
 .radio-list .radio:hover { border-color: var(--color-accent); }
 .radio-list .radio:has(input:checked) { border-color: var(--color-accent); background: var(--color-accent-900); }
 .radio-list .load { color: var(--muted); font-variant-numeric: tabular-nums; }
@@ -771,7 +785,32 @@ input, select, textarea {
 }
 textarea { min-height: 5.5rem; resize: vertical; }
 input[type="color"].swatch-input { padding: 0.25rem; height: 3rem; cursor: pointer; }
-input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); }
+/* T188. `outline: none` was here and is deliberately gone. Not because the ring was missing - it
+   renders today, and Creed withdrew that claim (spec 6h) after we both walked the cascade: the
+   element-qualified `input:focus-visible` block below is (0,1,1), the same as `input:focus`, and
+   later in source, so it wins.
+
+   THE DELETION CONVERTS A CORRECTNESS THAT DEPENDS ON SOURCE ORDER INTO ONE THAT DOES NOT.
+   That block exists TWICE - here and once earlier, identical selector lists, --ink aliasing
+   --color-text. Someone will dedupe them, and the obvious copy to delete is the later one, because
+   the earlier reads as the original. Do that while `outline: none` is still here and the survivor
+   sits BEFORE this rule: equal specificity, earlier loses, the outline is suppressed, and every text
+   input in the app silently loses its focus ring. No test fails and no screenshot moves, because
+   nothing in a static render is focused. With the suppression gone, either duplicate can go safely.
+
+   The border turning accent-coloured stays as reinforcement, and the outline is what carries the AA
+   obligation: 1.4.11 Non-text Contrast (AA) requires a focus indicator to reach 3:1 AGAINST ADJACENT
+   COLOURS, which the 2px --color-text ring does at any brand hue and a border on the brand hue does
+   not guarantee.
+
+   Citation corrected against the published Recommendation rather than carried over: this said
+   "2.4.11", which in WCAG 2.2 is Focus Not Obscured (Minimum) and is not about contrast at all. And
+   the 1.47-1.79:1 figure is a FOCUSED-VS-UNFOCUSED measurement, which belongs to 2.4.13 Focus
+   Appearance - AAA, not AA. 1.4.11 explicitly declines to require anything about the difference
+   between the two states. So that ratio is the AAA cost of the hazard above, not the AA obligation
+   and not a description of today - swapping the number's criterion without swapping its measurement
+   would have been the right criterion attached to the wrong pair. */
+input:focus, select:focus, textarea:focus { border-color: var(--accent); }
 /* Non-themeable focus indicator (FE-04): the branded border above is decoration; this outline is
    the real signal and survives any supplier colour, including a pale one that fails contrast. */
 a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible,
@@ -784,7 +823,10 @@ textarea:focus-visible, summary:focus-visible, .checkbox-option:focus-within {
 input.is-invalid, select.is-invalid, textarea.is-invalid {
     border-color: var(--error);
     border-width: 2px;
-    background: #FFF7F7;
+    /* Was #FFF7F7: a fixed pale-red fill under an ink that follows the appearance, i.e. the
+       .tile.urgent bug on EVERY invalid field in the app, in the one state a user most needs
+       to be able to read. Creed's sweep found the tiles; this came out of searching the shape. */
+    background: var(--error-bg);
 }
 .field-error {
     display: flex;
@@ -924,8 +966,10 @@ fieldset.checkbox-fieldset > legend {
     border-radius: 12px;
     font-size: var(--t-xs);
     font-weight: 700;
-    background: #eef2f6;
-    color: #333;
+    /* Both halves were hard-coded, so this pair was at least self-consistent - but it ignored
+       the appearance entirely, and every .status.* modifier below already takes a themed pair. */
+    background: var(--neutral-bg);
+    color: var(--neutral);
 }
 .status.REQUESTED { background: var(--warn-bg); color: var(--warn); }
 .status.ALLOCATED, .status.SCHEDULED, .status.REPORT_SUBMITTED { background: var(--info-bg); color: var(--info); }
@@ -998,9 +1042,6 @@ fieldset.checkbox-fieldset > legend {
    the rail marker, the status tag and the visitor's own banner already share; the tokens
    themselves were already locked (D-1a-2a). */
 .banner.sent-back { background: var(--sent-back-bg); color: var(--sent-back); border: 1px solid transparent; border-color: color-mix(in srgb, var(--sent-back) 25%, transparent); }
-/* .banner-warning kept as an alias so nothing already using it silently loses its styling. */
-.banner-warning { background: var(--warn-bg); color: var(--warn); border: 1px solid #EBCF8A; border-radius: var(--radius); padding: var(--s4); margin-bottom: var(--s4); }
-.banner-warning p { margin: 0.35rem 0 0; white-space: pre-wrap; }
 
 .muted { color: var(--muted); }
 dl.detail dt { font-weight: 650; margin-top: var(--s3); font-size: var(--t-xs); color: var(--muted); }
@@ -1081,13 +1122,17 @@ table caption { text-align: left; font-size: var(--t-xs); color: var(--muted); p
 }
 .rowlink { color: var(--accent-dark); font-weight: 650; text-decoration: none; display: inline-flex; align-items: center; min-height: 44px; margin-right: var(--s3); }
 .rowlink:hover, .rowlink:focus-visible { text-decoration: underline; }
-tr.group th { background: #F3F4F6; color: var(--ink); text-transform: none; font-size: var(--t-sm); letter-spacing: 0; }
 /* T165: the urgency-tier glyph is an aria-hidden <svg> in markup now, not a character inside the
    announced heading text - this keeps it on the text baseline in both the table and .stack views. */
 .due-group-head { display: inline-flex; align-items: center; gap: 6px; }
 
 /* stacked-card table - the mobile alternative to <table>, shown/hidden by the breakpoint below */
 .stack { display: none; flex-direction: column; gap: var(--s3); margin-top: var(--s5); }
+/* 6a (spec §7b): a page with no table at all (R-Q12 - cards for people, not a second table copy)
+   needs its card list visible at every width, not just below the breakpoint that used to reveal
+   it beside a hidden table. A distinct modifier rather than changing .stack itself, which every
+   still-paired table+stack screen still depends on staying breakpoint-gated. */
+.stack.solo { display: flex; }
 .srow { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: var(--s4); }
 .srow .top { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--s3); margin-bottom: var(--s2); }
 .srow .name { font-weight: 700; font-size: var(--t-md); }
@@ -1267,7 +1312,11 @@ fieldset.step[hidden] { display: none; }
     color: var(--muted); text-decoration: none; background: transparent;
 }
 .section-index a:hover { background: var(--surface); color: var(--color-text); }
-.section-index a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* T188: --color-accent, not the legacy --accent alias. They resolve to the same colour today, so
+   this changes nothing visually - it is here because this was the last focus rule still reading the
+   token T186 overrides, and leaving one behind is how the next person concludes the migration was
+   finished. The ring being brand-derived at all is the separate FE-04 question, flagged to Creed. */
+.section-index a:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
 body:has(#request:target) .section-index a[href="#request"],
 body:has(#young-person:target) .section-index a[href="#young-person"],
 body:has(#professionals:target) .section-index a[href="#professionals"],
@@ -1386,8 +1435,19 @@ dialog.dialog { border: none; }
 .tile .num { display: block; font-size: 30px; font-weight: 700; line-height: 1.15; margin: 4px 0 2px; font-variant-numeric: tabular-nums; }
 .tile .den { display: block; font-size: var(--t-xs); color: var(--muted); }
 .tile .go { display: block; font-size: var(--t-xs); font-weight: 700; color: var(--accent-dark); margin-top: var(--s2); }
-.tile.urgent { border-color: #F3C0C0; background: #FFFAFA; }
-.tile.warn { border-color: #EBCF8A; background: #FFFDF6; }
+/* LIVE DARK-MODE DEFECT, fixed (Creed's 2c review). Both rules used to set a hard-coded
+   LIGHT background (#FFFAFA / #FFFDF6) and no ink at all, so .num / .lab / .den / .go kept
+   inheriting --color-text - which is near-white in dark. Measured on dark: the .num, the
+   30px COUNT ITSELF, at 1.17:1 and 1.19:1; .lab/.den 2.23-2.27:1; .go 1.43-1.59:1. These
+   are the "needs attention" tiles, so the number that was invisible was the overdue count.
+   Same class as the .due.overdue bug (#48), not cosmetic.
+
+   The fix takes fill AND border from the semantic family and sets NO ink, so color:inherit
+   keeps working in both appearances. The border derives at 25% (§5h) and its fallback for a
+   browser without color-mix() is TRANSPARENT, never the old literal: a fallback degrades to
+   ABSENCE, because #F3C0C0 is precisely the value that produces the bug this removes. */
+.tile.urgent { background: var(--error-bg); border: 1px solid transparent; border-color: color-mix(in srgb, var(--error) 25%, transparent); }
+.tile.warn { background: var(--warn-bg); border: 1px solid transparent; border-color: color-mix(in srgb, var(--warn) 25%, transparent); }
 
 /* small flag chips (recurrence panel) - reuses the same neutral/semantic families as .due and .status */
 .pill {
@@ -1401,6 +1461,18 @@ dialog.dialog { border: none; }
     .no-print, .zone-hd form, .zone-hd select, .btn { display: none !important; }
     .zone, .tile, table { break-inside: avoid; }
 }
+
+/* ============================== split card (D-4b-5, spec §7e) ==============================
+   A description block beside an action block, wrapping under a narrow viewport - not a one-off,
+   it is the shape a card wants whenever it pairs "what this is" with "what to do about it" (4a's
+   own summary wants it too). Replaces four inline style attributes that used to live in
+   children/detail.html's case-file card. */
+.split-card { display: flex; gap: var(--s5); align-items: flex-start; flex-wrap: wrap; }
+.split-card-info { flex: 1 1 320px; }
+.split-card-info h3 { margin-top: 0; }
+.split-card-info > p { margin: 0; }
+.split-card-info > p + p { margin-top: var(--s2); }
+.split-card-actions { flex: 0 0 auto; display: flex; flex-direction: column; align-items: flex-start; gap: var(--s2); }
 
 /* ============================== audit feed (roadmap 2.5) ============================== */
 .filters { display: flex; gap: var(--s3); flex-wrap: wrap; align-items: flex-end; margin: var(--s4) 0; }
@@ -1427,3 +1499,247 @@ dialog.dialog { border: none; }
     display: inline-flex; align-items: center; gap: 6px; font-size: var(--t-xs); font-weight: 700;
     background: var(--warn-bg); color: var(--warn); padding: 3px 10px; border-radius: 999px;
 }
+
+/* ============================== 2a · queue filter chips ==============================
+   D-2a-4: the chips are .seg/.seg-opt, the shipped single-choice treatment - the controller
+   takes one `filter` param, so filtering IS single-choice, and .checkbox-option would promise
+   a combination the backend cannot honour. The component ships keyed off `:has(input:checked)`
+   because its first use was radio inputs; here the options are links, so selection arrives as
+   aria-current instead. These two rules give a selected LINK the same accent ink plus inset
+   ring - the ring is the point: it is what stops the active chip being colour alone.
+   Additive only; the existing .seg-opt rules above are untouched. */
+.seg-opt[aria-current] { color: var(--color-accent); box-shadow: inset 0 0 0 1px var(--color-accent); }
+.seg-opt:not([aria-current]):hover { background: color-mix(in srgb, var(--color-text) 7%, transparent); }
+/* The chip row is a link group, so its options need the link ink reset and a wrap: a coordinator
+   with a deep-linked filter on sees six chips, which will not fit one line on a narrow window. */
+nav.seg { flex-wrap: wrap; text-decoration: none; }
+nav.seg .seg-opt { color: inherit; text-decoration: none; }
+/* Tabular figures so the counts do not jitter the chip widths between renders. */
+.seg-count { font-variant-numeric: tabular-nums; opacity: 0.75; }
+
+/* ============================== S-1/S-2 · the case card ==============================
+   The row used by every list of PEOPLE OR CASES: the four interview lists through
+   fragments/case-card.html, and 4d's user list directly on these classes. This said "every
+   list of interview requests", which was true when it was written and stopped being true
+   when 4d adopted the row - a scope clause is a claim in its own right, and this one would
+   have gone on reading as a rule against reuse long after reuse was the intended thing. The
+   columns are shared so a list scans down its own edges: identity, the screen's second
+   fact, the two tags, one action with a MINIMUM width (D-2a-3 - 104px in the canvas is
+   incidental; a fixed width truncates a longer label and breaks under translation, while
+   a minimum still gives the list one aligned button edge, which is what that number was
+   reaching for). Nothing above this block is edited. */
+.case-group + .case-group { margin-top: var(--s5); }
+.case-group-head {
+    display: flex; align-items: center; gap: var(--s3);
+    font-size: var(--t-md); margin: 0 0 var(--s3);
+}
+.case-group-count { color: var(--muted); font-weight: 400; font-variant-numeric: tabular-nums; }
+.case-list { display: flex; flex-direction: column; gap: var(--s2); }
+.case {
+    display: flex; align-items: center; gap: var(--s4);
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: var(--s3) var(--s4);
+}
+/* The link is the identity block, not the row: the whole-card target is deliberately
+   rejected (S-1/D-2a-7), so the name is what carries the affordance. .rowlink already
+   supplies the 44px minimum. */
+.case-link { display: flex; align-items: center; gap: var(--s3); flex: 1.4 1 0; min-width: 0; }
+.case-avatar {
+    width: 38px; height: 38px; border-radius: 50%; flex: none;
+    display: grid; place-items: center;
+    background: var(--tint); color: var(--accent-dark);
+    font-size: var(--t-sm); font-weight: 650;
+}
+.case-ident { min-width: 0; }
+.case-name { display: block; font-size: var(--t-md); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.case-meta { display: block; font-size: var(--t-xs); font-weight: 400; color: var(--muted); }
+.case-aside { flex: 1 1 0; min-width: 0; font-size: var(--t-sm); }
+.case-aside .lbl {
+    display: block; font-size: var(--t-xs); letter-spacing: 0.09em;
+    text-transform: uppercase; color: var(--muted);
+}
+.case-tags { display: flex; align-items: center; gap: var(--s2); flex: none; }
+.case-action { flex: none; display: flex; align-items: center; gap: var(--s2); min-width: 104px; }
+.case-action .btn { margin-top: 0; width: 100%; }
+/* The reason a card has no action (2d's self-review guard, D-2d-1): a sentence, never a
+   disabled button - a disabled control is not focusable, so it cannot explain itself. */
+.case-action .case-no-action { font-size: var(--t-xs); color: var(--muted); }
+
+/* 4d additions. Deliberately NOT .case-action: that carries min-width:104px for a button, and
+   an icon stretched to 104px is the width reaching for an aligned button edge on a row that
+   has no button. */
+.case-edit { flex: none; display: grid; place-items: center; color: var(--muted); }
+.case-edit:hover { color: var(--accent-dark); }
+.role-chips { flex-wrap: wrap; }
+/* The username under the name, as a second identifier rather than a second name - monospace so
+   a login key reads as one and cannot be mistaken for the person's own spelling of themselves. */
+.case-username { font-family: ui-monospace, Menlo, Consolas, monospace; }
+/* A disabled account is dimmed on the canvas. The dimming is reinforcement only - the "Disabled"
+   chip carries the meaning - because opacity is a colour-only signal and 1.4.1 does not accept
+   one alone. Held at .62 as drawn; the chip and the name stay above AA at that value because
+   both sit on --surface rather than on the page ground. */
+.case-inactive { opacity: 0.62; }
+
+/* Below the shell's own breakpoint the row cannot hold five columns, so it stacks. The
+   action goes full width rather than shrinking: it is the one thing on the card that is a
+   tap target, and D-Q3's 44px is a floor, not a target to squeeze back towards. */
+@media (max-width: 720px) {
+    .case { flex-wrap: wrap; align-items: flex-start; }
+    .case-link { flex: 1 1 100%; }
+    .case-aside { flex: 1 1 100%; }
+    .case-tags { flex: 1 1 100%; flex-wrap: wrap; }
+    .case-action { flex: 1 1 100%; }
+}
+/* 2f's sent-back card: the reviewer's comment is what the visitor has to act on, so it
+   sits on the card rather than one navigation away. A note breaks the row's single line,
+   so the card becomes a two-row block; the label is what attributes the words to their
+   author, without which "you must add the times" arrives unattributed. */
+.case-with-note { flex-wrap: wrap; }
+.case-note {
+    flex: 1 1 100%;
+    border-top: 1px solid var(--border);
+    margin-top: var(--s2);
+    padding-top: var(--s3);
+}
+.case-note .lbl {
+    display: block; font-size: var(--t-xs); letter-spacing: 0.09em;
+    text-transform: uppercase; color: var(--muted);
+}
+.case-note p { margin: var(--s1) 0 0; font-size: var(--t-sm); white-space: pre-wrap; }
+
+/* ============================== 2c · compliance bars ==============================
+   D-2c-1. The bar is decoration over a number the row already states in words, so it
+   carries no ARIA and needs none - it is aria-hidden, and removing it loses nothing but
+   the at-a-glance comparison between rows. It still takes 3:1 against its own track:
+   an invisible encoding is not a safe encoding just because it is redundant. */
+.rate { display: block; font-variant-numeric: tabular-nums; }
+.bar {
+    display: block; height: 6px; margin-top: 5px; min-width: 90px;
+    border-radius: 999px; background: var(--neutral-bg); overflow: hidden;
+}
+.bar-fill { display: block; height: 100%; background: var(--accent-dark); border-radius: inherit; }
+
+/* ============================== 2e · the raise-a-request form ==============================
+   Four groups with a sticky rail. The rail is jump links, not tabs (D-1a-3's reasoning: a
+   long form that is read and checked in full, and printed). scroll-margin-top on the
+   headings so a jumped-to heading clears the sticky shell header instead of landing
+   underneath it, and tabindex="-1" in the markup so the jump moves the READING CURSOR and
+   not just the scroll position - without it a keyboard or screen-reader user is scrolled
+   to a section their focus is nowhere near. */
+.form-layout { display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: var(--s5); align-items: start; }
+.form-rail { position: sticky; top: 76px; display: flex; flex-direction: column; gap: 2px; }
+.form-rail a {
+    display: flex; align-items: center; min-height: 44px;
+    padding: 0 var(--s3); border-radius: 6px;
+    color: var(--muted); text-decoration: none; font-size: var(--t-sm);
+}
+.form-rail a:hover, .form-rail a:focus-visible { background: var(--tint); color: var(--accent-dark); }
+.form-layout h3 { scroll-margin-top: 76px; }
+/* The rail is a shortcut, not the only way through: below the breakpoint the form is one
+   column and every section is a short scroll away, so the rail stops earning its width. */
+@media (max-width: 900px) {
+    .form-layout { grid-template-columns: 1fr; }
+    .form-rail { display: none; }
+}
+
+/* ============================== 3a · branding live preview (spec §7j/§7k) ==============================
+   Layout only - the appearance-driven token set each pane renders under comes from extending the
+   existing [data-appearance="light"/"dark"] selector lists further up this file, not from anything
+   declared here (D-3a-6). background/color are the one thing that HAS to be explicit: custom
+   properties don't paint anything by themselves, and a nested pane's own --color-bg/--color-text
+   would otherwise sit unused while body's ambient background showed through. */
+.theme-preview-row { display: flex; gap: var(--s4); flex-wrap: wrap; margin: var(--s4) 0; }
+.theme-preview {
+    flex: 1 1 260px; padding: var(--s4); border-radius: var(--radius);
+    background: var(--color-bg); color: var(--color-text);
+}
+.theme-preview-label {
+    font-size: var(--t-xs); font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+    color: var(--color-text-muted); margin: 0 0 var(--s3);
+}
+.theme-preview h3 { margin: 0 0 var(--s2); }
+.theme-preview p { margin: 0 0 var(--s3); }
+.theme-preview .btn-row { margin-top: 0; }
+
+/* ============================== 6e · the error page ==============================
+   Centred, one card, no shell. The no-shell part is INHERITED, not decided here: error.html
+   has never included fragments/layout's nav, and no note says why. It is left that way
+   because the reason that suggests itself is a good one - a 403 is precisely the case where
+   the sidebar's own links may be what the person cannot reach - but that is this author's
+   reading of an existing choice, not a recorded one, and it should not harden into a rule
+   by being written down confidently. Either way the page has to stand alone at every width. */
+.error-page {
+    min-height: 70vh; display: grid; place-items: center;
+    padding: var(--s5); text-align: center;
+}
+.error-card {
+    max-width: 46ch; display: flex; flex-direction: column;
+    align-items: center; gap: var(--s3);
+}
+.error-icon { width: 2.5rem; height: 2.5rem; color: var(--muted); }
+.error-card h1 { margin: 0; }
+.error-body { margin: 0; color: var(--muted); line-height: 1.55; }
+.error-actions { display: flex; gap: var(--s3); flex-wrap: wrap; justify-content: center; }
+/* The status, demoted from the <h1> it used to be (FE-19). Small and muted because it is
+   for quoting to someone else, not for reading first. */
+.error-status { margin: var(--s2) 0 0; font-size: var(--t-xs); color: var(--muted); }
+/* The 404's own message - which link was broken. Monospace because it usually contains an
+   identifier, and an identifier read in prose type is one a person mis-transcribes. */
+.error-detail {
+    margin: 0; font-size: var(--t-sm); color: var(--muted);
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+    overflow-wrap: anywhere;
+}
+
+/* ============================== 4e · the organisation tree ==============================
+   Reuses the .case row from 4d/the interview lists rather than inventing a node component:
+   a supplier and a care provider are both "one entity, its second fact, its tags", which is
+   what that row already is. What the tree adds is only the INDENT and the rule that draws
+   the relationship. */
+.org-tree { display: flex; flex-direction: column; gap: var(--s5); margin-top: var(--s4); }
+.org-branch { display: flex; flex-direction: column; gap: var(--s2); }
+/* The children sit inside a left rule rather than on a bare margin, so the relationship is
+   drawn rather than implied by whitespace - whitespace alone reads as a gap once the list is
+   longer than one screen. --border, not the accent: the rule is structure, not emphasis. */
+.org-children {
+    display: flex; flex-direction: column; gap: var(--s2);
+    margin-left: var(--s4); padding-left: var(--s4);
+    border-left: 2px solid var(--border);
+}
+.org-children:empty { display: none; }
+.org-supplier .case-avatar { background: var(--accent); color: var(--accent-ink); }
+.org-icon { width: 1.25rem; height: 1.25rem; color: var(--muted); flex: none; }
+.org-orphan-head { font-size: var(--t-md); margin: 0; }
+/* The supplier and provider rows are not links - nothing is behind them yet. .case-link carries
+   the layout, .rowlink carries the affordance, and only the second is omitted, so these read as
+   information rather than as controls that do nothing (Creed's shell-org caret ruling). */
+.org-tree .case-link { display: flex; align-items: center; gap: var(--s3); flex: 1.4 1 0; min-width: 0; }
+
+@media (max-width: 720px) {
+    .org-children { margin-left: var(--s2); padding-left: var(--s3); }
+}
+
+/* ============================== 6c · one audit event in full ==============================
+   No new components: the record itself is a dl.detail, the absences are a plain list, and
+   the permanence line is the only new piece because it is the only thing on the page that
+   is an assurance rather than a field. */
+.page-head { margin-bottom: var(--s4); }
+.page-head h1 { margin: 0 0 var(--s1); }
+.not-kept-head { font-size: var(--t-md); margin: 0 0 var(--s3); }
+/* Dashes as list markers, matching the canvas: these rows are absences, and a bullet reads
+   as a thing that is present. THE DASH IS aria-hidden MARKUP, NOT A ::before content STRING.
+   I wrote the ::before first, reasoning that a pseudo-element is decorative by definition -
+   it is not: AnnouncedGlyphSourceGuardTest caught it, and it is right that the major screen
+   readers expose ::before content to the accessibility tree, where it is announced before the
+   sentence it decorates. "Decorative" is a property of what the accessibility tree is told,
+   not of which layer draws it. */
+.not-kept { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--s2); }
+.not-kept li { display: flex; gap: var(--s3); color: var(--muted); font-size: var(--t-sm); }
+.not-kept .mark { flex: none; }
+.permanence {
+    display: flex; align-items: flex-start; gap: var(--s3);
+    margin: var(--s4) 0; padding: var(--s3) var(--s4);
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    font-size: var(--t-sm); color: var(--muted);
+}
+.permanence .icon { flex: none; margin-top: 2px; }

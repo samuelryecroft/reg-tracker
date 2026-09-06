@@ -9,6 +9,7 @@ import ninja.samryecroft.returnhome.tracker.audit.AuditEventPublisher;
 import ninja.samryecroft.returnhome.tracker.child.NameRevealService;
 import ninja.samryecroft.returnhome.tracker.home.HomeRepository;
 import ninja.samryecroft.returnhome.tracker.organisation.OrganisationAccessService;
+import ninja.samryecroft.returnhome.tracker.security.LoginFailureHandler;
 import ninja.samryecroft.returnhome.tracker.theme.ThemeService;
 import ninja.samryecroft.returnhome.tracker.user.RoleMatrix;
 import ninja.samryecroft.returnhome.tracker.web.LoginController;
@@ -24,6 +25,17 @@ import org.springframework.test.web.servlet.MockMvc;
 @WebMvcTest(controllers = {RootController.class, LoginController.class})
 @Import(SecurityConfig.class)
 class SecurityConfigTest {
+
+    /**
+     * T215's failure handler. SecurityConfig now requires it, and this slice imports SecurityConfig
+     * without component-scanning, so without a bean here the whole context fails to start and every
+     * test in the class errors before asserting anything. Mocked rather than imported: the real one
+     * needs LoginAttemptService and AppProperties, and this class is about which routes each role
+     * may reach, not about what a failed sign-in renders (that is LoginFailureHandlerTest and
+     * LoginLockoutIntegrationTest).
+     */
+    @MockitoBean
+    private LoginFailureHandler loginFailureHandler;
 
     @Autowired
     private MockMvc mockMvc;
@@ -92,18 +104,5 @@ class SecurityConfigTest {
         // authorization filter surfaces as 404 (no handler), not 403 (denied) or a login redirect.
         mockMvc.perform(get("/admin/users"))
                 .andExpect(status().isNotFound());
-    }
-
-    @Test
-    void entraEnabledWithoutAClientRegistrationRefusesToStart() {
-        // Deliberately not a silent fall back to form login. A deployment that asked for Entra and
-        // did not get it would otherwise start and look healthy, so the misconfiguration would be
-        // reported by whoever could not sign in - the worst possible channel for a front door.
-        // Asserted on the guard directly: booting a knowingly broken application proves the same
-        // thing far more slowly.
-        assertThatThrownBy(() -> SecurityConfig.requireClientRegistrations(null))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("app.auth.entra.enabled is true")
-                .hasMessageContaining("'entra' profile");
     }
 }

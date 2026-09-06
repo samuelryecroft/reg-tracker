@@ -11,7 +11,7 @@
     <h1 th:text="${view.orgName()}">Care Provider</h1>
     <p class="muted" th:text="${view.homeCount() + (view.homeCount() == 1 ? ' home · ' : ' homes · ') + view.childCount() + ' children · Care Provider'}">Summary</p>
 
-    <!-- ============ LIVE ZONE ============ -->
+    <!--/* ============ LIVE ZONE ============ */-->
     <section class="zone live" aria-labelledby="z1">
         <div class="zone-hd">
             <h2 id="z1">Needs attention</h2>
@@ -27,7 +27,7 @@
         </div>
     </section>
 
-    <!-- ============ PERFORMANCE ZONE ============ -->
+    <!--/* ============ PERFORMANCE ZONE ============ */-->
     <section class="zone" aria-labelledby="z2">
         <div class="zone-hd">
             <h2 id="z2">Performance</h2>
@@ -53,8 +53,16 @@
                 <span class="num" th:if="${view.overallRate().percent().isPresent()}" th:text="${view.overallRate().percent().getAsInt()} + '%'">82%</span>
                 <span class="num" style="font-size:19px;color:var(--muted);font-weight:650" th:unless="${view.overallRate().percent().isPresent()}">Not enough data yet</span>
                 <span class="den" th:text="${view.overallRate().within72() + ' of ' + view.overallRate().validCompleted()}">41 of 50</span>
-                <span class="den" style="display:block;margin-top:8px;padding-top:8px;border-top:1px solid var(--border);color:var(--warn);font-weight:650" th:if="${view.overallRate().excludedNotMeasurable() > 0}"
-                      th:text="${'◷ ' + view.overallRate().excludedNotMeasurable() + ' further interview' + (view.overallRate().excludedNotMeasurable() == 1 ? '' : 's') + ' excluded — interview time not recorded'}">excluded</span>
+                <!--/* T165: the clock is aria-hidden markup, not a character inside announced text.
+                     As a U+25F7 baked into this th:text it reached a screen reader as the CHARACTER'S
+                     NAME, ahead of the sentence that said what had actually been excluded. The guard
+                     that was meant to stop this only scanned Java and CSS, never templates. */-->
+                <span class="den" style="display:block;margin-top:8px;padding-top:8px;border-top:1px solid var(--border);color:var(--warn);font-weight:650" th:if="${view.overallRate().excludedNotMeasurable() > 0}">
+                    <svg class="icon" aria-hidden="true"><use th:href="@{/icons/phosphor.svg} + '#ph-clock-countdown'"></use></svg>
+                    <span th:text="${view.overallRate().excludedNotMeasurable() + ' further interview'
+                            + (view.overallRate().excludedNotMeasurable() == 1 ? '' : 's')
+                            + ' excluded — interview time not recorded, distorts this figure for the home responsible too'}">excluded</span>
+                </span>
             </div>
         </div>
 
@@ -68,8 +76,19 @@
             <tr th:each="row : ${view.rankedHomes()}">
                 <td><a class="rowlink" th:href="${row.href()}" th:text="${row.name()}">Home</a></td>
                 <td th:text="${row.stat().validCompleted()}">0</td>
-                <td><span th:text="${row.stat().percent().getAsInt()} + '%'">82%</span>
-                    <span style="font-size:11px;color:var(--muted);display:block" th:text="${row.stat().within72() + ' of ' + row.stat().validCompleted()}">41 of 50</span></td>
+                <!--/*
+                  D-2c-1 (spec §7b, applied to 6b - same rulings as 2c): no chart library, no SVG,
+                  no ARIA. The value is in the row AS TEXT and the bar is a CSS width on top of it,
+                  so the bar is a visual encoding of a number that is already readable and the row
+                  is already the accessible content.
+                */-->
+                <td>
+                    <span class="rate" th:text="${row.stat().within72() + ' of ' + row.stat().validCompleted()
+                            + ' · ' + row.stat().percent().getAsInt() + '%'}">41 of 50 · 82%</span>
+                    <span class="bar" aria-hidden="true">
+                        <span class="bar-fill" th:style="'width:' + ${row.stat().percent().getAsInt()} + '%'"></span>
+                    </span>
+                </td>
                 <td th:text="${row.stat().excludedNotMeasurable()}">0</td>
                 <td th:text="${row.overdueNow()}">0</td>
             </tr>
@@ -119,7 +138,7 @@
         </div>
     </section>
 
-    <!-- ============ RECURRENCE PANEL ============ -->
+    <!--/* ============ RECURRENCE PANEL ============ */-->
     <section class="zone" aria-labelledby="z3">
         <div class="zone-hd">
             <h2 id="z3">Recurring missing episodes</h2>
@@ -139,7 +158,8 @@
                 </td>
                 <td th:text="${entry.latestSummary()}">Status</td>
             </tr>
-            <tr th:if="${#lists.isEmpty(view.recurrence())}"><td colspan="4" class="muted">No recurring missing episodes flagged on any open or recent request.</td></tr>
+            <!--/* R-Q13 (spec §5d), final copy - was a shorter, pre-final line on both dashboards. */-->
+            <tr th:if="${#lists.isEmpty(view.recurrence())}"><td colspan="4" class="muted">No recurring missing episodes have been flagged on open or recent requests. These are flagged by the home on the request form, so this does not rule out recurrence.</td></tr>
             </tbody>
         </table>
         </div>
@@ -153,7 +173,7 @@
                     <dt>Latest request status</dt><dd th:text="${entry.latestSummary()}">Status</dd>
                 </dl>
             </div>
-            <div class="empty" th:if="${#lists.isEmpty(view.recurrence())}">No recurring missing episodes flagged on any open or recent request.</div>
+            <div class="empty" th:if="${#lists.isEmpty(view.recurrence())}">No recurring missing episodes have been flagged on open or recent requests. These are flagged by the home on the request form, so this does not rule out recurrence.</div>
         </div>
     </section>
 </main>

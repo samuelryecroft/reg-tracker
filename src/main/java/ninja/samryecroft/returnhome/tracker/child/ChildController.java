@@ -1,13 +1,19 @@
 package ninja.samryecroft.returnhome.tracker.child;
 
 import jakarta.validation.Valid;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Locale;
+import java.util.stream.Collectors;
 import ninja.samryecroft.returnhome.tracker.audit.AuditEventPublisher;
 import ninja.samryecroft.returnhome.tracker.audit.AuditHistoryService;
 import ninja.samryecroft.returnhome.tracker.child.dto.CreateChildForm;
 import ninja.samryecroft.returnhome.tracker.export.ExportCapability;
 import ninja.samryecroft.returnhome.tracker.home.Home;
 import ninja.samryecroft.returnhome.tracker.home.HomeRepository;
+import ninja.samryecroft.returnhome.tracker.interview.DeadlineTracker;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewRequest;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewRequestRepository;
 import ninja.samryecroft.returnhome.tracker.organisation.OrgType;
@@ -79,11 +85,108 @@ public class ChildController {
         List<Child> sorted = children.stream()
                 .sorted(showHomeColumn ? ChildRepository.BY_HOME_THEN_NAME : ChildRepository.BY_NAME)
                 .toList();
+        boolean revealed = nameRevealService.isRevealed();
         model.addAttribute("children", sorted);
-        model.addAttribute("isAdmin", showHomeColumn);
-        model.addAttribute("childIdentities",
-                ChildIdentities.mapOf(sorted, c -> c, nameRevealService.isRevealed()));
+        model.addAttribute("showHomeColumn", showHomeColumn);
+        model.addAttribute("childIdentities", ChildIdentities.mapOf(sorted, c -> c, revealed));
+        model.addAttribute("childRows",
+                sorted.stream().collect(Collectors.toMap(Child::getId, c -> ChildListRow.of(c, revealed))));
         return "children/list";
+    }
+
+    /**
+     * T193 (PILOT-GATE, spec §7f D-4b-11): {@code children/list.html} took names through
+     * {@link ChildIdentities} but read {@code Child}'s date of birth straight off the entity - an
+     * {@code @Encrypted} (Article 9) field - so a masked row showed initials alongside an exact
+     * birth date in the clear. Gated here the same way {@link ChildIdentity} resolves its own
+     * fields: the caller decides {@code revealed} once, and the template receives exactly one
+     * already-resolved string - never a hidden value sitting unrendered in the DOM, and never both
+     * strings present at once. The original T193 fix also gated the case reference; see below for
+     * why that part was reverted.
+     *
+     * <p><strong>The case reference is never gated - it is not a disclosure to begin with.</strong>
+     * Kevin's masked label already carries it on every row ("A.B. · CH-0041" - see
+     * {@link ChildIdentity}'s own javadoc); masking defeats a stranger's glance, not a colleague's,
+     * by design. An earlier version of this fix masked the column too, "for consistency" - that was
+     * wrong: a masked row then read <em>Case reference: Hidden</em> two columns from a name that
+     * openly displayed it, so the only value the column withheld was one already on screen. A false
+     * "Hidden" doesn't just mislead, it makes the reader act - the one control on offer to see a
+     * value that's already visible is the reveal toggle, so a user chasing the reference reveals
+     * every child's full name on the page to get back something they could already read. Deciding a
+     * value MAY be withheld is a different decision from deciding what the withheld state SAYS, and
+     * the column's text is the one a reader actually acts on (Creed, T193 follow-up).
+     *
+     * <p>A private, page-scoped record rather than a change to {@link ChildIdentity} itself: that
+     * type is a separate, already-ruled ticket (making reveal strictly additive), and this page
+     * needs to be correct both before and after that change lands.
+     *
+     * <p>Named {@code dob()}/{@code caseReference()} rather than mirroring {@code Child}'s own
+     * accessor names on purpose: T194's guard scans template source for a bare property-read of
+     * either encrypted field name, by design with no receiver-type check (documented in its own
+     * javadoc as the accepted trade-off against a hand-maintained allow-list) - so a differently-
+     * named accessor here can never register as a fresh read of the entity, distinguishing it by
+     * construction rather than relying on a reviewer to keep re-deriving that this record's own
+     * two fields are already-resolved strings, not the encrypted values themselves.
+     */
+    private record ChildListRow(String dob, String caseReference) {
+        // Pinned explicitly rather than left to inherit the JVM default: the #temporals.format
+        // call this replaced resolved its locale through Thymeleaf/Spring's own LocaleResolver
+        // (no custom bean configured, so it falls back to the request's Accept-Language, not a
+        // fixed one), so leaving this formatter unpinned would be a real behaviour change, not a
+        // like-for-like swap - the same class of gap Jim's report-date formatters have (Creed's
+        // T193 follow-up).
+        private static final DateTimeFormatter DOB_FMT = DateTimeFormatter.ofPattern("dd MMM yyyy", Locale.UK);
+        private static final String HIDDEN = "Hidden";
+
+        static ChildListRow of(Child child, boolean revealed) {
+            String dob = revealed
+                    ? (child.getDateOfBirth() == null ? "Not recorded" : child.getDateOfBirth().format(DOB_FMT))
+                    : HIDDEN;
+            String reference = child.getLocalCaseReference() == null || child.getLocalCaseReference().isBlank()
+                    ? "—" : child.getLocalCaseReference();
+            return new ChildListRow(dob, reference);
+        }
+    }
+
+    /**
+     * D-4b-8 (spec §7e, closed via D-4b-9/T195): the identity block under the {@code <h1>} - date of
+     * birth and case reference, in the shipped {@code dl.detail} shape. {@code dateOfBirth} is
+     * {@code @Encrypted} Article-9 data, so - the same rule and the same guard (T194) as
+     * {@link ChildListRow} - the masked branch resolves to the words themselves and never contains a
+     * date of birth at all, not a hidden one: there is nothing here a template could leak by reaching
+     * past this record. Naming what is withheld (D-4b-8) beats dropping the row (D-1a-1) - the layout
+     * stays stable across the toggle and a masked viewer is told the control exists.
+     *
+     * <p>{@code caseReference()} is never gated, for the same reason it isn't on
+     * {@code children/list.html} (D-4b-12/D-4b-14): {@code childIdentity.label()} already carries it
+     * on this same page whenever one is recorded, so a "Hidden" here would misreport a value that is
+     * two lines above it.
+     *
+     * <p><strong>No age, in either state (T195, human, 6 Sep).</strong> Age was considered as a
+     * coarsening of the date of birth that might sit outside the reveal (D-4b-9's first draft), but
+     * Kevin's axis - <em>who can read it</em>, not how much information it carries - ruled it out: an
+     * integer age is legible to a far wider population than the case reference is, which makes it
+     * identifying to precisely the population the mask exists to defeat. The human then closed it
+     * without a bed-count-dependent escape hatch: there is no home size at which age returns to the
+     * screen. There is no age concept anywhere in this system to add one from here.
+     *
+     * <p>Named {@code dob()}/{@code caseReference()} rather than mirroring {@code Child}'s own
+     * accessors, for the same reason as {@link ChildListRow}: T194's guard scans for a bare
+     * property-read of either encrypted field name, by design with no receiver-type check, so a
+     * differently-named accessor here can never register as a fresh read of the entity.
+     */
+    private record ChildIdentityDetail(String dob, String caseReference) {
+        private static final DateTimeFormatter DOB_FMT = DateTimeFormatter.ofPattern("dd MMM yyyy", Locale.UK);
+        private static final String DOB_HIDDEN = "Hidden — reveal names to show";
+
+        static ChildIdentityDetail of(Child child, boolean revealed) {
+            String dob = revealed
+                    ? (child.getDateOfBirth() == null ? "Not recorded" : child.getDateOfBirth().format(DOB_FMT))
+                    : DOB_HIDDEN;
+            String reference = child.getLocalCaseReference() == null || child.getLocalCaseReference().isBlank()
+                    ? "—" : child.getLocalCaseReference();
+            return new ChildIdentityDetail(dob, reference);
+        }
     }
 
     @GetMapping("/{id}")
@@ -98,9 +201,19 @@ public class ChildController {
         long approvedReportCount = requests.stream()
                 .filter(r -> r.getStatus().name().equals("REPORT_APPROVED"))
                 .count();
+        boolean revealed = nameRevealService.isRevealed();
+        LocalDateTime now = LocalDateTime.now();
         model.addAttribute("child", child);
-        model.addAttribute("childIdentity", ChildIdentity.of(child, nameRevealService.isRevealed()));
+        model.addAttribute("childIdentity", ChildIdentity.of(child, revealed));
+        model.addAttribute("identityDetail", ChildIdentityDetail.of(child, revealed));
         model.addAttribute("requests", requests);
+        // D-4b-7 (spec §7e): a due badge only where DeadlineTracker.badgeFor actually returns one -
+        // a completed or cancelled request has no live clock and must show no urgency (D-4a-4's
+        // NO_CLOCK rule), so its absence here is meaningful rather than a gap. Same shape as
+        // VisitorController's own dueBadges map (screen 2f).
+        model.addAttribute("dueBadges", requests.stream()
+                .filter(r -> DeadlineTracker.badgeFor(r, now).isPresent())
+                .collect(Collectors.toMap(InterviewRequest::getId, r -> DeadlineTracker.badgeFor(r, now).orElseThrow())));
         model.addAttribute("caseHistory", auditHistoryService.caseHistoryFor(requests));
         model.addAttribute("canExport", ExportCapability.canExport(principal));
         model.addAttribute("approvedReportCount", approvedReportCount);
@@ -121,10 +234,14 @@ public class ChildController {
         }
         model.addAttribute("form", new CreateChildForm());
         List<Home> homeOptions = homePickerOptionsFor(principal);
-        model.addAttribute("isAdmin", homeOptions != null);
+        // D-5d-1 (spec §7g): this decides "does this user need to be asked which home", not
+        // "is this user an administrator" - a multi-home HOME_STAFF gets the picker too. Named for
+        // what it decides, matching what homePickerOptionsFor already returns.
+        model.addAttribute("needsHomePicker", homeOptions != null);
         if (homeOptions != null) {
             model.addAttribute("homes", homeOptions);
         }
+        model.addAttribute("dobMax", LocalDate.now());
         return "children/form";
     }
 
@@ -172,17 +289,24 @@ public class ChildController {
         // person cannot act on. That late, opaque refusal is the failure this ticket exists to move
         // earlier. The guard's job is to refuse EARLY with something actionable, not to refuse
         // twice.
-        if (home != null && !home.getOrganisation().isActive()) {
-            bindingResult.addError(new FieldError("form", "homeId",
-                    "This organisation is not yet active, so records cannot be added for it. "
-                            + "An administrator needs to activate it first."));
-        }
+        //
+        // D-5d-3 (spec §7g): NOT a FieldError on homeId - for a single-home user that field is not
+        // even rendered (th:if="${needsHomePicker}"), so the banner's own link pointed at nothing
+        // and there was no control to correct anyway (the message says an administrator must act,
+        // not this user). This is a page-level condition, so it gets a page-level banner instead,
+        // with no anchor offered.
+        String orgInactiveError = home != null && !home.getOrganisation().isActive()
+                ? "This organisation is not yet active, so records cannot be added for it. "
+                        + "An administrator needs to activate it first."
+                : null;
 
-        if (bindingResult.hasErrors()) {
-            model.addAttribute("isAdmin", needsHomePicker);
+        if (bindingResult.hasErrors() || orgInactiveError != null) {
+            model.addAttribute("needsHomePicker", needsHomePicker);
             if (needsHomePicker) {
                 model.addAttribute("homes", homeOptions);
             }
+            model.addAttribute("dobMax", LocalDate.now());
+            model.addAttribute("orgInactiveError", orgInactiveError);
             return "children/form";
         }
 

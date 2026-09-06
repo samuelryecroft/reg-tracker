@@ -120,6 +120,17 @@ public class GlobalControllerAdvice {
      * here also matches how every other page-context value ({@code theme}, {@code shellOrg}, {@code
      * can}) already reaches templates in this codebase.
      */
+    /**
+     * <b>Not populated for views rendered from an {@code @ExceptionHandler}.</b> Spring does not run
+     * a {@code @ControllerAdvice}'s {@code @ModelAttribute} methods during exception handling, so
+     * every attribute declared here is absent on those pages - and {@code fragments/layout :: nav}
+     * reads {@code currentPath} unguarded, so <b>including the shell in an exception-rendered view
+     * turns a 404 into a 500</b>. T218 hit exactly that.
+     *
+     * <p>So the error views deliberately render without the shell. {@code error.html} always has,
+     * which reads as a design choice and is also a constraint. Noted here rather than in each
+     * template because this is where the absence originates.
+     */
     @ModelAttribute("currentPath")
     public String currentPath(HttpServletRequest request) {
         return request.getRequestURI();
@@ -262,6 +273,21 @@ public class GlobalControllerAdvice {
             return principal;
         }
         return null;
+    }
+
+    /**
+     * T218: an export link that cannot be redeemed gets its own page rather than the generic error
+     * one, because there is ruled copy for this case and a bare 404 had nowhere to put it.
+     *
+     * <p><b>No model attributes, and that is the point.</b> The generic handler above passes
+     * {@code message} through; here there is deliberately nothing to pass, because the four reasons
+     * a redeem fails - unknown, expired, already spent, another user's - must be indistinguishable.
+     * A handler that accepted a message would be one edit away from explaining which one it was.
+     */
+    @ExceptionHandler(ninja.samryecroft.returnhome.tracker.export.ExportLinkUnavailableException.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public String handleExportLinkUnavailable() {
+        return "export/expired";
     }
 
     @ExceptionHandler(IllegalArgumentException.class)

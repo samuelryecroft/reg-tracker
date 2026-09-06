@@ -231,6 +231,56 @@ Kevin F1. AcrPull (job) + AcrPush (CD/deploy) live in `bootstrap-deployer-identi
 **One open item** (see `PREFLIGHT.md`): slot-swap needs App Service **S1** (B1 has no slots — ships a
 direct-deploy fallback with redeploy-previous-artifact rollback). ACR adds ~£4/mo.
 
+### Ephemeral migration env (T180) — the LIVE migration path
+
+**The GitHub Actions `deploy.yml` above has never completed a deploy** (no `prod` Environment, no
+OIDC identities/secrets provisioned; `deploy` job guarded to `main`). Go-live is a **manual** deploy,
+and this is the migration procedure it runs.
+
+**Why ephemeral.** The `modules/migrator_job` env (`cae-<prefix>`) is VNet-internal, so Container
+Apps stands up an internal load balancer for it in the platform-managed `ME_*` resource group. The
+**job scales to zero** (≈£0 at rest), but that **LB bills ~£6.5/mo idling 24/7** for a runner used a
+handful of minutes per deploy. So migrations run in a **per-run environment that is created, used and
+destroyed each deploy** — the LB then exists only for the ~minutes of a migration, not permanently.
+
+**What is standing vs ephemeral.** Standing (Terraform-owned, free/near-free): the CD managed
+identity (`rht-cd-prod`, with KV Secrets User + AcrPull), the digest-pinned DB-plane image in ACR,
+and a **dedicated `snet-ca-migrate` /23** (`module.network.migrate_subnet_id` — a bare delegated
+subnet carries no LB). Ephemeral (created out-of-band by the procedure via `az`, **never** in
+Terraform state): the Container Apps **environment + job**. Two envs cannot share one delegated
+subnet, which is why `snet-ca-migrate` is separate from `containerapps` (the latter holds the
+standing `modules/migrator_job` env, **kept as the fallback** until this path is proven in a real
+deploy, then removed).
+
+**Procedure (per deploy), BEFORE the jar goes live** — one committed script, not a checklist:
+
+1. `terraform apply` (idempotent) so `snet-ca-migrate` exists; read `migrate_subnet_id`.
+2. Run **`deploy/db-plane/ephemeral-migrate.sh`** with the environment it documents (`RG`,
+   `NAME_PREFIX`, `LOCATION`, `MIGRATE_SUBNET_ID`, the Log Analytics `LOG_WS_ID`/`LOG_WS_KEY`,
+   `ACR_LOGIN_SERVER`, the **digest-pinned** `DB_PLANE_IMAGE`, `CD_IDENTITY_ID`/`CD_CLIENT_ID`, and
+   `KEY_VAULT_URI`/`DB_HOST`/`DB_NAME`/`ADMIN_LOGIN`/`MIGRATOR_LOGIN`). It performs, in order:
+   **pre-create sweep** (remove an orphan env from a killed prior run — it still holds the subnet) →
+   **create** the internal env in `snet-ca-migrate` → **create** the job (same digest-pinned image,
+   `rht-cd-prod` managed identity, same env as `modules/migrator_job`) → **start + poll to
+   `Succeeded`**, exit non-zero on `Failed` (same WS-G ordering guarantee: `01 → Flyway → 02` before
+   the jar) → **always-teardown**.
+3. Deploy the jar on **exit 0** (migration succeeded, teardown confirmed). On **exit 1** the migration
+   failed — do not deploy. **Exit 3** is distinct on purpose: the migration succeeded but teardown
+   could not be confirmed — you may deploy the jar, but you MUST then check the platform-managed
+   `ME_*` group for a stranded env/load balancer (the invisible-cost failure). The distinct code keeps
+   that signal out of the tail of the poll log and lets a future pipeline decide.
+
+**Teardown is verified, not fired-and-forgotten** (an env that fails to tear down is the same idle-LB
+cost, only invisible): teardown runs on *every* exit path via a `trap` and the script does not return
+until the env is confirmed gone; if it cannot confirm within the timeout it warns LOUDLY to check the
+platform-managed `ME_*` group for a leftover load balancer. The delete order is **job → env** (env
+refuses while the job exists), and the subnet is **permanent** precisely to avoid the delete-ordering
+trap where a per-run subnet cannot be removed until the env's managed LB releases its frontend IP.
+
+This preserves the Kevin-T89 guarantees exactly (managed identity **in the VNet** + KV read; **ACI is
+still ruled out** — it cannot do MI-in-VNet without a stored credential). It is proven end-to-end on
+a real migration before the standing `cae-<prefix>` env + its LB are deleted.
+
 ## Restoring the database and Key Vault is a COUPLED operation (field encryption)
 
 Since field-level encryption landed, the database and Key Vault are **one restore unit, not two**.
