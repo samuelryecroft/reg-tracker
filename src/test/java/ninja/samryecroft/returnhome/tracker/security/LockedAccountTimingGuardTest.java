@@ -1,0 +1,187 @@
+package ninja.samryecroft.returnhome.tracker.security;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+
+import java.util.HashSet;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
+import ninja.samryecroft.returnhome.tracker.AbstractIntegrationTest;
+import ninja.samryecroft.returnhome.tracker.audit.AuditEventRepository;
+import ninja.samryecroft.returnhome.tracker.audit.AuditEventType;
+import ninja.samryecroft.returnhome.tracker.user.Role;
+import ninja.samryecroft.returnhome.tracker.user.User;
+import ninja.samryecroft.returnhome.tracker.user.UserRepository;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.Primary;
+import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.web.servlet.MockMvc;
+
+/**
+ * T221: while a lockout holds, <b>neither</b> a real account nor an unknown username may cause a
+ * password hash to be computed - because the hash is where the ~53ms difference between them came
+ * from.
+ *
+ * <h2>Why this counts hashes instead of measuring time</h2>
+ *
+ * <p>The defect is a timing difference, so the obvious guard is a stopwatch. <b>A stopwatch
+ * assertion would be the wrong test</b>: it is flaky on shared CI hardware, its threshold is a
+ * number nobody can defend, and the usual response to it going red is to widen the threshold until
+ * it stops - which ends with a guard that cannot fail.
+ *
+ * <p>So this asserts the <b>cause</b> rather than the symptom. The difference existed because
+ * {@code mitigateAgainstTimingAttack} runs one full BCrypt for an unknown username while a locked
+ * real account short-circuits before any compare. <b>Counting invocations of the
+ * {@link PasswordEncoder} measures exactly that, and it is deterministic</b> - the count is 0 or it
+ * is not, on any hardware, with no threshold to argue about.
+ *
+ * <h2>Armed by reverting the fix, not by a synthetic mutation</h2>
+ *
+ * <p>Remove {@code .addFilterBefore(lockedAccountFilter, ...)} from {@code SecurityConfig} and the
+ * locked request reaches {@code DaoAuthenticationProvider} again: the unknown username pays its
+ * mitigation hash, the count becomes 1, and {@code neitherLockedCaseComputesAPasswordHash} fails on
+ * the unknown case while still passing on the real one. <b>That asymmetry in the failure is the
+ * oracle itself</b>, which is what makes this guard a real one rather than a restatement of the
+ * implementation.
+ */
+@SpringBootTest
+@AutoConfigureMockMvc
+@Import(LockedAccountTimingGuardTest.CountingEncoderConfig.class)
+class LockedAccountTimingGuardTest extends AbstractIntegrationTest {
+
+    private static final int MAX_ATTEMPTS = 5;
+
+    /**
+     * Wraps the real encoder rather than stubbing it, so the application still behaves exactly as
+     * it does in production - a stub that returned a constant could make the lock unreachable and
+     * the test would pass for the wrong reason.
+     */
+    @TestConfiguration
+    static class CountingEncoderConfig {
+        static final AtomicInteger MATCH_CALLS = new AtomicInteger();
+
+        @Bean
+        @Primary
+        PasswordEncoder countingPasswordEncoder() {
+            PasswordEncoder delegate = new BCryptPasswordEncoder();
+            return new PasswordEncoder() {
+                @Override
+                public String encode(CharSequence rawPassword) {
+                    return delegate.encode(rawPassword);
+                }
+
+                @Override
+                public boolean matches(CharSequence rawPassword, String encodedPassword) {
+                    MATCH_CALLS.incrementAndGet();
+                    return delegate.matches(rawPassword, encodedPassword);
+                }
+            };
+        }
+    }
+
+    @Autowired
+    private MockMvc mockMvc;
+    @Autowired
+    private UserRepository userRepository;
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+    @Autowired
+    private AuditEventRepository auditEventRepository;
+
+    private final String suffix = "-" + System.nanoTime();
+
+    private String realUser() {
+        String username = "t221-real" + suffix;
+        User user = new User();
+        user.setUsername(username);
+        user.setFirstName("Rea");
+        user.setLastName("List");
+        user.setPassword(passwordEncoder.encode("correct-horse-battery"));
+        user.setRoles(new HashSet<>(Set.of(Role.ADMIN)));
+        user.setEnabled(true);
+        userRepository.save(user);
+        return username;
+    }
+
+    private MockHttpServletResponse attempt(String username) throws Exception {
+        return mockMvc.perform(post("/login").with(csrf())
+                        .param("username", username)
+                        .param("password", "definitely-not-the-password"))
+                .andReturn().getResponse();
+    }
+
+    private void lock(String username) throws Exception {
+        for (int i = 0; i < MAX_ATTEMPTS; i++) {
+            attempt(username);
+        }
+    }
+
+    @Test
+    void neitherLockedCaseComputesAPasswordHash() throws Exception {
+        String real = realUser();
+        String unknown = "t221-ghost" + suffix;
+        lock(real);
+        lock(unknown);
+
+        // Counted from here, so the attempts that BUILT the lock - which legitimately hash - are
+        // excluded. Only what happens once the lock holds is under test.
+        CountingEncoderConfig.MATCH_CALLS.set(0);
+        MockHttpServletResponse realResponse = attempt(real);
+        int afterReal = CountingEncoderConfig.MATCH_CALLS.getAndSet(0);
+        MockHttpServletResponse unknownResponse = attempt(unknown);
+        int afterUnknown = CountingEncoderConfig.MATCH_CALLS.get();
+
+        assertThat(afterUnknown)
+                .as("an unknown but locked username must not pay for a password hash. Before T221 "
+                        + "it did - DaoAuthenticationProvider's mitigateAgainstTimingAttack runs a "
+                        + "full BCrypt when no user is found - while a locked REAL account was "
+                        + "rejected before any compare. That ~53ms gap answered 'does this account "
+                        + "exist?' to anyone able to time a response")
+                .isEqualTo(afterReal);
+        assertThat(afterReal + afterUnknown)
+                .as("and the equal cost must be ZERO rather than merely equal: balancing the two by "
+                        + "hashing on both paths would be work whose only purpose is to consume "
+                        + "time, invisible in the source and confirmable only by measurement")
+                .isZero();
+
+        assertThat(unknownResponse.getStatus()).isEqualTo(realResponse.getStatus());
+        assertThat(unknownResponse.getRedirectedUrl())
+                .as("closing the timing channel must not have opened a content one")
+                .isEqualTo(realResponse.getRedirectedUrl());
+    }
+
+    /**
+     * The regression this fix could plausibly cause, asserted rather than assumed.
+     *
+     * <p>Neither locked case reaches the provider any more, so nothing publishes an authentication
+     * event unless the filter does it. Without that, {@code LOGIN_FAILURE} rows for attempts
+     * against locked accounts would stop being written - <b>the signal most worth having during an
+     * attack, lost with no error and nothing going red.</b>
+     */
+    @Test
+    void aLockedAttemptIsStillAudited() throws Exception {
+        String real = realUser();
+        lock(real);
+        long before = countLoginFailures();
+        attempt(real);
+        assertThat(countLoginFailures())
+                .as("a rejected attempt against a locked account must still produce a LOGIN_FAILURE "
+                        + "audit row - the filter short-circuits the provider, so it has to publish "
+                        + "the failure event itself")
+                .isGreaterThan(before);
+    }
+
+    private long countLoginFailures() {
+        return auditEventRepository.findByEventTypeOrderByOccurredAtDesc(
+                AuditEventType.LOGIN_FAILURE).size();
+    }
+}

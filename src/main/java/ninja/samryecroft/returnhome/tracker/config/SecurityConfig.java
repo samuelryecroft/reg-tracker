@@ -11,6 +11,8 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import ninja.samryecroft.returnhome.tracker.security.LoginFailureHandler;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import ninja.samryecroft.returnhome.tracker.security.LockedAccountFilter;
 
 @Configuration
 @EnableMethodSecurity
@@ -23,7 +25,8 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http,
-            LoginFailureHandler loginFailureHandler) throws Exception {
+            LoginFailureHandler loginFailureHandler,
+            LockedAccountFilter lockedAccountFilter) throws Exception {
         http
                 .authorizeHttpRequests(auth -> auth
                         // T119: /fonts/** and /icons/** are static assets the login page itself
@@ -77,7 +80,15 @@ public class SecurityConfig {
                         .permitAll())
                 .logout(logout -> logout
                         .logoutSuccessUrl("/login?logout")
-                        .permitAll());
+                        .permitAll())
+                // T221: BEFORE the authentication filter, and the position is the entire fix.
+                // A locked real account short-circuits in the provider's pre-checks (no hash) while
+                // a locked unknown username pays mitigateAgainstTimingAttack's full BCrypt - ~53ms
+                // apart, which is a username enumeration oracle readable over a network. Rejecting
+                // both here costs the same for both. It cannot be done in LoginFailureHandler: by
+                // the time a failure handler runs, the hash has already happened or already been
+                // skipped. See LockedAccountFilter for the two rejected alternatives.
+                .addFilterBefore(lockedAccountFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
