@@ -8,8 +8,11 @@ import jakarta.validation.constraints.Size;
 import java.util.HashSet;
 import java.util.Set;
 import ninja.samryecroft.returnhome.tracker.user.Role;
+import ninja.samryecroft.returnhome.tracker.user.password.PasswordCandidate;
+import ninja.samryecroft.returnhome.tracker.user.password.StrongPassword;
 
-public class EditUserForm {
+@StrongPassword
+public class EditUserForm implements PasswordCandidate {
 
     @NotBlank(message = "First name is required")
     @Size(max = 255)
@@ -47,7 +50,11 @@ public class EditUserForm {
 
     private boolean enabled;
 
-    @Size(min = 8, message = "Password must be at least 8 characters")
+    /**
+     * The length rule that used to sit here as {@code @Size(min = 8)} is the class-level
+     * {@link StrongPassword} constraint now - the same object {@code CreateUserForm} and
+     * {@code AdminUserSeeder} use.
+     */
     private String newPassword;
 
     public String getFirstName() {
@@ -123,4 +130,37 @@ public class EditUserForm {
         this.newPassword = newPassword;
     }
 
+    // --- PasswordCandidate (T272) ---
+
+    @Override
+    public String passwordBeingSet() {
+        return newPassword;
+    }
+
+    @Override
+    public String passwordFieldName() {
+        return "newPassword";
+    }
+
+    /**
+     * NULL, AND THIS IS A STATED GAP RATHER THAN AN OVERSIGHT. This form does not edit the username
+     * and does not carry it, so the constraint cannot check the username context value here. Adding
+     * a hidden field would make a validation input user-controllable, which is worse than the gap it
+     * closes. {@code UserAdminController} supplies the real username from the loaded account instead,
+     * through the same {@link ninja.samryecroft.returnhome.tracker.user.password.PasswordPolicy}.
+     */
+    @Override
+    public String usernameForPolicy() {
+        return null;
+    }
+
+    @Override
+    public String emailForPolicy() {
+        return email;
+    }
+
+    @Override
+    public Long organisationIdForPolicy() {
+        return organisationId;
+    }
 }

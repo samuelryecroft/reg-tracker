@@ -13,6 +13,8 @@ import ninja.samryecroft.returnhome.tracker.organisation.OrganisationAccessServi
 import ninja.samryecroft.returnhome.tracker.organisation.OrgType;
 import ninja.samryecroft.returnhome.tracker.user.dto.CreateUserForm;
 import ninja.samryecroft.returnhome.tracker.user.dto.EditUserForm;
+import ninja.samryecroft.returnhome.tracker.user.password.PasswordContext;
+import ninja.samryecroft.returnhome.tracker.user.password.PasswordPolicy;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -35,10 +37,12 @@ public class UserAdminController {
     private final OrganisationAccessService organisationAccessService;
     private final AuditHistoryService auditHistoryService;
     private final AuditEventPublisher auditEventPublisher;
+    private final PasswordPolicy passwordPolicy;
 
     public UserAdminController(UserService userService, UserRepository userRepository, HomeRepository homeRepository,
             OrganisationRepository organisationRepository, OrganisationAccessService organisationAccessService,
-            AuditHistoryService auditHistoryService, AuditEventPublisher auditEventPublisher) {
+            AuditHistoryService auditHistoryService, AuditEventPublisher auditEventPublisher,
+            PasswordPolicy passwordPolicy) {
         this.userService = userService;
         this.userRepository = userRepository;
         this.homeRepository = homeRepository;
@@ -46,6 +50,7 @@ public class UserAdminController {
         this.organisationAccessService = organisationAccessService;
         this.auditHistoryService = auditHistoryService;
         this.auditEventPublisher = auditEventPublisher;
+        this.passwordPolicy = passwordPolicy;
     }
 
     @GetMapping
@@ -110,6 +115,7 @@ public class UserAdminController {
     @PostMapping("/{id}/edit")
     public String update(@PathVariable Long id, @AuthenticationPrincipal AppUserPrincipal principal,
             @Valid @ModelAttribute("form") EditUserForm form, BindingResult bindingResult, Model model) {
+        rejectAPasswordBuiltFromTheUsername(id, principal, form, bindingResult);
         if (bindingResult.hasErrors()) {
             model.addAttribute("user", userService.getAuthorized(id, principal));
             addPickerAttributes(principal, model);
@@ -124,6 +130,26 @@ public class UserAdminController {
             return "admin/user-form-edit";
         }
         return "redirect:/admin/users";
+    }
+
+    /**
+     * The one context value {@code EditUserForm} cannot supply (T272 R2).
+     *
+     * <p>The form does not edit the username and does not carry it, so the class-level constraint
+     * checks the email, organisation and application values but not this one. Carrying the username
+     * in a hidden field would close the gap by making a validation input user-controllable, which
+     * trades a small hole for a worse shape. So the real username is read from the loaded account
+     * here - the SAME {@link PasswordPolicy} object, not a second copy of the rule, and only the
+     * username context is supplied because everything else has already been checked.
+     */
+    private void rejectAPasswordBuiltFromTheUsername(Long id, AppUserPrincipal principal,
+            EditUserForm form, BindingResult bindingResult) {
+        if (form.getNewPassword() == null || form.getNewPassword().isBlank()) {
+            return;
+        }
+        String username = userService.getAuthorized(id, principal).getUsername();
+        passwordPolicy.rejectionFor(form.getNewPassword(), new PasswordContext(username, null, null))
+                .ifPresent(message -> bindingResult.rejectValue("newPassword", "password.policy", message));
     }
 
     private void rejectDuplicateUsername(BindingResult bindingResult) {
