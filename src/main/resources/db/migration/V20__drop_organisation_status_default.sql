@@ -1,0 +1,60 @@
+-- T172: drop the column default on organisations.status. V19 always intended this to be a separate,
+-- later migration ("THE END STATE WE STILL WANT is no default at all... That belongs in a later
+-- release, once no old jar can be running"). This is that release.
+--
+-- WHY THE DEFAULT EXISTED, kept here because dropping it removes the only place the reason was
+-- written down. The DB-plane job runs Flyway to completion BEFORE the new jar goes live, so for a
+-- few minutes the OLD jar talks to the NEW schema. A jar that predates T168(b) knows nothing about
+-- `status` and omits it from an organisation INSERT; against a NOT NULL column with no default that
+-- is a constraint violation, and an admin's org-create 500s mid-onboarding. V19 chose PENDING for
+-- that window rather than ACTIVE, so a row written by an unaware jar lands in the safe state and
+-- goes through the KEK gate like any other. None of that reasoning is obsolete - it is the reason
+-- this migration could not have been part of V19, and it is why it must not be reintroduced as
+-- ACTIVE if a default is ever needed again.
+--
+-- WHY IT IS SAFE TO DROP NOW. The precondition V19 named is "no old jar can be running", meaning no
+-- jar that omits `status` on insert. Checked rather than assumed:
+--
+--   * The deployed baseline the release line diff-gates against (3ec83f3) already contains V19 and
+--     Organisation.status's PENDING field initialiser, as do release 1 and release 2 (32aa95b).
+--     Every artifact a rollback could redeploy therefore sets `status` explicitly, so the drop
+--     survives both the deploy window and a redeploy-previous-artifact rollback.
+--   * V5 seeds two organisations without `status`, which is fine and stays fine: on a fresh database
+--     V5 runs long before the column exists, and V19's ADD COLUMN ... DEFAULT 'ACTIVE' backfills
+--     those rows. Ordering makes that insert immune rather than lucky.
+--   * Nothing else writes this table outside the entity - the seed above is the only INSERT INTO
+--     organisations in the tree, Organisation.setStatus is package-private, and every transition
+--     goes through OrganisationLifecycleService.
+--
+-- WHAT THIS BUYS. Only loudness, and that is the whole point: an insert that bypasses the entity now
+-- fails NOT NULL instead of quietly landing PENDING. V19 deliberately made forgetting harmless; this
+-- makes it visible. The safety was never resting on the default, which is exactly why removing it is
+-- a small change rather than a risky one.
+--
+-- PROD IS AT V19, AND THIS IS NO LONGER AN INFERENCE. This paragraph originally said the opposite:
+-- nobody had queried the production database, `spring.flyway.enabled=false` on the azure profile so
+-- the jar cannot self-report, and the argument was indirect - the running jar maps `status` as a
+-- non-null column and every organisation read selects it, so the app could not be serving if the
+-- column were absent. That reasoning still holds, but it has since been replaced by direct evidence:
+-- release 2's ephemeral migration run left its console output in the `log-rht` workspace, and
+-- Flyway itself reported, against prod, `Current version of schema "public": 19` /
+-- `Successfully validated 19 migrations` / `Schema "public" is up to date. No migration necessary.`
+-- (Pam-devops, found while confirming the workspace survived the T180 teardown.)
+--
+-- So V20 is the SOLE pending migration on release 3, and the operator-visible check is
+-- `Successfully applied 1 migration` - not 20. The runbook documents that; if it says 20, the
+-- database is not the one this reasoning is about and the release should stop.
+--
+-- WHAT "LOUDLY" DEPENDS ON, and it is not free. Both claims above - this migration failing visibly,
+-- and a bypassing insert failing visibly - assume the DB-plane job's output actually reaches a human.
+-- V20 is the first V-file since the standing migration environment was retired for T180, so it runs
+-- in an env that exists for minutes, and that env's short life races the Log Analytics flush: the
+-- console logs can be gone before they land. What T180 proved end-to-end was a no-op; this executes
+-- DDL. So on infrastructure without capture-logs-on-failure, LOUD INTO A STREAM TORN DOWN BEFORE IT
+-- FLUSHES IS NOT LOUD, and the argument for this migration being safe to get wrong does not hold.
+-- That capture is a PRECONDITION of the release carrying this file, not a refinement of it - written
+-- here because the two facts live in different heads (this one is about the schema, that one about
+-- the teardown) and the dependency between them is invisible from either side alone.
+
+ALTER TABLE organisations
+    ALTER COLUMN status DROP DEFAULT;
