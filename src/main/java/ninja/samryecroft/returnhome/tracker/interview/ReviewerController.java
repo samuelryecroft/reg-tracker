@@ -9,6 +9,7 @@ import ninja.samryecroft.returnhome.tracker.child.ChildIdentities;
 import ninja.samryecroft.returnhome.tracker.child.ChildIdentity;
 import ninja.samryecroft.returnhome.tracker.child.NameRevealService;
 import ninja.samryecroft.returnhome.tracker.report.ReportService;
+import ninja.samryecroft.returnhome.tracker.report.InterviewReport;
 import ninja.samryecroft.returnhome.tracker.report.dto.SubmitReportForm;
 import ninja.samryecroft.returnhome.tracker.user.AppUserPrincipal;
 import ninja.samryecroft.returnhome.tracker.user.Role;
@@ -109,8 +110,24 @@ public class ReviewerController {
         // The rail only ever shows a timestamp and the status label, both already visible via the
         // status tag on this same page regardless of approval - ungated, same reasoning as 1a's
         // own reportForRail (InterviewRequestDetailController).
-        model.addAttribute("statusRail",
-                StatusRail.forRequest(request, reportService.findByRequestId(request.getId()).orElse(null)));
+        InterviewReport reportRow = reportService.findByRequestId(request.getId()).orElse(null);
+        model.addAttribute("statusRail", StatusRail.forRequest(request, reportRow));
+
+        // T233. The shared field fragment renders from `form`, which is a SubmitReportForm and
+        // therefore cannot answer "was an explanation for a late interview ever owed" - that is a
+        // question about the report against the request's return time, not about a submitted value.
+        // So the answer is computed once, here, off the same rule the record screen and the export
+        // use, and handed to the fragment rather than rebuilt inside it.
+        //
+        // False when there is no report row: a screen with nothing to review has no gap in it. That
+        // case is already degraded gracefully everywhere else on this page rather than failing it.
+        //
+        // This attribute is plumbing with a short life. T185 step 2 moves the section counts onto
+        // ReportQuestions, and the count then comes off the model rather than off a boolean threaded
+        // through a template - but the defect it fixes is live on a screen a reviewer approves from,
+        // and it must be corrected BEFORE the single source copies it, not after.
+        model.addAttribute("lateExplanationMissing",
+                reportRow != null && reportRow.isLateExplanationMissing());
 
         // The History card (same fragments/audit-history component 1a uses) and D-1b-8's
         // prior-send-back line both read this one fetch - no reason to ask twice.
