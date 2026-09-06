@@ -29,8 +29,10 @@ import org.junit.jupiter.api.Test;
  * <p><b>This is a source guard, not a rendered check.</b> It reads the template, not a response.
  * The rendered assertion would be better and is not available here: MockMvc does not perform the
  * ERROR dispatch by default, so a test that "renders /error" can pass while exercising nothing, and
- * a browser-level check would land in the non-blocking {@code flaky-infra} lane where a red is not
- * a merge failure. A guard that names its own limits is worth more than one that implies a
+ * a browser-level check used to land in the non-blocking {@code flaky-infra} lane where a red was
+ * not a merge failure. <b>T212 removed that second reason on 2026-09-08</b> - the browser suite now
+ * blocks - so only the first still stands, and a rendered assertion is worth revisiting on its own
+ * merits rather than being ruled out by where it would have run. A guard that names its own limits is worth more than one that implies a
  * stronger claim than it makes - so: this proves the binding is gone from the source. It does not
  * prove what a 500 renders in a browser.
  */

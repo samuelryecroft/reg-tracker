@@ -10,17 +10,33 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Tag;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
-// WS-E: the Playwright UI suite (real browser + Hikari pool + Testcontainers Postgres) is the
-// infra-timing category quarantined out of the CI required gate (T21). JUnit 5 inherits a
-// class-level @Tag to subclasses, so every *UiTest is tagged by tagging this base. Quarantined,
-// not deleted: the tests still run in ci.yml's non-blocking flaky-infra lane.
-@Tag("flaky-infra")
+// T212: this class carried @Tag("flaky-infra") until 2026-09-08, which quarantined the ENTIRE
+// Playwright suite out of the required gate - JUnit 5 inherits a class-level tag to subclasses, so
+// tagging this base tagged all thirteen *UiTest classes at once. The whole browser-rendering
+// evidence base therefore reported rather than prevented.
+//
+// WHY IT WAS QUARANTINED, kept because it is the reason it must not be re-added casually: WS-E
+// judged the suite infra-timing-flaky (real browser + Hikari pool + Testcontainers Postgres) after
+// T21. THAT CAUSE WAS REPAIRED AND THE QUARANTINE STAYED. AbstractIntegrationTest's own javadoc
+// records the repairs: one shared container instead of a per-class @Container (T21), one
+// @DynamicPropertySource on the base instead of six identical ones opening six contexts and
+// exhausting the pool (T148), and identity-based rather than sort-order-based reference lookup
+// (T120). Each fix is documented in the very file that went on carrying the tag.
+//
+// MEASURED BEFORE REMOVING, not assumed: the non-blocking lane passed 37 of 37 completed runs at
+// the STEP level - checked at the step rather than the job, because continue-on-error reports a job
+// green with a failed step inside it. A quarantine lane that has caught nothing in forty runs is
+// not protecting the gate from anything; it is only withholding evidence from it.
+//
+// Kevin's ruling (T212): a false red is visible and self-correcting, silent non-coverage is
+// invisible and self-perpetuating. If these tests do start flaking, the answer is a quarantine that
+// carries a named cause and a review date - see QuarantineDisciplineGuardTest, which now enforces
+// exactly that - and not a tag that outlives its reason by inertia.
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 public abstract class AbstractUiTest extends AbstractIntegrationTest {
 

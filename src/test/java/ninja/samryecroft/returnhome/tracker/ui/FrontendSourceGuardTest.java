@@ -533,10 +533,11 @@ class FrontendSourceGuardTest {
      * <p><strong>Complements {@code AccentTintMirrorsBetweenAppearancesUiTest}, and does not
      * replace it - do not delete either as a duplicate of the other.</strong> Kevin's test asserts
      * the SYMPTOM at render: that a branded org's {@code --accent}/{@code --tint} actually differ
-     * between light and dark in a real browser. It is a {@code *UiTest}, so it inherits
-     * {@code @Tag("flaky-infra")} and runs in the non-blocking lane - it can observe the defect
-     * returning but cannot fail a merge. This one reads source, needs no browser, and runs in the
-     * blocking gate: it catches the CAUSE and can stop it landing. Symptom-at-render and
+     * between light and dark in a real browser. <b>(T212 corrected this: that sentence used to say
+     * the {@code *UiTest} "runs in the non-blocking lane and cannot fail a merge". Since 2026-09-08
+     * it can - the Playwright suite is in the blocking gate.)</b> This one reads source, needs no
+     * browser, and runs in the blocking gate: it catches the CAUSE and can stop it landing. The
+     * distinction it draws is unaffected and is still the point. Symptom-at-render and
      * cause-in-source are different evidence, and the one that can block is not the one that can
      * prove the pixels.
      */
