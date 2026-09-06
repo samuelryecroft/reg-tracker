@@ -444,11 +444,20 @@ public class ReportService {
      * child's" would be the one that silently fell behind. Adding a child's question to the model
      * takes it out of a declined document automatically.
      *
-     * <p>Empty when the interview happened, or when nobody has said whether it did - the statement
-     * asserts that a young person was not spoken to, which is a safeguarding fact and may only be
-     * printed when somebody has actually recorded it.
+     * <p><b>Empty only when the interview happened.</b> Oscar overturned the earlier rule that null
+     * should be left alone: bare hiding is a claim, but hiding PLUS a sentence naming both absences
+     * is not, so the sentence is what makes the hide honest rather than decoration on it. The two
+     * collapsed states differ only in which sentence they carry - the declined one names an event
+     * that did not happen, the unrecorded one names two things this record does not say.
+     *
+     * <p>This paragraph previously stated the OVERTURNED rule, directly above the line that reverses
+     * it. In a codebase where the comment carries the reasoning, that is the paragraph a future
+     * reader trusts over the code.
      */
-    private DocxReportGenerator.RowCollapse childQuestionRows(InterviewReport report) {
+    // Static and package-private: a pure function of the report, so the guard comparing this
+    // decision against the screen's can call it without standing a service up. That comparison is
+    // the point - two consumers of one model cannot be told apart by mutating the model.
+    static DocxReportGenerator.RowCollapse childQuestionRows(InterviewReport report) {
         if (report.isChildInterviewed()) {
             return DocxReportGenerator.RowCollapse.none();
         }
