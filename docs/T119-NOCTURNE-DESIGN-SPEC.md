@@ -4880,3 +4880,128 @@ instead of it**:
 ### Flagged onward by Oscar, not part of this ruling
 A child who declines should ordinarily be **offered again**, and **the record has nowhere to say whether they
 were.** With god as a card.
+
+---
+
+## §8d — T250 `children` → `young people`: the substitutions that produce sentences nobody would write
+
+Oscar ruled scope and phrasing and gave me *"anything that reads awkwardly after substitution"*, with a known
+list he was explicit was **not the whole list**. Swept `origin/main` — 152 matches across 29 templates, plus
+Java. Build waits on Pam's redesign and T244.
+
+### D-8d-1 — 🔑 the worst one is not in a template
+
+```java
+// GlobalControllerAdvice:100
+roleMatrix.isChildrenListPersonalisedToOwnHomes(principal) ? "My Children" : "Children"
+```
+
+**"My Children" → "My Young People".** It is the worst substitution in the app and it is a **Java string
+literal**, so a template-only sweep misses it entirely — on the nav item that appears on **every screen**.
+
+*"My Children"* survives because the possessive reads as caseload shorthand. *"My Young People"* does not: the
+longer noun phrase makes the possessive land as **ownership of persons**, which is precisely the register this
+rename exists to improve.
+
+**Ruling — re-cut, do not substitute:**
+
+| | |
+| --- | --- |
+| `"Children"` | **`"Young people"`** |
+| `"My Children"` | **`"Young people in your homes"`** |
+
+*"your"*, not *"my"* — the app already addresses the reader in second person (*"Interviews you've completed"*,
+*"so you pick the right child"*). And it **says why the list is shorter**, which the possessive only implied.
+
+**The same pair is duplicated in Thymeleaf** at `children/list.html:15`
+(`${showHomeColumn} ? 'Children' : 'My Children'`) as the page `<h1>`. **Two copies of one decision, one in
+Java and one in a template, which must stay identical** — the nav label and the page title for the same page.
+
+### D-8d-2 — the empty state Oscar flagged: re-cut using a device this codebase already has
+
+> *"No children added yet. Add a child before you can raise an interview request."*
+
+Substituted: *"No young people added yet. Add a young person before you can raise an interview request."* —
+**the same noun phrase twice in consecutive clauses**, 21 words.
+
+**Ruling:** > **"No young people added yet. Add one before you can raise an interview request."**
+
+*"one"* for the second reference: the antecedent is immediate and unambiguous. **And it is not a new
+construction** — `home-staff/request-form.html:45` already says *"A request can be raised once one is
+added."* Per §7x, reuse rather than invent.
+
+**Constraint a builder can break:** this sentence is **deliberately shared** with
+`home-staff/request-list.html:65` (D-5e-1 — the rare childless case reuses the children-list sentence rather
+than rewriting it). **One re-cut, applied in two places, and they must stay identical.**
+
+### D-8d-3 — 🔑 things that must not be touched, which a blind sweep will touch
+
+**(a) A supplier's own name.** `admin/home-list.html:37` and `admin/organisation-list.html:80` render
+**`Harbourside Children's Care`**. A sweep produces *"Harbourside Young People's Care"* — **renaming a
+customer.** Oscar's carve-outs did not include this category: **never substitute inside a proper noun**, and
+these are organisation names even where they appear as static fallback text.
+
+**(b) Comments that quote rulings.** `fragments/report-fields.html:181` contains
+*"OFFERED WITHIN 72 HOURS AND DECLINED BY THE CHILD IS NOT A BREACH"* — **Oscar's own T231 reasoning, quoted**.
+`export/expired.html:52-57` likewise quotes the CTA ruling.
+
+> **Rewriting a quoted ruling inside a comment silently alters the record of what was decided**, and leaves
+> rationale that no longer matches the decision it cites. Sibling of the floor rule that scanners strip
+> comments: **a sweep must not read prose it is not entitled to change.**
+
+**(c) `class="org-children"`** (`admin/organisation-list.html:75`, `:119`) — a CSS class, covered by Oscar's
+data-model carve-out but easy to hit with a text sweep.
+
+### D-8d-4 — `children's home`: the carve-out is right and has **zero instances**
+
+Oscar names *"one instance today: `admin/home-list.html:16`, 'All children's homes.'"* **That string is not
+there** — line 16 is inside a comment block about the 4e tree — and **`children's home` appears nowhere in
+`src/main/resources/templates` or `src/main/java` at all.**
+
+Keep the carve-out: *Children's Homes (England) Regulations 2015* is the statutory name and *"young people's
+home"* does not exist. **But state it as prospective.** A builder told *"one instance, at this line"* finds
+nothing and either concludes the sweep is misconfigured or goes looking for something to change.
+
+### D-8d-5 — the sweep uncovers a live defect: **"1 children"**
+
+`dashboard/care-provider.html:12`:
+
+```
+${view.homeCount() + (view.homeCount() == 1 ? ' home · ' : ' homes · ') + view.childCount() + ' children · Care Provider'}
+```
+
+**`homeCount()` has a singular branch and `childCount()` does not.** A care provider with one child reads
+**"1 children"** today, on their own dashboard. The rename does not cause it; Oscar's replacement list
+(*1 child / 3 children → 1 young person / 3 young people*) **presumes a singular branch that has never
+existed.** Fix it with the sweep — it is the only place in the app that pluralises this noun.
+
+### D-8d-6 — the remaining re-cuts, with reasons
+
+| where | today | ruling |
+| --- | --- | --- |
+| `home-staff/request-form.html:82` | `Date/time child returned` | **`Date and time the young person returned`** — telegraphic today; substituting in place gives *"Date/time young person returned"*. Matches `heldAt`'s *"Date and time the interview was held"*, so the two datetime labels on the statutory path finally share a shape. |
+| `audit/feed.html:51` | `Event, date, home, child reference, role` | **`Event, date, home, case reference, role`** — *"young person reference"* is clumsy, and **`case reference` is what the field actually is** (`localCaseReference`, and `children/list.html:41` already labels it that). Better copy independent of the rename. |
+| `children/form.html` | `Add Child` (title, `<h1>`), `Add child` (button) | **`Add young person`** — substitutes cleanly; noted only because the `<h1>` and the button must move together. |
+| `dashboard/care-provider.html:151`, `dashboard/supplier.html:171`, `audit/event.html:54`, `visitor/schedule-form.html:32` | `Child`, `Children flagged`, `Child returned` | substitute — **but see D-8d-7.** |
+
+### D-8d-7 — the layout consequence, which is mine and not Oscar's to have seen
+
+**`Child` → `Young person` is 5 characters to 12; `Children` → `Young people` is 8 to 12.** These are **table
+column headers** and a **sidebar nav item**, both of which are width-constrained:
+
+* `dashboard/care-provider.html:151` `<th>Child</th>` — the narrowest column in a four-column table.
+* `dashboard/supplier.html:171` `<th>Children flagged</th>` → *"Young people flagged"*.
+* the nav item, which sits in a fixed-width rail beside `Homes` and `Users`.
+
+**Not a blocker and not a reason to shorten the copy** — the word is ruled and the register is the point. But
+**the sweep is a layout change as well as a copy change**, and the tables it touches are the ones that already
+have a responsive card fallback. **This must be looked at rendered, at narrow widths, not read off a diff** —
+which is the failure mode that produced every dark-mode defect on this floor.
+
+### Recorded, not disputed
+Oscar's note that *"young person"* reads oddly for a very young child, and means 16–17 in some UK contexts, is
+his and stands as written: seen, weighed, accepted, and the human has ruled. **T195 established we hold no age
+concept, so we could not vary it by age even if we wanted to.**
+
+*Swept on `origin/main`; verified `children's home` absent from templates and Java; verified the nav literals
+in `GlobalControllerAdvice`.*
