@@ -32,20 +32,36 @@
     <div class="error-card">
         <svg class="icon error-icon" aria-hidden="true"><use th:href="@{/icons/phosphor.svg} + '#ph-clock-countdown'"></use></svg>
         <h1>Export expired</h1>
-        <p class="error-body">This download link is no longer valid. Links are single-use and expire
-            shortly after they are created, so the pack has to be generated again.</p>
-        <p class="error-body">Generating it again is recorded separately in the case history — that
-            is what makes the history reliable.</p>
-        <!--/* "/" and NOT "/children", which was the obvious choice and would have been a dead
-             control for part of this page's audience. Export eligibility is ADMIN, ORG_ADMIN,
-             COORDINATOR and VIEWER (ExportCapability.ELIGIBLE_ROLES); /children/** is gated to
-             HOME_STAFF, ORG_ADMIN, VIEWER and ADMIN (SecurityConfig:63). A COORDINATOR can
-             therefore generate an export and could not follow a link back to the children list -
-             they would get a 403 from a button offered to them on an error page, which is the
-             worst place to hand someone a second failure. "/" is reachable by every authenticated
-             role and routes per role. */-->
+        <!--/* R-Q13, byte-exact (spec §7r, HEAD 6d3b067). Kept on ONE line so no editor can
+             reflow an em dash or an apostrophe into a lookalike: the apostrophe is ASCII 0x27 and
+             the dash is U+2014 with a space either side. Creed hexdumped rather than retyped it,
+             because retyping is how the last one drifted.
+
+             It says "from the child's record" while this page cannot link there, and that is
+             correct rather than sloppy: THE PAGE does not know which child, but THE READER does -
+             they just generated that export. It orients; it does not navigate. */-->
+        <p class="error-body">This export has expired. You can generate it again from the child's record — each export is recorded separately.</p>
+        <!--/* CTA is Creed's [Go to children] (§7r), GATED on actually being able to reach it -
+             his own §5f rule: omit a button rather than render a broken one. Export eligibility is
+             ADMIN, ORG_ADMIN, COORDINATOR and VIEWER; /children/** is gated to HOME_STAFF,
+             ORG_ADMIN, VIEWER and ADMIN (SecurityConfig:63), so A COORDINATOR CAN GENERATE AN
+             EXPORT AND CANNOT REACH THE CHILDREN LIST.
+
+             His §5f fallback was "let the shell's nav be the answer". IT CANNOT BE, ON THIS PAGE:
+             this view renders from an @ExceptionHandler, where a @ControllerAdvice's
+             @ModelAttribute methods do not run, so fragments/layout :: nav throws on a null
+             currentPath - that is the 500 this page shipped as on its first CI run. Omitting the
+             button outright would therefore leave a coordinator on a dead end with no way out at
+             all, which is worse than the broken link §5f forbids.
+
+             So: the ruled button for those who can use it, and a route home for those who cannot.
+             #authorization reads the SecurityContext rather than the model, which is why it works
+             here when ${can...} would not - same idiom fragments/layout already uses. */-->
         <div class="error-actions">
-            <a class="btn" href="/">Back to your dashboard</a>
+            <a class="btn" th:if="${#authorization.expression('hasAnyRole(''HOME_STAFF'',''ORG_ADMIN'',''VIEWER'',''ADMIN'')')}"
+               href="/children">Go to children</a>
+            <a class="btn" th:unless="${#authorization.expression('hasAnyRole(''HOME_STAFF'',''ORG_ADMIN'',''VIEWER'',''ADMIN'')')}"
+               href="/">Back to your dashboard</a>
         </div>
     </div>
 </main>
