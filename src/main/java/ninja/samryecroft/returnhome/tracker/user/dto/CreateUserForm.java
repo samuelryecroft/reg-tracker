@@ -8,8 +8,11 @@ import jakarta.validation.constraints.Size;
 import java.util.HashSet;
 import java.util.Set;
 import ninja.samryecroft.returnhome.tracker.user.Role;
+import ninja.samryecroft.returnhome.tracker.user.password.PasswordCandidate;
+import ninja.samryecroft.returnhome.tracker.user.password.StrongPassword;
 
-public class CreateUserForm {
+@StrongPassword
+public class CreateUserForm implements PasswordCandidate {
 
     @NotBlank
     private String username;
@@ -18,6 +21,10 @@ public class CreateUserForm {
      * Optional, and length-checked only when supplied - a short password is as invalid as it ever
      * was.
      *
+     * <p>The LENGTH rule that used to sit here as {@code @Size(min = 8)} is now the class-level
+     * {@link StrongPassword} constraint, which is the same rule {@code EditUserForm} and
+     * {@code AdminUserSeeder} apply. Two copies of a rule is how one of them stops being true.
+     *
      * <p><b>The reason it is optional has gone, and the rule has deliberately been left alone.</b>
      * It was optional because an account created for Entra sign-in had no local credential at all.
      * With Entra removed, form login is the only way in, so an account saved without a password
@@ -25,7 +32,6 @@ public class CreateUserForm {
      * creation and is out of scope here; it is recorded rather than silently made, because the
      * justification above it no longer holds and a reader would otherwise inherit it as current.
      */
-    @Size(min = 8, message = "Password must be at least 8 characters")
     private String password;
 
     @NotBlank(message = "First name is required")
@@ -141,4 +147,31 @@ public class CreateUserForm {
         this.homeIds = homeIds;
     }
 
+    // --- PasswordCandidate (T272). This form knows the username, the email and the organisation,
+    // so it can supply all three context values; nothing here returns a placeholder. ---
+
+    @Override
+    public String passwordBeingSet() {
+        return password;
+    }
+
+    @Override
+    public String passwordFieldName() {
+        return "password";
+    }
+
+    @Override
+    public String usernameForPolicy() {
+        return username;
+    }
+
+    @Override
+    public String emailForPolicy() {
+        return email;
+    }
+
+    @Override
+    public Long organisationIdForPolicy() {
+        return organisationId;
+    }
 }

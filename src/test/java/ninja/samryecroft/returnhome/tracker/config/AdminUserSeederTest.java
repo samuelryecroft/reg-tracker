@@ -28,6 +28,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import ninja.samryecroft.returnhome.tracker.user.password.PasswordPolicy;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 /**
@@ -44,6 +45,55 @@ class AdminUserSeederTest {
 
     private final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
+    /**
+     * The seeder now applies the SAME PasswordPolicy the user forms do (T272 R5), so every
+     * construction goes through here rather than repeating the wiring - and a real policy, not a
+     * stub, because the point of the rule is that this account cannot escape it.
+     */
+    private AdminUserSeeder seeder(UserRepository userRepository, AppProperties properties) {
+        return new AdminUserSeeder(new PasswordPolicy("return-home-tracker"), userRepository,
+                passwordEncoder, properties);
+    }
+
+    /**
+     * T272 R5. The bootstrap password never passes through form validation, so before this the
+     * platform admin was THE ONE ACCOUNT that could hold a password the policy forbids - and it is
+     * the account that can do anything. A weak value takes the same path as an absent one: refuse
+     * and say why, because seeding a weak admin is the worse of the two failures AND the silent one.
+     *
+     * <p>Both halves are asserted. Refusing without saying why would leave an operator who set the
+     * variable to a plausible-looking value staring at an app where nobody can sign in.
+     */
+    @Test
+    void refusesToSeedAnAdminWhoseSeedPasswordFailsThePolicy() {
+        UserRepository userRepository = mock(UserRepository.class);
+        when(userRepository.findByRoleOrderByFullName(Role.ADMIN)).thenReturn(List.of());
+
+        List<ILoggingEvent> events = captureLogsOf(AdminUserSeeder.class, () ->
+                seeder(userRepository, propertiesWith("admin", "unbelievable")).run(null));
+
+        verify(userRepository, never()).save(any());
+        assertThat(events.stream().map(ILoggingEvent::getFormattedMessage)
+                .collect(Collectors.joining("\n")))
+                .contains("THE SEED PASSWORD FAILS THE PASSWORD POLICY")
+                .contains("commonly used");
+    }
+
+    /** And it is the POLICY, not length alone: a 14-character password built from the service is still weak. */
+    @Test
+    void aSeedPasswordBuiltFromTheServiceNameIsRefusedToo() {
+        UserRepository userRepository = mock(UserRepository.class);
+        when(userRepository.findByRoleOrderByFullName(Role.ADMIN)).thenReturn(List.of());
+
+        List<ILoggingEvent> events = captureLogsOf(AdminUserSeeder.class, () ->
+                seeder(userRepository, propertiesWith("admin", "returnhome2026")).run(null));
+
+        verify(userRepository, never()).save(any());
+        assertThat(events.stream().map(ILoggingEvent::getFormattedMessage)
+                .collect(Collectors.joining("\n")))
+                .contains("THE SEED PASSWORD FAILS THE PASSWORD POLICY");
+    }
+
     private AppProperties propertiesWith(String username, String password) {
         AppProperties properties = new AppProperties();
         properties.getAdmin().setUsername(username);
@@ -56,9 +106,9 @@ class AdminUserSeederTest {
         UserRepository userRepository = mock(UserRepository.class);
         when(userRepository.findByRoleOrderByFullName(Role.ADMIN)).thenReturn(List.of());
 
-        new AdminUserSeeder(userRepository, passwordEncoder, propertiesWith("admin", null)).run(null);
-        new AdminUserSeeder(userRepository, passwordEncoder, propertiesWith("admin", "")).run(null);
-        new AdminUserSeeder(userRepository, passwordEncoder, propertiesWith("admin", "   ")).run(null);
+        seeder(userRepository, propertiesWith("admin", null)).run(null);
+        seeder(userRepository, propertiesWith("admin", "")).run(null);
+        seeder(userRepository, propertiesWith("admin", "   ")).run(null);
 
         // No fallback to a baked-in default: an app nobody can sign into yet beats a platform-wide
         // account with a well-known password guarding children's records.
@@ -70,7 +120,7 @@ class AdminUserSeederTest {
         UserRepository userRepository = mock(UserRepository.class);
         when(userRepository.findByRoleOrderByFullName(Role.ADMIN)).thenReturn(List.of());
 
-        new AdminUserSeeder(userRepository, passwordEncoder, propertiesWith("boss", "from-the-env")).run(null);
+        seeder(userRepository, propertiesWith("boss", "from-the-env")).run(null);
 
         ArgumentCaptor<User> saved = ArgumentCaptor.forClass(User.class);
         verify(userRepository).save(saved.capture());
@@ -87,7 +137,7 @@ class AdminUserSeederTest {
         UserRepository userRepository = mock(UserRepository.class);
         when(userRepository.findByRoleOrderByFullName(Role.ADMIN)).thenReturn(List.of(existingAdmin("boss")));
 
-        new AdminUserSeeder(userRepository, passwordEncoder, propertiesWith("admin", "irrelevant")).run(null);
+        seeder(userRepository, propertiesWith("admin", "irrelevant")).run(null);
 
         verify(userRepository, never()).save(any());
     }
@@ -103,7 +153,7 @@ class AdminUserSeederTest {
         when(userRepository.findByRoleOrderByFullName(Role.ADMIN)).thenReturn(List.of(existingAdmin("boss")));
 
         List<ILoggingEvent> events = captureLogsOf(AdminUserSeeder.class, () ->
-                new AdminUserSeeder(userRepository, passwordEncoder, propertiesWith("admin", "irrelevant"))
+                seeder(userRepository, propertiesWith("admin", "irrelevant"))
                         .run(null));
 
         assertThat(events).as("the skip must not be silent - a silent no-op is what stranded people")
@@ -137,7 +187,7 @@ class AdminUserSeederTest {
         when(userRepository.findByRoleOrderByFullName(Role.ADMIN)).thenReturn(List.of());
 
         List<ILoggingEvent> events = captureLogsOf(AdminUserSeeder.class, () ->
-                new AdminUserSeeder(userRepository, passwordEncoder, propertiesWith("admin", null)).run(null));
+                seeder(userRepository, propertiesWith("admin", null)).run(null));
 
         assertThat(events)
                 .as("the skip must be announced at ERROR - a WARN is what gets scrolled past")
@@ -160,7 +210,7 @@ class AdminUserSeederTest {
         when(userRepository.findByRoleOrderByFullName(Role.ADMIN)).thenReturn(List.of());
 
         List<ILoggingEvent> events = captureLogsOf(AdminUserSeeder.class, () ->
-                new AdminUserSeeder(userRepository, passwordEncoder, propertiesWith("boss", "from-the-env"))
+                seeder(userRepository, propertiesWith("boss", "from-the-env"))
                         .run(null));
 
         assertThat(events).noneMatch(event -> event.getLevel() == Level.ERROR);

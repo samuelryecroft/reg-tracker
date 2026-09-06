@@ -3,7 +3,10 @@ package ninja.samryecroft.returnhome.tracker.config;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.Optional;
 import ninja.samryecroft.returnhome.tracker.user.Role;
+import ninja.samryecroft.returnhome.tracker.user.password.PasswordContext;
+import ninja.samryecroft.returnhome.tracker.user.password.PasswordPolicy;
 import ninja.samryecroft.returnhome.tracker.user.User;
 import ninja.samryecroft.returnhome.tracker.user.UserRepository;
 import org.slf4j.Logger;
@@ -31,12 +34,14 @@ public class AdminUserSeeder implements ApplicationRunner {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final AppProperties appProperties;
+    private final PasswordPolicy passwordPolicy;
 
-    public AdminUserSeeder(UserRepository userRepository, PasswordEncoder passwordEncoder,
+    public AdminUserSeeder(PasswordPolicy passwordPolicy, UserRepository userRepository, PasswordEncoder passwordEncoder,
             AppProperties appProperties) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.appProperties = appProperties;
+        this.passwordPolicy = passwordPolicy;
     }
 
     @Override
@@ -51,6 +56,17 @@ public class AdminUserSeeder implements ApplicationRunner {
         String password = appProperties.getAdmin().getPassword();
         if (password == null || password.isBlank()) {
             warnNobodyCanSignIn();
+            return;
+        }
+        // T272 R5. This password never passes through form validation, so without this check the
+        // bootstrap admin was the ONE account that could hold a password the policy forbids - on the
+        // most privileged account on the system. A weak value takes the SAME path as an absent one:
+        // refuse, say why, and let the app start with nobody able to sign in, because seeding a weak
+        // platform admin is the worse of the two failures and the only one that is silent.
+        Optional<String> rejection = passwordPolicy.rejectionFor(password,
+                new PasswordContext(username, null, null));
+        if (rejection.isPresent()) {
+            warnSeedPasswordIsRejected(rejection.get());
             return;
         }
 
@@ -99,6 +115,21 @@ public class AdminUserSeeder implements ApplicationRunner {
      * message needs to be, not about whether the application is broken: it starts fine, and that
      * is the problem.
      */
+    private void warnSeedPasswordIsRejected(String reason) {
+        log.error("=====================================================================");
+        log.error(" NO ADMIN WAS SEEDED - THE SEED PASSWORD FAILS THE PASSWORD POLICY.");
+        log.error("   {}", reason);
+        log.error("");
+        log.error(" ADMIN_SEED_PASSWORD is set, but the value would not be accepted on");
+        log.error(" any user form, and this is the most privileged account on the system.");
+        log.error(" Seeding it anyway would put the one password nobody checked on the one");
+        log.error(" account that can do anything.");
+        log.error("");
+        log.error(" To fix: set ADMIN_SEED_PASSWORD to a value that meets the policy and");
+        log.error(" RESTART. Seeding only runs at startup.");
+        log.error("=====================================================================");
+    }
+
     private void warnNobodyCanSignIn() {
         log.error("=====================================================================");
         log.error(" NO ADMIN WAS SEEDED - NOBODY CAN SIGN IN.");
