@@ -1256,6 +1256,39 @@ fieldset.step[hidden] { display: none; }
    class needed its own [hidden] override and never got one. */
 .btn[hidden] { display: none; }
 
+/* D-1c/1d (spec §8m): the step label becomes the disclosure for a section index (D-1d-1) - the
+   sentence that already names the current position is what opens the panel, rather than a control
+   living beside it. Reset to a plain button first (buttons inherit neither font nor color from
+   their parent in most engines - without this it would silently stop matching .steps's own type). */
+.step-label {
+    font: inherit; color: inherit; background: none; border: none; cursor: pointer;
+    display: inline-flex; align-items: center; padding: 2px 6px; margin: -2px -6px; border-radius: 6px;
+}
+.step-label:hover { background: var(--tint); }
+/* Sighted affordance for the open/closed state - aria-expanded already carries it to a screen
+   reader; this is the equivalent for everyone else, without a decorative icon (T165/AGSGT rules out
+   CSS generated content, and nothing in D-1d-1 asks for one). */
+.step-label[aria-expanded="true"] { background: var(--tint); color: var(--accent-dark); }
+
+.step-panel { list-style: none; margin: 0; padding: var(--s2) 0; background: var(--surface); border-bottom: 1px solid var(--border); }
+.step-panel-row {
+    width: 100%; min-height: 44px; padding: 0 var(--s4); display: flex; align-items: center; gap: var(--s3);
+    background: none; border: none; font: inherit; color: var(--color-text); text-align: left; cursor: pointer;
+}
+.step-panel-row:hover { background: var(--tint); }
+.step-panel-marker { flex: 0 0 auto; width: 10px; height: 10px; border-radius: 50%; background: transparent; border: 2px solid var(--border); }
+/* D-1d-2: "visited" is a solid marker, "current" is a filled one with the same halo .dot.now
+   already uses immediately above - the two states share a family (both mean "has been on screen"),
+   current just adds the ring that marks which one is happening now. */
+.step-panel-row.visited .step-panel-marker { background: var(--ok); border-color: var(--ok); }
+.step-panel-row.current .step-panel-marker { background: var(--accent); border-color: var(--accent); box-shadow: 0 0 0 3px var(--tint); }
+.step-panel-row.current .step-panel-row-label { font-weight: 700; }
+/* An override on top of whichever of the three position-states applies, never a fourth position -
+   a step can be both "current" and "needs attention" at once. */
+.step-panel-row.needs-attention .step-panel-marker { background: var(--warn); border-color: var(--warn); box-shadow: none; }
+.step-panel-row-label { flex: 1; }
+.step-panel-row-attention { flex: 0 0 auto; font-size: var(--t-xs); font-weight: 650; color: var(--warn); }
+
 /* ============================== responsive (FE-03/FE-10/FE-25): 720px breakpoint ============================== */
 @media (max-width: 720px) {
     main { padding: 0 var(--s4); margin: var(--s5) auto; }
