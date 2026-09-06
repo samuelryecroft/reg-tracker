@@ -143,9 +143,21 @@ class MultiHomeScopingIntegrationTest extends AbstractIntegrationTest {
         // Pinned rather than left to the comment on saveChild, because the tempting simplification
         // is to drop the suffix back off the fixture: the assertions still read correctly, still
         // pass, and the flake returns at a rate far too low to connect to the edit that caused it.
+        //
+        // Asserted as "the suffix is applied" rather than as a digit count. The first version of
+        // this guard required 15+ digits, which passed locally and failed on CI - System.nanoTime()
+        // is documented as having an ARBITRARY origin, and on a freshly-booted Linux runner it is
+        // time since boot: 106135546418, twelve digits, where a macOS laptop gives nineteen. The
+        // magnitude is not a property of the value, so a threshold on it is not a property worth
+        // asserting - and one that can fail on a sufficiently fresh machine would have replaced a
+        // rare flake with a rarer one. What matters is only that the marker carries the suffix at
+        // all: even five digits puts a collision with a 96-character random token at ~64^-9.
         assertThat(childInUnrelated.getLocalCaseReference())
-                .as("the marker must be unique per run, not a word a random token can contain")
-                .matches("Cai-\\d{15,}");
+                .as("the marker must carry the per-run suffix, not be a bare word a token can contain")
+                .isEqualTo("Cai" + suffix);
+        assertThat(suffix)
+                .as("and the suffix must be the nanotime run that makes it unique")
+                .matches("-\\d+");
     }
 
     @Test
