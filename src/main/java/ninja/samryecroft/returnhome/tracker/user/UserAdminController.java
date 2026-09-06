@@ -106,6 +106,7 @@ public class UserAdminController {
 
         model.addAttribute("user", user);
         model.addAttribute("form", form);
+        model.addAttribute("rolesYouCannotChange", userService.rolesNotAssignableBy(user, principal));
         model.addAttribute("auditHistory", auditHistoryService.historyForUser(id, DraftSaveRuns.COLLAPSED));
         auditEventPublisher.auditViewOpened("User", id, principal.getOrganisationId(), null, principal);
         addPickerAttributes(principal, model);
@@ -117,15 +118,19 @@ public class UserAdminController {
             @Valid @ModelAttribute("form") EditUserForm form, BindingResult bindingResult, Model model) {
         rejectAPasswordBuiltFromTheUsername(id, principal, form, bindingResult);
         if (bindingResult.hasErrors()) {
-            model.addAttribute("user", userService.getAuthorized(id, principal));
+            User target = userService.getAuthorized(id, principal);
+            model.addAttribute("user", target);
+            model.addAttribute("rolesYouCannotChange", userService.rolesNotAssignableBy(target, principal));
             addPickerAttributes(principal, model);
             return "admin/user-form-edit";
         }
         try {
             userService.update(id, form, principal);
         } catch (DataIntegrityViolationException clash) {
+            User target = userService.getAuthorized(id, principal);
             rejectDuplicateUsername(bindingResult);
-            model.addAttribute("user", userService.getAuthorized(id, principal));
+            model.addAttribute("user", target);
+            model.addAttribute("rolesYouCannotChange", userService.rolesNotAssignableBy(target, principal));
             addPickerAttributes(principal, model);
             return "admin/user-form-edit";
         }
