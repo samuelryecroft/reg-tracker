@@ -6,6 +6,7 @@ import java.util.stream.Stream;
 import ninja.samryecroft.returnhome.tracker.audit.AuditHistoryEntry;
 import ninja.samryecroft.returnhome.tracker.audit.AuditHistoryService;
 import ninja.samryecroft.returnhome.tracker.audit.AuditHistorySection;
+import ninja.samryecroft.returnhome.tracker.audit.DraftSaveRuns;
 import ninja.samryecroft.returnhome.tracker.child.NameRevealService;
 import ninja.samryecroft.returnhome.tracker.report.ReportService;
 import ninja.samryecroft.returnhome.tracker.report.InterviewReport;
@@ -144,7 +145,7 @@ public class ReviewerController {
 
         // The History card (same fragments/audit-history component 1a uses) and D-1b-8's
         // prior-send-back line both read this one fetch - no reason to ask twice.
-        List<AuditHistorySection> auditHistory = auditHistoryService.historyFor(request);
+        List<AuditHistorySection> auditHistory = auditHistoryService.historyFor(request, DraftSaveRuns.COLLAPSED);
         model.addAttribute("auditHistory", auditHistory);
 
         // D-1b-8 CLOSED (god, via Creed's spec §6c/§6d): SHOW it, at the top of the page, alone -

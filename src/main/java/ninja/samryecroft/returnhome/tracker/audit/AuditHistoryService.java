@@ -76,7 +76,7 @@ public class AuditHistoryService {
     }
 
     /** The request's own lifecycle, plus its report's lifecycle once one exists - one combined story. */
-    public List<AuditHistorySection> historyFor(InterviewRequest request) {
+    public List<AuditHistorySection> historyFor(InterviewRequest request, DraftSaveRuns draftSaveRuns) {
         List<AuditEvent> events = new ArrayList<>(
                 auditEventRepository.findByTargetTypeAndTargetIdOrderByOccurredAtDesc("InterviewRequest", request.getId()));
         interviewReportRepository.findByInterviewRequestId(request.getId()).ifPresent(report ->
@@ -88,12 +88,7 @@ public class AuditHistoryService {
         // draft saves" is a claim about time order, so a run computed over an unsorted list is not
         // the run the reader is looking at.
         events.sort(Comparator.comparing(AuditEvent::getOccurredAt).reversed());
-        return groupByDay(events, WhenStyle.TIME, DraftSaveRuns.COLLAPSED);
-    }
-
-    /** Cross-request "case history" for a screen - see {@link DraftSaveRuns} before adding a caller. */
-    public List<AuditHistorySection> caseHistoryFor(List<InterviewRequest> requests) {
-        return caseHistoryFor(requests, DraftSaveRuns.COLLAPSED);
+        return groupByDay(events, WhenStyle.TIME, draftSaveRuns);
     }
 
     /** Cross-request "case history": every request raised for this child, each its own section. */
@@ -143,6 +138,16 @@ public class AuditHistoryService {
      * show and link them. Sign-in/account/access-denied events never appear (see
      * {@link #CASE_ACTIVITY_TYPES}), which is what keeps the platform-ADMIN sign-in-export question
      * out of scope here rather than needing a separate exclusion.
+     *
+     * <p><strong>Same two-consumer shape as {@link #caseHistoryFor}, and it takes no
+     * {@link DraftSaveRuns} because it collapses nothing: one row per event, always.</strong>
+     * {@code AuditFeedController} builds the org-wide feed SCREEN from this, and its
+     * {@code exportCsv} builds the audit-trail CSV - a disclosure, taken under a purpose and a
+     * reference and recorded as its own audit event. That the CSV is complete is therefore true
+     * <em>by construction</em> rather than by decision, which is exactly the position
+     * {@code caseHistoryFor} was in before T177 and where it went wrong. Anyone collapsing this for
+     * the screen has to split the two callers first, and {@code AuditFeedNeverCollapsesTest} is
+     * what will stop them from not noticing.
      */
     public List<AuditFeedRow> caseActivityFeed(List<InterviewRequest> requestsInScope, Long homeIdFilter,
             LocalDate from, LocalDate to) {
@@ -185,12 +190,12 @@ public class AuditHistoryService {
     }
 
     /** A user account's own audit trail - role/enabled/password changes, never sign-in activity. */
-    public List<AuditHistorySection> historyForUser(Long userId) {
+    public List<AuditHistorySection> historyForUser(Long userId, DraftSaveRuns draftSaveRuns) {
         List<AuditEvent> events = auditEventRepository.findByTargetTypeAndTargetIdOrderByOccurredAtDesc("User", userId)
                 .stream()
                 .filter(e -> !EXCLUDED_FROM_USER_HISTORY.contains(e.getEventType()))
                 .toList();
-        return groupByDay(events, WhenStyle.TIME, DraftSaveRuns.COLLAPSED);
+        return groupByDay(events, WhenStyle.TIME, draftSaveRuns);
     }
 
     /**
