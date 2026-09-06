@@ -314,6 +314,31 @@ public class VisitorController {
                 report != null && report.isLateExplanationMissing());
     }
 
+    /**
+     * When this report was last saved as a draft, or null if it has never been.
+     *
+     * <p><b>T247. The wizard chrome said "Not yet saved" on every load, including a load of a saved
+     * draft whose answers were already on the screen.</b> That is not silence, it is a false
+     * statement - and it is made by the one element whose entire job is to say whether a visitor's
+     * work is safe. A visitor who saved, came back, and read it had every reason to conclude the
+     * save had not worked.
+     *
+     * <p><b>Only DRAFT.</b> A row existing is not enough: the entry guard refuses to demote a
+     * SUBMITTED or APPROVED report, but it guards the WRITE, so this GET still renders the form for
+     * one. Calling that "saved" would tell a visitor their draft is waiting when the report has in
+     * fact gone to a reviewer.
+     *
+     * <p>Formatted with {@code SAVED_AT_FMT} - the same formatter the autosave response uses -
+     * deliberately: the state a visitor lands on and the state they watch appear a moment later
+     * are then the same sentence rather than two that happen to look alike.
+     */
+    private String draftSavedAt(Long requestId, AppUserPrincipal principal) {
+        return reportService.findByRequestId(requestId)
+                .filter(report -> report.getStatus() == ReportStatus.DRAFT)
+                .map(report -> report.getUpdatedAt().format(SAVED_AT_FMT))
+                .orElse(null);
+    }
+
     @GetMapping("/interviews/{id}/report")
     public String reportForm(@PathVariable Long id, @AuthenticationPrincipal AppUserPrincipal principal, Model model) {
         InterviewRequest request = interviewRequestService.getAuthorized(id, principal);
@@ -321,6 +346,7 @@ public class VisitorController {
         model.addAttribute("childIdentity", nameRevealService.identityFor(request.getChild()));
         model.addAttribute("form", reportService.formFor(id, principal));
         addCaptureFragmentAttributes(id, model);
+        model.addAttribute("draftSavedAt", draftSavedAt(id, principal));
         return "visitor/report-form";
     }
 

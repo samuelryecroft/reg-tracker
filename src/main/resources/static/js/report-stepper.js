@@ -37,6 +37,7 @@
     }
 
     var current = 0;
+    var savedAt = form.getAttribute('data-saved-at');
     var chrome = document.createElement('div');
     chrome.className = 'steps';
     chrome.innerHTML =
@@ -45,7 +46,21 @@
         // aria-live, because this is the only thing on the screen that says whether a visitor's
         // work is safe, and it changes without anything moving focus. A save state that reaches
         // only sighted users is the same defect as a state-bearing icon marked aria-hidden.
-        '<span class="saved pending" id="stepper-saved" aria-live="polite">Not yet saved</span>';
+        // T247. The initial state comes from the SERVER, because only the server knows whether a
+        // draft is already stored. This said "Not yet saved" on every load, including a load of a
+        // saved draft whose answers were already filled in on the screen below it - a false
+        // statement, made by the one element whose job is to say whether the work is safe.
+        //
+        // It describes THE WORK ON THIS PAGE, not the row in the database, which is why only the
+        // GET carries it. When the form is redisplayed after a validation error it holds edits that
+        // were rejected and never stored, and "Not yet saved" is then exactly right.
+        //
+        // Same words and same formatter the autosave uses, so the state a visitor lands on and the
+        // state they watch appear a moment later are one sentence rather than two that resemble
+        // each other.
+        (savedAt
+            ? '<span class="saved" id="stepper-saved" aria-live="polite">Saved ' + savedAt + '</span>'
+            : '<span class="saved pending" id="stepper-saved" aria-live="polite">Not yet saved</span>');
     form.insertBefore(chrome, steps[0]);
     var dotsEl = chrome.querySelector('.dots');
     var labelEl = chrome.querySelector('.step-label');

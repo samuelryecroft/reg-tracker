@@ -578,6 +578,44 @@ class TemplateRenderCoverageIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(model().attributeExists("childInterviewed", "lateExplanationMissing"));
     }
 
+    /**
+     * T247: the page is told when the draft was last saved, and only when there IS a draft.
+     *
+     * <p>The visible half is a Playwright round trip; this pins the two cases it cannot reach. The
+     * second is the one with teeth: <b>a row existing is not the same as a draft existing.</b> The
+     * entry guard refuses to demote a SUBMITTED report, but it guards the WRITE, so this GET still
+     * renders the form for one - and telling that visitor their draft is saved would say their work
+     * is waiting for them when it has in fact gone to a reviewer.
+     */
+    @Test
+    void theCaptureFormIsToldWhenADraftWasSavedAndOnlyWhenThereIsOne() throws Exception {
+        mockMvc.perform(get("/visitor/interviews/{id}/report", allocatedRequestId)
+                        .with(asUser("rc-visitor" + suffix)))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute("draftSavedAt", (Object) null));
+
+        mockMvc.perform(post("/visitor/interviews/{id}/report/draft", allocatedRequestId)
+                        .with(asUser("rc-visitor" + suffix)).with(csrf())
+                        .param("interviewLocation", "The quiet room"))
+                .andExpect(status().isOk());
+
+        String html = mockMvc.perform(get("/visitor/interviews/{id}/report", allocatedRequestId)
+                        .with(asUser("rc-visitor" + suffix)))
+                .andExpect(status().isOk())
+                .andExpect(model().attributeExists("draftSavedAt"))
+                .andReturn().getResponse().getContentAsString();
+        assertThat(html)
+                .as("and it reaches the page, because an attribute the template does not carry "
+                        + "tells the script nothing")
+                .contains("data-saved-at=");
+
+        // A report that has gone to a reviewer is not a saved draft, whatever the row says.
+        mockMvc.perform(get("/visitor/interviews/{id}/report", approvedRequestId)
+                        .with(asUser("rc-visitor" + suffix)))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute("draftSavedAt", (Object) null));
+    }
+
     /** The rendered card: from its id up to the start of the next one. */
     private static String substringAfter(String html, String marker) {
         int start = html.indexOf(marker);
