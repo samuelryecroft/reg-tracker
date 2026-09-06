@@ -63,7 +63,7 @@
 */-->
 <th:block th:fragment="reviewerFields()">
     <div class="card" id="report-details" tabindex="-1"
-         th:with="notAnswered=${(form.interviewLocation == null ? 1 : 0) + (form.ifNotWhyLate == null ? 1 : 0)
+         th:with="notAnswered=${(form.interviewLocation == null ? 1 : 0) + (lateExplanationMissing ? 1 : 0)
                                + (form.consultationWithHomeStaff == null ? 1 : 0) + (form.previouslyMissing == null ? 1 : 0)
                                + (form.missingOccasionsLast30Days == null ? 1 : 0) + (form.confidentialityExplained == null ? 1 : 0)}">
         <h2>1. Details
@@ -134,9 +134,27 @@
            aria-describedby="interviewLocation-error"/>
     <div th:unless="${readonly}" th:replace="~{fragments/layout :: fieldError('interviewLocation')}"></div>
 
+    <!--/*
+      T233. The read-only rendering of this one field is scored against whether an explanation was
+      OWED, never against whether the field is blank. A blank means two opposite things - the
+      interview was on time so nothing was owed, or it was late and nobody explained why - and this
+      row printed "Not answered" with the empty styling for both, while the section badge above
+      counted it. A fully completed, on-time interview therefore showed "1 not answered" on the
+      screen a reviewer approves from.
+
+      Every other read-only value on this fragment reads its field directly and is right to: they
+      are stored answers, and blank means one thing. This is the single field where copying the
+      neighbouring line reintroduces the defect, which is why there is a guard.
+
+      `lateExplanationMissing` is supplied by ReviewerController, because `form` is a
+      SubmitReportForm and cannot answer a question about the report against the request's return
+      time. The capture branch below is untouched - there the visitor is being ASKED, and the rule
+      is about presenting an absence as an answer, which only a read-only rendering can do.
+    */-->
     <label th:id="${readonly} ? 'ifNotWhyLate-label' : null" th:for="${readonly} ? null : 'ifNotWhyLate'">If not, why?</label>
-    <div class="readonly-val" th:classappend="${#strings.isEmpty(form.ifNotWhyLate)} ? ' empty' : ''" role="group" aria-labelledby="ifNotWhyLate-label"
-         th:if="${readonly}" th:text="${#strings.isEmpty(form.ifNotWhyLate)} ? 'Not answered' : ${form.ifNotWhyLate}">Answer</div>
+    <div class="readonly-val" th:classappend="${lateExplanationMissing} ? ' empty' : ''" role="group" aria-labelledby="ifNotWhyLate-label"
+         th:if="${readonly}" th:text="${lateExplanationMissing} ? 'No reason recorded'
+                : (${#strings.isEmpty(form.ifNotWhyLate)} ? 'Not applicable' : ${form.ifNotWhyLate})">Answer</div>
     <textarea id="ifNotWhyLate" th:field="*{ifNotWhyLate}" th:unless="${readonly}"></textarea>
 
     <label th:id="${readonly} ? 'consultationWithHomeStaff-label' : null" th:for="${readonly} ? null : 'consultationWithHomeStaff'">Consultation with home's staff to establish any new information</label>

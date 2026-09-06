@@ -119,12 +119,12 @@ public record SeventyTwoHourReading(String returnedLine, String heldLine, String
             // split a reading the rate does not split.
             return new SeventyTwoHourReading(returnedLine, heldLine,
                     notMeasurableCause(returnedAt, heldAt), Verdict.NOT_MEASURABLE,
-                    reason(report, false), explanationMissing(report, false));
+                    reason(report), report.isLateExplanationMissing());
         }
         boolean met = within;
         return new SeventyTwoHourReading(returnedLine, heldLine, elapsed(returnedAt, heldAt),
-                met ? Verdict.MET : Verdict.MISSED, reason(report, !met),
-                explanationMissing(report, !met));
+                met ? Verdict.MET : Verdict.MISSED, reason(report),
+                report.isLateExplanationMissing());
     }
 
     /**
@@ -169,33 +169,28 @@ public record SeventyTwoHourReading(String returnedLine, String heldLine, String
      * <p>A reason that was actually recorded is always printed, whatever the verdict: never hide
      * something a visitor took the trouble to write.
      */
-    private static String reason(InterviewReport report, boolean owed) {
+    private static String reason(InterviewReport report) {
         if (recorded(report)) {
             return report.getIfNotWhyLate();
         }
-        return owed ? "No reason recorded" : "Not applicable";
+        return report.isLateExplanationOwed() ? "No reason recorded" : "Not applicable";
     }
 
     /**
-     * Whether this reading has a <b>gap</b> in it, as opposed to a row that simply does not apply.
+     * <b>The rule is not here.</b> Whether an explanation was owed, and whether one is missing, are
+     * facts about the report rather than decisions this reading makes - and the record and review
+     * screens need the same answers, so they live on {@code InterviewReport} beside
+     * {@code getWithin72Hours()} (T233). This class had its own correct copy for a while; two
+     * correct definitions of one rule is still two definitions, and only one of them would have
+     * been updated.
      *
-     * <p>Carried as state rather than left for a renderer to work out, because two renderers now
-     * need it and the second one is a screen that styles the row. Deriving it there would mean
-     * either recomputing "was an explanation owed" - a second definition of the rule this whole
-     * class exists to hold once - or, worse, testing {@link #reasonLine()} against the string
-     * {@code "No reason recorded"}. That is the mistake Creed already named here: <b>a state must
-     * reach a second renderer as the state, not as a substring of the first rendering.</b> The
-     * failure mode is identical to the one recorded on {@link Verdict} - reword the sentence and the
-     * styling silently stops matching the meaning - and it would fail in the same direction, with a
-     * real gap quietly rendering as an ordinary answer.
-     *
-     * <p>False whenever a reason was written down, and false whenever none was owed. Only a measured,
-     * missed window with nothing written is a gap.
+     * <p>The <em>rendering</em> stays here, because it is this document's own wording. The state is
+     * shared; the sentences are not. {@code explanationMissing} is carried on the record rather than
+     * left for a renderer to infer, for the reason already noted on {@link Verdict}: a second
+     * renderer must receive the state, not a substring of the first rendering. Deciding a row's gap
+     * styling by testing {@link #reasonLine()} against {@code "No reason recorded"} would make a
+     * display sentence load-bearing, and rewording it would silently restyle a statutory record.
      */
-    private static boolean explanationMissing(InterviewReport report, boolean owed) {
-        return owed && !recorded(report);
-    }
-
     private static boolean recorded(InterviewReport report) {
         String value = report.getIfNotWhyLate();
         return value != null && !value.isBlank();

@@ -252,7 +252,7 @@
       being non-null on the model IS the authorization check.
     */-->
     <div class="card" id="report-details" tabindex="-1" th:if="${report != null}"
-         th:with="notAnswered=${(report.interviewLocation == null ? 1 : 0) + (report.ifNotWhyLate == null ? 1 : 0)
+         th:with="notAnswered=${(report.interviewLocation == null ? 1 : 0) + (report.lateExplanationMissing ? 1 : 0)
                                + (report.consultationWithHomeStaff == null ? 1 : 0) + (report.previouslyMissing == null ? 1 : 0)
                                + (report.missingOccasionsLast30Days == null ? 1 : 0) + (report.confidentialityExplained == null ? 1 : 0)}">
         <h3>Details
@@ -310,27 +310,26 @@
             <dd th:unless="${report.within72Hours == null}" th:text="${report.within72Hours} ? 'Yes' : 'No'">—</dd>
 
             <!--/*
-              T233. This row is scored against the verdict above it, never on its own. A blank means
-              two opposite things - the interview was on time so nothing is owed, or it was late and
-              nobody explained why - and the field alone cannot tell them apart. It used to print
-              "Not answered" with the gap styling for BOTH, so an on-time visitor who correctly left
-              it empty was recorded as having declined to justify a breach that never happened. The
-              harm landed on the honest answer as readily as on the confused one.
+              T233. Scored against the verdict above, never on the field alone. A blank means two
+              opposite things - the interview was on time so nothing is owed, or it was late and
+              nobody explained why - and this row printed "Not answered" with the gap styling for
+              both, so an on-time visitor who correctly left it empty was recorded as having
+              declined to justify a breach that never happened.
 
-              Worse, it contradicted the two rows immediately above: those refuse to assert a breach
-              the system cannot evidence, and then this one asserted a refusal to explain that same
-              unevidenced breach. Same family as the export's MISSING_VALUE defect - the system
-              reporting that a person declined to answer, when the system stopped asking.
+              It also contradicted the two rows immediately above it, which refuse to assert a
+              breach the system cannot evidence. A record that will not claim a breach and then
+              claims a refusal to explain that same breach is not merely wrong, it is internally
+              wrong, and a reader has no way to tell which half to believe.
 
-              Both the text and the gap styling come off the reading rather than being recomputed
-              here. `explanationMissing` is carried as STATE for exactly the reason recorded on
-              SeventyTwoHourReading.Verdict: a second renderer must receive the state, not a
-              substring of the first rendering. Testing this text against "No reason recorded" would
-              make a display sentence load-bearing, and rewording it would silently restyle a
-              statutory record.
+              The rule lives on InterviewReport beside getWithin72Hours(), not here: the export and
+              the review screen need the same answer, and a template that recomputed it would be
+              the second definition. The words are this screen's own - the state is shared, the
+              rendering is not.
             */-->
             <dt>If not, why?</dt>
-            <dd th:classappend="${reading.explanationMissing} ? 'unanswered'" th:text="${reading.reasonLine}">—</dd>
+            <dd th:classappend="${report.lateExplanationMissing} ? 'unanswered'"
+                th:text="${report.lateExplanationMissing} ? 'No reason recorded'
+                         : (${#strings.isEmpty(report.ifNotWhyLate)} ? 'Not applicable' : ${report.ifNotWhyLate})">—</dd>
 
             <dt>Consultation with home's staff to establish any new information</dt>
             <dd th:classappend="${report.consultationWithHomeStaff == null} ? 'unanswered'" th:text="${report.consultationWithHomeStaff} ?: 'Not answered'">—</dd>
