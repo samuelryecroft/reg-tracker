@@ -246,6 +246,30 @@ class SeventyTwoHourReadingTest {
      * <p><b>A reason is only owed when the window was measured and missed.</b> And a reason that was
      * actually recorded is printed whatever the verdict, because nothing a visitor took the trouble
      * to write should be hidden.
+     *
+     * <p><b>THE REQUIREMENT THIS PINS (Oscar, T233), stated here because the test predated it.</b>
+     * The behaviour below was built from Creed's finding and turned out to be exactly what Oscar
+     * later ruled - he believed it prospective only because it was not yet on main. Recording his
+     * reasoning against it rather than rewriting the test, so that what this pins is legible as a
+     * <em>rule</em> and not merely as the three cases someone happened to think of:
+     *
+     * <p><b>The reason field must be scored against the derived answer, never on its own</b>, because
+     * a blank means two opposite things and the export cannot tell them apart. Three states, three
+     * renderings: late and blank is "No reason recorded" and should be prominent, a real statutory
+     * failure with no explanation; within 72 hours and blank is <em>not applicable</em> and must not
+     * print as a missing reason; not measurable and blank is likewise not applicable, matching the
+     * record screen's existing refusal to assert a breach it cannot evidence.
+     *
+     * <p>That last state is the one that decided it: <b>the system already refuses to assert a breach
+     * it cannot evidence, so it must not assert a refusal to explain one either.</b> And the harm of
+     * getting it wrong lands on the honest, on-time visitor as readily as on a confused one - leaving
+     * an inapplicable field empty is the correct thing to do, and doing it correctly would have been
+     * recorded as declining to justify a breach that never happened. The wording fix (T231) is the
+     * smaller half precisely because it removes the confusion that produces the blank without
+     * changing what the blank is reported as.
+     *
+     * <p>The rule itself now lives on {@code InterviewReport.isLateExplanationOwed()} - two screens
+     * and this document need one answer - and this test pins the sentences this document says.
      */
     @Test
     void aReasonIsOnlyOwedWhenTheWindowWasMeasuredAndMissed() {
