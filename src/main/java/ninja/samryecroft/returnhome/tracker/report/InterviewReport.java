@@ -324,6 +324,45 @@ public class InterviewReport implements EncryptedEntity {
         return !heldAt.isAfter(interviewRequest.getReturnedAt().plus(DeadlineTracker.RETURN_WINDOW));
     }
 
+    /**
+     * Whether an explanation for a late interview is <em>owed</em> on this report.
+     *
+     * <p>True only when the window was measured <b>and</b> missed. Derived here rather than in a
+     * template because two screens and the export all need it, and the rule is the kind that reads
+     * as obvious and is not: the natural thing to write is "is the reason blank", which is a
+     * question about a field rather than about whether anybody was ever asked.
+     */
+    @Transient
+    public boolean isLateExplanationOwed() {
+        return Boolean.FALSE.equals(getWithin72Hours());
+    }
+
+    /**
+     * Whether this report has a <b>gap</b> where a late explanation should be, as opposed to a field
+     * that simply does not apply.
+     *
+     * <p><b>A blank {@code ifNotWhyLate} means two opposite things</b> - the interview was on time so
+     * nothing is owed, or it was late and nobody explained why - and the stored value is identical in
+     * both. Reading the field alone cannot tell them apart, and both screens did exactly that: they
+     * printed "Not answered" with the unanswered styling, and counted the blank into the section's
+     * "N not answered" badge. So <b>a fully completed, on-time interview displayed "1 not answered"</b>
+     * on the screen a reviewer approves from - a compliance-shaped number counting a question nobody
+     * was owed - and the record stated that the visitor had declined to justify a breach that never
+     * happened.
+     *
+     * <p>The harm landed on the honest, on-time visitor exactly as readily as on a confused one:
+     * leaving an inapplicable field empty is the correct thing to do, and doing it correctly was
+     * recorded as a refusal.
+     *
+     * <p>It is here, on the entity, because it is a fact about the report rather than a decision
+     * either screen gets to make. A template that recomputed it would be the second definition -
+     * and this is a rule where the wrong version is the one that looks natural.
+     */
+    @Transient
+    public boolean isLateExplanationMissing() {
+        return isLateExplanationOwed() && (ifNotWhyLate == null || ifNotWhyLate.isBlank());
+    }
+
     public String getIfNotWhyLate() {
         return ifNotWhyLate;
     }

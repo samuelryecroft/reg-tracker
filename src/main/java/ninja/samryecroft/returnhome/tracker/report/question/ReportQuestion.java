@@ -61,11 +61,24 @@ public record ReportQuestion(
     /**
      * Whether this question has an answer on the given report.
      *
-     * <p>Blank-is-unanswered matches what both existing renderers already do
-     * ({@code #strings.isEmpty} on the text fields, {@code == null} on the rest). It is stated once
-     * here so that a count and a rendering can never disagree about whether a field is filled in -
-     * which is the specific way a "questions answered" figure goes wrong: not by counting the wrong
-     * questions, but by counting them differently from how the page displays them.
+     * <p>Blank-is-unanswered matches what both existing renderers do for every stored answer. It is
+     * stated once here so that a count and a rendering can never disagree about whether a field is
+     * filled in - which is the specific way a "questions answered" figure goes wrong: not by
+     * counting the wrong questions, but by counting them differently from how the page displays them.
+     *
+     * <p><b>ONE QUESTION IS NOT LIKE THE OTHERS, AND STEP 2 MUST NOT FLATTEN IT.</b>
+     * {@code ifNotWhyLate} is only asked when the 72-hour window was measured and missed, so a blank
+     * means two opposite things - nothing was owed, or something was owed and not given - and
+     * {@code InterviewReport.isLateExplanationMissing()} is the rule that separates them (T233).
+     * Both screens got this wrong and both were corrected before this model took over their counts.
+     *
+     * <p>This sentence originally read that blank-is-unanswered "matches what both existing
+     * renderers already do", which was <em>true</em> and is exactly the trap: it was an accurate
+     * reconciliation of a defective pair, and moving the counts onto one definition would have
+     * turned two template bugs into the definition. <b>A single source of truth does not make a
+     * wrong answer right; it makes it unanimous</b> - and a reconciliation is most convincing
+     * precisely when it has faithfully copied something wrong. Conditional questions need the
+     * condition carried on the model, not a fold that treats every blank alike.
      */
     public boolean isAnsweredOn(InterviewReport report) {
         Object value = valueOf(report);
