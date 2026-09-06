@@ -15,6 +15,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewRequest;
+import ninja.samryecroft.returnhome.tracker.interview.InterviewStatus;
 import ninja.samryecroft.returnhome.tracker.report.InterviewReport;
 import ninja.samryecroft.returnhome.tracker.report.InterviewReportRepository;
 import ninja.samryecroft.returnhome.tracker.report.ReportStatus;
@@ -444,13 +445,56 @@ public class AuditHistoryService {
         return "true".equals(value) ? "Enabled" : "Disabled";
     }
 
+    /**
+     * A status transition, with BOTH ends said in the words the system uses for those states (T262).
+     *
+     * <p>This titleCased both operands, so a re-allocated sent-back interview rendered
+     * <em>"Report Rejected &rarr; Allocated"</em> - the exact pre-rename string D-1a-2 removed,
+     * reconstructed by the formatter from the constant, on a screen the visitor whose work it
+     * describes can see.
+     *
+     * <p><strong>The reason for the change is not that those particular words are loaded.</strong>
+     * That made REPORT_REJECTED urgent; it is not what makes the route correct. The route is correct
+     * because <strong>a generic formatter is not authorised to speak for the enum</strong>, and that
+     * reason does not depend on which enum it is. "Allocated" reads correctly through titleCase
+     * <em>by coincidence</em> - its display name happens to equal titleCase of its constant. That
+     * coincidence covers four of seven constants, is invisible at the call site, and holds only
+     * until somebody renames one. A coincidence that covers most cases and is invisible where it
+     * fails is not a reason to keep asking the formatter; it is why this went unseen for so long.
+     *
+     * <p>So the CALL is converted, not the words. Three of seven constants differ today, and that is
+     * a fact about today's names rather than a licence to convert three constants: a per-constant
+     * list is the one-string patch wearing a bigger number, right by coincidence of the current
+     * names and silently wrong after the next rename.
+     *
+     * <p>Why this matters more than {@link #statusDetail} did, even though that one was found first:
+     * {@code statusDetail} restated its own headline, and this does not. {@code statusBefore} is
+     * genuinely new information and the only place the reader learns it. <strong>A wrong vocabulary
+     * on a detail the reader uses is worse than on one that echoes.</strong>
+     */
     private String formatted(Map<String, String> meta, String beforeKey, String afterKey) {
         String before = meta.get(beforeKey);
         String after = meta.get(afterKey);
         if (before == null || after == null) {
             return null;
         }
-        return titleCase(before) + " → " + titleCase(after);
+        return interviewStatusName(before) + " → " + interviewStatusName(after);
+    }
+
+    /**
+     * The same shape as {@link #reportStatusName}, and for the same reason: an audit row is permanent
+     * and may name a constant a later {@link InterviewStatus} no longer has, and that row still has
+     * to render rather than throwing and taking the whole timeline with it. The fallback is the
+     * historic path; every constant the enum currently declares goes through {@code getDisplayName},
+     * and {@code InterviewStatusVocabularyTest} asserts that for all of them - including the ones no
+     * transition can currently produce.
+     */
+    private String interviewStatusName(String constant) {
+        try {
+            return InterviewStatus.valueOf(constant).getDisplayName();
+        } catch (IllegalArgumentException unknownToThisVersion) {
+            return titleCase(constant);
+        }
     }
 
     private String parseAndFormatTimestamp(String value) {
