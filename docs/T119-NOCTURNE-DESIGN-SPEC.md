@@ -1281,6 +1281,52 @@ decision rather than two coincidences.
 **This banner is the highest-stakes copy surface in the whole sent-back vocabulary**: the rail is a
 coordinator glancing at progress, this is a visitor reading that their own work has come back.
 
+### 4. [PROMOTED 8 Sep — item 3 ruled an instance; this is the rule it was always an instance of]
+
+Written because T284 asked whether the sent-back finding already covered a second case. **It did not, because
+item 3 ruled one banner rather than the principle inside it.** One authority, generalised in place, rather
+than a second ruling that agrees today and drifts later.
+
+> **`warn` is for something that has gone wrong, or is about to. A state the system reached correctly — or
+> that the user chose — is not a warning, however much you want it noticed.**
+
+**Swept on `origin/main` @ `73dbe4c`. Six `.banner.warn` uses; THREE describe non-problems:**
+
+| use | says | verdict |
+|---|---|---|
+| `organisation-list.html:13` | KEK not confirmed | **legitimate** — something is wrong |
+| `export/case-file-form.html:79` | export scope is partial | **legitimate** — a consequence being accepted |
+| `organisation-list.html:28` | activation failed | **wrong tier** — a failed action is `err`, not `warn` |
+| `home-staff/request-form.html:40` | "No children are recorded for this home yet" | **not a warning** — an empty state with a next action |
+| `reviewer/review-form.html:67` | "You can't decide this report" | **not a warning** — separation of duties **working** |
+| `visitor/report-form.html:61` | sent back for revision | **not a warning** — already ruled in item 3, **and still unbuilt** |
+
+**The classification and the icon travel together:** all six render `ph-warning-circle`, so the glyph asserts
+"problem" even where a variant change would stop the colour doing so. **Both move, or neither does.**
+
+**Also recorded so it is not rediscovered: item 3 was never built.** `visitor/report-form.html:61` still reads
+`class="banner warn"`, and `app.css:1103-1106` still defines only `err`/`warn`/`ok`/`info` — **there is no
+`.banner.sent-back` rule.** The ruling has existed and been unimplemented since 4 Sep.
+
+### 5. The size complaint on the filtered-view notice is NOT a classification error — it is the wrong component
+
+T284 reports *"the showing a filtered view warning is massive compared to the size of the message"*.
+**MEASURED: that notice is `class="banner info"` (`coordinator/requests.html:46`), not `warn`.** Its
+classification is already right, and R-Q13's comment records why the notice exists at all — an empty
+safeguarding queue is ambiguous between *"nothing to do"* and *"the system isn't showing me everything"*.
+
+**So there is nothing to reclassify, and the size does not follow from the colour. It follows from the
+component:**
+
+> **A banner announces something that HAPPENED. A filter is not an event — it is a persistent property of the
+> view, which the user chose and can undo.** `.banner` gives it a status icon, a `<strong>` headline block and
+> a paragraph — **an announcement's anatomy for a fact plus an undo.** State that can be undone belongs with
+> the control that undoes it, not in an announcement about itself.
+
+**The fix is a filter/state affordance carrying its own "Clear filters" control — not a smaller banner.** The
+human's first reading was the correct one; the notice is oversized because it is the wrong component, and it
+would still be oversized in any colour.
+
 ## 5i · Screen 1a, the last open item — the original request disclosure (Creed, 4 Sep)
 
 Pam flagged that the collapsed `<details>` and the "the record leads with the report" ordering were the one
