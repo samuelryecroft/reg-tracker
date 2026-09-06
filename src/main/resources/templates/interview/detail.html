@@ -392,7 +392,26 @@
          th:with="notAnswered=${unansweredBySection['rhi']}">
         <h3>Return Home Interview
             <span class="tag tag-semantic-neutral" th:if="${report.interviewDeclined}">Not interviewed</span>
-            <span class="section-count" th:if="${!report.interviewDeclined and notAnswered > 0}" th:text="${notAnswered + ' not answered'}"></span>
+            <!--/*
+              THE THIRD STATE, and silence was the wrong answer to it. Hiding the nine and saying
+              nothing leaves one quiet number carrying a meaning it cannot carry - the same trap as
+              the declined case, one state further along, and the understatement is worse here.
+              On a declined report the count was wrong but the truth was recoverable from the
+              section; on an unrecorded one "2 not answered" ACTIVELY MISDESCRIBES - it says two
+              small fields are outstanding when the truth is that nobody knows whether two are
+              outstanding or eleven.
+
+              A reviewer pays for that difference. A blank dropdown reads as a tidy-up; "the
+              interview's status is unrecorded" reads as DO NOT APPROVE THIS YET, and the screen
+              rendered those two decisions identically.
+
+              "Not yet recorded", never "not started": this states an absence in OUR RECORD and
+              asserts nothing about the young person. The interview may have happened and simply not
+              been written up. Neutral for the same reason as the chip above - nothing here is
+              anyone's failure yet.
+            */-->
+            <span class="tag tag-semantic-neutral" th:if="${report.interviewStatusUnrecorded}">Not yet recorded</span>
+            <span class="section-count" th:if="${report.childInterviewed and notAnswered > 0}" th:text="${notAnswered + ' not answered'}"></span>
         </h3>
         <p th:if="${report.interviewDeclined}">The young person was not interviewed, so these questions were not asked. The reason is recorded above.</p>
         <dl class="detail">

@@ -139,6 +139,8 @@ public class ReviewerController {
         // InterviewReport so the screen, the count and the export cannot disagree.
         model.addAttribute("childInterviewed", reportRow != null && reportRow.isChildInterviewed());
         model.addAttribute("interviewDeclined", reportRow != null && reportRow.isInterviewDeclined());
+        model.addAttribute("interviewStatusUnrecorded",
+                reportRow != null && reportRow.isInterviewStatusUnrecorded());
 
         // The History card (same fragments/audit-history component 1a uses) and D-1b-8's
         // prior-send-back line both read this one fetch - no reason to ask twice.

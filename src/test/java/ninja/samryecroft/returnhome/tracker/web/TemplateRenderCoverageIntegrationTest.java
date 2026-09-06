@@ -391,6 +391,51 @@ class TemplateRenderCoverageIntegrationTest extends AbstractIntegrationTest {
                 .doesNotContain("Not interviewed");
     }
 
+    /**
+     * T244, the third state: when nobody has recorded whether the interview happened, the section
+     * says so rather than going quiet.
+     *
+     * <p><b>Silence was the wrong answer and this is why.</b> Hiding the nine and showing only a
+     * count leaves one quiet number carrying a meaning it cannot carry: "2 not answered" says two
+     * small fields are outstanding, when the truth is that nobody knows whether two are outstanding
+     * or eleven. On a declined report the count was merely wrong; here it <em>actively
+     * misdescribes</em>.
+     *
+     * <p>A reviewer pays for the difference. A blank dropdown reads as a tidy-up; the interview's
+     * status being unrecorded reads as <b>do not approve this yet</b> - and the screen rendered
+     * those two decisions identically.
+     *
+     * <p>The statement is checked to STAY AWAY: it asserts that a young person was not spoken to,
+     * and on this state that names not just an unknown cause but an unknown event.
+     */
+    @Test
+    void anUnrecordedInterviewStatusSaysSoRatherThanShowingAQuietCount() throws Exception {
+        InterviewReport report = interviewReportRepository
+                .findByInterviewRequestId(approvedRequestId).orElseThrow();
+        report.setInterviewAccepted(null);
+        interviewReportRepository.saveAndFlush(report);
+
+        String card = substringAfter(renderDetail(), "id=\"rhi\"");
+
+        assertThat(card)
+                .as("an absence in OUR record - never 'not started', which would assert that no work "
+                        + "has happened when the interview may simply not be written up yet")
+                .contains("Not yet recorded")
+                .contains("tag-semantic-neutral");
+        assertThat(card)
+                .as("the count must not appear beside it: a quiet number and a stated status are two "
+                        + "claims about one section, and the number is the one that misdescribes")
+                .doesNotContain("not answered</span>");
+        assertThat(card)
+                .as("this asserts a young person was not spoken to. On an unrecorded status that "
+                        + "names an unknown EVENT, not merely an unknown cause")
+                .doesNotContain("was not interviewed, so these questions were not asked");
+        assertThat(card)
+                .as("the nine stay hidden - showing them would imply they are owed, and we do not "
+                        + "know that either")
+                .doesNotContain("Where were you while missing?");
+    }
+
     private String renderDetail() throws Exception {
         return mockMvc.perform(get("/interview-requests/{id}", approvedRequestId)
                         .with(asUser("rc-reviewer" + suffix)))

@@ -478,6 +478,23 @@ public class InterviewReport implements EncryptedEntity {
         return Boolean.FALSE.equals(interviewAccepted);
     }
 
+    /**
+     * Whether nobody has yet recorded whether the interview happened.
+     *
+     * <p>Named alongside the other two rather than composed in a template as "neither", because a
+     * three-state rule written out as the negation of two others is a second definition of the same
+     * rule - and this is the state a reader is most likely to get wrong.
+     *
+     * <p><b>It is an absence in OUR record, not a fact about the young person.</b> A screen may say
+     * that the interview's status has not been recorded; it may not say the interview did not
+     * happen, and it may not say no work has been done - the interview may have taken place and
+     * simply not been written up yet.
+     */
+    @Transient
+    public boolean isInterviewStatusUnrecorded() {
+        return interviewAccepted == null;
+    }
+
     public String getInterviewDeclinedReason() {
         return interviewDeclinedReason;
     }
