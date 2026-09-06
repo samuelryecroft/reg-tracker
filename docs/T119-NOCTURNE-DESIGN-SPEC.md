@@ -4373,3 +4373,117 @@ separate question; **the label swap and the title fix do not depend on that and 
 
 **Order:** label swap (independent, today) → #77 merges → title fix and accessor deletion together, since the
 deletion is what stops the title regressing again.
+
+---
+
+## §7y — reviewing #126 and #128, and the dangling anaphor Jim left me
+
+god sent both PRs on the rule that nobody merges in this field without my eyes on it, *because the whole
+point of the `heldAt` work was that a single lane could not see the field whole.* **Both are sound.** Two
+findings, one per PR, plus a copy ruling Jim surfaced and correctly did not make himself.
+
+### R-7y-1 — convergent discovery, and what it proves about guards
+
+#126's model→export guard **fired on its first run and found T187 independently.** Jim wrote it up before Pam
+relayed mine, and said so. His account of the difference is the one to keep:
+
+> **I found it by reading the export. He found it by asking a machine whether two lists agreed — and the
+> second one keeps working after we have both moved on.**
+
+That is the argument for the guard over the audit, made by two people reaching the same defect from opposite
+ends on the same day. **An audit is a measurement; a guard is a mechanism.** It is the same distinction
+D-7x-3 turned on, arriving as evidence rather than as an argument.
+
+### R-7y-2 — #126: **the recorded reason expires when #77 merges**
+
+god asked whether recording `heldAt`'s `${interviewDate}` exception **as data with the reason** rather than
+fixing it is the right treatment. **Yes** — a binary template plus statutory wording is not a thing to fold
+into an otherwise behaviour-free PR, and `exactlyOneQuestionGoesOutUnderADifferentNameThanItsOwn`,
+pinning `containsExactly("heldAt -> interviewDate")`, is the right shape: it **pins which one, not that some
+exist**, so the exception cannot quietly acquire company.
+
+**But #126 and #77 are both open, and the recorded reason is order-dependent.** After #77,
+`ReportService:406` sets that token from `reading.heldLine()`, so it carries the full datetime. The comment
+on the model then says:
+
+> *"THE EXPORTED RECORD SHOWS THE DAY AND NOT THE TIME"* — **of a record that shows the time.**
+
+The pin stays correct; only its justification expires. Same for the test's *"the one that exists is lossy"* —
+after #77 the rename is a name mismatch with a binary template, which is still worth pinning, but **not for
+the stated reason.**
+
+> **This is §5b's shape again, in the opposite direction. There I found an instruction that inverted when its
+> dependency was removed; here it is a RECORDED REASON that expires when its defect is FIXED.** A reason
+> written beside a defect has a shelf life tied to that defect's lifetime, and nothing connects the two.
+
+Not a blocker and not a rewrite: **whichever of #126 and #77 merges second updates the other's recorded
+reason.** It matters because these comments are load-bearing — a reader who finds one false stops trusting
+the rest, and the rest is what stops the exception acquiring company.
+
+### R-7y-3 — #128: the "not silently exempt" claim is true of one half and not the other
+
+The guard is right, and right for the reason Kevin gave: `DueStateCopy` was character-pinned because that copy
+**asserts** a compliance status, whereas a question label **elicits**. Locating question text from `<dt>`
+**or** `<label>` rather than per file is the correct generalisation, and the count tripwire — *"the scan found
+no rendering at all, which means this guard is protecting nothing"* — is the failure mode arriving through
+its own front door, pre-empted.
+
+**But `RENDERERS` is a hard-coded list of two files.** The PR states *"a third renderer added later is not
+silently exempt"*; that is delivered by the question-location half and **not** by the file list. A new
+template rendering `heldAt` is exempt exactly as before — and the history says that is not hypothetical:
+`report/view.html` renders `report.heldAt` and is not on `origin/main`.
+
+Remedy is about four lines: walk `templates/` for `heldAt` renderings instead of listing files. **Improvable,
+not wrong** — the guard catches everything it is pointed at; it is the aim that is fixed. Secondary, from the
+same cause: the tripwire counts renderings **in total**, so one file dropping to zero while another gains one
+still passes. Both are cheapest folded into T228, since Jim is already in these files.
+
+### R-7y-4 — quoting the reasoning into the template is faithful, and it built its own trap
+
+god asked me to confirm Jim putting §7x's out-of-scope note **in `detail.html` beside the change**, rather
+than in a spec a reader would have to know to open, is faithful to what I ruled. **It is, and it is better
+than the spec** — the note now sits where the temptation is.
+
+And it created the hazard that mutation 4 tests: **the comment quotes both labels, so an unstripped scanner
+would find the word "time" in the explanation of why the word was missing.** Jim stripped comments and proved
+it load-bearing rather than assuming it. **Fourth time in this codebase a scanner would have passed on its own
+prose.**
+
+> **Prose placed where a reader is tempted is also placed where a scanner is fooled.** The two remedies pull
+> against each other, and the resolution is not to move the prose — it is that **every scanner in this
+> codebase strips comments before matching, and proves it with a mutation that hides the correct answer inside
+> one.**
+
+### R-7y-5 — **the dangling anaphor is worse than a dangling anaphor** (Jim's finding, my ruling)
+
+Jim listed it as an open copy item and did not act on it. `report-fields.html`:
+
+| line | field | label | preceded by |
+| --- | --- | --- | --- |
+| 137 | `ifNotWhyLate` | **"If not, why?"** | "Location of this interview" — **if not WHAT?** |
+| 181 | `interviewDeclinedReason` | **"If not, why?"** | "Interview accepted?" — correctly anchored |
+
+The antecedent was the 72-hour question, removed from capture when it became derived. **Two identically-worded
+labels for two different fields, one anchored and one orphaned** — so a visitor with no antecedent may read
+the orphan against the nearest question they can find.
+
+**The harm is not vagueness, and this is why it is mine and not a tidy-up.** `ifNotWhyLate` is *the statutory
+explanation for a missed 72-hour window* — the field `SeventyTwoHourReading.reason()` prints, and prints as
+**"No reason recorded"** when blank. So the export tells a court **the visitor offered no explanation for the
+breach**, when the screen had stopped telling them lateness was the subject.
+
+> **Same family as the `MISSING_VALUE` → unanswered-styling defect Jim documented in the same PR: the system
+> reports that a person declined to answer, when the system stopped asking.** There it was a wiring gap; here
+> it is a removed antecedent. **A question that loses its antecedent does not become vague — it becomes a
+> different question, and the record still scores the answer against the old one.**
+
+**Ruling:** §7x's *reuse, do not invent* does **not** apply — there is nothing to reuse, since section 2's
+identical string is anchored by its own neighbour and copying it would reproduce the collision. New copy is
+required, it is on a shipped statutory form, and it must name the window rather than gesture at a question
+that is no longer there. **My proposal, for Oscar's ruling, not my decision:**
+
+> **"If the interview was not held within 72 hours of the child's return, why not?"**
+
+Self-anchoring, names the measurement the answer is scored against, and **removes the dependence on question
+order** — the property whose loss caused this. It also stops the two labels being identical strings, which is
+what let the removal go unnoticed. **Routed to god for Oscar and a card; I have raised neither.**
