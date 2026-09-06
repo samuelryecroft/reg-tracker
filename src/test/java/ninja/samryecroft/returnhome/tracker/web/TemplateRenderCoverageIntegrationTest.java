@@ -451,9 +451,30 @@ class TemplateRenderCoverageIntegrationTest extends AbstractIntegrationTest {
                 .andReturn().getResponse().getContentAsString();
     }
 
-    /** T244: the collapse is READ-ONLY ONLY. The visitor is still filling this form in, and hiding the nine here would stop them completing the section they are there to complete. Guarded by render, not by reading the expression: the gate is safe only because SpEL short-circuits `readonly and ...`, and `childInterviewed` is ABSENT from the visitor model - evaluating it throws EL1001E. */
+    /**
+     * T244: the collapse is READ-ONLY ONLY. The visitor is still filling this form in, and hiding
+     * the nine here would stop them completing the section they are there to complete - the null
+     * state would become unescapable by construction.
+     *
+     * <p><b>The gate is safe because {@code VisitorController} supplies {@code childInterviewed}</b>,
+     * so both operands of {@code readonly and !childInterviewed} evaluate to a real value on every
+     * renderer of this fragment.
+     *
+     * <p><b>History, because it explains why this test exists and no longer explains why it passes.</b>
+     * When this was written the attribute was ABSENT on the visitor path, and the form was correct
+     * only because SpEL's {@code and} short-circuits and never reached the second operand - reaching
+     * it threw {@code EL1001E}. Commit {@code 527c254}, in the same pull request, removed that
+     * asymmetry by supplying the attribute rather than defaulting the operand.
+     *
+     * <p>The comment above said the attribute was absent for as long as it took that commit to land,
+     * <b>and the reasoning was Dwight's, written for a throwaway probe and merged verbatim with it.</b>
+     * A future reader arming this test would have followed it, got a clean assertion failure instead
+     * of the promised exception, and had no way to tell which of the two was wrong. Same shape as
+     * the {@code childQuestionRows} javadoc in this PR: behaviour reversed, justification left
+     * standing - <b>and a justification is only load-bearing while it is true.</b>
+     */
     @Test
-    void probeVisitorCaptureFormKeepsTheNineWhenTheReportSaysDeclined() throws Exception {
+    void theVisitorCaptureFormKeepsTheNineWhenTheReportSaysDeclined() throws Exception {
         mockMvc.perform(post("/visitor/interviews/{id}/report/draft", allocatedRequestId)
                         .with(asUser("rc-visitor" + suffix)).with(csrf())
                         .param("interviewAccepted", "false"))
@@ -482,6 +503,13 @@ class TemplateRenderCoverageIntegrationTest extends AbstractIntegrationTest {
      * put to the young person is covered the day it is added rather than the day someone remembers
      * this file exists - the same reason the badge and label assertions compare against the model
      * instead of against literals.
+     *
+     * <p><b>Neither is redundant, and the reason is the state rather than the strength.</b> That one
+     * saves a declined draft first, so it renders the capture form with {@code interviewAccepted}
+     * FALSE; this one runs against a request with no report row, so it renders it with NULL. Those
+     * are the two states in which the read-only screens collapse the nine, and the whole point of
+     * both tests is that the capture form does not. Deleting either on grounds of overlap would
+     * leave one of the two collapsed states unexercised on the one surface that must never collapse.
      */
     @Test
     void theCaptureFormOffersEveryQuestionPutToTheYoungPerson() throws Exception {
