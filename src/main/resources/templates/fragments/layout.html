@@ -166,7 +166,12 @@
         <a th:if="${#authorization.expression('hasAnyRole(''ADMIN'',''ORG_ADMIN'')')}" href="/admin/homes"
            th:aria-current="${path == '/admin/homes' or #strings.startsWith(path, '/admin/homes/')} ? 'page'">
             <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-house-line'"></use></svg>Homes</a>
-        <a th:if="${#authorization.expression('hasAnyRole(''ORG_ADMIN'',''VIEWER'',''COORDINATOR'',''ADMIN'')')}" href="/audit"
+        <!--/* T271: was hasAnyRole('ORG_ADMIN','VIEWER','COORDINATOR','ADMIN') - the role CEILING
+             SecurityConfig's /audit/** matcher enforces, but not the actual gate. Every audit route
+             also requires ExportCapability.canExport (role AND a per-account grant), so an eligible
+             role without the grant saw this link and got a 403 for something the app itself offered
+             - the human's report. canViewAudit (GlobalControllerAdvice) asks that same method. */-->
+        <a th:if="${canViewAudit}" href="/audit"
            th:aria-current="${path == '/audit' or #strings.startsWith(path, '/audit/')} ? 'page'">
             <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-clock-counter-clockwise'"></use></svg>Audit</a>
 
