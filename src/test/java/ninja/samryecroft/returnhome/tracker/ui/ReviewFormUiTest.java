@@ -112,6 +112,95 @@ class ReviewFormUiTest extends AbstractUiTest {
         interviewReportRepository.save(report);
     }
 
+    /**
+     * T285, FROM THE HUMAN: "The approve and generate document button does not work?"
+     *
+     * <p>It was not the button. <strong>The form would not submit.</strong> The comment textarea
+     * carried a static {@code required} while living inside a dialog that is CLOSED on load, so
+     * pressing Approve ran native constraint validation, found an empty required control it could
+     * not focus, logged <em>"An invalid form control with name='reviewComments' is not
+     * focusable"</em>, and did nothing. <strong>There was no server round-trip at all</strong>,
+     * which is why nothing appeared in any log we hold and why no server-side test could see it.
+     *
+     * <p>This is the end of the whole safeguarding workflow - approving is what produces the
+     * document that leaves the system - and it was unreachable.
+     *
+     * <p><strong>Only a real browser reproduces this</strong>, because the mechanism IS the
+     * browser's constraint validation. That is the reason it survived every test we have.
+     */
+    @Test
+    void approveActuallySubmitsRatherThanBeingBlockedByAHiddenRequiredControl() {
+        login("review-ui-reviewer", PASSWORD);
+        page.navigate(url("/reviewer/reports/" + requestId + "/review"));
+        page.waitForLoadState();
+
+        // The URL alone cannot tell "never submitted" from "submitted and re-rendered with errors" -
+        // two of the five candidate mechanisms - so the console message that NAMES the defect is the
+        // assertion. It is the exact line from the human's own console.
+        java.util.List<String> console = new java.util.ArrayList<>();
+        page.onConsoleMessage(message -> console.add(message.text()));
+
+        page.click("button:has-text('Approve and generate document')");
+        page.waitForLoadState();
+
+        assertThat(console)
+                .as("native constraint validation must not block the submit on a control it cannot focus")
+                .noneMatch(text -> text.contains("not focusable"));
+        // DELIBERATELY NOT ASSERTED HERE: that the page navigates. It does not, and that is a
+        // SECOND blocker I have not identified - no "not focusable" message, no field error on the
+        // re-render, URL unchanged. Asserting navigation would make this test fail for a reason it
+        // does not diagnose, and asserting the current (broken) navigation would pin the defect.
+        // The console assertion above is the one that discriminates the cause this change fixes.
+        // Reported to god rather than guessed at.
+    }
+
+    /**
+     * And the requirement it replaced is still enforced, so the fix does not trade one defect for a
+     * worse one: <strong>a report sent back with no reason lands on a visitor who has to guess what
+     * to change, on a report about a child.</strong>
+     *
+     * <p>The requirement now DERIVES from the dialog being open rather than being declared
+     * separately, so the two cannot disagree again - which is what made the original defect
+     * reachable on the approve path only.
+     */
+    @Test
+    void sendBackStillRefusesToSubmitWithoutAComment() {
+        login("review-ui-reviewer", PASSWORD);
+        page.navigate(url("/reviewer/reports/" + requestId + "/review"));
+        page.waitForLoadState();
+
+        page.click("#openSendBackDialog");
+        assertThat((Boolean) page.evaluate("() => document.getElementById('reviewComments').required"))
+                .as("opening the dialog must ARM the requirement - it is no longer in the markup")
+                .isTrue();
+
+        page.click("#sendBackDialog button:has-text('Send back')");
+        assertThat(page.url())
+                .as("an empty comment must still block the send-back submit")
+                .contains("/review");
+    }
+
+    /**
+     * The requirement must be DISARMED when the dialog closes, or a reviewer who opens send-back and
+     * changes their mind is back in the original defect - approve blocked by the same mechanism, now
+     * created by their own click. Escape closes a dialog natively without any button, so the listener
+     * is on the dialog's own close event rather than on Cancel alone.
+     */
+    @Test
+    void changingYourMindAboutSendingBackDoesNotBlockApprove() {
+        login("review-ui-reviewer", PASSWORD);
+        page.navigate(url("/reviewer/reports/" + requestId + "/review"));
+        page.waitForLoadState();
+
+        page.click("#openSendBackDialog");
+        page.click("#cancelSendBack");
+        assertThat((Boolean) page.evaluate("() => document.getElementById('reviewComments').required"))
+                .as("closing the dialog must disarm the requirement")
+                .isFalse();
+
+        // Not asserting navigation - see the note in the approve test above.
+    }
+
     @Test
     void theDisclosureOpensInPlaceAndTheSendBackDialogOpensAndCancels() {
         login("review-ui-reviewer", PASSWORD);

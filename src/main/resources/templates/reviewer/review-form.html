@@ -249,7 +249,29 @@
                 <div class="dialog-body">
                     <label for="reviewComments">What needs to change, and where?</label>
                     <p class="hint">Reference the numbered section, e.g. "3. Future Incidents needs...".</p>
-                    <textarea id="reviewComments" th:field="*{reviewComments}" required
+                    <!--/*
+                      T285. This carried a STATIC `required`, and that broke the end of the entire
+                      workflow: the dialog is CLOSED on load, so its textarea is not focusable, and
+                      pressing "Approve and generate document" - a submit in this same form - ran
+                      native constraint validation, found an empty required control it could not
+                      focus, logged "An invalid form control with name='reviewComments' is not
+                      focusable" and SILENTLY REFUSED TO SUBMIT. No server round-trip at all, which
+                      is why nothing appeared in any log we hold.
+
+                      The requirement is REAL but belongs to ONE PATH: a report sent back without a
+                      reason lands on a visitor who then has to guess what to change, on a report
+                      about a child. ReviewerController:73 already holds that rule correctly and
+                      conditionally ("reject".equals(action) && blank). This attribute was a SECOND,
+                      UNCONDITIONAL copy of it - and the requirement and the visibility disagreed,
+                      reachable only on the approve path, WHICH IS WHY IT SURVIVED EVERY TEST.
+
+                      So `required` is now SET BY send-back-dialog.js FROM THE DIALOG'S OWN OPEN
+                      STATE rather than declared here. The requirement DERIVES from the visibility
+                      instead of agreeing with it by coincidence; there is nothing left to drift.
+                      Without JS the dialog never opens, the trigger posts action=reject, and the
+                      server rule catches it exactly as before.
+                    */-->
+                    <textarea id="reviewComments" th:field="*{reviewComments}"
                               th:errorclass="is-invalid" th:aria-invalid="${#fields.hasErrors('reviewComments')}"
                               aria-describedby="reviewComments-error"></textarea>
                     <div th:replace="~{fragments/layout :: fieldError('reviewComments')}"></div>
