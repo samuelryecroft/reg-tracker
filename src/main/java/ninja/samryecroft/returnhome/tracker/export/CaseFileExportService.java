@@ -9,6 +9,7 @@ import java.util.Optional;
 import java.util.Set;
 import ninja.samryecroft.returnhome.tracker.audit.AuditHistorySection;
 import ninja.samryecroft.returnhome.tracker.audit.AuditHistoryService;
+import ninja.samryecroft.returnhome.tracker.audit.DraftSaveRuns;
 import ninja.samryecroft.returnhome.tracker.child.Child;
 import ninja.samryecroft.returnhome.tracker.child.ChildRepository;
 import ninja.samryecroft.returnhome.tracker.document.DocumentSecurityException;
@@ -174,11 +175,16 @@ public class CaseFileExportService {
                 included, excluded, List.of(), manifest.partialScope(), manifest.partialScopeNote());
 
         HomeScope historyScope = organisationAccessService.homeScopeFor(principal);
+        // KEPT_IN_FULL, not the screen's default: T177 collapses runs of draft saves on the child
+        // page, and this pack is a disclosure to a DPO, a local authority or a court. A collapsed
+        // row states its count and the span between its ends, but "when exactly was the third
+        // revision saved" is asked about one row and a span does not answer it.
         List<AuditHistorySection> history = auditHistoryService.caseHistoryFor(
                 interviewRequestRepository.findByChildIdOrderByCreatedAtDesc(childId).stream()
                         .filter(r -> historyScope.canView(r.getHome()))
                         .filter(period::covers)
-                        .toList());
+                        .toList(),
+                DraftSaveRuns.KEPT_IN_FULL);
 
         return packWriter.write(new ExportPackWriter.PackRequest(
                 referenceFor(child), finalManifest, history, attachments, purpose, reference,

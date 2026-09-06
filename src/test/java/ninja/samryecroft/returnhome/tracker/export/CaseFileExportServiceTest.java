@@ -3,6 +3,7 @@ package ninja.samryecroft.returnhome.tracker.export;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -14,6 +15,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import ninja.samryecroft.returnhome.tracker.audit.AuditHistoryService;
+import ninja.samryecroft.returnhome.tracker.audit.DraftSaveRuns;
 import ninja.samryecroft.returnhome.tracker.child.Child;
 import ninja.samryecroft.returnhome.tracker.child.ChildRepository;
 import ninja.samryecroft.returnhome.tracker.document.KeyUnavailableException;
@@ -69,7 +71,7 @@ class CaseFileExportServiceTest {
         when(requestRepository.findDetailedById(1182L)).thenReturn(Optional.of(requestOne));
         when(requestRepository.findDetailedById(1191L)).thenReturn(Optional.of(requestTwo));
         when(accessService.homeScopeFor(any())).thenReturn(home -> true);
-        when(historyService.caseHistoryFor(any())).thenReturn(List.of());
+        when(historyService.caseHistoryFor(any(), any())).thenReturn(List.of());
         when(principal.getUsername()).thenReturn("orgadmin");
 
         approvedReportFor(requestOne, 900L);
@@ -92,6 +94,27 @@ class CaseFileExportServiceTest {
         report.setStatus(ReportStatus.APPROVED);
         report.setGeneratedDocumentPath("org-1/rhi-report-" + request.getId() + "-abc.docx");
         when(reportRepository.findByInterviewRequestId(request.getId())).thenReturn(Optional.of(report));
+    }
+
+    /**
+     * The pack asks for the audit trail UNCOLLAPSED. T177 folds runs of draft saves on the child
+     * page, and this service reaches the timeline through the same builder - so the screen's
+     * tidying would have followed the disclosure out of the door for free.
+     *
+     * <p>Written as a verify on the argument rather than an assertion about the pack, because the
+     * signature is where the mistake would be made: this test's own stub was
+     * {@code caseHistoryFor(any())} until the overload existed, and when the production call grew a
+     * second argument the stub simply stopped matching, the call returned null, and all six tests
+     * here stayed green. A stub that no longer matches looks exactly like one that does.
+     */
+    @Test
+    void theExportPackAsksForEverySaveOnItsOwnRow() throws Exception {
+        when(documentService.retrieve(any(), any(), any())).thenReturn(DOCUMENT);
+
+        service.export(5L, ExportPeriod.all(), ExportPurpose.REGULATORY_INSPECTION,
+                "OFSTED-1", Set.of(), "", principal);
+
+        verify(historyService).caseHistoryFor(any(), eq(DraftSaveRuns.KEPT_IN_FULL));
     }
 
     @Test
