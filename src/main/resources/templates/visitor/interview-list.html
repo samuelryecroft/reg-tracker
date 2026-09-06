@@ -34,6 +34,19 @@
           (@{...}) cannot be nested inside a ${...} - so the three destinations are built first and
           then chosen between. It also keeps one card call readable instead of four nested ternaries
           inside the fragment arguments.
+
+          T257 (Creed/Oscar): a SCHEDULED request with a saved draft used to read "Submit report"
+          regardless - worse than silent, since the row's most prominent element then implied there
+          was nothing to continue. isDraft is conditioned on a DRAFT REPORT ROW EXISTING, never on
+          request status alone (Oscar: a label derived from status is true only while two things
+          happen to move together, and quietly stops being true the day someone adds a state).
+          Verified against the eager-creation trap: ReportService's save/submit path only persists a
+          row via orElseGet, so a row existing here genuinely means the visitor saved something.
+          "Continue draft" (Oscar, ruled, do not "improve" to "Continue report"/"Finish report" -
+          the second promises something not knowable) pairs with the form's own "Save draft" button,
+          so "draft" is already the product's word for this. Nested inside the SCHEDULED branch as
+          defence in depth (Creed) - status still has to agree, it just is not what makes the claim
+          true any more.
         */-->
         <th:block th:each="r : ${requests}" th:with="
                 report=${reports[r.id]},
@@ -41,7 +54,8 @@
                 scheduleHref=@{/visitor/interviews/{id}/schedule(id=${r.id})},
                 reportHref=@{/visitor/interviews/{id}/report(id=${r.id})},
                 downloadHref=@{/reports/{id}/download(id=${r.id})},
-                sentBack=${st == 'REPORT_REJECTED'}">
+                sentBack=${st == 'REPORT_REJECTED'},
+                isDraft=${report != null and report.status.name() == 'DRAFT'}">
             <div th:replace="~{fragments/case-card :: caseCard(
                     identity=${childIdentities[r.child.id]},
                     href=@{/interview-requests/{id}(id=${r.id})},
@@ -53,7 +67,7 @@
                     badge=${dueBadges[r.id]},
                     status=${r.status},
                     actionLabel=${st == 'ALLOCATED' ? 'Confirm visit time'
-                            : (st == 'SCHEDULED' ? 'Submit report'
+                            : (st == 'SCHEDULED' ? (isDraft ? 'Continue draft' : 'Submit report')
                             : (sentBack ? 'Amend and resubmit'
                             : (st == 'REPORT_APPROVED' ? 'Download' : null)))},
                     actionHref=${st == 'ALLOCATED' ? scheduleHref
