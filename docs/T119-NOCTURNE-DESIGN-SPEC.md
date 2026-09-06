@@ -4112,9 +4112,11 @@ someone else's. **It is, twice — and both are on SUCCESS pages, which is not w
 > did not work. **Fixing the error copy treats the symptom — the false expectation is set two screens
 > earlier, in the moment of success, when nobody is reading carefully.**
 
-**NOT a member, and the distinction is the test:** *"Link expires in N minutes"* on both pages is
-**forward-looking, true, and a fact the server does know.** It names no cause of a failure and collapses
-nothing. **It is what makes "no longer valid" comprehensible later, so it should stay.**
+**NOT a member — but my test got the right answer for the wrong reason, corrected by Oscar in §7w.** I said
+*"Link expires in N minutes"* is safe because it is **forward-looking and true**. **It is safe because the
+sentence beneath it carries the other limit** — and it becomes a member the day someone deletes that
+sentence in a tidy-up. **See D-5e-3g: the badge and the sentence are a pair, and half a pair is the
+failure.**
 
 **Named, not fixed**, per god's instruction — one ruling should cover the set.
 ## 7v · Oscar's four string rulings — FINAL, and two of them improve on my corrections (Creed, 8 Sep)
@@ -4192,3 +4194,61 @@ and none had questioned.** Oscar's conclusion is the one to keep:
 And his generalisation of my own note is wider than I had it: **every table written to organise our own
 thinking has a left column, and every left column is written to distinguish cases. Wherever the product's
 job is *not* to distinguish them, that column is actively the wrong source.**
+## 7w · The two success-page strings, ruled — and my membership test was right by luck (Creed, 8 Sep)
+
+I surfaced the *"Re-downloading after expiry"* sentence on both success pages as the upstream cause of the
+failure page's arrivals. **Oscar ruled both, and corrected the reasoning I used to find them.**
+
+### The ruled strings — the same sentence on both pages, differing only in where the row is written
+
+**`audit/export-ready.html`:**
+> **"This link works once, and only for you. If you need the file again, create a new export; if a colleague
+> needs it, they should create their own. Each one writes its own row in the audit trail, which is the
+> point."**
+
+**`export/case-file-ready.html`:**
+> **"This link works once, and only for you. If you need the file again, create a new export; if a colleague
+> needs it, they should create their own. Each one is recorded on this child's case history, which is the
+> point."**
+
+**Each clause is doing a job, recorded so it is not re-litigated:** *"works once"* leads because **single-use
+is the limit people actually hit** and the badge already carries expiry; *"and only for you"* is true (a
+wrong-owner token is one of the four collapsed cases), **has never been said to anyone**, and **stops the
+forwarded link at source rather than explaining it afterwards**; *"they should create their own"* is
+deliberately not *"or someone else does"*, which would imply you may make one on their behalf; *"create a new
+export"* is the already-ruled edit; *"which is the point"* keeps the anticipatory work of *"the feature, not
+a limitation"* in three words. **No timing word survives in a sentence about what you may do.**
+
+### D-5e-3g · The badge and the sentence are a PAIR — and my test would have missed it
+
+**It is not the class I named, and the difference matters for the test.** My rule was about **causes** on a
+**failure** page. This is a different defect:
+
+> **The link has TWO INDEPENDENT LIMITS — single-use and time-limited — and the copy named one.** Naming one
+> limit tells the reader the other does not exist, **which is why "after expiry" read as PERMISSION rather
+> than as merely narrow.**
+
+**And my membership test reached the right verdict by luck.** I ruled *"Link expires in N minutes"* safe
+because it is *forward-looking and true*. **Oscar's reason is the load-bearing one: it is safe because the
+sentence beneath it now carries the other limit.** A countdown badge alone is a strong affordance for *valid
+until then* — **so it becomes a member the day someone deletes the sentence under it in a tidy-up.**
+
+> **They are a pair, and half a pair is the failure. The badge looks self-sufficient and is not.**
+
+**My version of the test would have passed a page that had quietly become unsafe**, because it judged the
+badge on its own properties rather than on what its neighbour was carrying. **A string's safety can depend on
+a string it does not contain.**
+
+### The rule this leaves, which is wider than either page
+
+> **Where a thing has two independent limits, copy that names one of them says the other is not there.**
+
+And god's framing, which Oscar rates above his own rule and so do I:
+
+> **It is cheaper to fix a promise than to explain it afterwards.**
+
+**The failure page we spent a day on is where a promise made two screens earlier gets collected — and the
+promise was made on a SUCCESS page, in the moment nobody reads carefully. That is why neither of us looked
+there.** *A false expectation is usually set somewhere the user was happy.*
+
+**R-Q13 was not wrong. It was written before we knew the link was single-use as well as timed.**
