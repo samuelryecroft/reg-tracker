@@ -5414,6 +5414,13 @@ is exactly the shape that has bitten this codebase before.
 and report existence staying in lockstep. If a state is ever added where a report is submitted while the
 request stays `SCHEDULED`, the label lies again.
 
+> **SUPERSEDED BY OSCAR, AND HE IS RIGHT — do not depend on it.** *Condition the label on "a draft exists",
+> because that is what it claims. **A label that is accidentally true is a label that will quietly become
+> false the day someone adds a state.*** I identified the assumption; he removed the need for it. The
+> structural placement inside the `SCHEDULED` branch stays as defence in depth — it is simply no longer the
+> only thing making the claim true. **The better form of "a mechanism beats a check someone has to remember":
+> the mechanism should also not depend on a coincidence.** See D-8h-5 for the predicate.
+
 **Sent-back is deliberately out of scope.** `REPORT_REJECTED` already has its own action (*"Amend and
 resubmit"*) and its own populated note slot, and its report row carries a non-null `submittedAt` — so it is a
 different fact with a different sentence, already told.
@@ -5445,3 +5452,32 @@ So the content axis is genuinely open, and it decides the treatment rather than 
 honest cost.** I would argue for the imperative, because the visitor's question is *"where is my saved work"*
 and the answer they can act on is a door, not a receipt — but that is his call, and I would rather he made it
 knowing the treatment moves with it.
+
+### D-8h-5 — 🔑 the predicate Oscar's rule asks for **already exists**: `ReportStatus.DRAFT`
+
+Oscar ruled *"Continue draft"* and required the label be conditioned on **a draft existing**, not on my
+lockstep assumption. **The system already carries that state explicitly, so the claim can be made directly
+rather than by proxy:**
+
+```java
+public enum ReportStatus { DRAFT("Draft"), SUBMITTED("Pending review"), REJECTED("Sent back"), APPROVED("Approved") }
+```
+
+`@Column(nullable = false)`, and set at exactly four points — `ReportService:148` **DRAFT** on save-draft,
+`:175` SUBMITTED, `:208` APPROVED, `:227` REJECTED.
+
+**Predicate: `report != null and report.status.name() == 'DRAFT'`.** That is the label's own claim in the
+system's own vocabulary — not `submittedAt == null`, which would also work in this branch **and is exactly the
+kind of accidentally-true test Oscar's rule is against.**
+
+**Why the proxy is the wrong choice, concretely:** `setSubmittedAt` is called in exactly one place
+(`ReportService:176`) and **never cleared** — so on a sent-back report `submittedAt != null` permanently while
+`status == REJECTED`. `submittedAt == null` therefore means **"never submitted"**, not "not currently
+submitted". It is correct inside the `SCHEDULED` branch by luck and **wrong the moment anyone copies it into
+the sent-back branch**, which is precisely where a predicate like this gets copied.
+
+**And it strengthens Oscar's own copy reason.** He anchored *"Continue draft"* to *"Save draft"* on the form.
+**There is a third anchor: `DRAFT("Draft")` — the word is already the system's name for this state, in an
+enum, with that display name.** So the string is not introduced for this row, it is the state's own name
+surfacing on a second screen. *(`getDisplayName()` has no production caller yet, so this is an argument about
+vocabulary rather than a proposal to render it.)*
