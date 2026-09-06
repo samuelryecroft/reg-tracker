@@ -5656,3 +5656,147 @@ decision on Article 9 data cached to visitor phones. Server autosave is *not* he
 This section requires no ruling from Oscar or the human to build. **The one thing I have not specified is the
 panel's own copy beyond the row labels** (which are the legends, already written) — if the toggle needs
 wording beyond the step sentence it already renders, that is a one-line question for Oscar, not a blocker.
+
+## §8n — T282: the shell below 900px. **D-1e, the narrow-viewport shell.**
+
+**Verified on `origin/main` @ `73dbe4c`.** Pam measured the symptom at 320/360/414; this rules the pattern.
+Written after reading `fragments/layout.html` and `app.css`, not from the description of it — which changed
+the scope, see D-1e-1.
+
+**The defect, in one line:** `@media (max-width: 900px) { .shell-side { display: none } }` (`app.css:772`),
+present since the Nocturne foundation commit `01e231b`, with **nothing substituted**. Not a regression; T271
+is ruled out on evidence. **This spec never specified a narrow-viewport shell — that is my oversight
+(§T282 answer), and this section closes it.**
+
+### D-1e-1 · It is not "no navigation". Three things vanish, and one of them is a security consequence
+
+`display:none` is set on `<aside class="shell-side">`, and the aside contains **four blocks**, not one:
+
+| block | what is lost below 900px |
+|---|---|
+| `.shell-brand` | product identity — cosmetic, the only one that is |
+| `.shell-org` | **which organisation the user is acting in** — on a multi-organisation platform |
+| `.shell-nav` | 2–11 role-gated links in 3 groups |
+| `.shell-user` | name, initials, **and the log-out button — the only one in the application** |
+
+> **BELOW 900px THERE IS NO WAY TO LOG OUT.** On a product whose primary device is a phone, used in a
+> children's home, plausibly on a shared or personal device, **that is a security consequence rather than an
+> inconvenience** — and it is not what the report described. The report said "no navigation on mobile".
+> **Reading the markup rather than the description is what found the other three.**
+
+**Consequence for the ruling: the panel restores the whole aside, not a link list.** A nav-only fix would
+leave the log-out button unreachable and would look complete.
+
+### D-1e-2 · Asset or trap — RULED: **asset**, and the reason names what would make it a trap
+
+`display:none` removes the subtree from **both** the accessibility tree and the tab order. Pam measured
+`getComputedStyle(.shell-side).display === 'none'` and `isVisible() === false` on every link. **Nothing is
+reachable by keyboard or screen reader, so there is no hidden-focusable trap today.** The markup is complete
+and server-rendered with its role-gating already applied: **only the presentation is missing.**
+
+> **BINDING, AND THIS IS THE ONE THAT WILL BE GOT WRONG: THE CLOSED STATE MUST REMAIN `display:none` (or the
+> `hidden` attribute). It may never be merely moved — `transform: translateX(-100%)`, `left:-100%`,
+> `visibility` with a transition, a zero-width container — because a moved panel is STILL IN THE TAB ORDER AND
+> STILL IN THE ACCESSIBILITY TREE.** That is the standard way an off-canvas drawer is animated, so it is the
+> likely implementation, **and it converts today's inert markup into a focus trap that no test will fail.**
+
+*If a slide is wanted, the animation must be on a wrapper that is itself display-toggled, or gated so the
+element is `display:none` at rest.*
+
+### D-1e-3 · The pattern: **a full-screen panel. Not a drawer, not a tab bar.**
+
+**A bottom tab bar is ruled out on evidence, not taste.** The nav renders **between 2 and 11 links** depending
+on role, across three group headings that are themselves conditional. A tab bar needs a fixed, small, uniform
+set. It cannot express this nav, and choosing a "primary five" would invent a hierarchy the role model does
+not have.
+
+**Full-screen rather than a partial-width drawer**, for one reason that follows from the content: at 320px a
+usable drawer is ~280px — nearly the full width anyway — but it obliges a scrim, a partial-width re-tune of an
+11-item, 3-group list plus an org block plus a user block, and it is the shape that invites the transform
+animation D-1e-2 forbids. **Full-screen lets `.shell-side` render with its existing children unchanged.**
+
+> **The pattern that reuses the existing DOM verbatim is the pattern in which the asset stays an asset.**
+
+### D-1e-4 · Focus — and it takes the OPPOSITE ruling to §8m's panel, deliberately
+
+§8m's section panel is explicitly **not** a modal: no focus trap, no `inert` background, no scroll lock. **This
+one is the reverse, and the discriminator is not how they look:**
+
+> **Does the content behind remain usable?** §8m's panel discloses a choice over a form the visitor is still
+> reading; the form behind stays theirs. **This panel covers the entire viewport — there is no "behind" left
+> to use.** Same shape, opposite ruling, because modality is a fact about what remains reachable, not about
+> how much of the screen is covered.
+
+- **Open** → focus moves to the **close control**, which is the panel's first focusable element. A way out is
+  the first thing announced.
+- **While open** → focus is trapped; the page behind is `inert`; page scroll is locked.
+- **Escape, or the close control** → panel closes, **focus returns to the toggle.**
+- **Selecting a link** → a full-page navigation. Nothing to restore; the panel does not survive the load.
+- The panel keeps `<nav aria-label="Main">` as it stands. **It gets no `role="dialog"`** — it holds no
+  interaction to complete, and a dialog role would promise a widget that is not there (same reasoning as
+  D-1a-3's refusal of `tablist`/`tab`).
+
+### D-1e-5 · It must work with JavaScript disabled
+
+A navigation affordance that depends on JS reintroduces this exact defect for anyone whose JS fails — and
+"no navigation at all" is the state we are fixing. **The disclosure must open and close with JS off.**
+`<details>`/`<summary>` does this natively and is already the house idiom (`visitor/report-form.html`'s
+`<details class="card disclosure">`). **JS enhances it — focus movement, Escape, the trap, `inert` — and
+enhances only.** Without JS the panel opens, every link works, and the trap is simply absent, which is the
+correct degradation.
+
+### D-1e-6 · The toggle, the header, and §5f gets STRICTER below 900px
+
+The toggle belongs in `.shell-header-actions`, beside the appearance and reveal controls. It will be the third
+control there — and Pam reports the notification icon beside it is **non-functional**.
+
+**§5f already rules this: anything in the shell that is not wired must not look like a control.** Below 900px
+that rule binds harder, and the reason is structural:
+
+> **At desktop width the header is secondary chrome — the sidebar carries the real affordances. Below 900px
+> THE HEADER IS THE ENTIRE SHELL.** A dead control that cost a wasted click at 1240px sits, at 320px, in the
+> only row of chrome the user has. **A working control beside a dead one teaches people not to trust either —
+> and the one being learned about here is the only way to reach navigation and log-out.**
+
+**Ruled: the non-functional notification icon is removed** — same disposition as `.shell-search` and
+`.shell-org`'s caret, for the same reason, and it comes back when it is wired. **The nav toggle must be real
+on the first commit that introduces it.** It has a visible accessible name, `aria-expanded`, and
+`aria-controls` pointing at the panel.
+
+### D-1e-7 · The width conflict: **it does not exist, and the real conflict is vertical**
+
+The constraint on the card was: the stepper row is already tight at 320 and the save state never yields, so
+say what happens when a nav and a save state want the same width.
+
+**Measured: they never want the same width.** The toggle lives in `.shell-header`, which is a **sibling of
+`<main>`**; the stepper chrome is inserted **inside the form, inside `<main>`**. Different rows, no shared
+horizontal space. §8m's amendment stands untouched.
+
+**The conflict that does bind is vertical, and it is real.** At 320×568 the stepper already owns a sticky
+footer (`.sticky-actions`). A sticky or fixed header would take a second horizontal band permanently.
+
+> **RULED: the header does NOT become sticky or fixed at narrow width.** It scrolls with the page. The visitor
+> is filling in a statutory instrument with a child present; the form is what they are using, and the
+> navigation is reachable by scrolling to the top of a page they are already scrolling. **A permanently
+> visible nav affordance would buy one scroll and spend it on every screen of the form.** *The save state
+> still never yields.*
+
+### D-1e-8 · The link set is server-rendered and the panel must assume nothing about it
+
+The nav is **2–11 links across three conditional group headings**, every link `th:if`-gated, and `Children`'s
+**label** varies by role (`childrenNav.label()`). T271 changed one of those conditions hours before this was
+written.
+
+**The panel renders whatever the server rendered.** No client-side list, no assumed count, no "primary" subset,
+no reordering. **Every rule in this section must hold at 2 links and at 11.**
+
+#### MEASURED, and reported separately rather than folded in: the group headings and their members are gated by different conditions
+
+`<span class="shell-nav-group">Work</span>` (`layout.html:135`) carries **no `th:if` at all**, while all five
+links beneath it are individually role-gated. **So an orphan heading is possible by construction** — any role
+holding none of those five renders "Work" with nothing under it. The `Records` and `Admin` headings *are*
+gated, but on conditions that are not the union of their own members.
+
+**Not folded into this ruling and not a sweep:** it is one template, and it is listed here because **the
+full-screen panel is what makes it visible** — an orphan heading is easy to miss in a 212px rail and hard to
+miss on a 320px screen showing nothing else.
