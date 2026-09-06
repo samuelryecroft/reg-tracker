@@ -45,6 +45,18 @@ public class AuditHistoryService {
     private static final DateTimeFormatter TIMESTAMP = DateTimeFormatter.ofPattern("dd MMM yyyy, HH:mm");
 
     /**
+     * Opening a record. One type today; a set so a second one is an addition rather than a rewrite.
+     *
+     * <p><strong>Declared here, above its first use, because three places now had their own copy of
+     * "what an access event is"</strong> and one of them would eventually have stopped agreeing: the
+     * request page excludes them (T246), the child page excludes them (T274 A5) and the feed's
+     * WITH_ACCESS_EVENTS scope includes them (T274 A1). They are the same question asked three times,
+     * so they read one answer - add a second access type and all three move together rather than two
+     * of them moving and the third being found later.
+     */
+    private static final Set<AuditEventType> ACCESS_TYPES = Set.of(AuditEventType.AUDIT_VIEW_OPENED);
+
+    /**
      * Opening a record is not something that happened TO the record, so the record's own history
      * does not list it (T246).
      *
@@ -64,9 +76,14 @@ public class AuditHistoryService {
      * <p>Same shape as {@link #EXCLUDED_FROM_USER_HISTORY} below, and deliberately a SEPARATE set:
      * the two exclusions answer different questions and merging them would make one screen's policy
      * silently govern the other's.
+     *
+     * <p><strong>It IS however the same question as {@link #ACCESS_TYPES}, so it is that set rather
+     * than a second literal.</strong> The name is kept because the POLICY - "a record's own history
+     * excludes these" - is a different statement from the DEFINITION of an access event, and only the
+     * definition is shared. That distinction is what makes this safe where merging it with the
+     * user-history exclusion would not be.
      */
-    private static final Set<AuditEventType> EXCLUDED_FROM_RECORD_HISTORY =
-            Set.of(AuditEventType.AUDIT_VIEW_OPENED);
+    private static final Set<AuditEventType> EXCLUDED_FROM_RECORD_HISTORY = ACCESS_TYPES;
 
     /** Sign-in monitoring is explicitly out of scope for V1 (gated on an unresolved GDPR policy call). */
     private static final Set<AuditEventType> EXCLUDED_FROM_USER_HISTORY =
@@ -124,8 +141,28 @@ public class AuditHistoryService {
         return groupByDay(events, WhenStyle.TIME, draftSaveRuns);
     }
 
-    /** Cross-request "case history": every request raised for this child, each its own section. */
-    public List<AuditHistorySection> caseHistoryFor(List<InterviewRequest> requests, DraftSaveRuns draftSaveRuns) {
+    /**
+     * Cross-request "case history": every request raised for this child, each its own section.
+     *
+     * <p><strong>The scope is a parameter with no default because this method has TWO consumers and
+     * they now want different things</strong> (T274 A5). {@code ChildController} builds the child
+     * page, which stops listing who opened a request; {@code CaseFileExportService} builds the
+     * case-file pack for a DPO, a local authority or a court, which does not. That is the same
+     * two-consumer shape as {@link #caseActivityFeed}, and the same trap: filtering here without a
+     * scope would have tidied a screen and silently rewritten every disclosure pack produced from
+     * this day on. <strong>The export therefore names {@code WITH_ACCESS_EVENTS} explicitly, and it
+     * means "unchanged", not "extended".</strong>
+     *
+     * <p><strong>Why the pack keeps them, weighed rather than defaulted:</strong> Kevin's A3 objection
+     * to access rows in a disclosure is that it acquires a SECOND DATA SUBJECT - an org-wide export
+     * containing access rows is an employee-monitoring dataset leaving the building under a purpose
+     * about a child. Two things make this pack the other case: it is scoped to ONE child rather than
+     * an organisation and a date range, and {@code CaseFileNarrativeWriter} renders <em>roles rather
+     * than individual names</em>. "Who accessed this child's record" is a question a DPO or a court
+     * asks OF a child's case file, and it is answered here without naming staff.
+     */
+    public List<AuditHistorySection> caseHistoryFor(List<InterviewRequest> requests, DraftSaveRuns draftSaveRuns,
+            AuditFeedScope scope) {
         if (requests.isEmpty()) {
             return List.of();
         }
@@ -139,6 +176,15 @@ public class AuditHistoryService {
                 auditEventRepository.findByTargetTypeAndTargetIdInOrderByOccurredAtDesc("InterviewRequest", requestIds));
         if (!reportIds.isEmpty()) {
             all.addAll(auditEventRepository.findByTargetTypeAndTargetIdInOrderByOccurredAtDesc("InterviewReport", reportIds));
+        }
+        // FILTER FIRST, COLLAPSE AFTER - the same ordering historyFor documents, and load-bearing for
+        // the same reason. The draft-save collapse runs downstream in toEntries, so removing a view
+        // event can leave two runs of draft saves ADJACENT, and they must then collapse into ONE row:
+        // what the reader sees has to be the collapse of what the reader sees. Filtering after the
+        // collapse leaves two "Draft saved" rows with nothing between them - T177's wall of noise,
+        // reintroduced by the fix for a different kind of noise.
+        if (scope != AuditFeedScope.WITH_ACCESS_EVENTS) {
+            all.removeIf(event -> ACCESS_TYPES.contains(event.getEventType()));
         }
 
         Map<Long, InterviewReport> reportByRequestId = new LinkedHashMap<>();
@@ -246,8 +292,6 @@ public class AuditHistoryService {
         return types;
     }
 
-    /** Opening a record. One type today; a set so a second one is an addition rather than a rewrite. */
-    private static final Set<AuditEventType> ACCESS_TYPES = Set.of(AuditEventType.AUDIT_VIEW_OPENED);
 
     /** A user account's own audit trail - role/enabled/password changes, never sign-in activity. */
     public List<AuditHistorySection> historyForUser(Long userId, DraftSaveRuns draftSaveRuns) {

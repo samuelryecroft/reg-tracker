@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.stream.Collectors;
 import ninja.samryecroft.returnhome.tracker.audit.AuditEventPublisher;
+import ninja.samryecroft.returnhome.tracker.audit.AuditFeedScope;
 import ninja.samryecroft.returnhome.tracker.audit.AuditHistoryService;
 import ninja.samryecroft.returnhome.tracker.audit.DraftSaveRuns;
 import ninja.samryecroft.returnhome.tracker.child.dto.CreateChildForm;
@@ -215,7 +216,16 @@ public class ChildController {
         model.addAttribute("dueBadges", requests.stream()
                 .filter(r -> DeadlineTracker.badgeFor(r, now).isPresent())
                 .collect(Collectors.toMap(InterviewRequest::getId, r -> DeadlineTracker.badgeFor(r, now).orElseThrow())));
-        model.addAttribute("caseHistory", auditHistoryService.caseHistoryFor(requests, DraftSaveRuns.COLLAPSED));
+        // T274 A5. The human objected to entity pages accumulating audit noise, and an auditor asking
+        // "who opened this record" looks in the FEED, not on the child's page - so this is half of a
+        // MOVE rather than a subtraction, and the other half (access events reaching the feed) landed
+        // first, deliberately: removing them from the only place they were visible would have amounted
+        // to having quietly stopped recording them.
+        //
+        // DISPLAY ONLY. Nothing about what is emitted changes, and the case-file export still carries
+        // them - see caseHistoryFor, which is why this is a scope and not a filter.
+        model.addAttribute("caseHistory", auditHistoryService.caseHistoryFor(requests, DraftSaveRuns.COLLAPSED,
+                AuditFeedScope.CASE_ACTIVITY_ONLY));
         model.addAttribute("canExport", ExportCapability.canExport(principal));
         model.addAttribute("approvedReportCount", approvedReportCount);
         // Opening a child's case history is professional access to a safeguarding record, and is

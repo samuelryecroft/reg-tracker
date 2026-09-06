@@ -113,6 +113,63 @@ class RecordHistoryHidesViewEventsTest {
         assertThat(service.historyFor(request, DraftSaveRuns.COLLAPSED)).isEmpty();
     }
 
+    // --- T274 A5: the child page's cross-request case history, and the export that shares it ---
+
+    /**
+     * The child page asks for the same story without the record-access rows.
+     *
+     * <p>This is the SECOND half of a move rather than a subtraction: the access events reached the
+     * audit feed first (T274 A1), and had they not, removing them from the child page would have
+     * amounted to having quietly stopped recording them.
+     */
+    @Test
+    void theChildPageStoryDoesNotListWhoOpenedTheRequest() {
+        List<AuditHistoryEntry> rows = caseRowsFor(AuditFeedScope.CASE_ACTIVITY_ONLY,
+                event(3L, AuditEventType.REPORT_SUBMITTED, at(12, 0)),
+                filteredView(),
+                event(1L, AuditEventType.INTERVIEW_REQUEST_CREATED, at(9, 0)));
+
+        assertThat(rows).extracting(AuditHistoryEntry::headline)
+                .containsExactly("Report submitted for review", "Interview requested");
+    }
+
+    /**
+     * <strong>The other direction, and the reason the scope is a parameter at all.</strong> The
+     * case-file pack for a DPO, a local authority or a court asks the same method for the same
+     * events and still gets the access rows. Without this, filtering for the child page would have
+     * tidied a screen and silently rewritten every disclosure produced afterwards - the trap
+     * {@code caseActivityFeed} documents one method over.
+     */
+    @Test
+    void theCaseFilePackStillGetsTheAccessRowsFromTheSameMethod() {
+        List<AuditHistoryEntry> rows = caseRowsFor(AuditFeedScope.WITH_ACCESS_EVENTS,
+                event(3L, AuditEventType.REPORT_SUBMITTED, at(12, 0)),
+                event(2L, AuditEventType.AUDIT_VIEW_OPENED, at(11, 0)),
+                event(1L, AuditEventType.INTERVIEW_REQUEST_CREATED, at(9, 0)));
+
+        assertThat(rows).hasSize(3);
+    }
+
+    /**
+     * The ordering requirement, restated for this method because it has its own copy of the pipeline.
+     *
+     * <p>Two draft saves with a view event between them are not adjacent in the raw list; once the
+     * view event is gone they ARE, and must collapse into ONE row - what the reader sees has to be
+     * the collapse of what the reader sees. Filter after the collapse and this goes red with two
+     * "Draft saved" rows and nothing between them.
+     */
+    @Test
+    void onTheChildPageTooAViewEventBetweenTwoDraftSavesLeavesThemAdjacent() {
+        List<AuditHistoryEntry> rows = caseRowsFor(AuditFeedScope.CASE_ACTIVITY_ONLY,
+                draftSave(3L, at(11, 0)),
+                filteredView(),
+                draftSave(1L, at(9, 0)));
+
+        assertThat(rows).singleElement()
+                .extracting(AuditHistoryEntry::headline)
+                .isEqualTo("Draft saved (2 times)");
+    }
+
     // --- fixtures ---
 
     private List<AuditHistoryEntry> rowsFor(AuditEvent... requestEvents) {
@@ -123,6 +180,38 @@ class RecordHistoryHidesViewEventsTest {
         when(auditEventRepository.findByTargetTypeAndTargetIdOrderByOccurredAtDesc("InterviewReport", REPORT_ID))
                 .thenReturn(List.of());
         List<AuditHistorySection> sections = service.historyFor(request, DraftSaveRuns.COLLAPSED);
+        assertThat(sections).hasSize(1);
+        return sections.get(0).entries();
+    }
+
+    /**
+     * A view event with ONLY its type stubbed, and the missing timestamp is the point.
+     *
+     * <p>Under strict stubs an unread stub fails the build, and a timestamp here would go unread -
+     * because {@code caseHistoryFor} filters BEFORE it sorts, so a removed event is never asked when
+     * it happened. That is a real difference from {@code historyFor}, which sorts first and would
+     * read it. <strong>The stub that cannot be written is the evidence the filter runs early</strong>,
+     * the same way the empty-history test above uses it.
+     */
+    private static AuditEvent filteredView() {
+        AuditEvent view = org.mockito.Mockito.mock(AuditEvent.class);
+        when(view.getEventType()).thenReturn(AuditEventType.AUDIT_VIEW_OPENED);
+        return view;
+    }
+
+    private List<AuditHistoryEntry> caseRowsFor(AuditFeedScope scope, AuditEvent... requestEvents) {
+        when(request.getCreatedAt()).thenReturn(at(8, 0));
+        when(interviewReportRepository.findByInterviewRequestId(REQUEST_ID)).thenReturn(Optional.empty());
+        when(auditEventRepository.findByTargetTypeAndTargetIdInOrderByOccurredAtDesc(
+                "InterviewRequest", List.of(REQUEST_ID))).thenReturn(List.of(requestEvents));
+        for (AuditEvent event : requestEvents) {
+            // Only read for events that survive the filter, so these are lenient rather than strict:
+            // pinning which ones get asked would pin the filter's position into the fixture, and the
+            // position is the thing under test.
+            org.mockito.Mockito.lenient().when(event.getTargetType()).thenReturn("InterviewRequest");
+            org.mockito.Mockito.lenient().when(event.getTargetId()).thenReturn(REQUEST_ID);
+        }
+        List<AuditHistorySection> sections = service.caseHistoryFor(List.of(request), DraftSaveRuns.COLLAPSED, scope);
         assertThat(sections).hasSize(1);
         return sections.get(0).entries();
     }
