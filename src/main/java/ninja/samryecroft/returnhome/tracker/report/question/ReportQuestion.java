@@ -1,6 +1,7 @@
 package ninja.samryecroft.returnhome.tracker.report.question;
 
 import java.util.function.Function;
+import java.util.function.Predicate;
 import ninja.samryecroft.returnhome.tracker.report.InterviewReport;
 
 /**
@@ -27,6 +28,25 @@ import ninja.samryecroft.returnhome.tracker.report.InterviewReport;
  *                  id; carried separately because for one question it is not, and that difference is
  *                  a fact about the exported record rather than a naming quirk - see
  *                  {@link ReportQuestions#ALL} on {@code heldAt}.
+ * @param blankIsAGap whether leaving this question blank is a <b>gap in the record</b>, as opposed
+ *                  to a legitimate answer. True for most questions and false for two, for different
+ *                  reasons - which is why it is a predicate on the report rather than a flag:
+ *
+ *                  <ul>
+ *                    <li><b>ifNotWhyLate</b> is only asked when the 72-hour window was measured and
+ *                        missed, so a blank means either "nothing was owed" or "something was owed
+ *                        and not given". Before T233 both screens counted every blank, so a fully
+ *                        completed, on-time interview reported "1 not answered".</li>
+ *                    <li><b>dateReportShared</b> is always asked and its blank is an <em>answer</em>:
+ *                        "not yet shared". The capture screen literally instructs the user to leave
+ *                        it blank in that case, so counting it as unanswered is <b>the system
+ *                        reporting a person as having declined to answer a question it told them not
+ *                        to answer</b>.</li>
+ *                  </ul>
+ *
+ *                  <p>Both are the same underlying mistake - treating an absence as a failure to
+ *                  respond when it is a state the domain gives meaning to - so they get one concept
+ *                  rather than two flags that would drift apart.
  * @param reader    how to get the answer off the report.
  *
  *                  <p><b>This is a method reference and not a property name on purpose.</b>
@@ -53,10 +73,21 @@ public record ReportQuestion(
         boolean required,
         String emptyText,
         String exportToken,
+        Predicate<InterviewReport> blankIsAGap,
         Function<InterviewReport, Object> reader) {
 
     /** The default for every question but one. */
     public static final String NOT_ANSWERED = "Not answered";
+
+    /**
+     * Whether this question is left <b>unanswered</b> on the given report - blank, and blank meaning
+     * a gap rather than an answer.
+     *
+     * <p>This is the question a count must ask, and "is the field empty" is not it.
+     */
+    public boolean isAGapOn(InterviewReport report) {
+        return !isAnsweredOn(report) && blankIsAGap.test(report);
+    }
 
     public Object valueOf(InterviewReport report) {
         return reader.apply(report);

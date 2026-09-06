@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import ninja.samryecroft.returnhome.tracker.report.question.ReportQuestions;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -56,10 +57,6 @@ class HeldAtCarriesItsTimeGuardTest {
     private static final Pattern HELD_AT_FORMAT =
             Pattern.compile("#temporals\\.format\\(\\s*[\\w.]*\\bheldAt\\s*,\\s*'([^']+)'");
 
-    /** The nearest preceding question text, whichever markup the screen states questions in. */
-    private static final Pattern QUESTION_TEXT =
-            Pattern.compile("<(dt|label)\\b[^>]*>(.*?)</\\1>", Pattern.DOTALL);
-
     @Test
     void everyScreenThatShowsHeldAtShowsItsTimeAndSaysSo() throws IOException {
         List<String> offences = new ArrayList<>();
@@ -75,11 +72,10 @@ class HeldAtCarriesItsTimeGuardTest {
                     offences.add(template.getFileName() + " renders heldAt as '" + pattern
                             + "', which has no time component");
                 }
-                String question = questionAskedBefore(html, rendering.start());
-                if (question == null || !question.toLowerCase().contains("time")) {
-                    offences.add(template.getFileName() + " asks \"" + question
-                            + "\" and then renders a time under it");
-                }
+                // The label half of this invariant moved to the model (T185 step 2): the screens
+                // no longer hold their own wording, so there is no per-screen text left to check
+                // and checking a placeholder would be checking nothing. It is asserted once, below,
+                // where the wording now lives - which is the point of having moved it.
             }
         }
 
@@ -89,6 +85,15 @@ class HeldAtCarriesItsTimeGuardTest {
                         + "exists to prevent, arriving through its own front door")
                 .isGreaterThanOrEqualTo(RENDERERS.size());
 
+        assertThat(ReportQuestions.byId("heldAt").orElseThrow().label().toLowerCase())
+                .as("the question itself must admit a time. It asked for a \"Date of interview\" on "
+                        + "the record screen while rendering HH:mm beneath it - telling a reviewer "
+                        + "the question is less precise than the judgement being made from their "
+                        + "answer. Now that both screens render this one string, getting it wrong "
+                        + "here would be wrong everywhere at once, which is the risk a single "
+                        + "source buys you along with the benefit")
+                .contains("time");
+
         assertThat(offences)
                 .as("heldAt is the value the statutory 72-hour measurement is taken from: it is "
                         + "compared against the child's return time plus 72 hours, so the time of "
@@ -97,22 +102,6 @@ class HeldAtCarriesItsTimeGuardTest {
                         + "judgement being made from their answer - and one that asks for a time "
                         + "and shows only a date withholds the evidence for a verdict it states")
                 .isEmpty();
-    }
-
-    /**
-     * The last question stated before this point in the document. {@code <dt>} on the record screen,
-     * {@code <label>} on the capture and review screens - derived from the markup rather than
-     * hard-coded per file, so a screen that states its questions either way is covered and a third
-     * renderer added later is not silently exempt.
-     */
-    private static String questionAskedBefore(String html, int position) {
-        String preceding = html.substring(0, position);
-        Matcher m = QUESTION_TEXT.matcher(preceding);
-        String last = null;
-        while (m.find()) {
-            last = m.group(2).replaceAll("<[^>]*>", " ").replaceAll("\\s+", " ").trim();
-        }
-        return last;
     }
 
     /**

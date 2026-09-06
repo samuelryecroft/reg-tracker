@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import ninja.samryecroft.returnhome.tracker.report.InterviewReport;
 
 /**
@@ -51,6 +52,31 @@ public final class ReportQuestions {
 
     private ReportQuestions() {
     }
+
+    /** Blank means the question was not answered. True for 25 of the 27; see the two exceptions. */
+    private static final Predicate<InterviewReport> ALWAYS = report -> true;
+
+    /**
+     * Blank is an answer here, not an absence of one. Used by {@code dateReportShared}, where the
+     * capture screen instructs the user to leave the field empty if the report has not been shared
+     * yet - so counting it as unanswered reports someone as having declined to answer a question the
+     * system told them not to answer.
+     */
+    private static final Predicate<InterviewReport> BLANK_IS_AN_ANSWER = report -> false;
+
+    /**
+     * Owed only when the interview was declined. {@code interviewDeclinedReason} is anchored to
+     * "Interview accepted?" exactly as the 72-hour reason is anchored to the window being missed -
+     * so on an ACCEPTED interview, the normal and successful case, a blank here means the question
+     * was never put to anyone.
+     *
+     * <p>Counting it made <b>the good outcome the one that got flagged</b>, on the screen a reviewer
+     * approves from. Null is not owed either, matching how the 72-hour reading treats a window it
+     * cannot measure: an unanswered "Interview accepted?" is a gap in its own right and does not
+     * also manufacture one here.
+     */
+    private static final Predicate<InterviewReport> ONLY_IF_DECLINED =
+            report -> Boolean.FALSE.equals(report.getInterviewAccepted());
 
     /**
      * Every question, in the order asked. Grouped by section for readability only - the sections
@@ -86,11 +112,19 @@ public final class ReportQuestions {
                     "The 72-hour window is measured from the child's return to this time, so the "
                             + "time of day matters. Needed before this report can be submitted for "
                             + "review — you can save a draft without it.",
-                    DATETIME, true, "interviewDate", InterviewReport::getHeldAt),
+                    DATETIME, true, "interviewDate", ALWAYS, InterviewReport::getHeldAt),
             q("interviewLocation", DETAILS, "Location of this interview", null,
                     TEXT, true, InterviewReport::getInterviewLocation),
-            q("ifNotWhyLate", DETAILS, "If not, why?", null,
-                    LONG_TEXT, false, InterviewReport::getIfNotWhyLate),
+            // The only conditional question on the report. It is asked only when the 72-hour
+            // window was measured and MISSED, so a blank here means two opposite things and a count
+            // that treats them alike reports a fully completed, on-time interview as having a gap
+            // in it (T233). The condition lives on the entity because the screens and the export
+            // all need the same answer.
+            new ReportQuestion("ifNotWhyLate", DETAILS,
+                    "If this interview was not offered and completed within 72 hours of the "
+                            + "child's return, why not?",
+                    null, LONG_TEXT, false, NOT_ANSWERED, "ifNotWhyLate",
+                    InterviewReport::isLateExplanationOwed, InterviewReport::getIfNotWhyLate),
             q("consultationWithHomeStaff", DETAILS,
                     "Consultation with home's staff to establish any new information", null,
                     LONG_TEXT, false, InterviewReport::getConsultationWithHomeStaff),
@@ -106,8 +140,12 @@ public final class ReportQuestions {
             // --- 2. Return Home Interview -----------------------------------------------------
             q("interviewAccepted", RETURN_HOME_INTERVIEW, "Interview accepted?", null,
                     YES_NO, false, InterviewReport::getInterviewAccepted),
+            // Conditional in exactly ifNotWhyLate's shape, and found by Creed the same way: section
+            // 2 also had no badge before this change, so giving it one is what would have surfaced
+            // the miscount. THE PR'S OWN RULE APPLIED TO THE SECOND SECTION IT UNCOVERED.
             q("interviewDeclinedReason", RETURN_HOME_INTERVIEW, "If not, why?", null,
-                    LONG_TEXT, false, InterviewReport::getInterviewDeclinedReason),
+                    LONG_TEXT, false, "interviewDeclinedReason", ONLY_IF_DECLINED,
+                    InterviewReport::getInterviewDeclinedReason),
             q("whereWereYouWhileMissing", RETURN_HOME_INTERVIEW, "Where were you while missing?", null,
                     LONG_TEXT, false, InterviewReport::getWhereWereYouWhileMissing),
             q("whoWereYouWithWhileMissing", RETURN_HOME_INTERVIEW, "Who were you with while missing?",
@@ -163,21 +201,31 @@ public final class ReportQuestions {
             // --- 6. Declaration ---------------------------------------------------------------
             q("conductedByStatement", DECLARATION, "Statement", null,
                     LONG_TEXT, false, InterviewReport::getConductedByStatement),
+            // The parenthetical that used to live inside this label - "(leave blank if not yet
+            // shared)" - is GUIDANCE, not part of the question, and it is now carried as a hint.
+            // That is why the record screen legitimately showed a shorter label: it was not drift,
+            // it was the model classifying capture instruction as part of the question. With the
+            // two separated, both screens render the same question and only the capture screen
+            // repeats the instruction - which is the one place anyone can act on it.
+            //
+            // It also explains the blankIsAGap above: a form that TELLS you to leave a field empty
+            // cannot then count the empty field against you.
             new ReportQuestion("dateReportShared", DECLARATION,
-                    "Date report shared with relevant professionals (leave blank if not yet shared)",
-                    null, DATE, false, "Not shared yet", "dateReportShared",
+                    "Date report shared with relevant professionals",
+                    "Leave blank if not yet shared.",
+                    DATE, false, "Not yet shared", "dateReportShared", BLANK_IS_AN_ANSWER,
                     InterviewReport::getDateReportShared));
 
     private static ReportQuestion q(String id, ReportSection section, String label, String hint,
             QuestionType type, boolean required, Function<InterviewReport, Object> reader) {
-        return q(id, section, label, hint, type, required, id, reader);
+        return q(id, section, label, hint, type, required, id, ALWAYS, reader);
     }
 
     private static ReportQuestion q(String id, ReportSection section, String label, String hint,
             QuestionType type, boolean required, String exportToken,
-            Function<InterviewReport, Object> reader) {
-        return new ReportQuestion(
-                id, section, label, hint, type, required, NOT_ANSWERED, exportToken, reader);
+            Predicate<InterviewReport> appliesTo, Function<InterviewReport, Object> reader) {
+        return new ReportQuestion(id, section, label, hint, type, required, NOT_ANSWERED,
+                exportToken, appliesTo, reader);
     }
 
     /** Every question, in order, grouped by the section that asks it. */
@@ -207,8 +255,35 @@ public final class ReportQuestions {
         return (int) ALL.stream().filter(q -> q.isAnsweredOn(report)).count();
     }
 
-    /** How many the given section leaves unanswered - the review screen's "N not answered" badge. */
+    /**
+     * How many questions the given section leaves unanswered - the "N not answered" badge on both
+     * read-only screens.
+     *
+     * <p><b>A blank is not always an absence of an answer.</b> Both screens used to count every
+     * blank, so a fully completed, on-time interview showed "1 not answered" on the screen a
+     * reviewer approves from: a compliance-shaped number counting a question nobody was owed
+     * (ifNotWhyLate, T233) and another the system had told the user to leave empty
+     * (dateReportShared).
+     */
     public static int unansweredIn(ReportSection section, InterviewReport report) {
-        return (int) of(section).stream().filter(q -> !q.isAnsweredOn(report)).count();
+        return (int) of(section).stream().filter(q -> q.isAGapOn(report)).count();
+    }
+
+    /**
+     * The unanswered count for every section, keyed by the anchor id both read-only screens already
+     * use as their card {@code id}.
+     *
+     * <p><b>Every section is present, including the ones that always come out zero.</b> Before this,
+     * sections 4, 5 and 6 had no badge markup at all while 1, 2 and 3 had hand-written null-counting
+     * expressions - so an absent badge meant "complete" on three cards and "never counted" on the
+     * other three, and nothing on the page distinguished them. An absent badge now has exactly one
+     * meaning, and {@code ReportSectionCountGuardTest} is what keeps that true.
+     */
+    public static Map<String, Integer> unansweredBySection(InterviewReport report) {
+        Map<String, Integer> counts = new LinkedHashMap<>();
+        for (ReportSection section : ReportSection.values()) {
+            counts.put(section.getAnchorId(), unansweredIn(section, report));
+        }
+        return counts;
     }
 }

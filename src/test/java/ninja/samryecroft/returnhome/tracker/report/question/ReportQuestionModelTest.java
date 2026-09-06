@@ -16,6 +16,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import ninja.samryecroft.returnhome.tracker.report.InterviewReport;
 import ninja.samryecroft.returnhome.tracker.report.dto.SubmitReportForm;
@@ -61,6 +63,8 @@ class ReportQuestionModelTest {
 
     private static final Path SHARED_FRAGMENT =
             Path.of("src/main/resources/templates/fragments/report-fields.html");
+    private static final Path RECORD_SCREEN =
+            Path.of("src/main/resources/templates/interview/detail.html");
 
     private static final Map<QuestionType, Class<?>> EXPECTED_JAVA_TYPE = Map.of(
             QuestionType.TEXT, String.class,
@@ -194,30 +198,75 @@ class ReportQuestionModelTest {
     }
 
     /**
-     * The model must be a faithful extraction of the wording that is live today, not a retyping of
-     * it. Apostrophes and dashes are the drift that survives review because it is invisible in a
-     * diff - {@code home's} and {@code home’s} read identically and are different strings.
+     * <b>No screen holds its own copy of a question's wording.</b>
      *
-     * <p>This is the pre-migration half of the template guard. Once the fragment renders <em>from</em>
-     * the model there will be no literal labels left in it to compare against, and the assertion
-     * inverts: no template may contain a question label at all. Landing it in this direction first
-     * means the extraction itself is checked, which is the step where a transcription error is
-     * possible and afterwards is not.
+     * <p>This assertion is the inverse of the one it replaces, and the inversion was predicted where
+     * it stood: while the templates carried the literal labels, the model had to match them
+     * character for character, because a transcription error was possible and that was the step to
+     * check. Now the templates render <em>from</em> the model, so the thing to check is that none of
+     * them has kept a copy - a stale literal beside a live one is drift that has already happened.
+     *
+     * <p>It looks only at question-label positions ({@code <dt>}, {@code <label>}) rather than at the
+     * whole file, because a section HEADING may legitimately repeat a label: the Recommendations
+     * card is headed "Recommendations" and its one question is also called "Recommendations". That
+     * is one word doing two jobs, not two definitions of one.
      */
     @Test
-    void everyLabelIsTheWordingTheSharedFragmentAlreadyRenders() throws IOException {
-        String fragment = withoutComments(Files.readString(SHARED_FRAGMENT, StandardCharsets.UTF_8));
+    void noScreenKeepsItsOwnCopyOfAQuestionsWording() throws IOException {
+        List<String> offences = new ArrayList<>();
+        for (Path screen : List.of(SHARED_FRAGMENT, RECORD_SCREEN)) {
+            String html = withoutComments(Files.readString(screen, StandardCharsets.UTF_8));
+            Matcher element = Pattern.compile("<(dt|label)\\b[^>]*>(.*?)</\\1>", Pattern.DOTALL)
+                    .matcher(html);
+            while (element.find()) {
+                String text = element.group(2).replaceAll("<[^>]*>", " ")
+                        .replaceAll("\\s+", " ").trim();
+                ReportQuestions.ALL.stream()
+                        .filter(q -> q.label().equals(text))
+                        .findFirst()
+                        .ifPresent(q -> offences.add(screen.getFileName() + " writes out question '"
+                                + q.id() + "' rather than rendering questions." + q.id()
+                                + ".label - so the wording now exists in two places again"));
+            }
+        }
+        assertThat(offences)
+                .as("a label that lives in one place can only be right once; one that lives in two "
+                        + "has to be KEPT right, and the field this project has already drifted on "
+                        + "is the one the statutory 72-hour measurement reads")
+                .isEmpty();
+    }
 
-        List<String> missing = ReportQuestions.ALL.stream()
-                .map(ReportQuestion::label)
-                .filter(label -> !fragment.contains(label))
-                .toList();
+    /**
+     * And the screens ask <b>all</b> of the questions. The check above stops a second copy
+     * appearing; this one stops a question quietly not being asked - the same defect from the other
+     * side, and the one a loop would have prevented structurally.
+     *
+     * <p>Two questions are exempt on the record screen and named rather than filtered:
+     * {@code interviewerComments} and {@code recommendations} render there as prose beneath a
+     * section heading that already carries their wording, so there is no label element to render
+     * from. That is different markup, not a missing question.
+     */
+    @Test
+    void everyQuestionIsAskedOnEveryScreenThatAsksQuestions() throws IOException {
+        String capture = Files.readString(SHARED_FRAGMENT, StandardCharsets.UTF_8);
+        String record = Files.readString(RECORD_SCREEN, StandardCharsets.UTF_8);
+        Set<String> headedBySectionTitle = Set.of("interviewerComments", "recommendations");
+
+        List<String> missing = new ArrayList<>();
+        for (ReportQuestion question : ReportQuestions.ALL) {
+            String reference = "questions." + question.id() + ".label";
+            if (!capture.contains(reference)) {
+                missing.add("capture fragment does not ask '" + question.id() + "'");
+            }
+            if (!headedBySectionTitle.contains(question.id()) && !record.contains(reference)) {
+                missing.add("record screen does not show '" + question.id() + "'");
+            }
+        }
 
         assertThat(missing)
-                .as("these labels are not in fragments/report-fields.html character for character. "
-                        + "The model is meant to be the wording that already ships, so a difference "
-                        + "here is a transcription error, not a copy decision - and a copy decision "
-                        + "on a safeguarding question is not one to make inside a refactor")
+                .as("a question in the model that no screen renders is asked of nobody, and a "
+                        + "question on a screen that the model does not know about cannot be "
+                        + "counted, exported or kept in step with the others")
                 .isEmpty();
     }
 

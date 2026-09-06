@@ -1,6 +1,7 @@
 package ninja.samryecroft.returnhome.tracker.interview;
 
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Stream;
 import ninja.samryecroft.returnhome.tracker.audit.AuditHistoryEntry;
 import ninja.samryecroft.returnhome.tracker.audit.AuditHistoryService;
@@ -8,6 +9,7 @@ import ninja.samryecroft.returnhome.tracker.audit.AuditHistorySection;
 import ninja.samryecroft.returnhome.tracker.child.NameRevealService;
 import ninja.samryecroft.returnhome.tracker.report.ReportService;
 import ninja.samryecroft.returnhome.tracker.report.InterviewReport;
+import ninja.samryecroft.returnhome.tracker.report.question.ReportQuestions;
 import ninja.samryecroft.returnhome.tracker.report.dto.SubmitReportForm;
 import ninja.samryecroft.returnhome.tracker.user.AppUserPrincipal;
 import ninja.samryecroft.returnhome.tracker.user.Role;
@@ -126,6 +128,11 @@ public class ReviewerController {
         // and it must be corrected BEFORE the single source copies it, not after.
         model.addAttribute("lateExplanationMissing",
                 reportRow != null && reportRow.isLateExplanationMissing());
+
+        // T185 step 2, same map and the same reason as 1a: one definition of what "unanswered"
+        // means, and a badge on every section so an absent one has a single meaning.
+        model.addAttribute("unansweredBySection", reportRow == null
+                ? Map.<String, Integer>of() : ReportQuestions.unansweredBySection(reportRow));
 
         // The History card (same fragments/audit-history component 1a uses) and D-1b-8's
         // prior-send-back line both read this one fetch - no reason to ask twice.

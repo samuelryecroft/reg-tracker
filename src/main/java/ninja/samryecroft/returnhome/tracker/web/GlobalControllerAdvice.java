@@ -25,6 +25,10 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import java.util.Map;
+import java.util.stream.Collectors;
+import ninja.samryecroft.returnhome.tracker.report.question.ReportQuestion;
+import ninja.samryecroft.returnhome.tracker.report.question.ReportQuestions;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -98,6 +102,26 @@ public class GlobalControllerAdvice {
 
     public record ChildrenNav(boolean visible, String label) {
     }
+
+    /**
+     * The report's questions, by id, so a template renders a question's wording rather than holding
+     * its own copy of it (T185).
+     *
+     * <p>It is here rather than threaded through three controllers because three screens ask the
+     * same 27 questions - the capture wizard, the review screen and the record screen - and the set
+     * is application-wide reference data with no per-request state. A controller that had to
+     * remember to supply it is a controller that can forget, and forgetting renders a blank label
+     * rather than failing.
+     *
+     * <p>Immutable and computed once: {@link ReportQuestions#ALL} is a {@code List.of} literal.
+     */
+    @ModelAttribute("questions")
+    public Map<String, ReportQuestion> questions() {
+        return QUESTIONS_BY_ID;
+    }
+
+    private static final Map<String, ReportQuestion> QUESTIONS_BY_ID = ReportQuestions.ALL.stream()
+            .collect(Collectors.toUnmodifiableMap(ReportQuestion::id, q -> q));
 
     @ModelAttribute("theme")
     public ThemeService.ThemeView theme(@AuthenticationPrincipal AppUserPrincipal principal) {

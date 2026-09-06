@@ -3,8 +3,10 @@ package ninja.samryecroft.returnhome.tracker.interview;
 import ninja.samryecroft.returnhome.tracker.audit.AuditEventPublisher;
 import ninja.samryecroft.returnhome.tracker.audit.AuditHistoryService;
 import ninja.samryecroft.returnhome.tracker.child.NameRevealService;
+import java.util.Map;
 import ninja.samryecroft.returnhome.tracker.report.InterviewReport;
 import ninja.samryecroft.returnhome.tracker.report.ReportService;
+import ninja.samryecroft.returnhome.tracker.report.question.ReportQuestions;
 import ninja.samryecroft.returnhome.tracker.user.AppUserPrincipal;
 import ninja.samryecroft.returnhome.tracker.user.Role;
 import org.slf4j.Logger;
@@ -107,6 +109,12 @@ public class InterviewRequestDetailController {
         model.addAttribute("canReview", canReview);
         model.addAttribute("canDownload", canDownload);
         model.addAttribute("report", report);
+        // T185 step 2. The "N not answered" badges come off ReportQuestions rather than out of
+        // hand-written null-counting expressions in the template. Every section is present,
+        // including the three that previously had no badge markup at all - so an absent badge means
+        // "complete" and can no longer also mean "never counted".
+        model.addAttribute("unansweredBySection", report == null
+                ? Map.<String, Integer>of() : ReportQuestions.unansweredBySection(report));
         model.addAttribute("auditHistory", auditHistoryService.historyFor(request));
         auditEventPublisher.auditViewOpened("InterviewRequest", request.getId(),
                 request.getHome() == null || request.getHome().getOrganisation() == null
