@@ -275,7 +275,26 @@ public class UserService {
         }
     }
 
-    /** ADMIN picks any organisation explicitly; an org-admin's new users are always pinned to their own org. */
+    /**
+     * ADMIN picks any organisation explicitly; a supplier may pick one of the care providers it
+     * serves; everyone else's new users are pinned to their own organisation.
+     *
+     * <p><b>T249 is the first version of this method that READS the submitted id for a non-ADMIN,
+     * and that is why the authorisation check ships in the same commit.</b> Until now the parameter
+     * was ignored on this path - the method returned the principal's own organisation whatever was
+     * posted - so a supplier could not place a user outside its scope because <b>you cannot get a
+     * check wrong on an input you never read</b>. The feature the check guards is what creates the
+     * escalation path; the check is a precondition of the change rather than a hardening of it.
+     *
+     * <p>The scope comes from {@code OrganisationAccessService}, which resolves the supplier side
+     * through T139's single supplier-link resolution. A second reading of
+     * {@code supplier_organisation_id} here would be a second definition of who serves whom.
+     *
+     * <p>The ADMIN branch is deliberately unscoped: a platform admin's scope IS every organisation.
+     *
+     * <p>A null id still means "my own organisation", so a care-provider org-admin - who has no
+     * picker and posts nothing - behaves exactly as before.
+     */
     private Organisation resolveOrganisation(Long organisationId, AppUserPrincipal principal) {
         if (principal.hasRole(Role.ADMIN)) {
             if (organisationId == null) {
@@ -284,6 +303,14 @@ public class UserService {
             return organisationRepository.findById(organisationId)
                     .orElseThrow(() -> new IllegalArgumentException("No such organisation: " + organisationId));
         }
-        return organisationRepository.findById(principal.getOrganisationId()).orElseThrow();
+        if (organisationId == null || organisationId.equals(principal.getOrganisationId())) {
+            return organisationRepository.findById(principal.getOrganisationId()).orElseThrow();
+        }
+        if (!organisationAccessService.canPlaceUserIn(principal, organisationId)) {
+            throw new AccessDeniedException(
+                    "You cannot create a user in organisation " + organisationId);
+        }
+        return organisationRepository.findById(organisationId)
+                .orElseThrow(() -> new IllegalArgumentException("No such organisation: " + organisationId));
     }
 }
