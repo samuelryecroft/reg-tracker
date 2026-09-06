@@ -42,8 +42,14 @@
                  that said what was actually happening. */-->
             <span class="tag tag-neutral expires"><svg class="icon" aria-hidden="true"><use th:href="@{/icons/phosphor.svg} + '#ph-clock-countdown'"></use></svg><span th:text="${'Link expires in ' + result.expiresInMinutes() + ' minutes'}">Expires</span></span>
         </p>
-        <p class="hint" style="margin-top:14px">After that you can generate it again — each download is
-            recorded separately, which is what makes the history reliable.</p>
+        <!--/* T223 / spec §7w: this and the countdown badge above are a PAIR, not two independent
+             facts. The link has two independent limits - single-use and time-limited - and copy
+             that names only the timing limit tells the reader the other one does not exist (the
+             old wording named expiry as the trigger when a second click is the common one). Do not
+             delete this sentence in a tidy-up: the badge alone is a strong affordance for "valid
+             until then", and becomes the same defect the moment nothing beneath it says otherwise.
+             Byte-exact per ExpiredSuccessCopyGuardTest. */-->
+        <p class="hint" style="margin-top:14px">This link works once, and only for you. If you need the file again, create a new export; if a colleague needs it, they should create their own. Each one is recorded on this child's case history, which is the point.</p>
     </div>
 
     <a class="btn ghost" th:href="@{/children/{id}(id=${child.id})}">Back to the child record</a>
