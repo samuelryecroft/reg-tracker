@@ -54,7 +54,20 @@ REPLICA_TIMEOUT="${REPLICA_TIMEOUT:-1800}"                                    # 
 MIGRATE_POLL_MAX="${MIGRATE_POLL_MAX:-$(((REPLICA_TIMEOUT + 300) / POLL_SLEEP))}"  # job timeout + 5 min margin
 TEARDOWN_POLL_MAX="${TEARDOWN_POLL_MAX:-80}"                                  # env delete ~10-20 min: 80*15s = 20 min
 
+# Log-capture budget (capture-logs-on-failure; release-3 PRECONDITION - V20 is the first REAL migration
+# through this path, so the first run where a loud DDL failure must not be torn down before its evidence
+# lands). SEPARATE knob from the migrate/teardown budgets: on a FAILED migration the env is kept alive
+# just long enough for Log Analytics to INGEST the container's console output (typ. 1-3 min) - the retry
+# is the actual fix for the flush race, because the env keeps shipping to the workspace while it is up.
+# ~5 min comfortably clears the latency; if nothing surfaces we STILL tear down and print an exact
+# post-hoc retrieval recipe (already-ingested rows persist in the STANDING workspace after the env is
+# gone - it is only the un-flushed tail that keeping the env up protects).
+LOG_CAPTURE_MAX="${LOG_CAPTURE_MAX:-$(((300 + POLL_SLEEP - 1) / POLL_SLEEP))}"   # ceil(5min / POLL_SLEEP)
+LOG_CAPTURE_DIR="${LOG_CAPTURE_DIR:-${TMPDIR:-/tmp}}"
+CONTAINER_NAME="migrate"    # pinned so `job logs show --container` is deterministic (not a generated name)
+
 TEARDOWN_UNCONFIRMED=0
+exec_name=""   # set once the job starts; stays empty if we fail earlier, so capture_logs_on_failure no-ops safely
 
 # env_present: 0 = present, 1 = CONFIRMED absent, 2 = could-not-determine. `env list ... length(@)`
 # exits 0 and prints 0/1 on success, so a CLI failure (throttle/token/network) exits non-zero and
@@ -88,6 +101,56 @@ destroy_env() {
        "group - a stranded internal LB is the invisible-cost failure this control exists to catch." >&2
 }
 
+# capture-logs-on-failure: pull the failed execution's console logs to stdout + a file BEFORE teardown.
+# WHY it is here and not in the poll loop: teardown deletes the env (and its log-forwarding agent), so a
+# loud DDL failure printed by Flyway can be gone before Log Analytics ingests it - "loud into a log
+# stream that is torn down before it flushes is not loud" (god, release-3 precondition). The RETRY LOOP
+# is the fix: the env is kept up, still shipping, until the rows land or the budget expires.
+# It is best-effort and FULLY guarded - every command swallows its own failure - because it runs inside
+# on_exit and must NEVER abort before destroy_env: teardown-is-the-point outranks evidence. Two sources,
+# since neither is guaranteed: (a) `az containerapp job logs show` (the containerapp extension is already
+# used throughout, so it is present; --container is pinned to a KNOWN name via job create); (b) a direct
+# KQL over the workspace we already hold (LOG_WS_ID), which survives (a) misbehaving. If BOTH stay empty
+# we still tear down and hand the operator an exact recipe against the STANDING workspace, where the rows
+# persist after the env is gone.
+capture_logs_on_failure() {
+  if [ -z "${exec_name:-}" ]; then
+    echo ">> capture-logs: no job execution was started (failure was pre-migration); nothing to capture." >&2
+    return 0
+  fi
+  local out="${LOG_CAPTURE_DIR}/rht-migrate-fail-${exec_name}.log"
+  local kql="ContainerAppConsoleLogs_CL | where TimeGenerated > ago(1h) | where ContainerGroupName_s startswith '${exec_name}' or ContainerAppName_s == '${JOB_NAME}' | project TimeGenerated, Log_s | order by TimeGenerated asc | take 1000"
+  echo ">> migration FAILED - capturing console logs for ${exec_name} BEFORE teardown" \
+       "(env kept up so Log Analytics can flush; budget ${LOG_CAPTURE_MAX} x ${POLL_SLEEP}s)" >&2
+  local i logs
+  for i in $(seq 1 "$LOG_CAPTURE_MAX"); do
+    logs="$(az containerapp job logs show -g "$RG" -n "$JOB_NAME" \
+              --job-execution-name "$exec_name" --container "$CONTAINER_NAME" \
+              --type console --follow false --tail 500 2>/dev/null)" || logs=""
+    # Fallback ONLY if the log-analytics extension is already present - never trigger a dynamic-install
+    # prompt, which would hang an interactive runbook operator (the primary above needs no extra extension).
+    if [ -z "$logs" ] && az extension show -n log-analytics >/dev/null 2>&1; then
+      logs="$(az monitor log-analytics query -w "$LOG_WS_ID" --analytics-query "$kql" -o tsv 2>/dev/null)" || logs=""
+    fi
+    if [ -n "$logs" ]; then
+      printf '%s\n' "$logs" >"$out" 2>/dev/null || true
+      echo ">> capture-logs: captured $(printf '%s\n' "$logs" | wc -l | tr -d ' ') line(s) to ${out}" >&2
+      echo "---- BEGIN ${exec_name} console logs ----" >&2
+      printf '%s\n' "$logs" >&2
+      echo "---- END ${exec_name} console logs ----" >&2
+      return 0
+    fi
+    sleep "$POLL_SLEEP" || true
+  done
+  echo "WARN: capture-logs could not surface console logs for ${exec_name} within" \
+       "$((LOG_CAPTURE_MAX * POLL_SLEEP))s. Teardown proceeds anyway. The rows may still land in the" \
+       "STANDING Log Analytics workspace (teardown deletes the env, NOT the workspace) - retrieve them" \
+       "once ingestion catches up:" >&2
+  echo "  az monitor log-analytics query -w ${LOG_WS_ID} --analytics-query \\" >&2
+  echo "    \"${kql}\" -o table" >&2
+  return 0
+}
+
 # always-teardown, and a DISTINCT exit code (Dwight #116-3) so "migration fine but env possibly
 # leaked" is an actionable signal to the caller rather than a WARN buried at the tail of the poll log:
 #   0 = migration succeeded AND teardown confirmed
@@ -96,6 +159,10 @@ destroy_env() {
 #       caller must verify the ME_* group; this survives into deploy.yml when that step is rewritten.
 on_exit() {
   local rc=$?
+  # On ANY failure exit, salvage evidence BEFORE teardown. `|| true` so a capture hiccup can never skip
+  # teardown - that is the one invariant this script exists to hold (an env that survives is the cost we
+  # are removing, only invisible). Skipped on rc 0 (success): no failure to evidence, tear down fast.
+  [ "$rc" -ne 0 ] && { capture_logs_on_failure || true; }
   destroy_env
   if [ "$rc" -eq 0 ] && [ "$TEARDOWN_UNCONFIRMED" -eq 1 ]; then
     exit 3
@@ -123,6 +190,7 @@ echo ">> create job ${JOB_NAME} (CD managed identity in-VNet; digest-pinned imag
 az containerapp job create -g "$RG" -n "$JOB_NAME" --environment "$ENV_NAME" \
   --trigger-type Manual --replica-timeout "$REPLICA_TIMEOUT" --replica-retry-limit 0 \
   --parallelism 1 --replica-completion-count 1 \
+  --container-name "$CONTAINER_NAME" \
   --image "${ACR_LOGIN_SERVER}/${DB_PLANE_IMAGE}" --cpu 0.5 --memory 1Gi \
   --mi-user-assigned "$CD_IDENTITY_ID" \
   --registry-server "$ACR_LOGIN_SERVER" --registry-identity "$CD_IDENTITY_ID" \
