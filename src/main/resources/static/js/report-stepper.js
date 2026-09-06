@@ -26,6 +26,22 @@
 // The two failures are told apart because their remedies are opposite: a terminal refusal (the
 // report was submitted or approved while they were typing) can never succeed on retry and stops
 // autosave for good, while anything else is transient and worth trying again.
+//
+// D-1c/1d (spec §8m) adds real navigation on top of the .dots-only display T7 shipped: the section
+// index merges INTO the step label rather than living beside it (D-1d-1) - ".dots show progress that
+// cannot be navigated; a section index is navigation that cannot survive the stepper" (a jump link to
+// a hidden fieldset scrolls nowhere and never matches :target). The load-bearing case is the
+// sent-back loop: a reviewer returns a report with comments about two specific answers, and the
+// visitor must be able to reach them without paging through a statutory instrument from section 1.
+//
+// D-1c-0: this build sits on top of TWO ad-hoc fixes that landed outside the formal queue and are
+// PRESERVED, not redrawn - T247 (the server-seeded save state) and T257 (the visitor list's
+// "Continue draft" label). They are one behaviour with two commits: T257 promises a draft is
+// waiting, T247 is what keeps that promise on this screen. Reverting either makes the other a lie.
+// Concretely here: the panel added below carries NO save indicator of its own (a second one is
+// exactly the "two sentences that resemble each other" T247 removed), aria-live stays on the
+// existing #stepper-saved element with a stable DOM identity, and data-saved-at is still read once,
+// on load, from the server - nothing below touches any of that.
 (function () {
     var form = document.querySelector('form[data-js="stepper"]');
     if (!form) {
@@ -42,7 +58,8 @@
     chrome.className = 'steps';
     chrome.innerHTML =
         '<span class="dots"></span>' +
-        '<span class="step-label"></span>' +
+        '<button type="button" class="step-label" aria-expanded="false" aria-controls="stepper-panel">' +
+        '<span class="step-label-text"></span></button>' +
         // aria-live, because this is the only thing on the screen that says whether a visitor's
         // work is safe, and it changes without anything moving focus. A save state that reaches
         // only sighted users is the same defect as a state-bearing icon marked aria-hidden.
@@ -63,11 +80,90 @@
             : '<span class="saved pending" id="stepper-saved" aria-live="polite">Not yet saved</span>');
     form.insertBefore(chrome, steps[0]);
     var dotsEl = chrome.querySelector('.dots');
-    var labelEl = chrome.querySelector('.step-label');
+    var labelBtn = chrome.querySelector('.step-label');
+    var labelTextEl = labelBtn.querySelector('.step-label-text');
     for (var d = 0; d < steps.length; d++) {
         var dot = document.createElement('i');
         dot.className = 'dot';
         dotsEl.appendChild(dot);
+    }
+
+    // D-1d-1: the panel this button discloses. Six rows, in document order, "<n>. <legend text>" -
+    // the same numbering as the produced document and 1b's reviewerFields(), read live from the DOM
+    // rather than hand-written, so a question-set change can never desync the two.  visited tracks
+    // "opened at least once this session" (D-1d-2); it is deliberately never cleared, including by
+    // Back, because leaving a section does not un-open it.
+    var visited = {};
+    var panel = document.createElement('ul');
+    panel.className = 'step-panel';
+    panel.id = 'stepper-panel';
+    panel.hidden = true;
+    var rows = steps.map(function (step, i) {
+        var legend = step.querySelector('legend');
+        var li = document.createElement('li');
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'step-panel-row';
+        var marker = document.createElement('i');
+        marker.className = 'step-panel-marker';
+        marker.setAttribute('aria-hidden', 'true');
+        var label = document.createElement('span');
+        label.className = 'step-panel-row-label';
+        label.textContent = (i + 1) + '. ' + (legend ? legend.textContent.trim() : '');
+        var attention = document.createElement('span');
+        attention.className = 'step-panel-row-attention';
+        attention.textContent = 'Needs attention';
+        attention.hidden = true;
+        btn.appendChild(marker);
+        btn.appendChild(label);
+        btn.appendChild(attention);
+        // D-1d-3: selecting a row is NEVER gated by validity, unlike Next - "I want to be
+        // somewhere else" is a different claim from "I have finished this section", and the
+        // sent-back loop this control exists for needs a visitor to be able to leave an
+        // incomplete section to reach the two answers a reviewer asked about.
+        btn.addEventListener('click', function () {
+            selectStep(i);
+        });
+        li.appendChild(btn);
+        panel.appendChild(li);
+        return { li: li, btn: btn, marker: marker, attention: attention };
+    });
+    form.insertBefore(panel, steps[0]);
+
+    function closePanel() {
+        panel.hidden = true;
+        labelBtn.setAttribute('aria-expanded', 'false');
+    }
+
+    labelBtn.addEventListener('click', function () {
+        if (panel.hidden) {
+            renderPanel();
+            panel.hidden = false;
+            labelBtn.setAttribute('aria-expanded', 'true');
+            // D-1d-4: open -> focus moves to the panel's current row.
+            rows[current].btn.focus();
+        } else {
+            // D-1d-4: re-pressing the toggle closes the panel and returns focus to it - a
+            // dismissal returns you where you were, unlike a selection which takes you where
+            // you chose (render()'s own focus rule handles that case).
+            closePanel();
+            labelBtn.focus();
+        }
+    });
+    panel.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape') {
+            closePanel();
+            labelBtn.focus();
+        }
+    });
+
+    function selectStep(i) {
+        current = i;
+        // render() closes the panel and moves focus itself (D-1d-4: "no new focus rule - reuse
+        // the built one"); selecting autosaves on the same terms as Next - after the step
+        // changes, never before it.
+        render();
+        autosave();
     }
 
     var actionButtons = Array.prototype.slice.call(form.querySelectorAll('button[type="submit"]'));
@@ -95,6 +191,9 @@
     }
 
     function render() {
+        // D-1c/1d: any step change closes the panel - it disclosed a choice, the choice is made.
+        closePanel();
+        visited[current] = true;
         steps.forEach(function (step, i) {
             step.hidden = i !== current;
         });
@@ -103,8 +202,9 @@
             dot.className = 'dot' + (i < current ? ' done' : i === current ? ' now' : '');
         });
         var legend = steps[current].querySelector('legend');
-        labelEl.textContent = 'Step ' + (current + 1) + ' of ' + steps.length +
+        labelTextEl.textContent = 'Step ' + (current + 1) + ' of ' + steps.length +
             (legend ? ' · ' + legend.textContent.trim() : '');
+        renderPanel();
         backBtn.disabled = current === 0;
         var isLast = current === steps.length - 1;
         nextBtn.hidden = isLast;
@@ -117,15 +217,42 @@
         (firstInvalid || fieldsIn(steps[current])[0] || steps[current]).focus({ preventScroll: true });
     }
 
-    function stepIsValid(step) {
+    // reportErrors is the only difference between Next's gate and the panel's read below - the
+    // predicate itself (what counts as invalid) is the SAME call in both places, so the two can
+    // never disagree (D-1d-2: "the panel asserts nothing the form itself does not already assert").
+    function stepIsValid(step, reportErrors) {
         var valid = true;
         fieldsIn(step).forEach(function (field) {
             if (!field.checkValidity()) {
                 valid = false;
-                field.reportValidity();
+                if (reportErrors) {
+                    field.reportValidity();
+                }
             }
         });
         return valid;
+    }
+
+    // D-1d-2: four states, and only these - current (where the visitor is), visited (opened at
+    // least once), not yet reached (never opened), and needs-attention (checkValidity fails),
+    // which is an independent overlay on top of whichever of the first three applies. Deliberately
+    // NO "N not answered" count here - see the file's own D-1d-2 note in report-fields.html's
+    // sibling spec: 1b's count is computed server-side from a stored report and would be stale the
+    // instant a visitor on THIS screen answers anything, and a client-side count-the-blanks repeats
+    // T233 (ifNotWhyLate is conditional; a blank means two opposite things).
+    function renderPanel() {
+        rows.forEach(function (row, i) {
+            row.btn.className = 'step-panel-row ' +
+                (i === current ? 'current' : visited[i] ? 'visited' : 'not-reached');
+            if (i === current) {
+                row.btn.setAttribute('aria-current', 'step');
+            } else {
+                row.btn.removeAttribute('aria-current');
+            }
+            var needsAttention = !stepIsValid(steps[i], false);
+            row.btn.classList.toggle('needs-attention', needsAttention);
+            row.attention.hidden = !needsAttention;
+        });
     }
 
     backBtn.addEventListener('click', function () {
@@ -135,7 +262,7 @@
         }
     });
     nextBtn.addEventListener('click', function () {
-        if (!stepIsValid(steps[current])) {
+        if (!stepIsValid(steps[current], true)) {
             return;
         }
         if (current < steps.length - 1) {
