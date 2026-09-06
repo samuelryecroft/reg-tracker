@@ -31,11 +31,19 @@
 -- makes it visible. The safety was never resting on the default, which is exactly why removing it is
 -- a small change rather than a risky one.
 --
--- NOT VERIFIED FROM HERE: nobody queried the production database. That V19 has been applied is
--- inferred - the running jar maps `status` as a non-null column and every organisation read selects
--- it, so the application could not be serving if the column were absent, and Flyway applies V19's
--- two statements atomically. If that inference is wrong the column does not exist and this migration
--- fails loudly on its own terms, which is the correct failure.
+-- PROD IS AT V19, AND THIS IS NO LONGER AN INFERENCE. This paragraph originally said the opposite:
+-- nobody had queried the production database, `spring.flyway.enabled=false` on the azure profile so
+-- the jar cannot self-report, and the argument was indirect - the running jar maps `status` as a
+-- non-null column and every organisation read selects it, so the app could not be serving if the
+-- column were absent. That reasoning still holds, but it has since been replaced by direct evidence:
+-- release 2's ephemeral migration run left its console output in the `log-rht` workspace, and
+-- Flyway itself reported, against prod, `Current version of schema "public": 19` /
+-- `Successfully validated 19 migrations` / `Schema "public" is up to date. No migration necessary.`
+-- (Pam-devops, found while confirming the workspace survived the T180 teardown.)
+--
+-- So V20 is the SOLE pending migration on release 3, and the operator-visible check is
+-- `Successfully applied 1 migration` - not 20. The runbook documents that; if it says 20, the
+-- database is not the one this reasoning is about and the release should stop.
 --
 -- WHAT "LOUDLY" DEPENDS ON, and it is not free. Both claims above - this migration failing visibly,
 -- and a bypassing insert failing visibly - assume the DB-plane job's output actually reaches a human.
