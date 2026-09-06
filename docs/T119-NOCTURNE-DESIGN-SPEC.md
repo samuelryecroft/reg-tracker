@@ -4590,3 +4590,94 @@ whatever has been built on it.
 
 **Not gated by T187** — as Oscar says, the human's answer governs *the words on the form*; it says nothing
 about whether an absence is rendered as a declination. **That is ours either way.**
+
+---
+
+## §8a — T235: the buttons-flush-against-inputs defect is one missing rule, and the value is already chosen
+
+Four reported instances — **login (live in production)**, the user-creation save button, add homes, add
+children. god's read is right that three unrelated forms failing identically is a **system rule missing**, not
+three local fixes. It is narrower and more fixable than that: **the rule exists, the value is already chosen,
+and the container everyone uses throws it away.**
+
+### D-8a-1 — the mechanism, in three lines of `app.css`
+
+```css
+.btn      { …; margin-top: var(--s5); margin-right: var(--s2); }   /* :915  legacy — 24px */
+.btn-row  { display: flex; gap: var(--s3); flex-wrap: wrap; … }    /* :959  NO margin-top */
+.btn-row .btn { margin-top: 0; margin-right: 0; }                  /* :960  correct, and fatal */
+```
+
+**The separation between a form and its actions is carried on the button.** `.btn-row` legitimately zeroes it
+— a flex row owns its own `gap`, and a stray top margin on each child would misalign them. But `.btn-row`
+never puts it back, and **the moment you wrap actions in the container that spaces buttons correctly against
+each other, you lose their spacing against the form above.**
+
+All four reported screens are exactly that shape — `<div class="btn-row">` immediately after the last control.
+Same for the other nine.
+
+> **A button's external margin is a property of where it sits, not of what it is.** Putting a layout
+> relationship on a component means any container that legitimately resets it silently deletes a relationship
+> it never knew existed.
+
+### D-8a-2 — Pam does not need to choose a token. She needs to stop losing one.
+
+god asked her to bring the token ruling here rather than pick a value locally. **The ruling is that the value
+is not a new decision:** legacy `.btn` already says `margin-top: var(--s5)` — **24px, the system's own answer
+to this exact relationship** — and it is simply unreachable from inside `.btn-row`.
+
+It is also the right value on its own terms. The field-to-field rhythm is `label { margin-top: var(--s4) }` =
+**16px**. **An actions block must be separated by more than a field is, or it reads as one more field.**
+`--s5` (24px) is the next step on the scale and is already the card's padding, so the actions sit at the same
+optical distance from the form as the form does from its container.
+
+**Ruling — one line, on the container:**
+
+```css
+.btn-row { margin-top: var(--s5); }        /* keep .btn-row .btn { margin-top: 0 } as it is */
+```
+
+**No double-spacing:** a bare legacy `.btn` outside a row keeps its own 24px, and inside a row it is zeroed by
+the existing rule, so both paths land on the same value.
+
+**And the two exceptions are already written.** `.srow .act .btn-row` (`:1142`) and `.theme-preview .btn-row`
+(`:1662`) already reset `margin-top: 0`. Those are **no-ops today** — which means someone has already been
+fighting the absent rule from the other end, and **the two contexts that would be wrong under this rule have
+already opted themselves out.** All 13 uses of `.btn-row` are an actions block following content, including
+`audit/event.html`, which wants the space for the same reason.
+
+### D-8a-3 — 🔑 this gets worse as the migration proceeds, which is why it is a system rule and why now
+
+The Nocturne `.btn` (`:439`) has **no external margin at all** — correctly, since external spacing is not a
+button's business. But nothing has taken over the job.
+
+> **The migration removes the accidental spacing without adding an intentional one.** The four reported
+> screens are not a backlog being worked off; they are the leading edge of a defect that arrives on each
+> screen as it is migrated.
+
+So when the legacy `.btn` family is retired, its `margin-top: var(--s5)` is **deleted, not ported** — the rule
+lives on `.btn-row` from now on, and a migrated screen whose actions are not in a `.btn-row` has no spacing
+because it has no actions container, which is the correct thing to notice at that point.
+
+### D-8a-4 — the deeper cause, flagged and **not** to be acted on now
+
+`app.css` carries **two spacing scales that do not align**:
+
+| | | | | | | |
+| --- | --- | --- | --- | --- | --- | --- |
+| Nocturne `--space-*` | 2.8 | 5.6 | 8.4 | 11.2 | 16.8 | 22.4 |
+| legacy `--s*` | 4 | 8 | 12 | 16 | 24 | 48 |
+
+A rule written in one is invisible to someone working in the other, and during the migration **the same visual
+gap has two different names.** That is the honest answer to *"a spacing rule is missing from the design
+system"*: the system has **two spacing vocabularies and no rule saying which one a form's rhythm is expressed
+in.**
+
+**And the target scale cannot express the value the system has chosen: `--space-*` tops out at 22.4px and has
+no 24px step.** So `.btn-row`'s rule cannot be written in Nocturne tokens today without changing the spacing
+while claiming to migrate it.
+
+**Deliberately not proposing a unification.** Pam is 16 of 25 screens into T119, and a rescale touches every
+migrated screen at once — the same churn hazard god already protected her from on `report-fields.html`.
+**Improvable, not wrong; back to product for sequencing, after the migration and not during it.** The one-line
+fix above is correct under either scale and does not prejudge it.
