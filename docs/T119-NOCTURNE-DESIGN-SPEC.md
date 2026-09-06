@@ -5228,3 +5228,41 @@ the real answer starts.
 **T252 should be re-scoped, not closed:** the genuine accessibility tail of Oscar's question is D-8f-3 and
 D-8f-4 — seven screens presenting a visual list with no list in the markup, and a fix that `app.css:1537`
 silently defeats unless it carries `role="list"`. That is a real ticket for Dwight; the caption is not.
+
+### D-8f-8 — provenance correction, and where the list-semantics finding actually came from
+
+god attributed to Oscar a generalisation Oscar did not make: *"a caption removed by hand once was probably
+removed by hand more than once."* **Oscar flagged one caption on one table**; the class-from-instance move was
+god's. He has corrected it himself.
+
+**The record needs one more thing than the correction, because the finding's provenance matters:** D-8f-3 did
+**not** come from that generalisation, and would not have. The generalisation is **false in its particulars** —
+no caption was removed by hand anywhere; a table was replaced wholesale, and its caption went with it
+correctly. Following it would have produced a hunt for hand-removed captions and found none.
+
+The question that found the seven screens was a different one: **"what replaced the table, and does the
+replacement carry the semantics the table was carrying?"** That is a question about a *migration*, not about a
+*deletion*, and it is the one worth reusing.
+
+> **A generalisation can be false in its particulars and still point somewhere real. That is luck, and it
+> should not be filed as method** — the next false generalisation points nowhere, and by then we will have
+> learned to follow them.
+
+### D-8f-9 — `role="list"` needs more than a comment, and the comment has the symmetric hazard
+
+god's catch is right and is the part most at risk: **a reviewer who does not know that `display: flex` strips
+the implicit role will read `role="list"` as redundant ARIA and remove it — correctly, by the usual rule.** So
+the card requires a comment saying why it is there, and *the fix and the reason it survives are the same edit*.
+
+**Two additions.**
+
+**(a) A comment tells a reviewer why; it does not stop the removal.** The durable form is the one this floor
+has converged on all week — **a mechanism beats a check someone has to remember.** The guard is mechanically
+expressible in the existing `FrontendSourceGuardTest` lane: *where a container's CSS sets `display: flex` or
+`grid` and its markup is a `<ul>`/`<ol>`, `role="list"` must be present.* That survives a reviewer who has
+never heard of the Safari behaviour, which a comment does not.
+
+**(b) The comment is prose placed exactly where a scanner will read it.** If such a guard is written, it must
+strip comments before matching, or **the rationale explaining why `role="list"` is required will itself satisfy
+a check for `role="list"`.** Fifth instance of that shape here, and the first where the prose and the thing it
+protects are on adjacent lines by design.
