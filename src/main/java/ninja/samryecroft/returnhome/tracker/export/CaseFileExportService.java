@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import ninja.samryecroft.returnhome.tracker.audit.AuditFeedScope;
 import ninja.samryecroft.returnhome.tracker.audit.AuditHistorySection;
 import ninja.samryecroft.returnhome.tracker.audit.AuditHistoryService;
 import ninja.samryecroft.returnhome.tracker.audit.DraftSaveRuns;
@@ -184,7 +185,13 @@ public class CaseFileExportService {
                         .filter(r -> historyScope.canView(r.getHome()))
                         .filter(period::covers)
                         .toList(),
-                DraftSaveRuns.KEPT_IN_FULL);
+                DraftSaveRuns.KEPT_IN_FULL,
+                // WITH_ACCESS_EVENTS means UNCHANGED here, not extended (T274 A5). The child page
+                // stopped listing who opened a request; this pack goes to a DPO, a local authority or
+                // a court, and "who accessed this child's record" is a question asked OF a case file.
+                // Naming the scope is what stops a screen's tidying from silently rewriting every
+                // disclosure produced after it - the same trap as the audit CSV, one method over.
+                AuditFeedScope.WITH_ACCESS_EVENTS);
 
         return packWriter.write(new ExportPackWriter.PackRequest(
                 referenceFor(child), finalManifest, history, attachments, purpose, reference,

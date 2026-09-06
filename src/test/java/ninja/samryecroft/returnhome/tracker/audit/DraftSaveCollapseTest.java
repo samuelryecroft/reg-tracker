@@ -233,7 +233,7 @@ class DraftSaveCollapseTest {
         events.forEach(event -> when(event.getTargetType()).thenReturn("InterviewReport"));
         events.forEach(event -> when(event.getTargetId()).thenReturn(REPORT_ID));
 
-        assertThat(service.caseHistoryFor(List.of(request), DraftSaveRuns.KEPT_IN_FULL))
+        assertThat(service.caseHistoryFor(List.of(request), DraftSaveRuns.KEPT_IN_FULL, AuditFeedScope.WITH_ACCESS_EVENTS))
                 .singleElement()
                 .extracting(AuditHistorySection::entries, list(AuditHistoryEntry.class))
                 .extracting(AuditHistoryEntry::headline, AuditHistoryEntry::id)
@@ -258,7 +258,7 @@ class DraftSaveCollapseTest {
         events.forEach(event -> when(event.getTargetType()).thenReturn("InterviewReport"));
         events.forEach(event -> when(event.getTargetId()).thenReturn(REPORT_ID));
 
-        assertThat(service.caseHistoryFor(List.of(request), DraftSaveRuns.COLLAPSED))
+        assertThat(service.caseHistoryFor(List.of(request), DraftSaveRuns.COLLAPSED, AuditFeedScope.WITH_ACCESS_EVENTS))
                 .singleElement()
                 .extracting(AuditHistorySection::entries, list(AuditHistoryEntry.class))
                 .singleElement()

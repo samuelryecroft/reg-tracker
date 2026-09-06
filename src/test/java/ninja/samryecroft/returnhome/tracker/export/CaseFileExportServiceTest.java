@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import ninja.samryecroft.returnhome.tracker.audit.AuditHistoryService;
+import ninja.samryecroft.returnhome.tracker.audit.AuditFeedScope;
 import ninja.samryecroft.returnhome.tracker.audit.DraftSaveRuns;
 import ninja.samryecroft.returnhome.tracker.child.Child;
 import ninja.samryecroft.returnhome.tracker.child.ChildRepository;
@@ -71,7 +72,7 @@ class CaseFileExportServiceTest {
         when(requestRepository.findDetailedById(1182L)).thenReturn(Optional.of(requestOne));
         when(requestRepository.findDetailedById(1191L)).thenReturn(Optional.of(requestTwo));
         when(accessService.homeScopeFor(any())).thenReturn(home -> true);
-        when(historyService.caseHistoryFor(any(), any())).thenReturn(List.of());
+        when(historyService.caseHistoryFor(any(), any(), any())).thenReturn(List.of());
         when(principal.getUsername()).thenReturn("orgadmin");
 
         approvedReportFor(requestOne, 900L);
@@ -106,6 +107,12 @@ class CaseFileExportServiceTest {
      * {@code caseHistoryFor(any())} until the overload existed, and when the production call grew a
      * second argument the stub simply stopped matching, the call returned null, and all six tests
      * here stayed green. A stub that no longer matches looks exactly like one that does.
+     *
+     * <p><strong>It happened again, as predicted, when T274 A5 added the scope</strong> - and the
+     * verify is now the reason the pack's SCOPE is a decision rather than whatever the child page
+     * last wanted. The child page stopped listing record-access events; this pack did not, and
+     * {@code WITH_ACCESS_EVENTS} here means "unchanged" rather than "extended". Both arguments are
+     * pinned because both are choices this caller makes and neither has a safe default.
      */
     @Test
     void theExportPackAsksForEverySaveOnItsOwnRow() throws Exception {
@@ -114,7 +121,8 @@ class CaseFileExportServiceTest {
         service.export(5L, ExportPeriod.all(), ExportPurpose.REGULATORY_INSPECTION,
                 "OFSTED-1", Set.of(), "", principal);
 
-        verify(historyService).caseHistoryFor(any(), eq(DraftSaveRuns.KEPT_IN_FULL));
+        verify(historyService).caseHistoryFor(any(), eq(DraftSaveRuns.KEPT_IN_FULL),
+                eq(AuditFeedScope.WITH_ACCESS_EVENTS));
     }
 
     @Test
