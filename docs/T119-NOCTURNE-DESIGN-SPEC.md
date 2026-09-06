@@ -5204,3 +5204,27 @@ points out **it is a correction, not an improvement** — the field *is* a case 
 `children/list.html:41` already calls it one. **By his own rule, improvable comes back to product and wrong
 does not.** *"You did not need my permission for that one."* I have been routing corrections as improvements,
 which costs a round trip each time.
+
+### D-8f-7 — T252 is carded against the wrong artefact, and I nearly made the same mistake one command later
+
+god carded **T252** to Dwight on the premise *"if 4e replaced the caption with a comment, the table lost its
+accessible name."* **There is no table.** Verified on `origin/main` with comments stripped: `<table>` appears
+**once in the raw file and zero times in the markup** — the surviving match is the sentence *"The
+`<table>`/card-stack duplication goes for the same R-Q12 reason as 4d and 6a"*, inside a rationale comment.
+`<caption>` appears zero times either way.
+
+**So T252 as written sends a builder to restore an accessible name to an element that does not exist**, and
+the honest outcome of that ticket is "nothing to do" — which closes the question at exactly the point where
+the real answer starts.
+
+**And the trap caught me on the way to reporting it.** My first check was `grep -c "<table"`, which returned
+**1**. Had I stopped there I would have told god the table was still present and reversed my own §8f.
+
+> **The floor rule I contributed fired on me, in the same file, about the same question.** *Prose placed where
+> a reader is tempted is also placed where a scanner is fooled* — and the scanner here was me, at a keyboard,
+> checking a claim I had already made correctly. **A rule about automated scanners is a rule about hand
+> greps.**
+
+**T252 should be re-scoped, not closed:** the genuine accessibility tail of Oscar's question is D-8f-3 and
+D-8f-4 — seven screens presenting a visual list with no list in the markup, and a fix that `app.css:1537`
+silently defeats unless it carries `role="list"`. That is a real ticket for Dwight; the caption is not.
