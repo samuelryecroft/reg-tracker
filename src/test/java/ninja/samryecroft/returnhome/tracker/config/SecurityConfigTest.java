@@ -9,6 +9,7 @@ import ninja.samryecroft.returnhome.tracker.audit.AuditEventPublisher;
 import ninja.samryecroft.returnhome.tracker.child.NameRevealService;
 import ninja.samryecroft.returnhome.tracker.home.HomeRepository;
 import ninja.samryecroft.returnhome.tracker.organisation.OrganisationAccessService;
+import ninja.samryecroft.returnhome.tracker.security.LoginAttemptService;
 import ninja.samryecroft.returnhome.tracker.security.LoginFailureHandler;
 import ninja.samryecroft.returnhome.tracker.theme.ThemeService;
 import ninja.samryecroft.returnhome.tracker.user.RoleMatrix;
@@ -36,6 +37,23 @@ class SecurityConfigTest {
      */
     @MockitoBean
     private LoginFailureHandler loginFailureHandler;
+
+    /**
+     * T221. {@code SecurityConfig} builds {@code LockedAccountFilter} itself and needs this to do
+     * it, so without a bean here the whole context fails to start and every test in the class errors
+     * before asserting anything - the same "a slice with no bean" shape T215 hit.
+     *
+     * <p><b>The SERVICE is mocked, never the filter.</b> The filter is a link in the chain: a mock of
+     * it would be a {@code doFilter} that does nothing and passes nothing on, so every route
+     * assertion here would be testing a chain that silently swallows requests. A mock is safe for a
+     * collaborator and unsafe for a chain link.
+     *
+     * <p>The default {@code isLocked} is {@code false}, so the real filter passes everything through
+     * and this class keeps testing what it is about - which routes each role may reach. Lockout
+     * behaviour belongs to {@code LockedAccountFilterTest} and {@code LockedAccountTimingGuardTest}.
+     */
+    @MockitoBean
+    private LoginAttemptService loginAttemptService;
 
     @Autowired
     private MockMvc mockMvc;

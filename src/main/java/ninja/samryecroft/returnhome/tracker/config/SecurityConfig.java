@@ -13,6 +13,8 @@ import ninja.samryecroft.returnhome.tracker.security.LoginFailureHandler;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import ninja.samryecroft.returnhome.tracker.security.LockedAccountFilter;
+import ninja.samryecroft.returnhome.tracker.security.LoginAttemptService;
+import org.springframework.context.ApplicationEventPublisher;
 
 @Configuration
 @EnableMethodSecurity
@@ -26,7 +28,13 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http,
             LoginFailureHandler loginFailureHandler,
-            LockedAccountFilter lockedAccountFilter) throws Exception {
+            LoginAttemptService loginAttemptService,
+            ApplicationEventPublisher eventPublisher) throws Exception {
+        // Constructed here rather than injected as a bean: Boot auto-registers Filter BEANS into the
+        // servlet chain as well, which would place this ahead of Spring Security's chain entirely and
+        // make its real position differ from the one addFilterBefore states. See LockedAccountFilter.
+        LockedAccountFilter lockedAccountFilter =
+                new LockedAccountFilter(loginAttemptService, loginFailureHandler, eventPublisher);
         http
                 .authorizeHttpRequests(auth -> auth
                         // T119: /fonts/** and /icons/** are static assets the login page itself

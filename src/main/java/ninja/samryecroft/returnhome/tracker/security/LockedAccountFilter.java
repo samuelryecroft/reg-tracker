@@ -11,7 +11,8 @@ import org.springframework.security.authentication.LockedException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.authentication.event.AuthenticationFailureLockedEvent;
 import org.springframework.security.web.authentication.AuthenticationFailureHandler;
-import org.springframework.stereotype.Component;
+import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
+import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
@@ -82,12 +83,51 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * an attack, and it would fail with no error and no test going red. That is why this filter
  * publishes the event itself, and why {@code LockedAccountFilterTest} asserts the audit row still
  * appears.
+ *
+ * <h2>Deliberately NOT a {@code @Component}</h2>
+ *
+ * <p>It is constructed by {@code SecurityConfig} instead. Spring Boot auto-registers any {@code
+ * Filter} <em>bean</em> into the servlet container's own chain, so a {@code @Component} here would be
+ * registered <b>twice</b>: once by Boot, ahead of Spring Security's filter chain entirely, and once
+ * by {@code addFilterBefore} where it is meant to sit. {@code OncePerRequestFilter} would suppress
+ * the second run, which means <b>the outer registration would win and the filter's real position
+ * would not be the one this class documents</b> - it would run before CSRF rather than beside the
+ * authentication filter.
+ *
+ * <p>Nothing observable might change, and that is the point: <b>the position would be wrong in a way
+ * no test would notice</b>, which is the exact failure this card already produced once when the
+ * matcher read {@code getServletPath()}. Not being a bean removes the second registration rather
+ * than compensating for it.
  */
-@Component
 public class LockedAccountFilter extends OncePerRequestFilter {
 
-    /** Matches {@code formLogin}'s default processing URL, which {@code SecurityConfig} keeps. */
+    /**
+     * {@code formLogin}'s default processing URL, which {@code SecurityConfig} keeps.
+     *
+     * <p><b>Matched with Spring Security's own matcher rather than by reading a field off the
+     * request, and that is not a style preference - it is the fix for a real defect.</b> This filter
+     * originally tested {@code request.getServletPath().equals("/login")}. That value is <b>not a
+     * property of the request</b>; it is a property of how the container mapped the servlet, so it
+     * is {@code "/login"} under Boot's {@code DispatcherServlet} at {@code "/"} and <b>empty string
+     * under MockMvc</b>, whose builder populates {@code requestURI} and leaves {@code servletPath}
+     * unset. The filter therefore never matched in the test harness, silently did nothing, and the
+     * integration guard measured an application with no filter in it.
+     *
+     * <p>A path matcher removes the question rather than answering it: it resolves the same way for
+     * a harness request, for {@code DispatcherServlet} at {@code "/"}, and for a deployment under a
+     * context path - the last being a case a hand-rolled {@code getRequestURI()} comparison would
+     * get wrong, since the URI there carries the context prefix and the pattern does not.
+     * {@code LockedAccountFilterTest} pins all four, plus two negative controls.
+     *
+     * <p>It is also the <b>same matcher machinery Spring Security uses to decide which requests
+     * {@code UsernamePasswordAuthenticationFilter} handles</b>, so this filter and the filter it
+     * stands in front of now agree about what a login submission is by construction rather than by
+     * two strings happening to be equal.
+     */
     static final String LOGIN_PROCESSING_URL = "/login";
+
+    private static final RequestMatcher LOGIN_SUBMISSION =
+            PathPatternRequestMatcher.pathPattern(HttpMethod.POST, LOGIN_PROCESSING_URL);
 
     private final LoginAttemptService loginAttemptService;
     private final AuthenticationFailureHandler failureHandler;
@@ -121,7 +161,6 @@ public class LockedAccountFilter extends OncePerRequestFilter {
      * the lock is about submitting credentials rather than about reaching the page.
      */
     private boolean isLoginSubmission(HttpServletRequest request) {
-        return HttpMethod.POST.matches(request.getMethod())
-                && LOGIN_PROCESSING_URL.equals(request.getServletPath());
+        return LOGIN_SUBMISSION.matches(request);
     }
 }
