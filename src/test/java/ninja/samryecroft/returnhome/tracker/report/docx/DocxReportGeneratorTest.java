@@ -343,6 +343,42 @@ class DocxReportGeneratorTest {
         }
     }
 
+    /**
+     * Adjacent token-bearing rows do not take an innocent row with them.
+     *
+     * <p><b>This case is not reachable through the application</b> - the child's questions each sit
+     * under their own label row, so no two of them are adjacent - and it was reported as unarmable
+     * for that reason. It is not: the template's own "Interview accepted?" and "If not, why?" rows
+     * ARE adjacent and both carry tokens, so collapsing that pair exercises the arithmetic directly.
+     *
+     * <p>Without {@code distinct()} the loop adds row <em>i</em> and then re-adds <em>i - 1</em> as
+     * the next row's label. Removal runs in reverse, so the repeated index deletes whatever has
+     * SHIFTED INTO THAT SLOT - here, the first question below the pair. Silently, from a statutory
+     * document, with everything else about the output correct.
+     *
+     * <p>The collapse set is chosen for the arithmetic rather than for a real scenario, and that is
+     * the point: a guard that can only see inputs the application currently produces cannot be
+     * distinguished from one that does nothing.
+     */
+    @Test
+    void collapsingTwoAdjacentRowsDoesNotDeleteTheRowBelowThem(@TempDir Path tempDir)
+            throws Exception {
+        Path outputPath = tempDir.resolve("adjacent.docx");
+        try (InputStream templateStream =
+                new ClassPathResource("docx-templates/rhi-report-template.docx").getInputStream()) {
+            generator.generate(templateStream, Map.of("childName", "Alex Smith"),
+                    null, null, null, outputPath,
+                    new DocxReportGenerator.RowCollapse(
+                            Set.of("interviewAccepted", "interviewDeclinedReason"),
+                            "Collapsed for the purposes of this test."));
+        }
+
+        assertThat(textOf(outputPath))
+                .as("the row immediately below the collapsed pair is innocent, and a repeated "
+                        + "removal index deletes exactly it")
+                .contains("Where were you while missing?");
+    }
+
     /** Every table cell and paragraph, in document order - what a reader would actually see. */
     private String textOf(Path docx) throws Exception {
         StringBuilder text = new StringBuilder();
