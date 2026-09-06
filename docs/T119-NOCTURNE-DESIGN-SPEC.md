@@ -37,6 +37,7 @@ reasoning that produced it is often still useful. It is simply not the answer.**
 | **D-1b-7's placement** | **SUPERSEDED** (§6f) | Both branches of the guard sit **above the content**, not beside the actions. |
 | **D-1b-8** (§6a) | **CLOSED** (§6c) | Show the prior send-back, at the **top**, in the `--sent-back` family. |
 | **D-1b-2's selector** | **CORRECTED** (§6a) | `.readonly-val`, not `dl.detail dd`. |
+| **R-Q13's "Export expired" row** | **CHANGED BY RULING** (Oscar, 8 Sep) — **not corrected.** | The original was **not wrong**. It moved because the already-used case is common and *"expired"* reads as *broken* to someone who downloaded it seconds ago — and a forwarded link makes the wrong word loop two people who have each behaved reasonably. New row and reasoning in §7t. |
 | **3a's supplier switcher** (canvas, §1) | **RULED OUT** (T213, human, 7 Sep) | *"No — suppliers brand themselves."* The canvas is aspirational here. **It nearly got built because it was drawn** — see §7o and the canvas-authority limit above. |
 | **§5b, whole section** | **⛔ SUPERSEDED** (T206 ruled, 7 Sep) | Premised on Entra shipping. **Credential block and first-password sentence STAY; email becomes the unique identifier; `Username`'s fate is Kevin's data-model call, not a spec one.** Current answer in the §5b banner. |
 | **4c "skipped, leave alone"** (§1) | **REVERSED** (7 Sep) | Entra owned sign-in; Entra is gone. **`login.html` is back in scope, unspecced, and it is the one screen every user meets.** |
@@ -4049,3 +4050,68 @@ His ruled row ends **+ [Back to record]**, carried forward from the original. **
 `redeem` collapses all four cases before the controller sees anything, so there is **no child id to link to**
 — and it would 403 for a COORDINATOR regardless (D-5e-3b). **That is a structural constraint, not a copy
 preference, so the sentence is applied and the CTA is not.** Flagged to him rather than silently dropped.
+## 7u · The CTA conflict Jim found, a clause added to the collapsed-response rule, and the "expired" class swept (Creed, 8 Sep)
+
+### D-5e-3e · Jim found a genuine conflict between two of my own rules — and the fix dissolves it
+
+He is right that **[Go to children] repeats my own error one level down**: export eligibility is ADMIN,
+ORG_ADMIN, COORDINATOR and VIEWER; `/children/**` admits HOME_STAFF, ORG_ADMIN, VIEWER and ADMIN. **A
+coordinator can export and cannot follow that link.**
+
+And he is right that **§5f's fallback cannot hold here.** *"Let the shell's nav be the answer"* presumes a
+shell, and this view renders from an `@ExceptionHandler` where `@ControllerAdvice`'s `@ModelAttribute`
+methods do not run — so there is no nav to fall back to (D-6e-1). **Omitting the button would leave a
+coordinator with no way out at all, which is worse than the broken link §5f forbids.**
+
+**His resolution — gate the button by role, plus a route home for the rest — is sound, and is not needed.**
+§7s already replaced the destination with **`/`**, which dissolves the conflict rather than balancing it:
+**one button, every role, no branching.**
+
+**Verified rather than assumed this time** — `RootController` redirects `/` by fixed role priority and
+**every export-eligible role has a landing page**: ADMIN → `/admin/users`, ORG_ADMIN and VIEWER →
+`/dashboard`, COORDINATOR → `/coordinator/requests`. **There is no role that can reach this page and not
+`/`.** I specified an unreachable destination once already in this ticket; checking is the whole lesson.
+
+> **§5f says omit a broken control. It assumes something else on the page still works.** On a view rendered
+> from an exception handler nothing else does, so **every such page must carry its own way out** — and the
+> way to satisfy both rules is a destination that cannot be broken, not a control that is sometimes hidden.
+
+**Raised, not changed: the label is inaccurate for two roles.** *"Go to dashboard"* is `error.html`'s shipped
+label, and `/` lands ADMIN on a user list and COORDINATOR on a request queue — **neither is a dashboard.**
+The harm is nil (both arrive somewhere useful), it would change 6e's shipped copy too, and by the standing
+practice this is **improvable, not wrong — so it goes to Oscar, not to me.**
+
+### D-5e-3f · Jim's clause is adopted: the rule needed a limit, and it is his
+
+My rule read: *a response must not vary with a fact the asker is not entitled to know — and that includes its
+links, not only its words.* **As written it could be read to forbid role-gated UI**, which would be wrong and
+harmful. His clause supplies the limit:
+
+> **The test is whether the variation is keyed to something about the ASKER'S OWN ENTITLEMENTS, or to
+> something about THE SECRET.** Varying by the reader's role is safe — they already know their own role.
+> Varying by the token's state is the oracle.
+
+**Both halves of the extended rule came from a build, not from this document.** The *links* clause came from
+T218's dead CTA and the *reachability* limit from its role gate. **A rule stated once is a hypothesis; it
+acquires its exceptions from contact with real screens.**
+
+### The "expired" class, swept — two members, and neither is an error page
+
+god asked whether *"expired"* is used elsewhere about a token that might instead be spent, unknown or
+someone else's. **It is, twice — and both are on SUCCESS pages, which is not where anyone would look:**
+
+| Where | String | Why it is a member |
+|---|---|---|
+| `audit/export-ready.html:28` | **"Re-downloading after expiry means generating again"** | **The strongest instance.** It does not merely name a cause — it grants a permission that does not exist. *"After expiry"* tells the reader that re-downloading **before** expiry is fine. **The link is single-use; it is not.** |
+| `export/case-file-ready.html:45` | **"After that you can generate it again"** | *"After that"* is the expiry tag above it, so it names expiry as the trigger when **a second click is the common one.** Also carries the *"generate it again"* ambiguity Oscar edited out of the ruled row — the *"it"* points at the link. |
+
+> **These are the upstream cause of the arrival Oscar ruled about.** The success page tells the user the link
+> lasts twenty minutes and implies they may use it during them; the failure page then has to explain why it
+> did not work. **Fixing the error copy treats the symptom — the false expectation is set two screens
+> earlier, in the moment of success, when nobody is reading carefully.**
+
+**NOT a member, and the distinction is the test:** *"Link expires in N minutes"* on both pages is
+**forward-looking, true, and a fact the server does know.** It names no cause of a failure and collapses
+nothing. **It is what makes "no longer valid" comprehensible later, so it should stay.**
+
+**Named, not fixed**, per god's instruction — one ruling should cover the set.
