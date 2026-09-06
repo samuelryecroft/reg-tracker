@@ -215,6 +215,25 @@ class AuditFeedIntegrationTest extends AbstractIntegrationTest {
                 .findFirst().orElseThrow();
         assertThat(exportEvent.getMetadata()).contains("rows=" + dataRows);
         assertThat(exportEvent.getMetadata()).doesNotContain("Free text that must never reach the CSV export");
+
+        // T274 A4, AND THIS IS THE ONLY PLACE IT IS GUARDED. The unit test proves the SERVICE can be
+        // asked for either scope; it cannot prove which scope the EXPORT asks for, nor that the
+        // disclosure records it. Both of those were unguarded until this line - I armed the flip and
+        // the label's removal and every test stayed green.
+        assertThat(exportEvent.getMetadata())
+                .as("the disclosure must state on its own face what it contains - a declared scope "
+                        + "is what makes 'the CSV cannot silently omit what the screen showed' a "
+                        + "property of the artefact rather than of the code that made it")
+                .contains("case activity only, record-access events excluded");
+
+        // And the omission itself: the CSV must not carry record-access rows. Asserted on the
+        // CONTENT, not only on the label, because a label that agrees with a wrong scope is worse
+        // than no label - it is a disclosure asserting something untrue about itself.
+        assertThat(csv)
+                .as("an org-wide export containing access rows acquires a SECOND DATA SUBJECT: it "
+                        + "becomes an employee-monitoring dataset leaving the building under a "
+                        + "purpose and reference that were about a child")
+                .doesNotContain("AUDIT_VIEW_OPENED");
     }
 
     @Test
