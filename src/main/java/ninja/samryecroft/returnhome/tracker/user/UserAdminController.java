@@ -4,6 +4,7 @@ import jakarta.validation.Valid;
 import java.util.HashSet;
 import ninja.samryecroft.returnhome.tracker.audit.AuditEventPublisher;
 import ninja.samryecroft.returnhome.tracker.audit.AuditHistoryService;
+import ninja.samryecroft.returnhome.tracker.audit.DraftSaveRuns;
 import ninja.samryecroft.returnhome.tracker.home.HomeRepository;
 import ninja.samryecroft.returnhome.tracker.organisation.OrganisationRepository;
 import java.util.List;
@@ -100,7 +101,7 @@ public class UserAdminController {
 
         model.addAttribute("user", user);
         model.addAttribute("form", form);
-        model.addAttribute("auditHistory", auditHistoryService.historyForUser(id));
+        model.addAttribute("auditHistory", auditHistoryService.historyForUser(id, DraftSaveRuns.COLLAPSED));
         auditEventPublisher.auditViewOpened("User", id, principal.getOrganisationId(), null, principal);
         addPickerAttributes(principal, model);
         return "admin/user-form-edit";

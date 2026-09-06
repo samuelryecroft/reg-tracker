@@ -6,8 +6,12 @@ import static org.assertj.core.api.InstanceOfAssertFactories.list;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewRequest;
@@ -198,7 +202,7 @@ class DraftSaveCollapseTest {
         when(auditEventRepository.findByTargetTypeAndTargetIdOrderByOccurredAtDesc("InterviewReport", REPORT_ID))
                 .thenReturn(reportEvents);
 
-        assertThat(service.historyFor(request).get(0).entries())
+        assertThat(service.historyFor(request, DraftSaveRuns.COLLAPSED).get(0).entries())
                 .extracting(AuditHistoryEntry::when)
                 .containsExactly("11:00", "10:00", "09:00");
     }
@@ -235,7 +239,7 @@ class DraftSaveCollapseTest {
                         tuple("Draft saved", 1L));
     }
 
-    /** The same events through the screen's default, so the two are told apart by the flag alone. */
+    /** The same events with the other constant, so the two are told apart by the flag alone. */
     @Test
     void theSameEventsCollapseOnTheChildPage() {
         List<AuditEvent> events = List.of(
@@ -250,7 +254,7 @@ class DraftSaveCollapseTest {
         events.forEach(event -> when(event.getTargetType()).thenReturn("InterviewReport"));
         events.forEach(event -> when(event.getTargetId()).thenReturn(REPORT_ID));
 
-        assertThat(service.caseHistoryFor(List.of(request)))
+        assertThat(service.caseHistoryFor(List.of(request), DraftSaveRuns.COLLAPSED))
                 .singleElement()
                 .extracting(AuditHistorySection::entries, list(AuditHistoryEntry.class))
                 .singleElement()
@@ -260,6 +264,41 @@ class DraftSaveCollapseTest {
                     assertThat(row.when()).isEqualTo("04 Mar 2026");
                     assertThat(row.detail()).isNull();
                 });
+    }
+
+    // --- the shape itself ---
+
+    /**
+     * No timeline builder can be called without saying which kind of caller it is.
+     *
+     * <p>The parameter being mandatory is enforced by the compiler, not by a test - which is
+     * exactly why this exists. The branch taken on trust in "the signature asks the question" is
+     * that nobody adds a convenience overload back, and a one-argument {@code caseHistoryFor} is a
+     * pleasant thing to add on a busy afternoon. It compiles, every existing call site keeps
+     * working, and the hole is open again with nothing red.
+     *
+     * <p>Scoped to the methods that return {@code List<AuditHistorySection>}, because those are
+     * precisely the ones that run the collapse. {@code caseActivityFeed} and
+     * {@code groupFeedByDay} return other types and are correctly out of scope - see
+     * {@code AuditFeedNeverCollapsesTest} for the guard that covers the feed.
+     */
+    @Test
+    void everyTimelineBuilderMakesItsCallerSayWhichKindOfCallerItIs() {
+        assertThat(Arrays.stream(AuditHistoryService.class.getDeclaredMethods())
+                .filter(method -> Modifier.isPublic(method.getModifiers()))
+                .filter(DraftSaveCollapseTest::buildsTimelineSections)
+                .filter(method -> Arrays.stream(method.getParameterTypes())
+                        .noneMatch(DraftSaveRuns.class::equals))
+                .map(Method::getName))
+                .as("public methods of AuditHistoryService that build a timeline but let the caller "
+                        + "stay silent about whether it is a screen or a disclosure")
+                .isEmpty();
+    }
+
+    private static boolean buildsTimelineSections(Method method) {
+        return method.getGenericReturnType() instanceof ParameterizedType parameterized
+                && parameterized.getRawType().equals(List.class)
+                && parameterized.getActualTypeArguments()[0].equals(AuditHistorySection.class);
     }
 
     // --- fixtures ---
@@ -275,7 +314,7 @@ class DraftSaveCollapseTest {
                 .thenReturn(List.of());
         when(auditEventRepository.findByTargetTypeAndTargetIdOrderByOccurredAtDesc("InterviewReport", REPORT_ID))
                 .thenReturn(List.of(reportEvents));
-        return service.historyFor(request);
+        return service.historyFor(request, DraftSaveRuns.COLLAPSED);
     }
 
     private static LocalDateTime at(int hour, int minute) {

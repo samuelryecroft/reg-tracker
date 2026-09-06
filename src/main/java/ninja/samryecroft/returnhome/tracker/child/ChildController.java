@@ -9,6 +9,7 @@ import java.util.Locale;
 import java.util.stream.Collectors;
 import ninja.samryecroft.returnhome.tracker.audit.AuditEventPublisher;
 import ninja.samryecroft.returnhome.tracker.audit.AuditHistoryService;
+import ninja.samryecroft.returnhome.tracker.audit.DraftSaveRuns;
 import ninja.samryecroft.returnhome.tracker.child.dto.CreateChildForm;
 import ninja.samryecroft.returnhome.tracker.export.ExportCapability;
 import ninja.samryecroft.returnhome.tracker.home.Home;
@@ -214,7 +215,7 @@ public class ChildController {
         model.addAttribute("dueBadges", requests.stream()
                 .filter(r -> DeadlineTracker.badgeFor(r, now).isPresent())
                 .collect(Collectors.toMap(InterviewRequest::getId, r -> DeadlineTracker.badgeFor(r, now).orElseThrow())));
-        model.addAttribute("caseHistory", auditHistoryService.caseHistoryFor(requests));
+        model.addAttribute("caseHistory", auditHistoryService.caseHistoryFor(requests, DraftSaveRuns.COLLAPSED));
         model.addAttribute("canExport", ExportCapability.canExport(principal));
         model.addAttribute("approvedReportCount", approvedReportCount);
         // Opening a child's case history is professional access to a safeguarding record, and is

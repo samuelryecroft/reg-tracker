@@ -2,6 +2,7 @@ package ninja.samryecroft.returnhome.tracker.interview;
 
 import ninja.samryecroft.returnhome.tracker.audit.AuditEventPublisher;
 import ninja.samryecroft.returnhome.tracker.audit.AuditHistoryService;
+import ninja.samryecroft.returnhome.tracker.audit.DraftSaveRuns;
 import ninja.samryecroft.returnhome.tracker.child.NameRevealService;
 import java.util.Map;
 import ninja.samryecroft.returnhome.tracker.report.InterviewReport;
@@ -115,7 +116,7 @@ public class InterviewRequestDetailController {
         // "complete" and can no longer also mean "never counted".
         model.addAttribute("unansweredBySection", report == null
                 ? Map.<String, Integer>of() : ReportQuestions.unansweredBySection(report));
-        model.addAttribute("auditHistory", auditHistoryService.historyFor(request));
+        model.addAttribute("auditHistory", auditHistoryService.historyFor(request, DraftSaveRuns.COLLAPSED));
         auditEventPublisher.auditViewOpened("InterviewRequest", request.getId(),
                 request.getHome() == null || request.getHome().getOrganisation() == null
                         ? null : request.getHome().getOrganisation().getId(),
