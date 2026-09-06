@@ -6,6 +6,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
@@ -27,6 +28,7 @@ import ninja.samryecroft.returnhome.tracker.report.InterviewReport;
 import ninja.samryecroft.returnhome.tracker.report.InterviewReportRepository;
 import ninja.samryecroft.returnhome.tracker.report.question.ReportQuestion;
 import ninja.samryecroft.returnhome.tracker.report.question.ReportQuestions;
+import ninja.samryecroft.returnhome.tracker.report.question.Respondent;
 import ninja.samryecroft.returnhome.tracker.report.question.ReportSection;
 import ninja.samryecroft.returnhome.tracker.user.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -447,6 +449,82 @@ class TemplateRenderCoverageIntegrationTest extends AbstractIntegrationTest {
                         .with(asUser("rc-reviewer" + suffix)))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
+    }
+
+    /** T244: the collapse is READ-ONLY ONLY. The visitor is still filling this form in, and hiding the nine here would stop them completing the section they are there to complete. Guarded by render, not by reading the expression: the gate is safe only because SpEL short-circuits `readonly and ...`, and `childInterviewed` is ABSENT from the visitor model - evaluating it throws EL1001E. */
+    @Test
+    void probeVisitorCaptureFormKeepsTheNineWhenTheReportSaysDeclined() throws Exception {
+        mockMvc.perform(post("/visitor/interviews/{id}/report/draft", allocatedRequestId)
+                        .with(asUser("rc-visitor" + suffix)).with(csrf())
+                        .param("interviewAccepted", "false"))
+                .andExpect(status().isOk());
+
+        String html = mockMvc.perform(get("/visitor/interviews/{id}/report", allocatedRequestId)
+                        .with(asUser("rc-visitor" + suffix)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(html)
+                .as("the visitor is still filling this in and must be able to complete it")
+                .contains("Where were you while missing?")
+                .contains("What made you go missing?")
+                .contains("Any additional comments from the young person?");
+        assertThat(html)
+                .as("and the read-only statement must not appear on the capture form")
+                .doesNotContain("The young person was not interviewed, so these questions were not asked.");
+    }
+
+    /**
+     * Beside Dwight's probe rather than folded into it: a different property, and his is taken
+     * unmodified because he has watched it go red on the mutation it exists to catch.
+     *
+     * <p>His names three of the nine. This asserts the whole set FROM THE MODEL, so a tenth question
+     * put to the young person is covered the day it is added rather than the day someone remembers
+     * this file exists - the same reason the badge and label assertions compare against the model
+     * instead of against literals.
+     */
+    @Test
+    void theCaptureFormOffersEveryQuestionPutToTheYoungPerson() throws Exception {
+        String html = mockMvc.perform(get("/visitor/interviews/{id}/report", allocatedRequestId)
+                        .with(asUser("rc-visitor" + suffix)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        List<ReportQuestion> childQuestions = ReportQuestions.ALL.stream()
+                .filter(q -> q.answeredBy() == Respondent.CHILD)
+                .toList();
+        assertThat(childQuestions)
+                .as("if this reaches zero the loop below asserts nothing at all")
+                .isNotEmpty();
+
+        for (ReportQuestion question : childQuestions) {
+            assertThat(html)
+                    .as("the visitor is here to answer '%s', and a control they cannot see is a "
+                            + "question they cannot answer", question.id())
+                    .contains("id=\"" + question.id() + "\"");
+        }
+    }
+
+    /**
+     * The capture page supplies every attribute the shared fragment reads on its path.
+     *
+     * <p><b>This exists because removing the asymmetry was not self-guarding.</b> Deleting the
+     * controller call again leaves every other test green: the two expressions that read these
+     * attributes are protected by evaluation order - SpEL's {@code and} short-circuits on
+     * {@code readonly=false}, and Thymeleaf drops the T233 row for its {@code th:if} before touching
+     * its other attributes - so an absent attribute renders identically to a false one.
+     *
+     * <p>So the page cannot tell you whether it is safe by rendering correctly, and neither can a
+     * test that only reads the output. <b>The property is about the MODEL, so it is asserted against
+     * the model.</b> Without this, the next controller to render this fragment gets the same
+     * unnoticed asymmetry, and the first sign of it is a 500 on a form a visitor is midway through.
+     */
+    @Test
+    void theCapturePageSuppliesEveryAttributeTheSharedFragmentReads() throws Exception {
+        mockMvc.perform(get("/visitor/interviews/{id}/report", allocatedRequestId)
+                        .with(asUser("rc-visitor" + suffix)))
+                .andExpect(status().isOk())
+                .andExpect(model().attributeExists("childInterviewed", "lateExplanationMissing"));
     }
 
     /** The rendered card: from its id up to the start of the next one. */
