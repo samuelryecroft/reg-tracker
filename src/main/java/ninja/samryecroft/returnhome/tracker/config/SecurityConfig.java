@@ -96,7 +96,16 @@ public class SecurityConfig {
                 // both here costs the same for both. It cannot be done in LoginFailureHandler: by
                 // the time a failure handler runs, the hash has already happened or already been
                 // skipped. See LockedAccountFilter for the two rejected alternatives.
-                .addFilterBefore(lockedAccountFilter, UsernamePasswordAuthenticationFilter.class);
+                ;
+        // ARMING REVERT #2 (Dwight, T221 re-verification) - THIS BRANCH MUST NEVER MERGE.
+        // Removes exactly Kevin's one line:
+        //     .addFilterBefore(lockedAccountFilter, UsernamePasswordAuthenticationFilter.class)
+        // KEVIN'S STATED PASS CONDITION: the guard must go RED ON THE UNKNOWN CASE ONLY -
+        // afterReal = 0, afterUnknown = 1. If it comes back SYMMETRIC again the filter still is not
+        // running and his fix is wrong; the guard must NOT be adjusted to make it pass.
+        if (lockedAccountFilter == null) {
+            throw new IllegalStateException("unreachable - keeps the arming revert to one behaviour");
+        }
 
         return http.build();
     }
