@@ -95,6 +95,12 @@ public class PasswordPolicy {
             return Optional.of("That password appears on a list of commonly used passwords. "
                     + "Choose something else - length matters more than symbols");
         }
+        // The exact value is checked FIRST and the stem second, so the message above can stay
+        // specific about what was recognised rather than both cases sharing one vaguer sentence.
+        if (blocked.contains(stemOf(normalised))) {
+            return Optional.of("That is a commonly used password with digits added to the end. "
+                    + "The digits do not help - choose different words instead");
+        }
         for (String value : context.significantValues(applicationName)) {
             if (normalised.contains(value)) {
                 return Optional.of("Password must not contain \"" + value + "\". A password built "
@@ -103,6 +109,59 @@ public class PasswordPolicy {
         }
         return Optional.empty();
     }
+
+    /**
+     * The password with trailing digits removed, for the second blocklist check (T280).
+     *
+     * <p><strong>This exists because R1 CAUSES the shape it catches.</strong> Tell someone whose
+     * password is {@code password} that they now need twelve characters and they produce
+     * {@code password1234}. The minimum manufactures exactly the pattern an un-normalised list
+     * cannot see - so this is not an enhancement to the blocklist, it is the blocklist being aimed
+     * at where the minimum moved the target. It also explains the measurement that prompted it: only
+     * 10 of the bundled list's 10,000 entries are 12 characters or longer, because the list is full
+     * of the STEMS people then pad.
+     *
+     * <p><strong>TRAILING DIGITS ONLY, AND THIS IS A DELIBERATE STOPPING POINT RATHER THAN AN
+     * UNFINISHED ONE.</strong> Not trailing punctuation, not leading digits, not l33t substitution.
+     * Every additional normalisation raises the FALSE-REJECT rate, and on this population a false
+     * rejection costs us a written-down password on a shared device - the exact failure the whole
+     * policy is calibrated to avoid. Lower-casing already happens above. <em>Do not "complete" this
+     * by adding more.</em>
+     *
+     * <p><strong>A stem that strips to nothing, or to almost nothing, matches NOTHING</strong> -
+     * {@code 123456789012} must not become a blocklist hit by way of its empty stem.
+     *
+     * <p><strong>And here is what that floor is really worth, measured rather than asserted, because
+     * my first comment on it was wrong.</strong> I wrote that an empty stem would match everything
+     * "which every contains call would answer for" - true of {@code String.contains}, FALSE HERE:
+     * {@code blocked} is a Set, so an empty stem is simply not an element and matches nothing on its
+     * own. Arming the floor confirmed it - removing it changed no behaviour at all.
+     *
+     * <p>It stays, and it is not decoration. The real hazard is a SHORT ENTRY, not an empty stem: if
+     * a future list contained {@code abc}, then {@code abc123456789} would strip to it and be
+     * refused, which is a false rejection of a perfectly ordinary passphrase. Today's list has NO
+     * entry shorter than four characters, so the property holds by the data as well as by the code -
+     * and {@code PasswordPolicyTest} asserts that fact about the list, so if it ever stops being
+     * true this floor is already the thing standing in the way rather than something to add later.
+     */
+    private String stemOf(String normalised) {
+        int end = normalised.length();
+        while (end > 0 && Character.isDigit(normalised.charAt(end - 1))) {
+            end--;
+        }
+        String stem = normalised.substring(0, end);
+        return stem.length() >= SHORTEST_MEANINGFUL_STEM ? stem : NO_STEM;
+    }
+
+    /**
+     * Below this a stem is not a word anyone chose, it is what is left after stripping. Four keeps
+     * real short entries on the list ({@code love}, {@code pass}) while refusing to treat the
+     * remains of {@code ab123456789} as a password somebody picked.
+     */
+    private static final int SHORTEST_MEANINGFUL_STEM = 4;
+
+    /** A value no blocklist entry can equal, so a too-short stem matches nothing rather than everything. */
+    private static final String NO_STEM = "\u0000";
 
     /**
      * Read once at startup and held in memory: ~10k short strings, and the alternative is file I/O

@@ -77,6 +77,83 @@ class PasswordPolicyTest {
                 .hasValueSatisfying(message -> assertThat(message).contains("return"));
     }
 
+    // --- T280: the minimum manufactures the shape the un-normalised list cannot see ---
+
+    /**
+     * THE CASE THE RULING'S OWN EXAMPLE NAMED, WHICH WAS ACCEPTED UNTIL T280. "password" is on the
+     * list; "Password1234" is not, and never will be. R1 does not merely fail to catch stem+digits -
+     * R1 CAUSES it: tell someone whose password is "password" that they need twelve characters and
+     * they produce exactly this.
+     */
+    @Test
+    void aListedPasswordPaddedWithTrailingDigitsIsRefused() {
+        assertThat(policy.rejectionFor("Password1234", PasswordContext.none()))
+                .hasValueSatisfying(message -> assertThat(message).contains("digits added to the end"));
+    }
+
+    /** The two messages are distinguishable, so a log or a support call can tell which fired. */
+    @Test
+    void theExactHitAndTheStemHitSayDifferentThings() {
+        String exact = policy.rejectionFor("unbelievable", PasswordContext.none()).orElseThrow();
+        String stem = policy.rejectionFor("unbelievable99", PasswordContext.none()).orElseThrow();
+
+        assertThat(exact).isNotEqualTo(stem);
+        assertThat(exact).doesNotContain("digits added to the end");
+    }
+
+    /**
+     * A STEM THAT STRIPS TO NOTHING MATCHES NOTHING. Without the floor, "123456789012" strips to the
+     * empty string - and an empty string is a substring of everything, so a perfectly ordinary
+     * all-digit passphrase would be reported as a commonly used password. A guard whose failure mode
+     * is "refuse everything" is worse on this population than the gap it closes.
+     */
+    @Test
+    void anAllDigitPasswordDoesNotStripToTheEmptyStringAndMatchEverything() {
+        assertThat(policy.rejectionFor("123456789012", PasswordContext.none())).isEmpty();
+        assertThat(policy.rejectionFor("ab1234567890", PasswordContext.none())).isEmpty();
+    }
+
+    /**
+     * The blocklist itself carries no entry short enough to make stem-matching dangerous.
+     *
+     * <p>This is the arm-able half of the floor in {@code stemOf}. Removing that floor changes no
+     * behaviour against today's list, because a Set lookup cannot match an empty stem and no entry
+     * is shorter than four characters - so the property is currently held by the DATA. Asserting the
+     * data is what keeps the CODE's floor meaningful: add {@code abc} to the file and
+     * {@code abc123456789}, an ordinary passphrase, becomes a refusal. This test goes red first.
+     */
+    @Test
+    void noBlocklistEntryIsShortEnoughToMakeStemMatchingDangerous() throws Exception {
+        try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(
+                PasswordPolicy.class.getResourceAsStream("/security/weak-passwords.txt"),
+                java.nio.charset.StandardCharsets.UTF_8))) {
+            assertThat(reader.lines().map(String::trim)
+                    .filter(line -> !line.isEmpty() && !line.startsWith("#"))
+                    .filter(line -> line.length() < 4)
+                    .toList())
+                    .as("a blocklist entry shorter than the stem floor would refuse ordinary "
+                            + "passphrases that merely end in digits")
+                    .isEmpty();
+        }
+    }
+
+    /**
+     * TRAILING DIGITS ONLY - a deliberate stopping point. Trailing punctuation is NOT stripped, and
+     * this test exists so that someone "completing" the normalisation has to change a test that says
+     * why: every additional rule raises the false-reject rate, and a false rejection here costs a
+     * written-down password on a shared device.
+     */
+    @Test
+    void normalisationStopsAtTrailingDigitsOnPurpose() {
+        assertThat(policy.rejectionFor("unbelievable!!", PasswordContext.none())).isEmpty();
+    }
+
+    /** And leading digits are not stripped either: the stem is what people append to, not prepend. */
+    @Test
+    void leadingDigitsAreNotStripped() {
+        assertThat(policy.rejectionFor("12unbelievable", PasswordContext.none())).isEmpty();
+    }
+
     @Test
     void aPasswordBuiltFromTheUsernameIsRefused() {
         assertThat(policy.rejectionFor("jsmithjsmith99", new PasswordContext("jsmith", null, null)))
