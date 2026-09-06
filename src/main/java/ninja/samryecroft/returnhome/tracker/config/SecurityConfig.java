@@ -89,13 +89,21 @@ public class SecurityConfig {
                 .logout(logout -> logout
                         .logoutSuccessUrl("/login?logout")
                         .permitAll())
-                // T221: BEFORE the authentication filter, and the position is the entire fix.
-                // A locked real account short-circuits in the provider's pre-checks (no hash) while
-                // a locked unknown username pays mitigateAgainstTimingAttack's full BCrypt - ~53ms
-                // apart, which is a username enumeration oracle readable over a network. Rejecting
-                // both here costs the same for both. It cannot be done in LoginFailureHandler: by
-                // the time a failure handler runs, the hash has already happened or already been
-                // skipped. See LockedAccountFilter for the two rejected alternatives.
+                // T221: BEFORE the authentication filter, and the position is the entire point.
+                // NOT a fix for a timing oracle - there isn't one. This comment used to say a locked
+                // real account paid no hash while a locked unknown one paid a full BCrypt, ~53ms
+                // apart; spring-security-core 7.1.0 does NOT do that. performPreCheck catches the
+                // LockedException and runs additionalAuthenticationChecks anyway, because the
+                // constructor sets alwaysPerformAdditionalChecksOnUser = true - a deliberate
+                // timing-equalisation mitigation, on by default. Both locked paths already cost one
+                // hash (measured: 76ms vs 87ms).
+                // What this buys is defence in depth: that setter is public and one call from off,
+                // and nothing here sets it, so the equalisation is a default we INHERIT rather than
+                // a property we ASSERT. Rejecting here makes it ours, costs zero hashes instead of
+                // one wasted one, and LockedAccountTimingGuardTest would catch the default flipping.
+                // It cannot live in LoginFailureHandler: by the time a failure handler runs, the
+                // hash has already happened or already been skipped.
+                // Full disassembly and the two rejected alternatives: see LockedAccountFilter.
                 .addFilterBefore(lockedAccountFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
