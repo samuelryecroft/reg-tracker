@@ -1,0 +1,137 @@
+package ninja.samryecroft.returnhome.tracker.report.question;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import ninja.samryecroft.returnhome.tracker.interview.InterviewRequest;
+import ninja.samryecroft.returnhome.tracker.report.InterviewReport;
+import org.junit.jupiter.api.Test;
+
+/**
+ * T185 step 2: the "N not answered" badges are a fold over the one question set, and <b>every
+ * section has one</b>.
+ *
+ * <p><b>The asymmetry is the part worth guarding.</b> Sections 1, 2 and 3 counted, using
+ * null-checks written out by hand; sections 4, 5 and 6 had no badge markup at all. So an absent
+ * badge meant "complete" on three cards and "never counted" on the other three, and nothing on the
+ * page distinguished them - <b>an absence reads as "nothing to answer" whichever it is</b>, and the
+ * uncounted case is the one that quietly understates what a reviewer still has to check.
+ *
+ * <p>That is why this guard asserts the badge is present on all six rather than merely that the
+ * count is right. A correct count on three cards is what the screen already had.
+ *
+ * <p><b>And the hand-written version could not have been right.</b> One question is conditional -
+ * {@code ifNotWhyLate} is asked only when the 72-hour window was measured and missed - so a blank
+ * means two opposite things, and counting every blank reported a fully completed, on-time interview
+ * as having a gap in it. An expression in a template can only get that right by repeating the
+ * condition, which is a third copy of a rule that already exists twice.
+ */
+class ReportSectionCountGuardTest {
+
+    private static final List<Path> READ_ONLY_SCREENS = List.of(
+            Path.of("src/main/resources/templates/interview/detail.html"),
+            Path.of("src/main/resources/templates/fragments/report-fields.html"));
+
+    /** A card whose id is one of the report's own sections, and whatever count it declares. */
+    private static final Pattern REPORT_CARD = Pattern.compile(
+            "<div class=\"card\" id=\"([\\w-]+)\"[^>]*?(?:\\n[^>]*?)?>", Pattern.DOTALL);
+
+    private static final LocalDateTime RETURNED = LocalDateTime.of(2026, 9, 2, 14, 20);
+
+    @Test
+    void everySectionOfTheReportCarriesACountSoAnAbsentBadgeMeansOneThing() throws IOException {
+        List<String> offences = new ArrayList<>();
+
+        for (Path screen : READ_ONLY_SCREENS) {
+            String html = withoutComments(Files.readString(screen, StandardCharsets.UTF_8));
+            for (ReportSection section : ReportSection.values()) {
+                String card = cardFor(html, section.getAnchorId());
+                if (card == null) {
+                    offences.add(screen.getFileName() + " has no card for section '"
+                            + section.getAnchorId() + "'");
+                    continue;
+                }
+                if (!card.contains("unansweredBySection['" + section.getAnchorId() + "']")) {
+                    offences.add(screen.getFileName() + " section '" + section.getAnchorId()
+                            + "' does not take its count from the model - so it is either counting "
+                            + "by hand or not counting at all, and an absent badge there means "
+                            + "something different from an absent badge elsewhere on the page");
+                }
+            }
+        }
+
+        assertThat(offences)
+                .as("an absent badge must have exactly one meaning. While three sections counted "
+                        + "and three did not, 'no badge' meant 'complete' on half the cards and "
+                        + "'never counted' on the other half, and a reader had no way to tell - "
+                        + "which understates what is still outstanding on a safeguarding record")
+                .isEmpty();
+    }
+
+    /**
+     * The count itself, on the case that was wrong before T233 and would be wrong again the moment
+     * anyone reimplements it as "how many fields are blank".
+     */
+    @Test
+    void aQuestionThatDoesNotApplyIsNotCountedAsUnanswered() {
+        InterviewReport onTime = report(RETURNED.plusHours(10), null);
+        InterviewReport late = report(RETURNED.plusHours(80), null);
+
+        assertThat(ReportQuestions.unansweredIn(ReportSection.DETAILS, onTime))
+                .as("on time, so no explanation was ever owed. A fully completed interview must not "
+                        + "report a gap - this is the compliance-shaped number that used to appear "
+                        + "on the screen a reviewer approves from")
+                .isEqualTo(ReportQuestions.unansweredIn(ReportSection.DETAILS, late) - 1);
+
+        assertThat(ReportQuestions.byId("ifNotWhyLate").orElseThrow().isApplicableTo(onTime))
+                .as("the condition belongs to the question, not to whichever renderer is asking")
+                .isFalse();
+        assertThat(ReportQuestions.byId("ifNotWhyLate").orElseThrow().isApplicableTo(late)).isTrue();
+    }
+
+    @Test
+    void everySectionAppearsInTheCountsIncludingTheOnesThatComeOutZero() {
+        Map<String, Integer> counts = ReportQuestions.unansweredBySection(report(null, null));
+
+        assertThat(counts.keySet())
+                .as("a section missing from this map renders no badge, which is the asymmetry this "
+                        + "whole change exists to remove")
+                .containsExactlyElementsOf(
+                        java.util.Arrays.stream(ReportSection.values())
+                                .map(ReportSection::getAnchorId).toList());
+    }
+
+    /** The card element and its attributes, which may wrap across lines. */
+    private static String cardFor(String html, String anchorId) {
+        Matcher m = Pattern.compile("<div class=\"card\" id=\"" + Pattern.quote(anchorId)
+                + "\"[^>]*>", Pattern.DOTALL).matcher(html);
+        return m.find() ? m.group() : null;
+    }
+
+    /**
+     * Comments stripped first. The rationale added beside these badges names the very expression it
+     * replaced, so a scan reading its own explanation would pass on the description of the defect.
+     */
+    private static String withoutComments(String html) {
+        return html.replaceAll("(?s)<!--.*?-->", "");
+    }
+
+    private InterviewReport report(LocalDateTime heldAt, String reason) {
+        InterviewRequest request = new InterviewRequest();
+        request.setReturnedAt(RETURNED);
+        InterviewReport report = new InterviewReport();
+        report.setInterviewRequest(request);
+        report.setHeldAt(heldAt);
+        report.setIfNotWhyLate(reason);
+        return report;
+    }
+}

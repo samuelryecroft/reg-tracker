@@ -251,10 +251,22 @@
       to enforce on the old standalone route). Do not gate this block on anything else: `report`
       being non-null on the model IS the authorization check.
     */-->
+    <!--/*
+      T185 step 2. The "N not answered" badges below come from ReportQuestions rather than from
+      null-counting expressions written out by hand here. Two things were wrong with the old shape,
+      and the second is the one that mattered.
+
+      It was a second definition of the question set - add a question and the badge silently
+      under-counts. No error, no red, just a smaller number, on the screen a reviewer approves from.
+
+      And it was ASYMMETRIC. Sections 1, 2 and 3 counted; sections 4, 5 and 6 had no badge markup at
+      all. So an absent badge meant "complete" on three cards and "never counted" on the other
+      three, and nothing on the page told them apart - an absence reads as "nothing to answer"
+      whichever it is. Every section is counted now, so an absent badge has exactly one meaning, and
+      ReportSectionCountGuardTest is what keeps that true rather than this comment.
+    */-->
     <div class="card" id="report-details" tabindex="-1" th:if="${report != null}"
-         th:with="notAnswered=${(report.interviewLocation == null ? 1 : 0) + (report.lateExplanationMissing ? 1 : 0)
-                               + (report.consultationWithHomeStaff == null ? 1 : 0) + (report.previouslyMissing == null ? 1 : 0)
-                               + (report.missingOccasionsLast30Days == null ? 1 : 0) + (report.confidentialityExplained == null ? 1 : 0)}">
+         th:with="notAnswered=${unansweredBySection['report-details']}">
         <h3>Details
             <span class="section-count" th:if="${notAnswered > 0}" th:text="${notAnswered + ' not answered'}"></span>
         </h3>
@@ -346,12 +358,7 @@
     </div>
 
     <div class="card" id="rhi" tabindex="-1" th:if="${report != null}"
-         th:with="notAnswered=${(report.interviewAccepted == null ? 1 : 0) + (report.interviewDeclinedReason == null ? 1 : 0)
-                               + (report.whereWereYouWhileMissing == null ? 1 : 0) + (report.whoWereYouWithWhileMissing == null ? 1 : 0)
-                               + (report.whatMadeYouGoMissing == null ? 1 : 0) + (report.whatCanBeDoneToAddressReasons == null ? 1 : 0)
-                               + (report.consideredSelfMissing == null ? 1 : 0) + (report.whatDidYouDoWhileMissing == null ? 1 : 0)
-                               + (report.whatHappenedWhenReturned == null ? 1 : 0) + (report.preventFutureMissingSuggestions == null ? 1 : 0)
-                               + (report.additionalCommentsFromYoungPerson == null ? 1 : 0) + (report.additionalInfoFromParentCarer == null ? 1 : 0)}">
+         th:with="notAnswered=${unansweredBySection['rhi']}">
         <h3>Return Home Interview
             <span class="section-count" th:if="${notAnswered > 0}" th:text="${notAnswered + ' not answered'}"></span>
         </h3>
@@ -395,8 +402,7 @@
     </div>
 
     <div class="card" id="future-incidents" tabindex="-1" th:if="${report != null}"
-         th:with="notAnswered=${(report.risksIdentifiedDuringEpisode == null ? 1 : 0) + (report.risksIncreaseFutureEpisodes == null ? 1 : 0)
-                               + (report.safeguardingConcernsToExplore == null ? 1 : 0) + (report.infoToHelpLocateFuture == null ? 1 : 0)}">
+         th:with="notAnswered=${unansweredBySection['future-incidents']}">
         <h3>Future Incidents
             <span class="section-count" th:if="${notAnswered > 0}" th:text="${notAnswered + ' not answered'}"></span>
         </h3>
@@ -415,18 +421,27 @@
         </dl>
     </div>
 
-    <div class="card" id="interviewer-comments" tabindex="-1" th:if="${report != null}">
-        <h3>Interviewer's Comments</h3>
+    <div class="card" id="interviewer-comments" tabindex="-1" th:if="${report != null}"
+         th:with="notAnswered=${unansweredBySection['interviewer-comments']}">
+        <h3>Interviewer's Comments
+            <span class="section-count" th:if="${notAnswered > 0}" th:text="${notAnswered + ' not answered'}"></span>
+        </h3>
         <p th:classappend="${report.interviewerComments == null} ? 'unanswered'" th:text="${report.interviewerComments} ?: 'Not answered'">Comments</p>
     </div>
 
-    <div class="card" id="recommendations" tabindex="-1" th:if="${report != null}">
-        <h3>Recommendations</h3>
+    <div class="card" id="recommendations" tabindex="-1" th:if="${report != null}"
+         th:with="notAnswered=${unansweredBySection['recommendations']}">
+        <h3>Recommendations
+            <span class="section-count" th:if="${notAnswered > 0}" th:text="${notAnswered + ' not answered'}"></span>
+        </h3>
         <p th:classappend="${report.recommendations == null} ? 'unanswered'" th:text="${report.recommendations} ?: 'Not answered'">Recommendations</p>
     </div>
 
-    <div class="card" id="declaration" tabindex="-1" th:if="${report != null}">
-        <h3>Declaration</h3>
+    <div class="card" id="declaration" tabindex="-1" th:if="${report != null}"
+         th:with="notAnswered=${unansweredBySection['declaration']}">
+        <h3>Declaration
+            <span class="section-count" th:if="${notAnswered > 0}" th:text="${notAnswered + ' not answered'}"></span>
+        </h3>
         <dl class="detail">
             <dt>Statement</dt>
             <dd th:classappend="${report.conductedByStatement == null} ? 'unanswered'" th:text="${report.conductedByStatement} ?: 'Not answered'">—</dd>

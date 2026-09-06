@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
 import java.time.LocalDate;
+import java.util.Map;
 import java.util.Set;
 import ninja.samryecroft.returnhome.tracker.AbstractIntegrationTest;
 import ninja.samryecroft.returnhome.tracker.child.Child;
@@ -21,6 +22,10 @@ import ninja.samryecroft.returnhome.tracker.organisation.Organisation;
 import ninja.samryecroft.returnhome.tracker.user.AppUserDetailsService;
 import ninja.samryecroft.returnhome.tracker.user.Role;
 import ninja.samryecroft.returnhome.tracker.user.User;
+import ninja.samryecroft.returnhome.tracker.report.InterviewReport;
+import ninja.samryecroft.returnhome.tracker.report.InterviewReportRepository;
+import ninja.samryecroft.returnhome.tracker.report.question.ReportQuestions;
+import ninja.samryecroft.returnhome.tracker.report.question.ReportSection;
 import ninja.samryecroft.returnhome.tracker.user.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -75,6 +80,8 @@ class TemplateRenderCoverageIntegrationTest extends AbstractIntegrationTest {
     private UserRepository userRepository;
     @Autowired
     private InterviewRequestRepository interviewRequestRepository;
+    @Autowired
+    private InterviewReportRepository interviewReportRepository;
     @Autowired
     private AppUserDetailsService appUserDetailsService;
 
@@ -223,6 +230,62 @@ class TemplateRenderCoverageIntegrationTest extends AbstractIntegrationTest {
     void interviewDetailRendersApprovedReportContentInline() throws Exception {
         assertRenders("/interview-requests/" + approvedRequestId, "interview/detail", "rc-reviewer",
                 "The quiet room");
+    }
+
+    /**
+     * T185 step 2: the "N not answered" badges on the record screen show what {@link ReportQuestions}
+     * says, for every section.
+     *
+     * <p>Deliberately compares against the model rather than against expected numbers. A test that
+     * hard-coded "1 not answered" would be a second definition of the count - the exact thing this
+     * change removes - and would need editing every time the fixture gained a field. What must hold
+     * is that the SCREEN AGREES WITH THE MODEL; whether the model is right is settled by
+     * {@code ReportSectionCountGuardTest}, against the conditional-question case that used to be
+     * wrong.
+     *
+     * <p>The unit guard proves each section takes its count from the model; this proves the value
+     * survives the trip through the controller and out to the page. Between them: every section
+     * counted, and counted correctly.
+     */
+    @Test
+    void everySectionsBadgeShowsWhatTheQuestionModelSays() throws Exception {
+        String html = mockMvc.perform(get("/interview-requests/{id}", approvedRequestId)
+                        .with(asUser("rc-reviewer" + suffix)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        InterviewReport report = interviewReportRepository
+                .findByInterviewRequestId(approvedRequestId).orElseThrow();
+        Map<String, Integer> expected = ReportQuestions.unansweredBySection(report);
+
+        assertThat(expected)
+                .as("a section missing here renders no badge at all, which is the asymmetry step 2 "
+                        + "exists to remove")
+                .hasSize(ReportSection.values().length);
+
+        for (Map.Entry<String, Integer> section : expected.entrySet()) {
+            String card = substringAfter(html, "id=\"" + section.getKey() + "\"");
+            if (section.getValue() > 0) {
+                assertThat(card)
+                        .as("section '%s' has %d unanswered question(s) and the badge must say so",
+                                section.getKey(), section.getValue())
+                        .contains(section.getValue() + " not answered");
+            } else {
+                assertThat(card)
+                        .as("section '%s' is complete, so it carries no badge - and because EVERY "
+                                + "section is now counted, an absent badge can only mean this",
+                                section.getKey())
+                        .doesNotContain("not answered");
+            }
+        }
+    }
+
+    /** The rendered card: from its id up to the start of the next one. */
+    private static String substringAfter(String html, String marker) {
+        int start = html.indexOf(marker);
+        assertThat(start).as("the page must contain a card marked %s", marker).isGreaterThan(-1);
+        int next = html.indexOf("class=\"card\"", start);
+        return next < 0 ? html.substring(start) : html.substring(start, next);
     }
 
     /**
