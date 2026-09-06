@@ -660,4 +660,112 @@ class FrontendSourceGuardTest {
                         + "legal - a guard that fails the fix is worse than no guard")
                 .isEmpty();
     }
+
+    /**
+     * T253 (Creed, spec 8f/9681e6d): {@code display: flex}/{@code grid} overrides an element's
+     * list-item box generation, which is exactly the condition under which some engines stop
+     * inferring the implicit {@code list}/{@code listitem} role from a {@code <ul>}/{@code <ol>}/
+     * {@code <li>} tag alone - the shape behind the well-known Safari/VoiceOver
+     * {@code list-style: none} case, and the reason seven card stacks across six templates
+     * (fragments/case-card.html + app.css) read as a list visually and announced nothing.
+     *
+     * <p><strong>A comment explaining this is not enough</strong> (Creed: "a comment tells a
+     * reviewer why; it does not stop the removal"). The durable form is a check that fails a build
+     * rather than a review - so this fires on the CSS/markup PAIRING, not on the presence of an
+     * explanatory sentence, which is also why comments are stripped from both sides before
+     * matching (see below).
+     *
+     * <p><strong>Scoped to a BARE single-class selector deliberately, not any selector mentioning
+     * the class.</strong> {@code .manifest li} and {@code .tl .ev} both contain {@code display:
+     * flex} and both mention a class ({@code manifest}, {@code tl}) that also appears, elsewhere,
+     * as a bare {@code .classname} selector with no {@code display} override at all - a naive
+     * extraction that took every class token out of every matching selector attributed the
+     * DESCENDANT's flex to the ANCESTOR class, and would have flagged {@code <ul class="manifest">}
+     * for a property that belongs to the {@code <li>} inside it, not to the list itself. Restricting
+     * extraction to selectors that are, once split on commas, an exact {@code .classname} match is
+     * what keeps this guard pointed at the tag that actually carries the override -
+     * {@link #theBareSelectorRestrictionDoesNotMistakeADescendantsFlexForTheAncestors} pins this
+     * distinction against the exact case that would otherwise have produced a false positive here.
+     */
+    @Test
+    void everyFlexOrGridListCarriesItsExplicitAriaRole() throws IOException {
+        Set<String> flexOrGridClasses = flexOrGridClassesIn(
+                Files.readString(CSS_DIR.resolve("app.css"), StandardCharsets.UTF_8));
+
+        List<String> violations = new ArrayList<>();
+        for (Path file : sourceFilesUnder(TEMPLATES_DIR)) {
+            String html = Files.readString(file, StandardCharsets.UTF_8)
+                    .replaceAll("(?s)<!--.*?-->", "");
+            for (String tag : List.of("ul", "ol", "li")) {
+                String requiredRole = tag.equals("li") ? "listitem" : "list";
+                Matcher tagMatch = Pattern.compile("<" + tag + "\\b([^>]*)>", Pattern.CASE_INSENSITIVE)
+                        .matcher(html);
+                while (tagMatch.find()) {
+                    String attrs = tagMatch.group(1);
+                    Matcher classAttr = Pattern.compile("class=\"([^\"]*)\"").matcher(attrs);
+                    if (!classAttr.find()) {
+                        continue;
+                    }
+                    boolean isFlexOrGrid = false;
+                    for (String cls : classAttr.group(1).split("\\s+")) {
+                        if (flexOrGridClasses.contains(cls)) {
+                            isFlexOrGrid = true;
+                            break;
+                        }
+                    }
+                    if (isFlexOrGrid && !attrs.contains("role=\"" + requiredRole + "\"")) {
+                        violations.add(file.getFileName() + ": <" + tag + " " + attrs.trim()
+                                + ">  missing role=\"" + requiredRole + "\"");
+                    }
+                }
+            }
+        }
+
+        assertThat(violations)
+                .describedAs("a <ul>/<ol>/<li> whose own class sets display:flex or display:grid "
+                        + "needs its list role stated explicitly - some engines stop inferring it "
+                        + "from the tag alone once display is overridden (T253)")
+                .isEmpty();
+    }
+
+    /**
+     * The extraction this guard depends on, pinned against the exact false positive it would
+     * otherwise produce (found while building the guard, not invented for the test): {@code
+     * .manifest li} and {@code .tl .ev} both contain {@code display: flex} and both mention a bare
+     * class ({@code manifest}, {@code tl}) with no override of its own - only a selector that is,
+     * after splitting on commas, an EXACT {@code .classname} may contribute that class to the set.
+     */
+    @Test
+    void theBareSelectorRestrictionDoesNotMistakeADescendantsFlexForTheAncestors() {
+        assertThat(flexOrGridClassesIn(".case-list { display: flex; }"))
+                .containsExactly("case-list");
+        assertThat(flexOrGridClassesIn(".rail, .not-kept { display: flex; }"))
+                .containsExactlyInAnyOrder("rail", "not-kept");
+
+        // The false positive this restriction exists to prevent: display:flex belongs to the
+        // DESCENDANT (.ev, li), never to .tl or .manifest themselves.
+        assertThat(flexOrGridClassesIn(".tl .ev { display: flex; }")).isEmpty();
+        assertThat(flexOrGridClassesIn(".manifest li { display: flex; }")).isEmpty();
+        assertThat(flexOrGridClassesIn(".tl { list-style: none; }")).isEmpty();
+    }
+
+    private static Set<String> flexOrGridClassesIn(String css) {
+        String withoutComments = css.replaceAll("(?s)/\\*.*?\\*/", "");
+        Set<String> classes = new TreeSet<>();
+        Matcher block = Pattern.compile("([^{}]+)\\{([^{}]*)\\}").matcher(withoutComments);
+        while (block.find()) {
+            String selector = block.group(1);
+            String declarations = block.group(2);
+            if (!Pattern.compile("display\\s*:\\s*(flex|grid)\\b").matcher(declarations).find()) {
+                continue;
+            }
+            for (String part : selector.split(",")) {
+                Matcher bareClass = Pattern.compile("^\\s*\\.([\\w-]+)\\s*$").matcher(part);
+                if (bareClass.matches()) {
+                    classes.add(bareClass.group(1));
+                }
+            }
+        }
+        return classes;
+    }
 }

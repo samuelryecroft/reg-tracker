@@ -80,9 +80,13 @@
       rail shows CURRENT and the earlier send-back is invisible there, which is exactly why the
       note above exists.
     */-->
-    <ol class="rail" aria-label="Interview status">
+    <!--/* T253 (spec 8f/9681e6d): .rail sets display:flex on both the <ol> and its <li> (app.css),
+         which overrides list-item box generation on both - the same condition that motivated
+         role="list"/"listitem" on the case-card lists, found on this component in the same sweep.
+         Explicit roles restore what the overridden display would otherwise cost. */-->
+    <ol class="rail" aria-label="Interview status" role="list">
         <li th:each="step, stat : ${statusRail}" th:classappend="'rail-' + ${step.state()}"
-            th:attr="aria-current=${step.state().name() == 'CURRENT'} ? 'step'">
+            role="listitem" th:attr="aria-current=${step.state().name() == 'CURRENT'} ? 'step'">
             <span class="rail-connector" aria-hidden="true" th:unless="${stat.first}"></span>
             <span class="rail-marker" aria-hidden="true" th:switch="${step.state().name()}">
                 <svg class="icon" th:case="'COMPLETE'"><use th:href="${ico} + '#ph-fill-check-circle'"></use></svg>

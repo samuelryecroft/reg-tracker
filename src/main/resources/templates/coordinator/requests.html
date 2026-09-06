@@ -74,7 +74,11 @@
                     <span th:text="${group.label()}">Overdue</span>
                 </span>
             </h2>
-            <div class="case-list">
+            <!--/* T253 (spec 8f/9681e6d): <ul>/<li>, not <div> - fragments/case-card.html's root is
+                 <li role="listitem">, th:replace substitutes it for this placeholder tag entirely,
+                 so only the container needs changing here. role="list" is load-bearing, see
+                 app.css's own comment on .case-list for why. */-->
+            <ul class="case-list" role="list">
                 <th:block th:each="row : ${group.rows()}" th:with="r=${row.request()},
                         open=${r.status.name() == 'REQUESTED' or r.status.name() == 'ALLOCATED' or r.status.name() == 'SCHEDULED'}">
                     <div th:replace="~{fragments/case-card :: caseCard(
@@ -93,7 +97,7 @@
                             noteLabel=null,
                             note=null)}"></div>
                 </th:block>
-            </div>
+            </ul>
         </section>
     </th:block>
 

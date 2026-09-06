@@ -24,7 +24,11 @@
       this screen needs no variant of the tag - only the absence of the grouping that would make
       the word redundant.
     */-->
-    <div class="case-list">
+    <!--/* T253 (spec 8f/9681e6d): <ul>/<li>, not <div> - fragments/case-card.html's root is
+         <li role="listitem">, th:replace substitutes it for this placeholder tag entirely, so only
+         the container needs changing here. role="list" is load-bearing, see app.css's own comment
+         on .case-list for why. */-->
+    <ul class="case-list" role="list">
         <!--/*
           The action decision is resolved in th:with rather than inline, because a link expression
           (@{...}) cannot be nested inside a ${...} - so the three destinations are built first and
@@ -58,7 +62,7 @@
                     noteLabel=${sentBack ? 'Reviewer''s comment' : null},
                     note=${sentBack and report != null ? report.reviewComments : null})}"></div>
         </th:block>
-    </div>
+    </ul>
 
     <!--/*
       R-Q13, both cases. Oscar added the second one for exactly this screen: a visitor who has

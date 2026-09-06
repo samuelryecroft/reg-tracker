@@ -1591,6 +1591,19 @@ nav.seg .seg-opt { color: inherit; text-decoration: none; }
     font-size: var(--t-md); margin: 0 0 var(--s3);
 }
 .case-group-count { color: var(--muted); font-weight: 400; font-variant-numeric: tabular-nums; }
+/* T253 (spec 8f/9681e6d): seven card stacks across six templates were a visually-unambiguous list
+   with no list in the markup (WCAG 2.2 1.3.1) - a <table> announced "table, N rows" and let a
+   screen-reader user step through and skip it; a <div> stack announced nothing. The design (cards,
+   not rows) is not in question - only that the container is now a <ul role="list"> and each card a
+   <li role="listitem"> (fragments/case-card.html).
+   THE ROLE ATTRIBUTES ARE LOAD-BEARING, NOT BELT-AND-BRACES. display:flex here overrides this
+   element's list-item box generation, which is exactly the condition under which some engines stop
+   inferring the implicit list/listitem role from the tag name - the same failure shape as
+   list-style:none on a <ul> (the well-known Safari/VoiceOver case this pattern is named after).
+   Swapping <div> for <ul>/<li> alone would look correct, pass review, and still announce nothing to
+   the reader it was changed for. Do not let a future tidy-up remove role="list"/"listitem" as
+   redundant with the tag - FrontendSourceGuardTest.everyFlexOrGridListHasAnExplicitListRole pins
+   this mechanically, comments stripped first, so the removal fails a build rather than a review. */
 .case-list { display: flex; flex-direction: column; gap: var(--s2); }
 .case {
     display: flex; align-items: center; gap: var(--s4);
