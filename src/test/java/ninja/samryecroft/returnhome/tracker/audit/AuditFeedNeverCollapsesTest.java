@@ -78,13 +78,72 @@ class AuditFeedNeverCollapsesTest {
                 draftSave(2L, at(9, 40)), draftSave(1L, at(9, 14)));
         when(auditEventRepository.findByOrganisationIdIn(anyCollection())).thenReturn(saves);
 
-        assertThat(service.caseActivityFeed(List.of(request), null, null, null))
+        assertThat(service.caseActivityFeed(List.of(request), null, null, null, AuditFeedScope.WITH_ACCESS_EVENTS))
                 .extracting(row -> row.entry().id(), row -> row.entry().headline())
                 .containsExactly(
                         org.assertj.core.groups.Tuple.tuple(4L, "Draft saved"),
                         org.assertj.core.groups.Tuple.tuple(3L, "Draft saved"),
                         org.assertj.core.groups.Tuple.tuple(2L, "Draft saved"),
                         org.assertj.core.groups.Tuple.tuple(1L, "Draft saved"));
+    }
+
+    /**
+     * T274 A4: THE FEED AND THE CSV STILL SHARE ONE SOURCE, and the CSV's narrower scope is a
+     * PARAMETER rather than a filter of its own.
+     *
+     * <p>The property this class protects has been widened from <em>never collapses</em> to
+     * <em>never omits a type without recording that it did</em>. Giving the CSV its own filtering
+     * would recreate exactly the divergence T177 exists to stop; asking the one method for a
+     * declared scope does not. So this asserts the two scopes differ ONLY by the access rows -
+     * everything the screen shows about what was DONE to a case is still in the disclosure.
+     */
+    @Test
+    void theTwoScopesDifferOnlyByTheAccessRows() {
+        List<AuditEvent> events = List.of(
+                draftSave(3L, at(11, 0)),
+                accessEvent(2L, at(10, 0)),
+                draftSave(1L, at(9, 0)));
+        when(auditEventRepository.findByOrganisationIdIn(anyCollection())).thenReturn(events);
+
+        List<Long> screen = idsFrom(AuditFeedScope.WITH_ACCESS_EVENTS);
+        List<Long> disclosure = idsFrom(AuditFeedScope.CASE_ACTIVITY_ONLY);
+
+        assertThat(screen).containsExactly(3L, 2L, 1L);
+        assertThat(disclosure)
+                .as("the disclosure may omit ONLY the access rows - anything else it drops is "
+                        + "something the screen showed and the CSV silently did not")
+                .containsExactly(3L, 1L);
+    }
+
+    /**
+     * And the access rows are genuinely reachable on the screen, which is the whole point of A1:
+     * they were recorded and displayed nowhere, and A RECORD SURFACED NOWHERE IS NOT KEPT.
+     */
+    @Test
+    void anAccessEventIsVisibleInTheFeed() {
+        List<AuditEvent> events = List.of(accessEvent(1L, at(10, 0)));
+        when(auditEventRepository.findByOrganisationIdIn(anyCollection())).thenReturn(events);
+
+        assertThat(idsFrom(AuditFeedScope.WITH_ACCESS_EVENTS)).containsExactly(1L);
+        assertThat(idsFrom(AuditFeedScope.CASE_ACTIVITY_ONLY)).isEmpty();
+    }
+
+    private List<Long> idsFrom(AuditFeedScope scope) {
+        return service.caseActivityFeed(List.of(request), null, null, null, scope).stream()
+                .map(row -> row.entry().id())
+                .toList();
+    }
+
+    private AuditEvent accessEvent(long id, LocalDateTime occurredAt) {
+        AuditEvent event = org.mockito.Mockito.mock(AuditEvent.class);
+        when(event.getId()).thenReturn(id);
+        when(event.getEventType()).thenReturn(AuditEventType.AUDIT_VIEW_OPENED);
+        when(event.getOccurredAt()).thenReturn(occurredAt);
+        when(event.getActorRolesAtTime()).thenReturn("VIEWER");
+        when(event.getMetadata()).thenReturn("deduplication=access-episode");
+        when(event.getTargetType()).thenReturn("InterviewRequest");
+        when(event.getTargetId()).thenReturn(REQUEST_ID);
+        return event;
     }
 
     private static LocalDateTime at(int hour, int minute) {

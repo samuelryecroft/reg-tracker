@@ -74,7 +74,11 @@ public class AuditFeedController {
             Model model) {
         authorize(principal);
         List<InterviewRequest> scope = requestsInScope(principal);
-        List<AuditFeedRow> rows = auditHistoryService.caseActivityFeed(scope, homeId, from, to);
+        // T274 A1: the SCREEN is where "who looked at this child's record" is asked, so it is where
+        // access events become visible. They were being recorded and shown on no screen at all, and
+        // A RECORD SURFACED NOWHERE IS NOT KEPT, IT IS HOARDED.
+        List<AuditFeedRow> rows = auditHistoryService.caseActivityFeed(scope, homeId, from, to,
+                AuditFeedScope.WITH_ACCESS_EVENTS);
 
         model.addAttribute("rows", rows);
         model.addAttribute("days", auditHistoryService.groupFeedByDay(rows));
@@ -111,7 +115,11 @@ public class AuditFeedController {
             Model model) {
         authorize(principal);
         AuditFeedRow row = auditHistoryService
-                .caseActivityFeed(requestsInScope(principal), null, null, null).stream()
+                // The same scope the SCREEN uses, necessarily: this route resolves a row the feed
+                // linked to, and a narrower scope here would 404 exactly the access rows the feed
+                // has just started showing.
+                .caseActivityFeed(requestsInScope(principal), null, null, null,
+                        AuditFeedScope.WITH_ACCESS_EVENTS).stream()
                 .filter(candidate -> id.equals(candidate.entry().id()))
                 .findFirst()
                 // IllegalArgumentException is the codebase's 404 (GlobalControllerAdvice), and the
@@ -136,7 +144,14 @@ public class AuditFeedController {
             Model model) {
         authorize(principal);
         List<InterviewRequest> scope = requestsInScope(principal);
-        List<AuditFeedRow> rows = auditHistoryService.caseActivityFeed(scope, homeId, from, to);
+        // T274 A2/A3: the CSV keeps case activity ONLY, and says so - see exportScope below. Adding
+        // access rows here would change every disclosure this system makes from here on, and the
+        // problem is not volume: the disclosure would ACQUIRE A SECOND DATA SUBJECT. A case-activity
+        // export is about a child and the professional actions on their case; an org-wide export
+        // over a date range containing access rows is additionally an EMPLOYEE-MONITORING DATASET,
+        // leaving the building under a purpose and reference that were about a child.
+        AuditFeedScope exportScope = AuditFeedScope.CASE_ACTIVITY_ONLY;
+        List<AuditFeedRow> rows = auditHistoryService.caseActivityFeed(scope, homeId, from, to, exportScope);
 
         List<AuditQueryCsvWriter.FeedRow> feedRows = rows.stream()
                 .map(row -> new AuditQueryCsvWriter.FeedRow(row.entry(), row.homeName(), row.childLabel(), row.requestId()))
@@ -146,7 +161,12 @@ public class AuditFeedController {
         ExportPack pack = new ExportPack("audit-trail-" + LocalDate.now() + ".csv", csv, checksum, null);
         String token = exportLinkService.hold(pack, principal.getUserId());
 
-        String scopeLabel = scopeDescription(homeId, from, to) + " · " + rows.size() + " rows";
+        // T274 A4, AND IT IS THE NON-NEGOTIABLE PART: THE DISCLOSURE STATES ON ITS FACE WHAT IT
+        // CONTAINS. This is T283's R3 one level up - the artefact must say what it is. The property
+        // worth protecting was never "screen and CSV are identical"; it is "THE CSV CANNOT SILENTLY
+        // OMIT WHAT THE SCREEN SHOWED". A declared scope satisfies that; a silent default does not.
+        String scopeLabel = scopeDescription(homeId, from, to) + " · " + describe(exportScope)
+                + " · " + rows.size() + " rows";
         auditEventPublisher.auditQueryExported(principal.getOrganisationId(), purpose, reference, scopeLabel,
                 rows.size(), checksum, principal);
 
@@ -156,6 +176,18 @@ public class AuditFeedController {
         model.addAttribute("rowCount", rows.size());
         model.addAttribute("expiresInMinutes", exportLinkService.lifetime().toMinutes());
         return "audit/export-ready";
+    }
+
+    /**
+     * What the recorded scope says about access events. Spelled out either way rather than only when
+     * they are excluded: a label that is silent when they are absent and explicit when they are
+     * present cannot be read as a statement about the export at all - the reader has to know which
+     * convention was in force, which is the thing the label exists to remove.
+     */
+    private String describe(AuditFeedScope scope) {
+        return scope == AuditFeedScope.WITH_ACCESS_EVENTS
+                ? "includes record-access events"
+                : "case activity only, record-access events excluded";
     }
 
     private String scopeDescription(Long homeId, LocalDate from, LocalDate to) {
