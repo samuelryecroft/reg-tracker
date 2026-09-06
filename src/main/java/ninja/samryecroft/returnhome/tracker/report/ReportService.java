@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import ninja.samryecroft.returnhome.tracker.audit.AuditEventPublisher;
@@ -31,8 +32,15 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class ReportService {
 
-    private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("dd MMM yyyy");
-    private static final DateTimeFormatter DATETIME_FMT = DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm");
+    // Locale pinned rather than inherited (T187). Without it these formatters follow the JVM's
+    // default locale, so the same report generated on a differently configured container prints its
+    // month names in another language - in a document that is a statutory record and gets read by a
+    // court, an IRO or a local authority. Found while adding the 72-hour reading; it was latent
+    // here already rather than introduced by it.
+    private static final DateTimeFormatter DATE_FMT =
+            DateTimeFormatter.ofPattern("dd MMM yyyy", Locale.UK);
+    private static final DateTimeFormatter DATETIME_FMT =
+            DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm", Locale.UK);
     private static final String NOT_RECORDED = "Not recorded";
 
     private final InterviewReportRepository interviewReportRepository;
@@ -403,11 +411,28 @@ public class ReportService {
         values.put("visitorName", report.getVisitor().getFullName());
         values.put("requestReceivedAt", request.getCreatedAt().format(DATETIME_FMT));
         values.put("missingEpisodeDate", formatDateTime(request.getMissingSince()));
-        values.put("interviewDate", report.getInterviewDate() == null ? NOT_RECORDED : report.getInterviewDate().format(DATE_FMT));
+
+        // Built once, above its first use. Every 72-hour value in this document - the head block AND
+        // the statutory question list further down - comes off this one object, so the two cannot
+        // disagree about the same fact. Before T187 they were computed independently and did.
+        SeventyTwoHourReading reading = SeventyTwoHourReading.of(report);
+        // reading.heldLine(), NOT getInterviewDate(). This is the row T187 exists to fix and it was
+        // still printing heldAt truncated to a date - THE VERY VALUE 7a OPENS BY NAMING AS THE
+        // DEFECT - three rows from the precise one. Two same-date reports with opposite verdicts
+        // showed an identical "Date of Interview", so a reader who read the question list and
+        // stopped saw the original paradox completely intact.
+        //
+        // The spec was written against ReportService.interviewHeldLine() and the template was never
+        // opened. A DEFECT SPECCED AGAINST A JAVA METHOD IS SPECCED AGAINST ONE OF ITS CALLERS -
+        // and the template is a caller.
+        values.put("interviewDate", reading.heldLine());
         values.put("interviewLocation", orNotProvided(report.getInterviewLocation()));
 
-        values.put("within72Hours", yesNo(report.getWithin72Hours()));
-        values.put("ifNotWhyLate", orNotProvided(report.getIfNotWhyLate()));
+        // Both off the same reading as the block above, so the question list and the head block are
+        // one source stated twice and cannot disagree. yesNo() and orNotProvided() are for STORED
+        // answers - a question a person filled in or did not - and these two are derived.
+        values.put("within72Hours", reading.verdictAnswer());
+        values.put("ifNotWhyLate", reading.reasonLine());
         values.put("consultationWithHomeStaff", orNotProvided(report.getConsultationWithHomeStaff()));
         values.put("previouslyMissing", yesNo(report.getPreviouslyMissing()));
         values.put("missingOccasionsLast30Days", report.getMissingOccasionsLast30Days() == null
@@ -440,11 +465,15 @@ public class ReportService {
         values.put("dateReportShared", report.getDateReportShared() == null
                 ? "Not yet shared" : report.getDateReportShared().format(DATE_FMT));
 
-        // T98 head block. When the interview happened, and whether that met the 72 hours - the one
-        // fact in this document with statutory meaning, stated up front rather than eight rows into
-        // the first table. If it was not met, the reason belongs in the same breath as the "No".
-        // The template cannot branch, so the sentence is composed here.
-        values.put("interviewHeldLine", interviewHeldLine(report));
+        // T98 head block, rebuilt as five labelled rows for T187 (spec 7a). The one fact in this
+        // document with statutory meaning, stated up front rather than eight rows into the first
+        // table - and stated so a reader can CHECK it rather than take it. The template cannot
+        // branch, so every case is decided in SeventyTwoHourReading and each row always has a value.
+        values.put("returnedLine", reading.returnedLine());
+        values.put("heldLine", reading.heldLine());
+        values.put("elapsedLine", reading.elapsedLine());
+        values.put("verdictLine", reading.verdictLine());
+        values.put("reasonLine", reading.reasonLine());
 
         // T98 / D-02. A statutory record signed by one person for a two-person process misstates
         // how it was produced. Generation only ever happens from approve(), which sets both of
@@ -458,22 +487,6 @@ public class ReportService {
 
         values.put("generatedAt", LocalDateTime.now().format(DATETIME_FMT));
         return values;
-    }
-
-    /** The head block's "Interview held" line: when it happened and whether that met the 72 hours. */
-    private String interviewHeldLine(InterviewReport report) {
-        String date = report.getInterviewDate() == null
-                ? NOT_RECORDED : report.getInterviewDate().format(DATE_FMT);
-        Boolean within = report.getWithin72Hours();
-        if (within == null) {
-            return date + " - 72-hour outcome not recorded";
-        }
-        if (within) {
-            return date + " - within 72 hours of return";
-        }
-        String reason = report.getIfNotWhyLate();
-        return date + " - NOT within 72 hours of return"
-                + ((reason == null || reason.isBlank()) ? ", no reason recorded" : ": " + reason);
     }
 
     private String yesNo(Boolean value) {

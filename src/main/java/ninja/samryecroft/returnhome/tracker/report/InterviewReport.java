@@ -311,14 +311,28 @@ public class InterviewReport implements EncryptedEntity {
      * state was counted as a breach while still sitting in the denominator, so an unanswered
      * question cost an organisation exactly what a real failure did.
      *
-     * <p>Null means "not measurable" - the interview has no recorded {@code heldAt}. That is an
+     * <p>Null means <b>the clock cannot be read</b>, which has more than one cause. That is an
      * exclusion from the rate, not a failure, and {@link ninja.samryecroft.returnhome.tracker.dashboard.RateStat}
      * keeps it visible rather than folding it into either side. The clock's start cannot be missing:
      * {@code returned_at} is NOT NULL as of V15.
+     *
+     * <p>The causes are a missing {@code heldAt}, and <b>an interview recorded before the return</b>
+     * - an impossible sequence, and a data-entry error rather than a measurement. T187 found the
+     * second one, and it was not a display problem: {@code !heldAt.isAfter(returnedAt.plus(72h))} is
+     * <em>satisfied</em> by an impossible sequence, so such a report was counted in the NUMERATOR of
+     * the published compliance rate. This method's own history above records fixing that defect in
+     * mirror image - an unanswered question counted as a breach while sitting in the denominator.
+     * <b>That was half of it. This is the other half: an impossible state counted as a pass.</b>
+     *
+     * <p>Equality stays measurable. A held time equal to the return is odd, not impossible, and
+     * zero elapsed is a reading rather than a contradiction.
      */
     @Transient
     public Boolean getWithin72Hours() {
         if (heldAt == null || interviewRequest == null || interviewRequest.getReturnedAt() == null) {
+            return null;
+        }
+        if (heldAt.isBefore(interviewRequest.getReturnedAt())) {
             return null;
         }
         return !heldAt.isAfter(interviewRequest.getReturnedAt().plus(DeadlineTracker.RETURN_WINDOW));

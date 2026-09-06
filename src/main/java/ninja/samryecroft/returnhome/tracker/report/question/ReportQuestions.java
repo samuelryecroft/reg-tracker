@@ -59,20 +59,29 @@ public final class ReportQuestions {
      */
     public static final List<ReportQuestion> ALL = List.of(
             // --- 1. Details -------------------------------------------------------------------
-            // heldAt fills ${interviewDate} in the .docx, not ${heldAt}, and the mismatch is not
-            // cosmetic. That token is filled from getInterviewDate() - heldAt.toLocalDate() - so
-            // THE EXPORTED RECORD SHOWS THE DAY AND NOT THE TIME, under a row headed "Date of
-            // Interview", in a document whose head block states a 72-hour outcome computed from
-            // precisely the time it has just withheld. A reader cannot check the conclusion against
-            // the evidence, because the evidence is the half that was dropped.
+            // heldAt fills ${interviewDate} in the .docx, not ${heldAt}. The pin is still needed
+            // and its original justification is no longer true, so it is restated rather than left
+            // standing: these comments are what keep the renamed-token exception alone, and a reader
+            // who finds one of them false has no reason to trust the rest.
             //
-            // This is the same drift the record screen had ("Date of interview" against the capture
-            // screen's "Date and time the interview was held"), which makes it three surfaces
-            // disagreeing rather than two - and the export is the copy that leaves the building, to
-            // social workers and to the police. Carried here rather than fixed here: correcting it
-            // means editing a binary template and rewording a statutory document, which is Creed's
-            // and Oscar's call and its own card. Recorded as data so the guard below stays armed and
-            // the divergence cannot quietly acquire company.
+            // WHAT IT USED TO BE (T230): that token was filled from getInterviewDate() -
+            // heldAt.toLocalDate() - so the exported record showed the day and not the time, under a
+            // row headed "Date of Interview", in a document whose head block stated a 72-hour
+            // outcome computed from precisely the time it had just withheld. A reader could not
+            // check the conclusion against the evidence, because the evidence was the half that was
+            // dropped. That, plus the record screen's shortened label, made three surfaces
+            // disagreeing about one statutory field.
+            //
+            // WHAT IT IS NOW: T187 points the row at SeventyTwoHourReading.heldLine(), which carries
+            // the time, and T227 restored the record screen's label. The truncation is gone from
+            // every surface; only the token's NAME still differs from the question's id, which is a
+            // .docx template concern and not a lossy one.
+            //
+            // Kept in the past tense rather than deleted, on the same reasoning as DemoDataSeeder's
+            // prediction: a reader deciding whether this exception is safe needs to know what it
+            // once hid, and the record of a defect having been closed is more useful than the
+            // warning was. The guard below stays armed either way - it does not read this comment,
+            // it reads the model - so the divergence still cannot quietly acquire company.
             q("heldAt", DETAILS, "Date and time the interview was held",
                     "The 72-hour window is measured from the child's return to this time, so the "
                             + "time of day matters. Needed before this report can be submitted for "
