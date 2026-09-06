@@ -11,6 +11,10 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import ninja.samryecroft.returnhome.tracker.security.LoginFailureHandler;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import ninja.samryecroft.returnhome.tracker.security.LockedAccountFilter;
+import ninja.samryecroft.returnhome.tracker.security.LoginAttemptService;
+import org.springframework.context.ApplicationEventPublisher;
 
 @Configuration
 @EnableMethodSecurity
@@ -23,7 +27,14 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http,
-            LoginFailureHandler loginFailureHandler) throws Exception {
+            LoginFailureHandler loginFailureHandler,
+            LoginAttemptService loginAttemptService,
+            ApplicationEventPublisher eventPublisher) throws Exception {
+        // Constructed here rather than injected as a bean: Boot auto-registers Filter BEANS into the
+        // servlet chain as well, which would place this ahead of Spring Security's chain entirely and
+        // make its real position differ from the one addFilterBefore states. See LockedAccountFilter.
+        LockedAccountFilter lockedAccountFilter =
+                new LockedAccountFilter(loginAttemptService, loginFailureHandler, eventPublisher);
         http
                 .authorizeHttpRequests(auth -> auth
                         // T119: /fonts/** and /icons/** are static assets the login page itself
@@ -77,7 +88,15 @@ public class SecurityConfig {
                         .permitAll())
                 .logout(logout -> logout
                         .logoutSuccessUrl("/login?logout")
-                        .permitAll());
+                        .permitAll())
+                // T221: BEFORE the authentication filter, and the position is the entire fix.
+                // A locked real account short-circuits in the provider's pre-checks (no hash) while
+                // a locked unknown username pays mitigateAgainstTimingAttack's full BCrypt - ~53ms
+                // apart, which is a username enumeration oracle readable over a network. Rejecting
+                // both here costs the same for both. It cannot be done in LoginFailureHandler: by
+                // the time a failure handler runs, the hash has already happened or already been
+                // skipped. See LockedAccountFilter for the two rejected alternatives.
+                .addFilterBefore(lockedAccountFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
