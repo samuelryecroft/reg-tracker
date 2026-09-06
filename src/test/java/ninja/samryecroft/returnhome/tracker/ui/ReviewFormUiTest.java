@@ -139,6 +139,9 @@ class ReviewFormUiTest extends AbstractUiTest {
         // assertion. It is the exact line from the human's own console.
         java.util.List<String> console = new java.util.ArrayList<>();
         page.onConsoleMessage(message -> console.add(message.text()));
+        java.util.List<String> traffic = new java.util.ArrayList<>();
+        page.onResponse(r -> traffic.add(r.request().method() + " " + r.status() + " "
+                + r.url().replaceAll(".*://[^/]+", "")));
 
         page.click("button:has-text('Approve and generate document')");
         page.waitForLoadState();
@@ -146,6 +149,15 @@ class ReviewFormUiTest extends AbstractUiTest {
         assertThat(console)
                 .as("native constraint validation must not block the submit on a control it cannot focus")
                 .noneMatch(text -> text.contains("not focusable"));
+        assertThat((String) page.evaluate("() => Array.from(document.querySelectorAll('form :invalid'))"
+                + ".map(e => e.tagName + '#' + e.id).join(', ') || 'NONE'"))
+                .as("no control may be left blocking the submit - the browser's own view, not ours")
+                .isEqualTo("NONE");
+
+        // AND THE POST NOW HAPPENS. Asserted because the whole defect was that it did not, and
+        // because the URL cannot show it: Spring's error forward keeps the request URL, so a 500
+        // renders AT /review and is indistinguishable from "the button did nothing" from outside.
+        assertThat(traffic).anyMatch(entry -> entry.startsWith("POST"));
         // DELIBERATELY NOT ASSERTED HERE: that the page navigates. It does not, and that is a
         // SECOND blocker I have not identified - no "not focusable" message, no field error on the
         // re-render, URL unchanged. Asserting navigation would make this test fail for a reason it
