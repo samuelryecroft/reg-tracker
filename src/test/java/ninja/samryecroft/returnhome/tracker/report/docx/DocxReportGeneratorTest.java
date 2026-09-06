@@ -33,7 +33,11 @@ class DocxReportGeneratorTest {
                 new ClassPathResource("docx-templates/rhi-report-template.docx").getInputStream()) {
             generator.generate(templateStream,
                     Map.of("childName", "Alex Smith", "caseReference", "CR-42",
-                            "interviewDate", "20 Jul 2026", "supplierName", "STEPS with Children",
+                            // The body row and the document's NAME are two values now (T228).
+                            // interviewDate is the reading's own sentence and can say things like
+                            // "Interview time not recorded"; titleDate is a date or nothing.
+                            "interviewDate", "20 Jul 2026 14:05", "titleDate", "20 Jul 2026",
+                            "supplierName", "STEPS with Children",
                             "interviewerComments", "Not provided"),
                     accent, null, tint, outputPath);
         }
@@ -171,9 +175,57 @@ class DocxReportGeneratorTest {
             var core = document.getProperties().getCoreProperties();
             // D-07: title, real creator, language - creator was literally "Apache POI".
             assertThat(core.getTitle()).contains("Return Home Interview Report").contains("Alex Smith");
+            // T228: the title takes titleDate, never interviewDate. That key now holds the 72-hour
+            // reading's own sentence, so a report with no recorded time would otherwise be NAMED
+            // "... - Interview time not recorded" - what Word shows in Recent Files and what a PDF
+            // conversion adopts, read by people deciding whether to open the document at all.
+            assertThat(core.getTitle()).contains("20 Jul 2026").doesNotContain("14:05");
             assertThat(core.getCreator()).isEqualTo("STEPS with Children");
             assertThat(core.getCreator()).isNotEqualTo("Apache POI");
             assertThat(core.getUnderlyingProperties().getLanguageProperty()).contains("en-GB");
+        }
+    }
+
+    /**
+     * T228. The title must never become a sentence about a data gap.
+     *
+     * <p>It shared the {@code interviewDate} key with the body row until now. When T187 corrected
+     * that row to carry the 72-hour reading, it corrected the title too - <b>one value, two
+     * consumers, fixed for one of them</b> - and a report with no recorded time was named
+     * "Return Home Interview Report - Alex Smith - Interview time not recorded".
+     *
+     * <p>Creed found it from the consumer end, and nothing in the diff that changed the row
+     * mentioned the title: <b>a map key hides its second consumer better than a method signature
+     * does.</b> So the fix is not a safer shared string but a second value, and this pins that the
+     * title has no route back to the first one - a missing date shortens the name rather than
+     * explaining itself.
+     */
+    @Test
+    void aMissingInterviewTimeShortensTheTitleRatherThanNamingTheDocumentAfterTheGap(
+            @TempDir Path tempDir) throws Exception {
+        Path outputPath = tempDir.resolve("no-time.docx");
+        try (InputStream templateStream =
+                new ClassPathResource("docx-templates/rhi-report-template.docx").getInputStream()) {
+            generator.generate(templateStream,
+                    Map.of("childName", "Alex Smith",
+                            "interviewDate", "Interview time not recorded",
+                            "titleDate", "",
+                            "interviewerComments", "Not provided"),
+                    null, null, null, outputPath);
+        }
+
+        try (XWPFDocument document = new XWPFDocument(java.nio.file.Files.newInputStream(outputPath))) {
+            String title = document.getProperties().getCoreProperties().getTitle();
+
+            assertThat(title)
+                    .as("the document is still named, and named after the child")
+                    .isEqualTo("Return Home Interview Report - Alex Smith");
+            assertThat(title)
+                    .as("this string is a correct sentence in the body of the report and an "
+                            + "indefensible one in its name - it is what a court or an IRO would see "
+                            + "in a file list before opening anything")
+                    .doesNotContain("Interview time not recorded")
+                    .doesNotContain("not recorded");
         }
     }
 

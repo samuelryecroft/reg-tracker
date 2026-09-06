@@ -31,13 +31,14 @@ import org.junit.jupiter.api.Test;
  * broken, nothing rendered wrong, and no test failed.
  *
  * <p><b>What this guard deliberately does not cover, and why that is not a gap.</b> The .docx is the
- * third renderer and it is not checked here. Creed's ruling is that the enforceable version of this
+ * third renderer and it is not checked here. Creed's ruling was that the enforceable version of this
  * invariant is not a template guard at all but <em>deleting</em>
  * {@code InterviewReport.getInterviewDate()} - a derived {@code LocalDate} accessor carrying the
  * friendlier name of the field it truncates, which is why three renderers independently reached for
- * the lossy path. Once it is gone (T228, after #77), truncation is something a call site writes out
- * loud with {@code .toLocalDate()} where a reviewer sees it, rather than the default a renderer gets
- * for writing the obvious thing. A mechanism beats a check somebody has to remember, and this guard
+ * the lossy path. <b>T228 deleted it.</b> Truncating is now something a call site writes out loud
+ * with {@code .toLocalDate()} where a reviewer sees it, rather than the default a renderer gets for
+ * writing the obvious thing - and exactly one call site does, for the document's core title, where
+ * a date is what NAMES the file rather than an answer anyone checks a verdict against. A mechanism beats a check somebody has to remember, and this guard
  * covers the two surfaces the mechanism cannot reach - the ones where the label is prose.
  *
  * <p>Note also that a title or a filename is not an answer. Naming a document by its date is correct

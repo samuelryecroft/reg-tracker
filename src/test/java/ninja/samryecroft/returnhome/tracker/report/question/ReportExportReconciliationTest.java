@@ -45,6 +45,27 @@ class ReportExportReconciliationTest {
     private static final Path REPORT_SERVICE = Path.of(
             "src/main/java/ninja/samryecroft/returnhome/tracker/report/ReportService.java");
 
+    private static final Path DOCX_GENERATOR = Path.of(
+            "src/main/java/ninja/samryecroft/returnhome/tracker/report/docx/DocxReportGenerator.java");
+
+    /**
+     * Values that are deliberately not {@code ${token}} substitutions: they are consumed as Word
+     * <b>document properties</b> rather than rendered into the body.
+     *
+     * <ul>
+     *   <li><b>titleDate</b> - the core Title's date (T228). It exists precisely because sharing the
+     *       body row's {@code interviewDate} key made the title a second consumer of a value that
+     *       was then corrected for the first one, and a report with no recorded time was NAMED
+     *       "... - Interview time not recorded".</li>
+     * </ul>
+     *
+     * <p>An allow-list rather than a filter, and one that is itself verified below: a key named here
+     * must actually be read by {@code applyDocumentProperties}. Otherwise a typo in this set would
+     * exempt a genuinely orphaned value - <b>an exception that is merely declared is a hole; one
+     * that is checked is a rule.</b>
+     */
+    private static final Set<String> DOCUMENT_PROPERTIES = Set.of("titleDate");
+
     private static final Pattern PLACEHOLDER = Pattern.compile("\\$\\{(\\w+)}");
     private static final Pattern VALUES_PUT = Pattern.compile("values\\.put\\(\"(\\w+)\"");
 
@@ -66,10 +87,32 @@ class ReportExportReconciliationTest {
                         + "render as \"Not provided\" with the unanswered styling, so the exported "
                         + "statutory record will state that the child was asked and did not answer")
                 .isEmpty();
-        assertThat(difference(filled, placeholders))
+        assertThat(difference(difference(filled, placeholders), DOCUMENT_PROPERTIES))
                 .as("ReportService fills these and the template has nowhere to put them, so they "
                         + "are silently missing from the export. Nothing reports this - not a log, "
                         + "not a warning, not the document itself")
+                .isEmpty();
+    }
+
+    /**
+     * The allow-list above is only worth having if it cannot lie. A key excused from needing a
+     * placeholder must be read somewhere that is not the body, and this is where that is checked -
+     * so adding a name to that set is a claim the build verifies rather than a comment it trusts.
+     */
+    @Test
+    void everyValueExcusedFromNeedingAPlaceholderIsReallyADocumentProperty() throws IOException {
+        String generator = Files.readString(DOCX_GENERATOR, StandardCharsets.UTF_8);
+        String properties = generator.substring(generator.indexOf("applyDocumentProperties"));
+
+        Set<String> unread = DOCUMENT_PROPERTIES.stream()
+                .filter(key -> !properties.contains("\"" + key + "\""))
+                .collect(Collectors.toCollection(TreeSet::new));
+
+        assertThat(unread)
+                .as("these are excused from needing a ${token} on the grounds that they are read as "
+                        + "document properties, and applyDocumentProperties does not mention them. "
+                        + "Either the excuse is stale and the value is orphaned, or the name is "
+                        + "misspelt and is quietly exempting something else")
                 .isEmpty();
     }
 

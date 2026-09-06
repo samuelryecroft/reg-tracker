@@ -30,11 +30,15 @@ import ninja.samryecroft.returnhome.tracker.report.InterviewReport;
  * @param reader    how to get the answer off the report.
  *
  *                  <p><b>This is a method reference and not a property name on purpose.</b>
- *                  {@code InterviewReport.getInterviewDate()} is a lossy accessor named as if it
- *                  were a field - it is {@code heldAt.toLocalDate()} - and it is exactly what a
- *                  string-keyed reflective read would reach for, because it is the one whose name
- *                  matches what a reader expects "the interview date" to be called. A method
- *                  reference makes that resolution explicit, compile-checked, and visible in review;
+ *                  {@code InterviewReport.getInterviewDate()} <em>was</em> a lossy accessor named as
+ *                  if it were a field - {@code heldAt.toLocalDate()} - and was exactly what a
+ *                  string-keyed reflective read would reach for, because its name matched what a
+ *                  reader expects "the interview date" to be called. T228 deleted it, so that
+ *                  particular trap is gone; the method reference stays because the reasoning does
+ *                  not depend on the trap existing. A property name resolved by string would still
+ *                  find whatever accessor is added next.
+ *                  A method reference makes the resolution explicit, compile-checked and visible in
+ *                  review;
  *                  {@code ReportQuestionModelTest} additionally pins that {@code heldAt}'s reader
  *                  keeps the time. Reproducing the T187 defect <em>from the single source of truth</em>
  *                  would put it everywhere at once, which is the risk a single source buys you along

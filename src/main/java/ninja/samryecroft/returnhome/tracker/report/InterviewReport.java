@@ -277,15 +277,31 @@ public class InterviewReport implements EncryptedEntity {
         this.visitor = visitor;
     }
 
-    /**
-     * The calendar date the interview was held - derived, so it can never disagree with the
-     * timestamp the compliance rate is measured from. Everything that only wants to display a date
-     * (the docx, the report view) keeps working unchanged.
+    /*
+     * T228: getInterviewDate() USED TO BE HERE, and its deletion is the point of that card rather
+     * than a tidy-up alongside it.
+     *
+     * It returned heldAt.toLocalDate(), and its javadoc carried a compatibility promise from the
+     * LocalDate -> LocalDateTime migration: "everything that only wants to display a date keeps
+     * working unchanged". That promise is what made TRUNCATION THE DEFAULT for every consumer that
+     * did not opt in - one field, two accessors, and THE LOSSY ONE CARRIED THE FRIENDLIER NAME. A
+     * renderer reached the truncating path by writing the obvious thing, and three of them did:
+     * the record screen, the docx body row, and the docx core title.
+     *
+     * It is also why nobody experienced it as one bug. Those surfaces DO NOT SHARE AN IDENTIFIER,
+     * so no grep could have joined them; each was found separately, by a different person, from the
+     * consumer end.
+     *
+     * Creed's ruling, and it is why this is a deletion and not a guard: the enforceable version of
+     * "heldAt keeps its time" is not a test that watches renderers, it is removing the path. With
+     * one accessor named for the field, truncating is something a call site writes OUT LOUD with
+     * .toLocalDate() where a reviewer sees it - a mechanism, rather than a rule someone has to
+     * remember. The one place that legitimately wants a date, the document's core title, now says so
+     * in ReportService.buildValues.
+     *
+     * Left as a note rather than silently removed: an absence explains nothing, and the next person
+     * to want "just the date" needs to find the reason here rather than reintroduce the convenience.
      */
-    @Transient
-    public LocalDate getInterviewDate() {
-        return heldAt == null ? null : heldAt.toLocalDate();
-    }
 
     public String getInterviewLocation() {
         return interviewLocation;

@@ -428,6 +428,29 @@ public class ReportService {
         values.put("interviewDate", reading.heldLine());
         values.put("interviewLocation", orNotProvided(report.getInterviewLocation()));
 
+        // T228. The Word CORE TITLE's date, and it is a SEPARATE VALUE from the row above on
+        // purpose. Both used to read the one "interviewDate" key: ONE VALUE, TWO CONSUMERS, and when
+        // T187 corrected it for the row it corrected it for the title too - so a report with no
+        // recorded time produced a document NAMED "Return Home Interview Report - Alex B - Interview
+        // time not recorded". That property is what Word shows in Recent Files and what a PDF
+        // conversion adopts, so a sentence about a data gap became the name a court or an IRO sees
+        // in a file list before opening anything.
+        //
+        // A map key hides its second consumer better than a method signature does - nothing in the
+        // diff that changed the row mentioned the title. So the fix is not a better shared string:
+        // it is to stop sharing the channel. Two consumers with different needs get two values.
+        //
+        // Date-only here is CORRECT rather than a compromise (Creed): where heldAt is THE ANSWER a
+        // reader checks the 72-hour verdict against, it must carry the time; where it NAMES
+        // something, a date is what names it and no label question arises. The truncation is written
+        // out loud with toLocalDate() at the point of use, which is the whole reason
+        // getInterviewDate() was deleted rather than merely avoided.
+        //
+        // Blank when there is no recorded time, and the title then simply omits it. A shorter name,
+        // never a sentence about what is missing.
+        values.put("titleDate", report.getHeldAt() == null
+                ? "" : report.getHeldAt().toLocalDate().format(DATE_FMT));
+
         // Both off the same reading as the block above, so the question list and the head block are
         // one source stated twice and cannot disagree. yesNo() and orNotProvided() are for STORED
         // answers - a question a person filled in or did not - and these two are derived.
