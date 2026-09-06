@@ -5367,3 +5367,81 @@ approves from.**
 whenever it is non-zero; both may appear.* `Not interviewed · 1 not answered` reads exactly as intended —
 **this section: not interviewed, and one thing still outstanding.** The zero case I was protecting is now
 covered by the chip's presence rather than by the count's absence, which is the right place for it.
+
+---
+
+## §8h — T257: the draft signal belongs in the action label, not beside it
+
+**Worth doing.** The cost is one ternary branch and one string; the benefit is that the reassurance reaches
+the visitor who **did not** go looking, which is god's framing and it is right — fixing only the report page
+leaves the answer available to the person who least needs it.
+
+### D-8h-1 — 🔑 treatment: change the verb. No new element.
+
+For `st == 'SCHEDULED'` with a saved report, `actionLabel` becomes the draft form instead of `'Submit report'`.
+
+**The argument, which is the part to keep:**
+
+> **The row already has a control, and the control is the thing a visitor reads.** A badge added beside a
+> button that still says *"Submit report"* would **put the correction next to the error rather than in it.**
+
+The row does not merely omit the draft — **its most prominent element actively implies there is nothing to
+continue.** Annotating that with a chip leaves the misstatement in place and adds a second thing to reconcile;
+changing the verb removes it. And the action label is the only element on the row that **changes what the
+person expects to happen when they click**, which is what "a draft is waiting" actually means to them.
+
+It is also idiomatic here: `actionLabel` is **already** a four-branch state expression. A fifth branch adds no
+vocabulary, no component, no layout risk, and nothing to the row's reading load — which already carries
+identity, home, due badge, status tag, visit time and an action.
+
+### D-8h-2 — the constraint is satisfied **structurally**, not by a remembered condition
+
+god's constraint: *a row existing is not a draft existing* — SUBMITTED and APPROVED rows exist too, and telling
+a visitor their work is waiting when it has gone to a reviewer replaces one false statement with another.
+
+**Because the string lives inside the `st == 'SCHEDULED'` branch of an existing ternary, it cannot fire for
+any later state.** The distinction is enforced by **where the string sits**, not by a condition someone has to
+keep true. *A mechanism beats a check someone has to remember* — the same reason the accessor deletion beat a
+template guard in §7x.
+
+**Discriminator, verified rather than supposed:** `report != null` inside that branch. The row is created
+**lazily** — `ReportService:263`, `findByInterviewRequestId(...).orElseGet(...)` on the save/submit path — so
+a row existing genuinely means the visitor saved something. **This is explicitly not the D-7p-2 trap** (a
+predicate true for everyone because a row is created eagerly at creation time); I checked for it because that
+is exactly the shape that has bitten this codebase before.
+
+**Named dependency, so it is a known assumption rather than an invisible one:** this relies on request status
+and report existence staying in lockstep. If a state is ever added where a report is submitted while the
+request stays `SCHEDULED`, the label lies again.
+
+**Sent-back is deliberately out of scope.** `REPORT_REJECTED` already has its own action (*"Amend and
+resubmit"*) and its own populated note slot, and its report row carries a non-null `submittedAt` — so it is a
+different fact with a different sentence, already told.
+
+### D-8h-3 — what I am ruling **out**: no "saved at HH:mm"
+
+The row should not carry a timestamp.
+
+> **The list answers *"there is one, and here it is."* The report page answers *"and here is its state."*** A
+> saved-at time on the list answers a third question — *did my last edit save?* — which is #148's job on the
+> page where the editing happened, and raising it on the list **invites the anxiety it appears to settle.**
+
+One signal, in the element they are going to click.
+
+### D-8h-4 — the consequence for Oscar's half, stated rather than assumed
+
+**My slot constrains his content, and he should have that before he writes it.** The action label is a button,
+so it takes an **imperative** — a phrase that names what happens next. A **reporting** phrase (*"Draft saved"*,
+past tense, about the system) cannot go there.
+
+So the content axis is genuinely open, and it decides the treatment rather than the other way round:
+
+| register | example | where it can live |
+| --- | --- | --- |
+| **imperative — names the next action** | *"Continue draft"* | **the action label** (D-8h-1, no new element) |
+| **reporting — states the system's state** | *"Draft saved"* | a chip in the row's status slot — **a second element, and it leaves the button still saying "Submit report"** |
+
+**If Oscar wants the reporting register, my treatment does not hold and the second row of that table is the
+honest cost.** I would argue for the imperative, because the visitor's question is *"where is my saved work"*
+and the answer they can act on is a door, not a receipt — but that is his call, and I would rather he made it
+knowing the treatment moves with it.
