@@ -88,7 +88,7 @@ public class ChildController {
         boolean revealed = nameRevealService.isRevealed();
         model.addAttribute("children", sorted);
         model.addAttribute("showHomeColumn", showHomeColumn);
-        model.addAttribute("childIdentities", ChildIdentities.mapOf(sorted, c -> c, revealed));
+        model.addAttribute("childIdentities", nameRevealService.identitiesFor(sorted, c -> c));
         model.addAttribute("childRows",
                 sorted.stream().collect(Collectors.toMap(Child::getId, c -> ChildListRow.of(c, revealed))));
         return "children/list";
@@ -204,7 +204,7 @@ public class ChildController {
         boolean revealed = nameRevealService.isRevealed();
         LocalDateTime now = LocalDateTime.now();
         model.addAttribute("child", child);
-        model.addAttribute("childIdentity", ChildIdentity.of(child, revealed));
+        model.addAttribute("childIdentity", nameRevealService.identityFor(child));
         model.addAttribute("identityDetail", ChildIdentityDetail.of(child, revealed));
         model.addAttribute("requests", requests);
         // D-4b-7 (spec §7e): a due badge only where DeadlineTracker.badgeFor actually returns one -

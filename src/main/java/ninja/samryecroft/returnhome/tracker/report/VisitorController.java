@@ -8,8 +8,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import ninja.samryecroft.returnhome.tracker.audit.AuditEventPublisher;
-import ninja.samryecroft.returnhome.tracker.child.ChildIdentities;
-import ninja.samryecroft.returnhome.tracker.child.ChildIdentity;
 import ninja.samryecroft.returnhome.tracker.child.NameRevealService;
 import ninja.samryecroft.returnhome.tracker.interview.DeadlineTracker;
 import ninja.samryecroft.returnhome.tracker.interview.DueBadge;
@@ -68,7 +66,7 @@ public class VisitorController {
 
         model.addAttribute("requests", requests);
         model.addAttribute("childIdentities",
-                ChildIdentities.mapOf(requests, InterviewRequest::getChild, nameRevealService.isRevealed()));
+                nameRevealService.identitiesFor(requests, InterviewRequest::getChild));
         model.addAttribute("reports", reportService.reportsByRequestId(requests));
         model.addAttribute("dueBadges", requests.stream()
                 .filter(r -> DeadlineTracker.badgeFor(r, now).isPresent())
@@ -141,7 +139,7 @@ public class VisitorController {
      */
     private void populateScheduleModel(Model model, InterviewRequest request) {
         model.addAttribute("request", request);
-        model.addAttribute("childIdentity", ChildIdentity.of(request.getChild(), nameRevealService.isRevealed()));
+        model.addAttribute("childIdentity", nameRevealService.identityFor(request.getChild()));
         model.addAttribute("scheduledAtMin", request.getReturnedAt().format(DATETIME_LOCAL_FMT));
         model.addAttribute("deadline", request.getReturnedAt().plus(DeadlineTracker.RETURN_WINDOW));
         model.addAttribute("timeRemaining", DeadlineTracker.badgeFor(request, LocalDateTime.now())
@@ -277,7 +275,7 @@ public class VisitorController {
     public String reportForm(@PathVariable Long id, @AuthenticationPrincipal AppUserPrincipal principal, Model model) {
         InterviewRequest request = interviewRequestService.getAuthorized(id, principal);
         model.addAttribute("request", request);
-        model.addAttribute("childIdentity", ChildIdentity.of(request.getChild(), nameRevealService.isRevealed()));
+        model.addAttribute("childIdentity", nameRevealService.identityFor(request.getChild()));
         model.addAttribute("form", reportService.formFor(id, principal));
         return "visitor/report-form";
     }
@@ -298,7 +296,7 @@ public class VisitorController {
         if (bindingResult.hasErrors()) {
             InterviewRequest request = interviewRequestService.getAuthorized(id, principal);
             model.addAttribute("request", request);
-            model.addAttribute("childIdentity", ChildIdentity.of(request.getChild(), nameRevealService.isRevealed()));
+            model.addAttribute("childIdentity", nameRevealService.identityFor(request.getChild()));
             return "visitor/report-form";
         }
         if ("submit".equals(action)) {
