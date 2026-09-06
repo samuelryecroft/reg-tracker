@@ -5106,3 +5106,101 @@ as replaced is being dropped, not consolidated.**
 
 *Verified on `origin/main` `7ecfac5`. Not yet rendered — the layout claims here are read off source, which is
 the failure mode this floor has form for, and I will look at it before any of this is built.*
+
+---
+
+## §8f — Oscar's caption question answered: no regression, but the pattern that replaced the table has no list semantics
+
+### D-8f-1 — the nav split: he is right, and my own §8d disproved my re-cut
+
+Oscar accepted the *"My Children"* catch and **overruled the re-cut using my own width finding**: I flagged
+that `Child` → `Young person` is tight in a fixed-width rail, then ruled a **26-character** nav label. Both
+could not be right.
+
+> **One string was doing two jobs.** Identical was free while both were *"My Children"*; **it stops being free
+> the moment the label needs to EXPLAIN rather than NAME. A nav item names; a heading may explain, and has the
+> room to.**
+
+**Ruled:** nav item **`Young people`** on both branches; page heading **`Young people in your homes`** when
+personalised, **`Young people`** otherwise. My *your*-not-*my* call stands.
+
+**And the split dissolves the hazard rather than documenting it.** §8d recorded *"one decision in two files
+that must stay identical"* as a constraint to be careful about. **It is now two strings because it is two
+jobs** — the drift risk is gone rather than managed. *A duplication that has to be policed is usually two
+things wearing one name.*
+
+### D-8f-2 — the caption: **no regression**, and the reason is that the table went with it
+
+Oscar's citation was correct on his own checkout (`489e8d4`), where `admin/home-list.html:15-16` is
+`<table><caption>All children's homes.</caption>`. On `origin/main` there is **no table**: 4e replaced it with
+`<div class="case-list">` of `<div class="case">` — the R-Q12 card pattern, on the reasoning that homes are
+places, not an aggregate.
+
+**A `<caption>` is only valid inside a `<table>`, so removing it with the table is correct, not a regression.**
+The caption's *information* survives too: `<h1>Homes</h1>` names the collection, which is the job the caption
+was doing. **His worry was well-founded and the answer is no.**
+
+### D-8f-3 — 🔑 but the follow-up found something the caption question was pointing at
+
+**What did go, silently, is list semantics — and not on one screen.**
+
+| | |
+| --- | --- |
+| templates using `.case-list` | **7** — `admin/home-list`, `admin/user-list`, `coordinator/requests`, `home-staff/request-list`, `reviewer/queue` (×2), `visitor/interview-list` |
+| of those using `<ul>`/`<li>` | **0** |
+| shared fragment `fragments/case-card.html` root | `<div>` |
+
+Every screen that migrated from `<table>` to cards gained responsive behaviour and a shape appropriate to
+people rather than aggregates — **that design reasoning is sound and is not in question.** But a `<table>`
+announced *"table, 12 rows"* and let a screen-reader user move by row and skip one. **`<div>` inside `<div>`
+announces nothing:** no item count, no boundaries between one home and the next, no way to step through them.
+
+> **A list that looks like a list must be a list.** WCAG 2.2 **1.3.1 Info and Relationships (Level A)** —
+> structure conveyed visually has to be programmatically determinable. Seven screens present a visually
+> unambiguous list with no list in the markup.
+
+**This is the `.btn-row` shape again:** not seven oversights, **one pattern with a gap in it**, so one fix
+reaches all seven — `fragments/case-card.html`'s root `<div>` → `<li>`, and the seven containers → `<ul>`.
+
+### D-8f-4 — 🔑 and the obvious fix is silently defeated by the CSS already there
+
+```css
+.case-list { display: flex; flex-direction: column; gap: var(--s2); }   /* app.css:1537 */
+```
+
+**`display: flex` (and `grid`) on a `<ul>` strips list semantics in Safari/VoiceOver.** So changing the tags
+produces markup that reads as correct, passes review, and **still announces nothing to the users it was
+changed for** — while now *looking* fixed, which is worse than the current state because nobody checks twice.
+
+**The fix must carry the role explicitly:**
+
+```html
+<ul class="case-list" role="list">   <!-- role="list" is load-bearing, not belt-and-braces -->
+```
+
+> **An accessibility fix that is only verified in the markup is not verified.** This is the floor's standing
+> failure mode — source read, screen never opened — arriving in the one domain where reading the source is
+> most convincing and least sufficient.
+
+**Not built and not carded.** Wants confirming with an actual screen reader before anyone claims it, which is
+the same discipline this section is arguing for.
+
+### D-8f-5 — Oscar's addition to the comment rule, which is better than mine
+
+I ruled that a sweep must not rewrite prose quoting a ruling. His extension:
+
+> **A comment quoting a ruling is a record of what was decided. Editing a record so that it matches a later
+> decision destroys the one thing it exists for — you can no longer tell what was decided, only what is
+> currently believed.**
+
+And the operational half, which stops someone tidying it later: after the rename `report-fields.html:181` will
+say *"declined by the child"* while the live label says *"the young person"*. **They are supposed to
+disagree.** A record of a past decision is entitled to the words used at the time. **That divergence is not
+drift and must not be reconciled** — reconcile it and the comment stops being evidence and becomes decoration.
+
+### D-8f-6 — calibration I am keeping
+On *"child reference"* → *"case reference"*, which I offered as better copy independent of the rename: he
+points out **it is a correction, not an improvement** — the field *is* a case reference and
+`children/list.html:41` already calls it one. **By his own rule, improvable comes back to product and wrong
+does not.** *"You did not need my permission for that one."* I have been routing corrections as improvements,
+which costs a round trip each time.
