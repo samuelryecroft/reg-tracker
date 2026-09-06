@@ -77,6 +77,59 @@ class PasswordPolicyTest {
                 .hasValueSatisfying(message -> assertThat(message).contains("return"));
     }
 
+    // --- T280: the minimum manufactures the shape the un-normalised list cannot see ---
+
+    /**
+     * THE CASE THE RULING'S OWN EXAMPLE NAMED, WHICH WAS ACCEPTED UNTIL T280. "password" is on the
+     * list; "Password1234" is not, and never will be. R1 does not merely fail to catch stem+digits -
+     * R1 CAUSES it: tell someone whose password is "password" that they need twelve characters and
+     * they produce exactly this.
+     */
+    @Test
+    void aListedPasswordPaddedWithTrailingDigitsIsRefused() {
+        assertThat(policy.rejectionFor("Password1234", PasswordContext.none()))
+                .hasValueSatisfying(message -> assertThat(message).contains("digits added to the end"));
+    }
+
+    /** The two messages are distinguishable, so a log or a support call can tell which fired. */
+    @Test
+    void theExactHitAndTheStemHitSayDifferentThings() {
+        String exact = policy.rejectionFor("unbelievable", PasswordContext.none()).orElseThrow();
+        String stem = policy.rejectionFor("unbelievable99", PasswordContext.none()).orElseThrow();
+
+        assertThat(exact).isNotEqualTo(stem);
+        assertThat(exact).doesNotContain("digits added to the end");
+    }
+
+    /**
+     * A STEM THAT STRIPS TO NOTHING MATCHES NOTHING. Without the floor, "123456789012" strips to the
+     * empty string - and an empty string is a substring of everything, so a perfectly ordinary
+     * all-digit passphrase would be reported as a commonly used password. A guard whose failure mode
+     * is "refuse everything" is worse on this population than the gap it closes.
+     */
+    @Test
+    void anAllDigitPasswordDoesNotStripToTheEmptyStringAndMatchEverything() {
+        assertThat(policy.rejectionFor("123456789012", PasswordContext.none())).isEmpty();
+        assertThat(policy.rejectionFor("ab1234567890", PasswordContext.none())).isEmpty();
+    }
+
+    /**
+     * TRAILING DIGITS ONLY - a deliberate stopping point. Trailing punctuation is NOT stripped, and
+     * this test exists so that someone "completing" the normalisation has to change a test that says
+     * why: every additional rule raises the false-reject rate, and a false rejection here costs a
+     * written-down password on a shared device.
+     */
+    @Test
+    void normalisationStopsAtTrailingDigitsOnPurpose() {
+        assertThat(policy.rejectionFor("unbelievable!!", PasswordContext.none())).isEmpty();
+    }
+
+    /** And leading digits are not stripped either: the stem is what people append to, not prepend. */
+    @Test
+    void leadingDigitsAreNotStripped() {
+        assertThat(policy.rejectionFor("12unbelievable", PasswordContext.none())).isEmpty();
+    }
+
     @Test
     void aPasswordBuiltFromTheUsernameIsRefused() {
         assertThat(policy.rejectionFor("jsmithjsmith99", new PasswordContext("jsmith", null, null)))

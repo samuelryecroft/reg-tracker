@@ -43,9 +43,22 @@ public record PasswordContext(String username, String email, String organisation
      * guessable to anyone who knows the service. A whole context value stays at four because it is
      * specific to this account rather than generic.
      *
-     * <p><strong>This is an implementation choice, not a ruled one</strong> - the ruling says
-     * "four context values" and does not say how they are matched. It is recorded here so it can be
-     * argued with rather than discovered.
+     * <p><strong>SIX IS A PROXY FOR DISTINCTIVENESS, and that is what stops anyone lowering it.</strong>
+     * It is not a length rule; it is a cheap stand-in for "is this word specific to us". It works
+     * because of a property of THIS DOMAIN rather than a general truth: the non-distinctive
+     * vocabulary here is short - home, care, team, unit - while the distinctive tokens are longer -
+     * return, tracker, real organisation names. Lower it and the short generic words come back in,
+     * and every care worker whose passphrase contains "home" is refused.
+     *
+     * <p>A short but distinctive ORGANISATION name does not fall through this gap, which is worth
+     * saying because it is the objection a reader will reach for: whole context values are matched
+     * at {@link #SHORTEST_USEFUL_VALUE} (four), and only WORDS SPLIT OUT of a multi-word value need
+     * six. So an organisation called "Oaks" is matched whole, and {@code oaks2026} is caught.
+     *
+     * <p>Confirmed by Kevin (T280) after reading the code rather than the summary. It remains an
+     * implementation choice rather than a ruled one - the ruling says "four context values" and does
+     * not say how they are matched - and is recorded here so it can be argued with rather than
+     * discovered.
      */
     private static final int SHORTEST_USEFUL_WORD = 6;
 
