@@ -80,15 +80,14 @@ public class SecurityConfig {
                         .permitAll())
                 .logout(logout -> logout
                         .logoutSuccessUrl("/login?logout")
-                        .permitAll())
-                // T221: BEFORE the authentication filter, and the position is the entire fix.
-                // A locked real account short-circuits in the provider's pre-checks (no hash) while
-                // a locked unknown username pays mitigateAgainstTimingAttack's full BCrypt - ~53ms
-                // apart, which is a username enumeration oracle readable over a network. Rejecting
-                // both here costs the same for both. It cannot be done in LoginFailureHandler: by
-                // the time a failure handler runs, the hash has already happened or already been
-                // skipped. See LockedAccountFilter for the two rejected alternatives.
-                .addFilterBefore(lockedAccountFilter, UsernamePasswordAuthenticationFilter.class);
+                        .permitAll());
+        // ARMING REVERT (Dwight, T221 verification) - THIS BRANCH MUST NEVER MERGE.
+        // The one line removed here is Kevin's whole fix:
+        //     .addFilterBefore(lockedAccountFilter, UsernamePasswordAuthenticationFilter.class)
+        // Removing it puts the locked request back through DaoAuthenticationProvider, so the
+        // unknown username pays mitigateAgainstTimingAttack's BCrypt again and the real one still
+        // short-circuits. The guard must then fail ASYMMETRICALLY - on the unknown case only.
+        // A symmetric failure would mean the guard measures something other than the oracle.
 
         return http.build();
     }
