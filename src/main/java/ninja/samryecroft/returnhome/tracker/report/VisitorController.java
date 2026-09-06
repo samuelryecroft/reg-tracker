@@ -2,6 +2,7 @@ package ninja.samryecroft.returnhome.tracker.report;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -42,12 +43,21 @@ public class VisitorController {
     private final NameRevealService nameRevealService;
     private final AuditEventPublisher auditEventPublisher;
 
+    /**
+     * Injected rather than read from {@code LocalDateTime.now()} (T241). Every deadline calculation
+     * already takes its {@code now} as a parameter - {@code DeadlineTracker} was written that way -
+     * so this controller is where the wall clock actually entered, and where a test previously had
+     * to chase it rather than pin it. Production gets the system clock and behaves identically.
+     */
+    private final Clock clock;
+
     public VisitorController(InterviewRequestService interviewRequestService, ReportService reportService,
-            NameRevealService nameRevealService, AuditEventPublisher auditEventPublisher) {
+            NameRevealService nameRevealService, AuditEventPublisher auditEventPublisher, Clock clock) {
         this.interviewRequestService = interviewRequestService;
         this.reportService = reportService;
         this.nameRevealService = nameRevealService;
         this.auditEventPublisher = auditEventPublisher;
+        this.clock = clock;
     }
 
     /**
@@ -62,7 +72,7 @@ public class VisitorController {
     @GetMapping("/interviews")
     public String list(@AuthenticationPrincipal AppUserPrincipal principal, Model model) {
         List<InterviewRequest> requests = interviewRequestService.listForVisitor(principal);
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(clock);
 
         model.addAttribute("requests", requests);
         model.addAttribute("childIdentities",
@@ -142,7 +152,7 @@ public class VisitorController {
         model.addAttribute("childIdentity", nameRevealService.identityFor(request.getChild()));
         model.addAttribute("scheduledAtMin", request.getReturnedAt().format(DATETIME_LOCAL_FMT));
         model.addAttribute("deadline", request.getReturnedAt().plus(DeadlineTracker.RETURN_WINDOW));
-        model.addAttribute("timeRemaining", DeadlineTracker.badgeFor(request, LocalDateTime.now())
+        model.addAttribute("timeRemaining", DeadlineTracker.badgeFor(request, LocalDateTime.now(clock))
                 .map(DueBadge::text).orElse(null));
     }
 
@@ -219,7 +229,7 @@ public class VisitorController {
         }
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(Map.of("outcome", "saved", "savedAt", LocalDateTime.now().format(SAVED_AT_FMT)));
+                .body(Map.of("outcome", "saved", "savedAt", LocalDateTime.now(clock).format(SAVED_AT_FMT)));
     }
 
     /**

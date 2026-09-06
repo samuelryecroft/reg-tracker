@@ -8,9 +8,13 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
+import java.util.Locale;
 import java.util.HashSet;
 import java.util.Set;
 import ninja.samryecroft.returnhome.tracker.AbstractIntegrationTest;
@@ -36,6 +40,10 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextImpl;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.Primary;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
@@ -47,10 +55,64 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
  * reason later.
  */
 @SpringBootTest
+@Import(ConfirmVisitTimeIntegrationTest.PinnedClock.class)
 @AutoConfigureMockMvc
 class ConfirmVisitTimeIntegrationTest extends AbstractIntegrationTest {
 
-    private static final DateTimeFormatter DISPLAY_FMT = DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm");
+    /**
+     * T241. A fixed instant, so "how much time is left" is arithmetic rather than a race with the
+     * runner. Chosen mid-minute and mid-hour on an ordinary weekday: a value that is round in any
+     * component invites a passing assertion for the wrong reason.
+     *
+     * <p><b>Zero seconds, deliberately.</b> A {@code datetime-local} input cannot carry them, so the
+     * POSTs below round-trip through an ISO-minute string and come back truncated. A fixed instant
+     * with seconds in it would make the expected and actual values differ by the seconds the browser
+     * was never able to send - a fixture artefact wearing the costume of a real defect.
+     *
+     * <p>The clock is replaced for the whole context rather than stubbed per call, because the
+     * defect was never in one calculation - {@code DeadlineTracker} already takes its {@code now} as
+     * a parameter and is entirely clock-agnostic. The wall clock entered at the controller, which is
+     * the boundary this pins.
+     */
+    private static final Clock FIXED_CLOCK =
+            Clock.fixed(Instant.parse("2026-09-09T11:37:00Z"), ZoneOffset.UTC);
+
+    /**
+     * {@code @Primary} rather than a same-named override: Spring Boot disables bean-definition
+     * overriding by default, and turning it on for one test would quietly license it everywhere.
+     * Two clocks exist in this context and injection prefers this one.
+     */
+    @TestConfiguration
+    static class PinnedClock {
+        @Bean
+        @Primary
+        Clock pinnedClock() {
+            return FIXED_CLOCK;
+        }
+    }
+
+    /**
+     * T241, the second half. This formatter used to take the JVM's default locale, and the screen
+     * renders through Thymeleaf's {@code #temporals.format}, which takes the <b>request</b> locale.
+     * Two undetermined inputs that happen to agree on most days - and disagree in exactly one month,
+     * because English CLDR abbreviates September as "Sept" under {@code en-GB} and "Sep" under
+     * {@code en-US}. Every other month is three letters in both.
+     *
+     * <p>So the test was red on unmodified main at the moment it was picked up, for a reason nobody
+     * had diagnosed: it was reported as a wall-clock flake, and the wall-clock anchoring is real, but
+     * the failure actually on screen was this. <b>A test can be flaky for two independent reasons and
+     * the first explanation that fits will stop the search.</b>
+     *
+     * <p>Both sides are now pinned to {@code en-GB} - the request below sends it explicitly - so the
+     * comparison no longer depends on the machine, the month, or which locale a runner defaults to.
+     * The screen keeping the request locale is deliberate and ruled (spec §7x): a SCREEN follows its
+     * reader, while the exported statutory DOCUMENT pins {@code Locale.UK} because it must not print
+     * month names in whatever language a container happens to default to. Different rules, on
+     * purpose - what was missing was the test declaring which one it was testing.
+     */
+    private static final Locale DISPLAY_LOCALE = Locale.UK;
+    private static final DateTimeFormatter DISPLAY_FMT =
+            DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm", DISPLAY_LOCALE);
     private static final DateTimeFormatter MIN_ATTR_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm");
 
     @Autowired
@@ -93,9 +155,19 @@ class ConfirmVisitTimeIntegrationTest extends AbstractIntegrationTest {
         child.setHome(home);
         Child savedChild = childRepository.save(child);
 
-        // Truncated to the minute: a datetime-local input can never carry seconds, and the POST
-        // params below round-trip through the same ISO-minute string a real picker would send.
-        returnedAt = LocalDateTime.now().minusHours(10).withSecond(0).withNano(0); // ~62h remaining: ON_TRACK
+        // T241: derived from the PINNED clock, not from the wall clock. This used to be
+        // LocalDateTime.now().minusHours(10), which made the "time left" assertion below depend on
+        // where now() happened to fall - correct only while the seconds discarded by truncation plus
+        // the test's own runtime stayed inside one minute. It passed reliably on a fast machine and
+        // would drift on a slow runner, in the BLOCKING lane, which is the worst place for it: a
+        // flaky test there trains people to re-run CI on red, and a lane whose red is routinely
+        // re-run has stopped being a gate while still looking like one.
+        //
+        // The offset is deliberately not a round number of hours. A fixture 10 hours back would
+        // assert "62h 0m left", which a stub returning a round default could also produce; 10h23m
+        // asserts a figure only the real arithmetic yields.
+        returnedAt = LocalDateTime.now(FIXED_CLOCK).minusHours(10).minusMinutes(23)
+                .withSecond(0).withNano(0);
         InterviewRequest request = InterviewRequestTestFixtures.requestAt(InterviewStatus.ALLOCATED);
         request.setChild(savedChild);
         request.setHome(home);
@@ -113,11 +185,15 @@ class ConfirmVisitTimeIntegrationTest extends AbstractIntegrationTest {
         // D-5b-1: the deadline is returnedAt + DeadlineTracker.RETURN_WINDOW (72h), never a literal.
         assertThat(html).contains(returnedAt.plusHours(72).format(DISPLAY_FMT));
         // The exact words DueStateCopy/DeadlineTracker produce for ON_TRACK, quoted verbatim, not
-        // re-worded on this screen. 61h 59m rather than a clean 62h: returnedAt is truncated to the
-        // minute above, but the controller's own "now" is real wall-clock time with its own
-        // (non-zero) seconds, so the computed remaining duration is always a hair under the round
-        // hour, never exactly on it - confirmed against a live run rather than assumed.
-        assertThat(html).contains("On track — 61h 59m left");
+        // re-worded on this screen. 61h 37m is 72h minus the fixture's 10h23m, and it is now an
+        // arithmetic fact rather than an observation: with the clock pinned, the figure cannot move
+        // whatever the machine or the day.
+        //
+        // The previous value was 61h 59m, and the comment here explained it as "always a hair under
+        // the round hour ... confirmed against a live run rather than assumed". That reasoning was
+        // sound and the number was right - it was a correct description of an artefact, which is a
+        // harder thing to spot than a wrong one, because everything about it reads as diligence.
+        assertThat(html).contains("On track — 61h 37m left");
     }
 
     @Test
@@ -216,7 +292,9 @@ class ConfirmVisitTimeIntegrationTest extends AbstractIntegrationTest {
     }
 
     private String getForm() throws Exception {
-        return mockMvc.perform(get("/visitor/interviews/{id}/schedule", requestId).with(asUser(visitorUsername)))
+        return mockMvc.perform(get("/visitor/interviews/{id}/schedule", requestId)
+                        .locale(DISPLAY_LOCALE)
+                        .with(asUser(visitorUsername)))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
     }
