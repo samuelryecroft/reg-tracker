@@ -527,6 +527,29 @@ class TemplateRenderCoverageIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(model().attributeExists("childInterviewed", "lateExplanationMissing"));
     }
 
+    /**
+     * The same attributes on the POST's binding-error re-render.
+     *
+     * <p><b>Two render paths, and only one of them was covered.</b> Supplying the attributes on the
+     * GET and forgetting them here leaves every other test green - the page renders, the errors
+     * show, and the two expressions that would read them are still behind their short-circuits. The
+     * first sign would be a 500 on a visitor who mistyped something, which is the worst moment for
+     * one.
+     *
+     * <p>It is also the path a refactor drops. This project has already shipped a defect where a
+     * fix was applied to a GET handler and not to the validation re-render beside it, and the
+     * re-render is the half nobody opens.
+     */
+    @Test
+    void theCapturePageAlsoSuppliesThemWhenItRedisplaysWithErrors() throws Exception {
+        mockMvc.perform(post("/visitor/interviews/{id}/report", allocatedRequestId)
+                        .with(asUser("rc-visitor" + suffix)).with(csrf())
+                        .param("action", "submit"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("visitor/report-form"))
+                .andExpect(model().attributeExists("childInterviewed", "lateExplanationMissing"));
+    }
+
     /** The rendered card: from its id up to the start of the next one. */
     private static String substringAfter(String html, String marker) {
         int start = html.indexOf(marker);
