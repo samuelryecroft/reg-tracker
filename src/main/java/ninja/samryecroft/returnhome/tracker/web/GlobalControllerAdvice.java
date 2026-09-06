@@ -120,6 +120,17 @@ public class GlobalControllerAdvice {
      * here also matches how every other page-context value ({@code theme}, {@code shellOrg}, {@code
      * can}) already reaches templates in this codebase.
      */
+    /**
+     * <b>Not populated for views rendered from an {@code @ExceptionHandler}.</b> Spring does not run
+     * a {@code @ControllerAdvice}'s {@code @ModelAttribute} methods during exception handling, so
+     * every attribute declared here is absent on those pages - and {@code fragments/layout :: nav}
+     * reads {@code currentPath} unguarded, so <b>including the shell in an exception-rendered view
+     * turns a 404 into a 500</b>. T218 hit exactly that.
+     *
+     * <p>So the error views deliberately render without the shell. {@code error.html} always has,
+     * which reads as a design choice and is also a constraint. Noted here rather than in each
+     * template because this is where the absence originates.
+     */
     @ModelAttribute("currentPath")
     public String currentPath(HttpServletRequest request) {
         return request.getRequestURI();

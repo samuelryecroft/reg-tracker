@@ -6,7 +6,12 @@
     <th:block th:replace="~{fragments/layout :: styles}"></th:block>
 </head>
 <body>
-<div th:replace="~{fragments/layout :: nav}"></div>
+<!--/* NO SHELL, and this one is mechanical rather than stylistic. This view is rendered from an
+     @ExceptionHandler, and @ModelAttribute methods on a @ControllerAdvice DO NOT RUN for exception
+     handling - so GlobalControllerAdvice#currentPath is null, and fragments/layout :: nav evaluates
+     #strings.startsWith(path, '/dashboard/') on it and throws. Including the nav here turned a 404
+     page into a 500. error.html has always rendered without the shell for the same reason, which I
+     had previously read as a design choice; it is also a constraint. */-->
 <main id="main" class="error-page">
     <!--/*
       T218. This page renders for FOUR different situations and must look identical in all of
