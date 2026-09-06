@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import ninja.samryecroft.returnhome.tracker.report.question.ReportQuestions;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -47,29 +48,37 @@ class LateReasonQuestionMatchesGuardTest {
     private static final Path RECORD =
             Path.of("src/main/resources/templates/interview/detail.html");
 
-    /** The label bound to ifNotWhyLate on the capture/review fragment. */
-    private static final Pattern CAPTURE_LABEL =
-            Pattern.compile("<label[^>]*'ifNotWhyLate'[^>]*>(.*?)</label>", Pattern.DOTALL);
+    /** Each screen must render this question's wording FROM the model, not hold its own. */
+    private static final Pattern CAPTURE_REFERENCE =
+            Pattern.compile("<label[^>]*'ifNotWhyLate'[^>]*th:text=\"\\$\\{questions\\.ifNotWhyLate\\.label}\"");
+    private static final Pattern RECORD_REFERENCE =
+            Pattern.compile("<dt th:text=\"\\$\\{questions\\.ifNotWhyLate\\.label}\">");
 
-    /** The dt immediately preceding the record screen's ifNotWhyLate value. */
-    private static final Pattern RECORD_ROW =
-            Pattern.compile("<dt>([^<]*)</dt>\\s*<dd[^>]*lateExplanationMissing", Pattern.DOTALL);
-
+    /**
+     * <b>This guard changed shape when the labels moved onto the model, and the change is the
+     * point.</b> It used to scrape the wording out of both templates and compare the two strings -
+     * the only way to check agreement while each screen held its own copy. Now neither holds one, so
+     * agreement is <em>structural</em>: both render the same field of the same object, and there is
+     * no longer a state in which they could differ.
+     *
+     * <p>So what is asserted is that neither has quietly reacquired a copy. A guard comparing two
+     * strings would still pass if both were hard-coded and happened to match - which is exactly the
+     * condition this question was in for months, and it was not safe then either.
+     */
     @Test
     void bothSurfacesAskTheSameQuestionAboveTheSameAnswer() throws IOException {
-        String captureLabel = onlyMatch(CAPTURE_LABEL, withoutComments(read(CAPTURE)),
-                "the ifNotWhyLate label on the capture fragment");
-        String recordLabel = onlyMatch(RECORD_ROW, withoutComments(read(RECORD)),
-                "the question above the record screen's late-reason value");
+        assertThat(CAPTURE_REFERENCE.matcher(withoutComments(read(CAPTURE))).find())
+                .as("the capture form must render questions.ifNotWhyLate.label rather than its own "
+                        + "wording")
+                .isTrue();
+        assertThat(RECORD_REFERENCE.matcher(withoutComments(read(RECORD))).find())
+                .as("the record screen must render the same field of the same question. If the two "
+                        + "diverge the form asks one question while the record displays another "
+                        + "ABOVE THE SAME STORED ANSWER, and a reader cannot tell which one the "
+                        + "visitor was actually answering")
+                .isTrue();
 
-        assertThat(recordLabel)
-                .as("the form asks \"%s\" and the record displays \"%s\" above the same stored "
-                        + "answer. A reader cannot tell which question was actually put to the "
-                        + "visitor, so the record contradicts itself - which is worse than either "
-                        + "wording being wrong alone", captureLabel, recordLabel)
-                .isEqualTo(captureLabel);
-
-        assertThat(captureLabel)
+        assertThat(ReportQuestions.byId("ifNotWhyLate").orElseThrow().label())
                 .as("the question must still name the thing it is conditional on. \"If not, why?\" "
                         + "referred to a question that no longer exists, and read as a follow-up to "
                         + "whatever happened to precede it")
@@ -80,15 +89,15 @@ class LateReasonQuestionMatchesGuardTest {
      * <b>Section 2's identically worded question is left alone deliberately</b>, and this asserts it
      * is still there rather than trusting that nobody tidied it. It follows "Interview accepted?",
      * so it is anchored and correct - order-dependent, but improvable is not a licence to change.
-     * The risk this covers is the opposite of the usual one: someone finding two "If not, why?"
-     * labels, concluding both were the bug, and "finishing" T231.
+     *
+     * <p>The risk here runs opposite to the usual one: someone finds two identically worded
+     * questions, concludes both were the bug, and "finishes" T231.
      */
     @Test
-    void theSecondSectionsOwnFollowUpIsNotSweptUpWithIt() throws IOException {
-        assertThat(withoutComments(read(CAPTURE)))
-                .as("section 2's interviewDeclinedReason keeps 'If not, why?' - it follows "
-                        + "'Interview accepted?' and reads correctly there")
-                .contains("'interviewDeclinedReason'\">If not, why?</label>");
+    void theSecondSectionsOwnFollowUpIsNotSweptUpWithIt() {
+        assertThat(ReportQuestions.byId("interviewDeclinedReason").orElseThrow().label())
+                .as("this one follows 'Interview accepted?' and reads correctly there")
+                .isEqualTo("If not, why?");
     }
 
     private static String read(Path path) throws IOException {

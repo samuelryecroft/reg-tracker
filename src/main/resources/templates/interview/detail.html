@@ -291,10 +291,10 @@
               Locale.UK pin, which exists only because a statutory DOCUMENT cannot print month
               names in whatever language the container happens to default to.
             */-->
-            <dt>Date and time the interview was held</dt>
+            <dt th:text="${questions.heldAt.label}">Question</dt>
             <dd th:classappend="${report.heldAt == null} ? 'unanswered'" th:text="${report.heldAt} != null ? ${#temporals.format(report.heldAt, 'dd MMM yyyy HH:mm')} : 'Not answered'">Date</dd>
 
-            <dt>Location of this interview</dt>
+            <dt th:text="${questions.interviewLocation.label}">Question</dt>
             <dd th:classappend="${report.interviewLocation == null} ? 'unanswered'" th:text="${report.interviewLocation} ?: 'Not answered'">Location</dd>
 
             <dt>Was this interview offered and completed within 72 hours of return?</dt>
@@ -338,21 +338,21 @@
               the second definition. The words are this screen's own - the state is shared, the
               rendering is not.
             */-->
-            <dt>If this interview was not offered and completed within 72 hours of the child's return, why not?</dt>
+            <dt th:text="${questions.ifNotWhyLate.label}">Question</dt>
             <dd th:classappend="${report.lateExplanationMissing} ? 'unanswered'"
                 th:text="${report.lateExplanationMissing} ? 'No reason recorded'
                          : (${#strings.isEmpty(report.ifNotWhyLate)} ? 'Not applicable' : ${report.ifNotWhyLate})">—</dd>
 
-            <dt>Consultation with home's staff to establish any new information</dt>
+            <dt th:text="${questions.consultationWithHomeStaff.label}">Question</dt>
             <dd th:classappend="${report.consultationWithHomeStaff == null} ? 'unanswered'" th:text="${report.consultationWithHomeStaff} ?: 'Not answered'">—</dd>
 
-            <dt>Has this young person previously been missing?</dt>
+            <dt th:text="${questions.previouslyMissing.label}">Question</dt>
             <dd th:classappend="${report.previouslyMissing == null} ? 'unanswered'" th:text="${report.previouslyMissing} == null ? 'Not answered' : (${report.previouslyMissing} ? 'Yes' : 'No')">—</dd>
 
-            <dt>How many occasions of missing has there been in the last 30 days?</dt>
+            <dt th:text="${questions.missingOccasionsLast30Days.label}">Question</dt>
             <dd th:classappend="${report.missingOccasionsLast30Days == null} ? 'unanswered'" th:text="${report.missingOccasionsLast30Days} ?: 'Not answered'">—</dd>
 
-            <dt>Confidentiality explained to the young person regarding safeguarding duty of care?</dt>
+            <dt th:text="${questions.confidentialityExplained.label}">Question</dt>
             <dd th:classappend="${report.confidentialityExplained == null} ? 'unanswered'" th:text="${report.confidentialityExplained} == null ? 'Not answered' : (${report.confidentialityExplained} ? 'Yes' : 'No')">—</dd>
         </dl>
     </div>
@@ -363,40 +363,40 @@
             <span class="section-count" th:if="${notAnswered > 0}" th:text="${notAnswered + ' not answered'}"></span>
         </h3>
         <dl class="detail">
-            <dt>Interview accepted?</dt>
+            <dt th:text="${questions.interviewAccepted.label}">Question</dt>
             <dd th:classappend="${report.interviewAccepted == null} ? 'unanswered'" th:text="${report.interviewAccepted} == null ? 'Not answered' : (${report.interviewAccepted} ? 'Yes' : 'No')">—</dd>
 
-            <dt>If not, why?</dt>
+            <dt th:text="${questions.interviewDeclinedReason.label}">Question</dt>
             <dd th:classappend="${report.interviewDeclinedReason == null} ? 'unanswered'" th:text="${report.interviewDeclinedReason} ?: 'Not answered'">—</dd>
 
-            <dt>Where were you while missing?</dt>
+            <dt th:text="${questions.whereWereYouWhileMissing.label}">Question</dt>
             <dd th:classappend="${report.whereWereYouWhileMissing == null} ? 'unanswered'" th:text="${report.whereWereYouWhileMissing} ?: 'Not answered'">—</dd>
 
-            <dt>Who were you with while missing?</dt>
+            <dt th:text="${questions.whoWereYouWithWhileMissing.label}">Question</dt>
             <dd th:classappend="${report.whoWereYouWithWhileMissing == null} ? 'unanswered'" th:text="${report.whoWereYouWithWhileMissing} ?: 'Not answered'">—</dd>
 
-            <dt>What made you go missing?</dt>
+            <dt th:text="${questions.whatMadeYouGoMissing.label}">Question</dt>
             <dd th:classappend="${report.whatMadeYouGoMissing == null} ? 'unanswered'" th:text="${report.whatMadeYouGoMissing} ?: 'Not answered'">—</dd>
 
-            <dt>What can be done to address these reasons?</dt>
+            <dt th:text="${questions.whatCanBeDoneToAddressReasons.label}">Question</dt>
             <dd th:classappend="${report.whatCanBeDoneToAddressReasons == null} ? 'unanswered'" th:text="${report.whatCanBeDoneToAddressReasons} ?: 'Not answered'">—</dd>
 
-            <dt>Did you consider yourself to be missing?</dt>
+            <dt th:text="${questions.consideredSelfMissing.label}">Question</dt>
             <dd th:classappend="${report.consideredSelfMissing == null} ? 'unanswered'" th:text="${report.consideredSelfMissing} == null ? 'Not answered' : (${report.consideredSelfMissing} ? 'Yes' : 'No')">—</dd>
 
-            <dt>What did you do while you were missing?</dt>
+            <dt th:text="${questions.whatDidYouDoWhileMissing.label}">Question</dt>
             <dd th:classappend="${report.whatDidYouDoWhileMissing == null} ? 'unanswered'" th:text="${report.whatDidYouDoWhileMissing} ?: 'Not answered'">—</dd>
 
-            <dt>What happened when you returned home?</dt>
+            <dt th:text="${questions.whatHappenedWhenReturned.label}">Question</dt>
             <dd th:classappend="${report.whatHappenedWhenReturned == null} ? 'unanswered'" th:text="${report.whatHappenedWhenReturned} ?: 'Not answered'">—</dd>
 
-            <dt>Is there anything that can be done to stop you going missing again?</dt>
+            <dt th:text="${questions.preventFutureMissingSuggestions.label}">Question</dt>
             <dd th:classappend="${report.preventFutureMissingSuggestions == null} ? 'unanswered'" th:text="${report.preventFutureMissingSuggestions} ?: 'Not answered'">—</dd>
 
-            <dt>Any additional comments from the young person?</dt>
+            <dt th:text="${questions.additionalCommentsFromYoungPerson.label}">Question</dt>
             <dd th:classappend="${report.additionalCommentsFromYoungPerson == null} ? 'unanswered'" th:text="${report.additionalCommentsFromYoungPerson} ?: 'Not answered'">—</dd>
 
-            <dt>Any additional information provided by the parent/carer?</dt>
+            <dt th:text="${questions.additionalInfoFromParentCarer.label}">Question</dt>
             <dd th:classappend="${report.additionalInfoFromParentCarer == null} ? 'unanswered'" th:text="${report.additionalInfoFromParentCarer} ?: 'Not answered'">—</dd>
         </dl>
     </div>
@@ -407,16 +407,16 @@
             <span class="section-count" th:if="${notAnswered > 0}" th:text="${notAnswered + ' not answered'}"></span>
         </h3>
         <dl class="detail">
-            <dt>Any identified risks during this missing episode?</dt>
+            <dt th:text="${questions.risksIdentifiedDuringEpisode.label}">Question</dt>
             <dd th:classappend="${report.risksIdentifiedDuringEpisode == null} ? 'unanswered'" th:text="${report.risksIdentifiedDuringEpisode} ?: 'Not answered'">—</dd>
 
-            <dt>Is there anything that would increase risks during future missing episodes?</dt>
+            <dt th:text="${questions.risksIncreaseFutureEpisodes.label}">Question</dt>
             <dd th:classappend="${report.risksIncreaseFutureEpisodes == null} ? 'unanswered'" th:text="${report.risksIncreaseFutureEpisodes} ?: 'Not answered'">—</dd>
 
-            <dt>Any safeguarding concerns that need to be further explored?</dt>
+            <dt th:text="${questions.safeguardingConcernsToExplore.label}">Question</dt>
             <dd th:classappend="${report.safeguardingConcernsToExplore == null} ? 'unanswered'" th:text="${report.safeguardingConcernsToExplore} ?: 'Not answered'">—</dd>
 
-            <dt>Any information that might help locating the young person during future missing episodes?</dt>
+            <dt th:text="${questions.infoToHelpLocateFuture.label}">Question</dt>
             <dd th:classappend="${report.infoToHelpLocateFuture == null} ? 'unanswered'" th:text="${report.infoToHelpLocateFuture} ?: 'Not answered'">—</dd>
         </dl>
     </div>
@@ -443,7 +443,7 @@
             <span class="section-count" th:if="${notAnswered > 0}" th:text="${notAnswered + ' not answered'}"></span>
         </h3>
         <dl class="detail">
-            <dt>Statement</dt>
+            <dt th:text="${questions.conductedByStatement.label}">Question</dt>
             <dd th:classappend="${report.conductedByStatement == null} ? 'unanswered'" th:text="${report.conductedByStatement} ?: 'Not answered'">—</dd>
 
             <dt>Signed</dt>
@@ -462,7 +462,7 @@
               them ever read by any given person. "Not yet shared" wins because it matches the
               guidance the form itself gives.
             */-->
-            <dt>Date report shared with relevant professionals</dt>
+            <dt th:text="${questions.dateReportShared.label}">Question</dt>
             <dd th:text="${report.dateReportShared} != null ? ${#temporals.format(report.dateReportShared, 'dd MMM yyyy')} : 'Not yet shared'">—</dd>
         </dl>
     </div>

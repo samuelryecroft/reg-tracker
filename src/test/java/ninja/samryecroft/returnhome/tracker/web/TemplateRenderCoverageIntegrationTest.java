@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import ninja.samryecroft.returnhome.tracker.AbstractIntegrationTest;
@@ -24,6 +25,7 @@ import ninja.samryecroft.returnhome.tracker.user.Role;
 import ninja.samryecroft.returnhome.tracker.user.User;
 import ninja.samryecroft.returnhome.tracker.report.InterviewReport;
 import ninja.samryecroft.returnhome.tracker.report.InterviewReportRepository;
+import ninja.samryecroft.returnhome.tracker.report.question.ReportQuestion;
 import ninja.samryecroft.returnhome.tracker.report.question.ReportQuestions;
 import ninja.samryecroft.returnhome.tracker.report.question.ReportSection;
 import ninja.samryecroft.returnhome.tracker.user.UserRepository;
@@ -278,6 +280,52 @@ class TemplateRenderCoverageIntegrationTest extends AbstractIntegrationTest {
                         .doesNotContain("not answered");
             }
         }
+    }
+
+    /**
+     * T185 step 2: every question the record screen shows renders <b>the model's wording</b>.
+     *
+     * <p>The unit guards prove the templates no longer hold their own copies and that each one
+     * references {@code questions.<id>.label}. Neither can prove the words arrive: a missing model
+     * attribute, a renamed field, a placeholder left showing - all compile, and all pass a scan of
+     * the template source. This renders the page and looks.
+     *
+     * <p>Compared against the model rather than against expected strings, for the same reason as the
+     * badge assertion above: a list of 27 literals here would be exactly the second copy this whole
+     * change removes.
+     */
+    @Test
+    void everyQuestionTheRecordScreenShowsRendersTheModelsWording() throws Exception {
+        String html = mockMvc.perform(get("/interview-requests/{id}", approvedRequestId)
+                        .with(asUser("rc-reviewer" + suffix)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        // Rendered as prose beneath a section heading that already carries their wording, so they
+        // have no label element of their own - different markup, not a missing question.
+        Set<String> headedBySectionTitle = Set.of("interviewerComments", "recommendations");
+
+        // Character entities resolved before comparing. Thymeleaf escapes apostrophes to &#39;, so
+        // two of the 27 labels - the ones containing "child's" and "home's" - would otherwise be
+        // reported as never rendering when they render perfectly. That is a check failing for a
+        // reason other than the one it names, which is the shape this codebase keeps finding.
+        String rendered = html.replace("&#39;", "'").replace("&apos;", "'")
+                .replace("&quot;", "\"").replace("&amp;", "&");
+
+        List<String> missing = ReportQuestions.ALL.stream()
+                .filter(q -> !headedBySectionTitle.contains(q.id()))
+                .filter(q -> !rendered.contains(q.label()))
+                .map(ReportQuestion::id)
+                .toList();
+
+        assertThat(missing)
+                .as("these questions are in the model and their wording never reached the page. A "
+                        + "label that does not render is a question nobody is asked, and it fails "
+                        + "silently - the row is still there, with an answer under a blank heading")
+                .isEmpty();
+        assertThat(rendered)
+                .as("the design-time placeholder must never survive into a rendered page")
+                .doesNotContain(">Question<");
     }
 
     /** The rendered card: from its id up to the start of the next one. */

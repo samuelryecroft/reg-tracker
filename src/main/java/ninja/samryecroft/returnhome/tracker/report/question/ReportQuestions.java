@@ -183,9 +183,19 @@ public final class ReportQuestions {
             // --- 6. Declaration ---------------------------------------------------------------
             q("conductedByStatement", DECLARATION, "Statement", null,
                     LONG_TEXT, false, InterviewReport::getConductedByStatement),
+            // The parenthetical that used to live inside this label - "(leave blank if not yet
+            // shared)" - is GUIDANCE, not part of the question, and it is now carried as a hint.
+            // That is why the record screen legitimately showed a shorter label: it was not drift,
+            // it was the model classifying capture instruction as part of the question. With the
+            // two separated, both screens render the same question and only the capture screen
+            // repeats the instruction - which is the one place anyone can act on it.
+            //
+            // It also explains the blankIsAGap above: a form that TELLS you to leave a field empty
+            // cannot then count the empty field against you.
             new ReportQuestion("dateReportShared", DECLARATION,
-                    "Date report shared with relevant professionals (leave blank if not yet shared)",
-                    null, DATE, false, "Not yet shared", "dateReportShared", BLANK_IS_AN_ANSWER,
+                    "Date report shared with relevant professionals",
+                    "Leave blank if not yet shared.",
+                    DATE, false, "Not yet shared", "dateReportShared", BLANK_IS_AN_ANSWER,
                     InterviewReport::getDateReportShared));
 
     private static ReportQuestion q(String id, ReportSection section, String label, String hint,
