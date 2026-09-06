@@ -5,6 +5,8 @@ import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.BrowserType;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
+import java.util.ArrayList;
+import java.util.List;
 import ninja.samryecroft.returnhome.tracker.AbstractIntegrationTest;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -60,6 +62,10 @@ public abstract class AbstractUiTest extends AbstractIntegrationTest {
     protected BrowserContext context;
     protected Page page;
 
+    /** Extra contexts opened via {@link #newPageWithJavaScript(boolean)}, closed alongside the
+     * default one - a test that opens one of these must not also have to remember to close it. */
+    private final List<BrowserContext> extraContexts = new ArrayList<>();
+
     @BeforeAll
     static void launchBrowser() {
         playwright = Playwright.create();
@@ -81,6 +87,19 @@ public abstract class AbstractUiTest extends AbstractIntegrationTest {
     @AfterEach
     void closePage() {
         context.close();
+        extraContexts.forEach(BrowserContext::close);
+        extraContexts.clear();
+    }
+
+    /** A second, independent page - same server, its own cookies/session - with JavaScript on or
+     * off. For D-1e-5-shaped requirements ("must work with JS off"): the only way to test the
+     * no-JS claim is a browser that genuinely has none, not a page that happens not to trigger any
+     * script. Tracked and closed automatically alongside the default page. */
+    protected Page newPageWithJavaScript(boolean javaScriptEnabled) {
+        BrowserContext extra = browser.newContext(
+                new Browser.NewContextOptions().setJavaScriptEnabled(javaScriptEnabled));
+        extraContexts.add(extra);
+        return extra.newPage();
     }
 
     protected String url(String path) {
@@ -88,10 +107,16 @@ public abstract class AbstractUiTest extends AbstractIntegrationTest {
     }
 
     protected void login(String username, String password) {
-        page.navigate(url("/login"));
-        page.fill("#username", username);
-        page.fill("#password", password);
-        page.click("button[type=submit]");
-        page.waitForLoadState();
+        login(page, username, password);
+    }
+
+    /** Same steps, on a page other than the default one - the only shape
+     * {@link #newPageWithJavaScript} is useful for signing in on. */
+    protected void login(Page targetPage, String username, String password) {
+        targetPage.navigate(url("/login"));
+        targetPage.fill("#username", username);
+        targetPage.fill("#password", password);
+        targetPage.click("button[type=submit]");
+        targetPage.waitForLoadState();
     }
 }
