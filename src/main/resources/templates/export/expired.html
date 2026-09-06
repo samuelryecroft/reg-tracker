@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en" th:attr="data-appearance=${#strings.toLowerCase(appearancePreference)}">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Link no longer valid — Return Home Tracker</title>
+    <th:block th:replace="~{fragments/layout :: styles}"></th:block>
+</head>
+<body>
+<!--/* NO SHELL, and this one is mechanical rather than stylistic. This view is rendered from an
+     @ExceptionHandler, and @ModelAttribute methods on a @ControllerAdvice DO NOT RUN for exception
+     handling - so GlobalControllerAdvice#currentPath is null, and fragments/layout :: nav evaluates
+     #strings.startsWith(path, '/dashboard/') on it and throws. Including the nav here turned a 404
+     page into a 500. error.html has always rendered without the shell for the same reason, which I
+     had previously read as a design choice; it is also a constraint. */-->
+<main id="main" class="error-page">
+    <!--/*
+      T218. This page renders for FOUR different situations and must look identical in all of
+      them: the token is unknown, it has expired, it has already been spent, or it belongs to
+      another user. ExportLinkService.redeem collapses them into one empty Optional before the
+      controller sees anything, so they are indistinguishable BY CONSTRUCTION rather than by this
+      template being careful - but the template must not undo that, which is why there is no model
+      attribute here to render and the advice deliberately passes none.
+
+      Distinguishing them would tell someone holding a guessed token that it was once real, which
+      is most of the work of finding a live one. Same rule as T215's lockout banner and 6c's
+      404-not-403.
+
+      The heading therefore describes the COMMONEST case in the reader's own terms rather than
+      diagnosing theirs. Someone who followed their own link a day later is right; someone probing
+      is told nothing they did not already have.
+    */-->
+    <div class="error-card">
+        <svg class="icon error-icon" aria-hidden="true"><use th:href="@{/icons/phosphor.svg} + '#ph-clock-countdown'"></use></svg>
+        <h1>Link no longer valid</h1>
+        <!--/* R-Q13, byte-exact (spec §7r, HEAD 6d3b067). Kept on ONE line so no editor can
+             reflow an em dash or an apostrophe into a lookalike: the apostrophe is ASCII 0x27 and
+             the dash is U+2014 with a space either side. Creed hexdumped rather than retyped it,
+             because retyping is how the last one drifted.
+
+             §7t (HEAD fda2b34) SUPERSEDES §7r AND §7s. Oscar replaced R-Q13's row outright, and
+             NOT on the accuracy argument he explicitly declined - on WHO LANDS HERE. The
+             already-used case is common, not exotic: a double-click, a prefetch, a second click on
+             the same email. That person downloaded seconds ago, so "expired" reads as broken
+             rather than narrow. And a forwarded link tells the colleague it EXPIRED, so they ask
+             for a fresh one that also will not work for them - the wrong word manufactures a loop
+             between two people who have each been told something reasonable.
+
+             KNOCK-ON I WOULD NOT HAVE MADE: "generate it again" became "create a new export".
+             Once the first sentence changed, "it" pointed at the LINK, and you do not regenerate a
+             link. A swapped sentence moves what the next pronoun refers to.
+
+             It says "from the child's record" while this page cannot link there, and that is
+             correct rather than sloppy: THE PAGE does not know which child, but THE READER does -
+             they just generated that export. It orients; it does not navigate. */-->
+        <p class="error-body">You can create a new export from the child's record — each export is recorded separately.</p>
+        <!--/* CTA is "/" with error.html's existing label - Creed's §7s, REPLACING his own §7r
+             ruling of [Go to children], which he corrected once this build tested it against the
+             audience. The generalisation is now in the spec above the fix: AN ERROR PAGE'S CTA HAS
+             A DIFFERENT AUDIENCE FROM THE PAGE THAT PRODUCED THE ERROR - the reader arrived by
+             failing, so the permissions that got them here are not the permissions the destination
+             needs. A COORDINATOR can generate an export and is not in /children/**'s gate.
+
+             My interim version gated the button by role. "/" removes the branch entirely and
+             reuses a label this codebase already has, which is one decision rather than two. */-->
+        <div class="error-actions">
+            <a class="btn" href="/">Go to dashboard</a>
+        </div>
+    </div>
+</main>
+</body>
+</html>
