@@ -242,30 +242,82 @@ public class AuditHistoryService {
         Map<Long, Long> requestIdByReportId = interviewReportRepository.findByInterviewRequestIdIn(requestIds).stream()
                 .collect(Collectors.toMap(InterviewReport::getId, r -> r.getInterviewRequest().getId()));
 
+        // T292's scope, and this line IS the access control. A child is reachable here ONLY through a
+        // request that is already in the principal's bounded set, so the child path cannot see a
+        // child the request path could not. BOUND FROM THE PRINCIPAL FIRST, FILTER WITHIN - never a
+        // fresh query by home or organisation, which would be a SECOND implementation of
+        // requestsInScope, free to drift from it, silently, across organisations.
+        Map<Long, List<InterviewRequest>> inScopeRequestsByChildId = requestsInScope.stream()
+                .collect(Collectors.groupingBy(request -> request.getChild().getId()));
+
         List<AuditFeedRow> rows = new ArrayList<>();
         for (AuditEvent event : auditEventRepository.findByOrganisationIdIn(organisationIds)) {
             if (!typesIn(scope).contains(event.getEventType())) {
-                continue;
-            }
-            Long requestId = "InterviewRequest".equals(event.getTargetType()) ? event.getTargetId()
-                    : "InterviewReport".equals(event.getTargetType()) ? requestIdByReportId.get(event.getTargetId())
-                    : null;
-            InterviewRequest request = requestId == null ? null : requestById.get(requestId);
-            if (request == null) {
-                continue;
-            }
-            if (homeIdFilter != null && !homeIdFilter.equals(request.getHome().getId())) {
                 continue;
             }
             LocalDate day = event.getOccurredAt().toLocalDate();
             if ((from != null && day.isBefore(from)) || (to != null && day.isAfter(to))) {
                 continue;
             }
-            rows.add(new AuditFeedRow(toEntry(event, WhenStyle.SHORT_DATE), request.getHome().getName(),
-                    request.getChild().getFullName(), request.getId()));
+            AuditFeedRow row = "Child".equals(event.getTargetType())
+                    ? childRow(event, inScopeRequestsByChildId, homeIdFilter)
+                    : requestRow(event, requestById, requestIdByReportId, homeIdFilter);
+            if (row != null) {
+                rows.add(row);
+            }
         }
         rows.sort(Comparator.comparing((AuditFeedRow row) -> row.entry().occurredAt()).reversed());
         return rows;
+    }
+
+    /** An event about a request or its report, resolved back to the request. {@code null} if out of scope. */
+    private AuditFeedRow requestRow(AuditEvent event, Map<Long, InterviewRequest> requestById,
+            Map<Long, Long> requestIdByReportId, Long homeIdFilter) {
+        Long requestId = "InterviewRequest".equals(event.getTargetType()) ? event.getTargetId()
+                : "InterviewReport".equals(event.getTargetType()) ? requestIdByReportId.get(event.getTargetId())
+                : null;
+        InterviewRequest request = requestId == null ? null : requestById.get(requestId);
+        if (request == null || (homeIdFilter != null && !homeIdFilter.equals(request.getHome().getId()))) {
+            return null;
+        }
+        return AuditFeedRow.forRequest(toEntry(event, WhenStyle.SHORT_DATE), request.getHome().getName(),
+                request.getChild().getFullName(), request.getId());
+    }
+
+    /**
+     * An event about a child - today only record access (T292). <strong>Before this the feed dropped
+     * every one of them</strong>, because a row it could not resolve to an interview request was
+     * skipped: we had not lost the data, we had lost the ROUTE, and a row reachable only by writing
+     * SQL against production is hoarded rather than kept.
+     *
+     * <p><strong>The event is NOT retargeted to a request to make it resolve.</strong> That was
+     * considered and refused: it would falsify what happened, and you do not close a retrieval gap by
+     * mislabelling the record. The row keeps saying it was about a child, and the feed learns to
+     * carry that.
+     *
+     * <p><strong>Scope comes from the anchor request, not from the child.</strong> The child's own
+     * {@code getHome()} is deliberately not read: a child who moved homes could carry one the
+     * principal cannot see, and the feed would then print a home name that its own access rule would
+     * have withheld. Every field here comes from a request already in the principal's set.
+     */
+    private AuditFeedRow childRow(AuditEvent event, Map<Long, List<InterviewRequest>> inScopeRequestsByChildId,
+            Long homeIdFilter) {
+        List<InterviewRequest> anchors = inScopeRequestsByChildId.get(event.getTargetId());
+        if (anchors == null) {
+            return null;
+        }
+        // Any in-scope request in the filtered home will do, and looking at ALL of them is the point:
+        // a child with requests in two homes must still appear when the feed is filtered to the
+        // second one. Picking one anchor up front would have hidden the row instead.
+        InterviewRequest anchor = anchors.stream()
+                .filter(request -> homeIdFilter == null || homeIdFilter.equals(request.getHome().getId()))
+                .findFirst()
+                .orElse(null);
+        if (anchor == null) {
+            return null;
+        }
+        return AuditFeedRow.forChild(toEntry(event, WhenStyle.SHORT_DATE), anchor.getHome().getName(),
+                anchor.getChild().getFullName(), event.getTargetId());
     }
 
     /**
