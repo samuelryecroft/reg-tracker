@@ -88,11 +88,16 @@ public class AuditHistoryService {
         // draft saves" is a claim about time order, so a run computed over an unsorted list is not
         // the run the reader is looking at.
         events.sort(Comparator.comparing(AuditEvent::getOccurredAt).reversed());
-        return groupByDay(events, WhenStyle.TIME);
+        return groupByDay(events, WhenStyle.TIME, DraftSaveRuns.COLLAPSED);
+    }
+
+    /** Cross-request "case history" for a screen - see {@link DraftSaveRuns} before adding a caller. */
+    public List<AuditHistorySection> caseHistoryFor(List<InterviewRequest> requests) {
+        return caseHistoryFor(requests, DraftSaveRuns.COLLAPSED);
     }
 
     /** Cross-request "case history": every request raised for this child, each its own section. */
-    public List<AuditHistorySection> caseHistoryFor(List<InterviewRequest> requests) {
+    public List<AuditHistorySection> caseHistoryFor(List<InterviewRequest> requests, DraftSaveRuns draftSaveRuns) {
         if (requests.isEmpty()) {
             return List.of();
         }
@@ -126,7 +131,7 @@ public class AuditHistoryService {
                 continue;
             }
             String label = "Request #" + request.getId() + " — " + request.getCreatedAt().format(MONTH_YEAR);
-            sections.add(new AuditHistorySection(label, toEntries(forThisRequest, WhenStyle.SHORT_DATE)));
+            sections.add(new AuditHistorySection(label, toEntries(forThisRequest, WhenStyle.SHORT_DATE, draftSaveRuns)));
         }
         return sections;
     }
@@ -185,7 +190,7 @@ public class AuditHistoryService {
                 .stream()
                 .filter(e -> !EXCLUDED_FROM_USER_HISTORY.contains(e.getEventType()))
                 .toList();
-        return groupByDay(events, WhenStyle.TIME);
+        return groupByDay(events, WhenStyle.TIME, DraftSaveRuns.COLLAPSED);
     }
 
     /**
@@ -203,16 +208,22 @@ public class AuditHistoryService {
      * would silently restate <em>who</em> did something, and the only thing this projection is for
      * is that a row's facts are its event's facts.
      *
+     * <p>{@code draftSaveRuns} is what keeps the case-file export out of this: see
+     * {@link DraftSaveRuns}. The export reaches the timeline through the same builder, which is
+     * what made this change need no template edit and is also what would have collapsed a
+     * disclosure as a side effect of tidying a screen.
+     *
      * <p><strong>Display-only and reversible.</strong> Nothing is dropped and nothing is filtered:
      * the rows underneath are untouched and still answer "how many times was this revised, and
      * when" for a DPO or a court - and so does the collapsed row itself, which carries the count
      * and the span rather than hiding them behind an affordance.
      */
-    private List<AuditHistoryEntry> toEntries(List<AuditEvent> events, WhenStyle whenStyle) {
+    private List<AuditHistoryEntry> toEntries(List<AuditEvent> events, WhenStyle whenStyle,
+            DraftSaveRuns draftSaveRuns) {
         List<AuditHistoryEntry> entries = new ArrayList<>();
         int i = 0;
         while (i < events.size()) {
-            int end = endOfDraftSaveRun(events, i);
+            int end = draftSaveRuns == DraftSaveRuns.COLLAPSED ? endOfDraftSaveRun(events, i) : i + 1;
             entries.add(end - i > 1 ? collapsedDraftSaves(events.subList(i, end), whenStyle)
                     : toEntry(events.get(i), whenStyle));
             i = end;
@@ -277,7 +288,8 @@ public class AuditHistoryService {
      * happened to be first. A day heading that has rows under it the day did not contain is a
      * worse defect than the noise this card exists to remove.
      */
-    private List<AuditHistorySection> groupByDay(List<AuditEvent> events, WhenStyle whenStyle) {
+    private List<AuditHistorySection> groupByDay(List<AuditEvent> events, WhenStyle whenStyle,
+            DraftSaveRuns draftSaveRuns) {
         Map<LocalDate, List<AuditEvent>> byDay = new LinkedHashMap<>();
         for (AuditEvent event : events) {
             byDay.computeIfAbsent(event.getOccurredAt().toLocalDate(), d -> new ArrayList<>()).add(event);
@@ -286,7 +298,7 @@ public class AuditHistoryService {
         List<AuditHistorySection> sections = new ArrayList<>();
         for (Map.Entry<LocalDate, List<AuditEvent>> dayEntry : byDay.entrySet()) {
             sections.add(new AuditHistorySection(dayLabel(dayEntry.getKey(), today),
-                    toEntries(dayEntry.getValue(), whenStyle)));
+                    toEntries(dayEntry.getValue(), whenStyle, draftSaveRuns)));
         }
         return sections;
     }

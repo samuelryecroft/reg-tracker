@@ -2,6 +2,7 @@ package ninja.samryecroft.returnhome.tracker.audit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
+import static org.assertj.core.api.InstanceOfAssertFactories.list;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -200,6 +201,65 @@ class DraftSaveCollapseTest {
         assertThat(service.historyFor(request).get(0).entries())
                 .extracting(AuditHistoryEntry::when)
                 .containsExactly("11:00", "10:00", "09:00");
+    }
+
+    // --- the export is not a screen ---
+
+    /**
+     * The case-file export reaches the timeline through the same builder, which is what let this
+     * change land without a template edit and is also what would have collapsed a disclosure as a
+     * side effect of tidying a screen. KEPT_IN_FULL is the export's answer; this asserts it is a
+     * real one and not a parameter nobody reads.
+     */
+    @Test
+    void keptInFullLeavesEverySaveOnItsOwnRow() {
+        List<AuditEvent> events = List.of(
+                draftSave(3L, at(11, 2), "DRAFT"),
+                draftSave(2L, at(10, 30), "DRAFT"),
+                draftSave(1L, at(9, 14), "DRAFT"));
+        when(request.getCreatedAt()).thenReturn(at(8, 0));
+        when(auditEventRepository.findByTargetTypeAndTargetIdInOrderByOccurredAtDesc(
+                "InterviewRequest", List.of(REQUEST_ID))).thenReturn(List.of());
+        when(auditEventRepository.findByTargetTypeAndTargetIdInOrderByOccurredAtDesc(
+                "InterviewReport", List.of(REPORT_ID))).thenReturn(events);
+        events.forEach(event -> when(event.getTargetType()).thenReturn("InterviewReport"));
+        events.forEach(event -> when(event.getTargetId()).thenReturn(REPORT_ID));
+
+        assertThat(service.caseHistoryFor(List.of(request), DraftSaveRuns.KEPT_IN_FULL))
+                .singleElement()
+                .extracting(AuditHistorySection::entries, list(AuditHistoryEntry.class))
+                .extracting(AuditHistoryEntry::headline, AuditHistoryEntry::id)
+                .containsExactly(
+                        tuple("Draft saved", 3L),
+                        tuple("Draft saved", 2L),
+                        tuple("Draft saved", 1L));
+    }
+
+    /** The same events through the screen's default, so the two are told apart by the flag alone. */
+    @Test
+    void theSameEventsCollapseOnTheChildPage() {
+        List<AuditEvent> events = List.of(
+                draftSave(3L, at(11, 2), "DRAFT"),
+                draftSave(2L, at(10, 30), "DRAFT"),
+                draftSave(1L, at(9, 14), "DRAFT"));
+        when(request.getCreatedAt()).thenReturn(at(8, 0));
+        when(auditEventRepository.findByTargetTypeAndTargetIdInOrderByOccurredAtDesc(
+                "InterviewRequest", List.of(REQUEST_ID))).thenReturn(List.of());
+        when(auditEventRepository.findByTargetTypeAndTargetIdInOrderByOccurredAtDesc(
+                "InterviewReport", List.of(REPORT_ID))).thenReturn(events);
+        events.forEach(event -> when(event.getTargetType()).thenReturn("InterviewReport"));
+        events.forEach(event -> when(event.getTargetId()).thenReturn(REPORT_ID));
+
+        assertThat(service.caseHistoryFor(List.of(request)))
+                .singleElement()
+                .extracting(AuditHistorySection::entries, list(AuditHistoryEntry.class))
+                .singleElement()
+                .satisfies(row -> {
+                    assertThat(row.headline()).isEqualTo("Draft saved (3 times)");
+                    // The child page's WHEN column is date-only, so a same-day run gets no span.
+                    assertThat(row.when()).isEqualTo("04 Mar 2026");
+                    assertThat(row.detail()).isNull();
+                });
     }
 
     // --- fixtures ---
