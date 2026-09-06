@@ -2,6 +2,7 @@ package ninja.samryecroft.returnhome.tracker.audit;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -17,6 +18,21 @@ public interface AuditEventRepository extends JpaRepository<AuditEvent, Long> {
     List<AuditEvent> findByEventTypeOrderByOccurredAtDesc(AuditEventType eventType);
 
     List<AuditEvent> findByTargetTypeAndTargetIdOrderByOccurredAtDesc(String targetType, Long targetId);
+
+    /**
+     * This actor's most recent row, of any type (T283).
+     *
+     * <p>Used by {@code AuditEventPublisher} to decide whether a view is a NEW access or a refresh
+     * inside one the actor is already having. "Of any kind" is the whole point: any other activity
+     * by them - a different child, an edit, an export - ends the episode, so a second view of the
+     * same record after doing something else is recorded.
+     *
+     * <p>Scoped to ONE ACTOR deliberately. The global version of this - "is the immediately
+     * preceding ROW mine" - was ruled out because another user's unrelated event landing between two
+     * of your refreshes would change YOUR trail: the same behaviour producing a different record
+     * depending on how busy the estate was.
+     */
+    Optional<AuditEvent> findFirstByActorIdOrderByOccurredAtDesc(Long actorId);
 
     /**
      * Batched form of the finder above - a child's case history spans several interview requests

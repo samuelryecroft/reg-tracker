@@ -1,6 +1,9 @@
 package ninja.samryecroft.returnhome.tracker.audit;
 
+import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.Comparator;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import ninja.samryecroft.returnhome.tracker.export.ExportPurpose;
@@ -32,13 +35,29 @@ import org.springframework.stereotype.Component;
 @Component
 public class AuditEventPublisher {
 
+    /**
+     * How long one access episode may last regardless of inactivity (T283 R2).
+     *
+     * <p>A judgement, not a measurement (Kevin's own flag): comfortably shorter than a working
+     * half-day, comfortably longer than a read-and-refresh. It is the BACKSTOP - R1 does the work -
+     * and it exists only to close the case where a user opens a record, does nothing in the
+     * application for hours, and comes back to the same one.
+     *
+     * <p>If anyone measures real episode lengths, that measurement should replace this number.
+     * Changing it will not corrupt the rows already written, because each row carries the window it
+     * was written under.
+     */
+    private static final Duration ACCESS_EPISODE_CAP = Duration.ofMinutes(30);
+
     private final ApplicationEventPublisher applicationEventPublisher;
     private final UserRepository userRepository;
+    private final AuditEventRepository auditEventRepository;
 
     public AuditEventPublisher(ApplicationEventPublisher applicationEventPublisher,
-            UserRepository userRepository) {
+            UserRepository userRepository, AuditEventRepository auditEventRepository) {
         this.applicationEventPublisher = applicationEventPublisher;
         this.userRepository = userRepository;
+        this.auditEventRepository = auditEventRepository;
     }
 
     // --- Authentication (A.1) ---
@@ -395,10 +414,64 @@ public class AuditEventPublisher {
      */
     public void auditViewOpened(String subjectType, Long subjectId, Long organisationId, Long homeId,
             AppUserPrincipal principal) {
+        if (continuesAnAccessEpisode(subjectType, subjectId, principal)) {
+            return;
+        }
         publish(actor(AuditEventRecord.of(AuditEventType.AUDIT_VIEW_OPENED), principal)
                 .target(subjectType, subjectId)
                 .scope(organisationId, homeId)
+                // T283 R3, AND THIS IS THE CLAUSE THAT MAKES SUPPRESSION SAFE. A suppressed event is
+                // invisible: without these the trail cannot tell "suppressed" from "never happened".
+                // So the surviving row says what it is, and the trail stops claiming "these are all
+                // accesses" and starts claiming "these are all access EPISODES, de-duplicated at 30
+                // minutes" - a WEAKER claim, and a TRUE one.
+                //
+                // THE WINDOW IS IN THE ROW, NOT ONLY IN THE CODE, and that is not redundancy. If the
+                // policy becomes 5 minutes next year, rows written under the old rule must still say
+                // 30 - a window living only in code silently REINTERPRETS EVERY HISTORICAL ROW the
+                // day someone edits the constant.
+                .meta("deduplication", "access-episode")
+                .meta("deduplicationWindowMinutes", ACCESS_EPISODE_CAP.toMinutes())
                 .build());
+    }
+
+    /**
+     * Whether this view is a refresh inside an access the actor is already having (T283 R1).
+     *
+     * <p><strong>Multiple draft saves are multiple ACTS; multiple refreshes are ONE act.</strong>
+     * That is why this does not contradict T177, which refused to drop events at all: twenty rows
+     * for twenty refreshes do not record twenty accesses, they record one access and nineteen
+     * artefacts of HTTP. This declines to over-count an access; it does not drop one.
+     *
+     * <p>The unit is the EPISODE, not a time window. A pure duration was rejected because there is
+     * no length both long enough to be useful and provably unable to merge two decisions - a worker
+     * may return ten minutes later - so <strong>a time window alone is a guess about human behaviour
+     * wearing the costume of a rule.</strong> The real test is that NOTHING ELSE HAPPENED: any other
+     * activity by this actor, of any kind, ends the episode.
+     *
+     * <p>Scoped to ONE ACTOR deliberately. The global form - "is the immediately preceding ROW mine"
+     * - would let another user's unrelated event landing between two of your refreshes change YOUR
+     * trail, so the same behaviour would produce a different record depending on how busy the estate
+     * was. "Complete except when the system was quiet" is not a property anyone can explain.
+     *
+     * <p><strong>It fails towards RECORDING in all three of its uncertain cases, deliberately:</strong>
+     * an actor we cannot identify is never suppressed; a row not yet committed when the next request
+     * queries produces a second row rather than a lost one; and any doubt about the previous event's
+     * type or target resolves to writing. On an access trail an extra row is noise, and a missing one
+     * is a gap nobody can see.
+     */
+    private boolean continuesAnAccessEpisode(String subjectType, Long subjectId, AppUserPrincipal principal) {
+        Long actorId = principal == null ? null : principal.getUserId();
+        if (actorId == null) {
+            return false;
+        }
+        return auditEventRepository.findFirstByActorIdOrderByOccurredAtDesc(actorId)
+                .filter(previous -> previous.getEventType() == AuditEventType.AUDIT_VIEW_OPENED)
+                .filter(previous -> Objects.equals(previous.getTargetType(), subjectType))
+                .filter(previous -> Objects.equals(previous.getTargetId(), subjectId))
+                .filter(previous -> previous.getOccurredAt()
+                        .isAfter(LocalDateTime.now().minus(ACCESS_EPISODE_CAP)))
+                .isPresent();
     }
 
     // --- Masking (T138 1c) ---
