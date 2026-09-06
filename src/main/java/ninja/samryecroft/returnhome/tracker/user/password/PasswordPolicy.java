@@ -128,9 +128,21 @@ public class PasswordPolicy {
      * policy is calibrated to avoid. Lower-casing already happens above. <em>Do not "complete" this
      * by adding more.</em>
      *
-     * <p>A stem that strips to nothing, or to almost nothing, matches NOTHING: {@code 123456789012}
-     * must not become a blocklist hit by way of the empty string, which every {@code contains} call
-     * would otherwise answer for.
+     * <p><strong>A stem that strips to nothing, or to almost nothing, matches NOTHING</strong> -
+     * {@code 123456789012} must not become a blocklist hit by way of its empty stem.
+     *
+     * <p><strong>And here is what that floor is really worth, measured rather than asserted, because
+     * my first comment on it was wrong.</strong> I wrote that an empty stem would match everything
+     * "which every contains call would answer for" - true of {@code String.contains}, FALSE HERE:
+     * {@code blocked} is a Set, so an empty stem is simply not an element and matches nothing on its
+     * own. Arming the floor confirmed it - removing it changed no behaviour at all.
+     *
+     * <p>It stays, and it is not decoration. The real hazard is a SHORT ENTRY, not an empty stem: if
+     * a future list contained {@code abc}, then {@code abc123456789} would strip to it and be
+     * refused, which is a false rejection of a perfectly ordinary passphrase. Today's list has NO
+     * entry shorter than four characters, so the property holds by the data as well as by the code -
+     * and {@code PasswordPolicyTest} asserts that fact about the list, so if it ever stops being
+     * true this floor is already the thing standing in the way rather than something to add later.
      */
     private String stemOf(String normalised) {
         int end = normalised.length();

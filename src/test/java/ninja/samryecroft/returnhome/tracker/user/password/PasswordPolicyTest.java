@@ -114,6 +114,30 @@ class PasswordPolicyTest {
     }
 
     /**
+     * The blocklist itself carries no entry short enough to make stem-matching dangerous.
+     *
+     * <p>This is the arm-able half of the floor in {@code stemOf}. Removing that floor changes no
+     * behaviour against today's list, because a Set lookup cannot match an empty stem and no entry
+     * is shorter than four characters - so the property is currently held by the DATA. Asserting the
+     * data is what keeps the CODE's floor meaningful: add {@code abc} to the file and
+     * {@code abc123456789}, an ordinary passphrase, becomes a refusal. This test goes red first.
+     */
+    @Test
+    void noBlocklistEntryIsShortEnoughToMakeStemMatchingDangerous() throws Exception {
+        try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(
+                PasswordPolicy.class.getResourceAsStream("/security/weak-passwords.txt"),
+                java.nio.charset.StandardCharsets.UTF_8))) {
+            assertThat(reader.lines().map(String::trim)
+                    .filter(line -> !line.isEmpty() && !line.startsWith("#"))
+                    .filter(line -> line.length() < 4)
+                    .toList())
+                    .as("a blocklist entry shorter than the stem floor would refuse ordinary "
+                            + "passphrases that merely end in digits")
+                    .isEmpty();
+        }
+    }
+
+    /**
      * TRAILING DIGITS ONLY - a deliberate stopping point. Trailing punctuation is NOT stripped, and
      * this test exists so that someone "completing" the normalisation has to change a test that says
      * why: every additional rule raises the false-reject rate, and a false rejection here costs a
