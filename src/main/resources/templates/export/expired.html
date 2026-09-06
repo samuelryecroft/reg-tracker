@@ -37,31 +37,25 @@
              the dash is U+2014 with a space either side. Creed hexdumped rather than retyped it,
              because retyping is how the last one drifted.
 
+             §7s supersedes §7r: the opening clause "This export has expired." is PROMOTED INTO
+             THE HEADING, which a page needs and a table row never had, so the body carries
+             R-Q13's remainder only. No word altered, one clause relocated.
+
              It says "from the child's record" while this page cannot link there, and that is
              correct rather than sloppy: THE PAGE does not know which child, but THE READER does -
              they just generated that export. It orients; it does not navigate. */-->
-        <p class="error-body">This export has expired. You can generate it again from the child's record — each export is recorded separately.</p>
-        <!--/* CTA is Creed's [Go to children] (§7r), GATED on actually being able to reach it -
-             his own §5f rule: omit a button rather than render a broken one. Export eligibility is
-             ADMIN, ORG_ADMIN, COORDINATOR and VIEWER; /children/** is gated to HOME_STAFF,
-             ORG_ADMIN, VIEWER and ADMIN (SecurityConfig:63), so A COORDINATOR CAN GENERATE AN
-             EXPORT AND CANNOT REACH THE CHILDREN LIST.
+        <p class="error-body">You can generate it again from the child's record — each export is recorded separately.</p>
+        <!--/* CTA is "/" with error.html's existing label - Creed's §7s, REPLACING his own §7r
+             ruling of [Go to children], which he corrected once this build tested it against the
+             audience. The generalisation is now in the spec above the fix: AN ERROR PAGE'S CTA HAS
+             A DIFFERENT AUDIENCE FROM THE PAGE THAT PRODUCED THE ERROR - the reader arrived by
+             failing, so the permissions that got them here are not the permissions the destination
+             needs. A COORDINATOR can generate an export and is not in /children/**'s gate.
 
-             His §5f fallback was "let the shell's nav be the answer". IT CANNOT BE, ON THIS PAGE:
-             this view renders from an @ExceptionHandler, where a @ControllerAdvice's
-             @ModelAttribute methods do not run, so fragments/layout :: nav throws on a null
-             currentPath - that is the 500 this page shipped as on its first CI run. Omitting the
-             button outright would therefore leave a coordinator on a dead end with no way out at
-             all, which is worse than the broken link §5f forbids.
-
-             So: the ruled button for those who can use it, and a route home for those who cannot.
-             #authorization reads the SecurityContext rather than the model, which is why it works
-             here when ${can...} would not - same idiom fragments/layout already uses. */-->
+             My interim version gated the button by role. "/" removes the branch entirely and
+             reuses a label this codebase already has, which is one decision rather than two. */-->
         <div class="error-actions">
-            <a class="btn" th:if="${#authorization.expression('hasAnyRole(''HOME_STAFF'',''ORG_ADMIN'',''VIEWER'',''ADMIN'')')}"
-               href="/children">Go to children</a>
-            <a class="btn" th:unless="${#authorization.expression('hasAnyRole(''HOME_STAFF'',''ORG_ADMIN'',''VIEWER'',''ADMIN'')')}"
-               href="/">Back to your dashboard</a>
+            <a class="btn" href="/">Go to dashboard</a>
         </div>
     </div>
 </main>
