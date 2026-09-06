@@ -5750,6 +5750,16 @@ correct degradation.
 The toggle belongs in `.shell-header-actions`, beside the appearance and reveal controls. It will be the third
 control there — and Pam reports the notification icon beside it is **non-functional**.
 
+> **[CORRECTED 8 Sep — this said DOM parentage when it meant reading order.]** Pam found that `<summary>` must
+> be `<details>`'s literal first child, so it cannot also be a child of `.shell-header-actions` unless
+> `<details>` wraps the header too — which would make the header's presence depend on the nav's open state.
+> **The tension is my wording, not the design: "in `.shell-header-actions`" was never a claim about DOM
+> parentage.** What is load-bearing is that the toggle **(a)** reads as part of the same control row,
+> **(b)** sits in **focus order adjacent to the other header controls, matching its visual position**, and
+> **(c)** is real (§5f). **None of those require it to be a DOM child of that div.** So this constraint gives:
+> `<details>` wraps `<summary>` + `<aside class="shell-side">`, adjacent and unchanged, laid into the header's
+> row by normal flow. *I wrote an implementation where I needed a property — the same error as §8m's caret.*
+
 **§5f already rules this: anything in the shell that is not wired must not look like a control.** Below 900px
 that rule binds harder, and the reason is structural:
 
@@ -5775,7 +5785,19 @@ horizontal space. §8m's amendment stands untouched.
 **The conflict that does bind is vertical, and it is real.** At 320×568 the stepper already owns a sticky
 footer (`.sticky-actions`). A sticky or fixed header would take a second horizontal band permanently.
 
-> **RULED: the header does NOT become sticky or fixed at narrow width.** It scrolls with the page. The visitor
+> **RULED: the header does NOT become sticky or fixed at narrow width.** It scrolls with the page.
+
+**[CLARIFIED 8 Sep]** This rules out **viewport-anchored** positioning — `fixed`, `sticky` — because of the
+failure it produces: *a toggle that stays put while its apparent header siblings scroll away underneath it.*
+**It does not forbid positioning as such.** Anything that scrolls with the document cannot produce that
+failure, so an ordinary-flow or document-scrolling arrangement is not excluded by this rule.
+
+**And one hazard for any shape that nests `.shell-side` deeper than it sits today:** it is `position: fixed`,
+so it is viewport-relative *regardless of parent* — **unless an ancestor gains `transform`, `filter`,
+`perspective`, `backdrop-filter`, `will-change` or `contain`,** any of which creates a containing block and
+would silently reposition the desktop sidebar. **Verified: no shell ancestor has one today.** A new wrapper
+must never acquire one, and that is exactly the kind of reason that has to be recorded or it is one restyle
+from being lost. The visitor
 > is filling in a statutory instrument with a child present; the form is what they are using, and the
 > navigation is reachable by scrolling to the top of a page they are already scrolling. **A permanently
 > visible nav affordance would buy one scroll and spend it on every screen of the form.** *The save state
