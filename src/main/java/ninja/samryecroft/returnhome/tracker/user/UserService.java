@@ -96,6 +96,20 @@ public class UserService {
         return roleMatrix.assignableRoles(principal);
     }
 
+    /**
+     * The roles this target holds that the given actor may not assign - i.e. the ones the edit form
+     * must show as present and refuse to let them change (T275).
+     *
+     * <p>Public because the CONTROLLER needs the same answer the merge uses. One method, so the
+     * screen and the save cannot disagree about which roles are off-limits; two computations of this
+     * would be the original defect in a new place, where the form shows one thing and the service
+     * keeps another.
+     */
+    public List<Role> rolesNotAssignableBy(User user, AppUserPrincipal principal) {
+        List<Role> assignable = allowedRolesFor(principal);
+        return user.getRoles().stream().filter(role -> !assignable.contains(role)).sorted().toList();
+    }
+
     public User getAuthorized(Long id, AppUserPrincipal principal) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("No such user: " + id));
@@ -132,7 +146,8 @@ public class UserService {
 
     @Transactional
     public User create(CreateUserForm form, AppUserPrincipal principal) {
-        validateRoles(form.getRoles(), principal);
+        validateAssignable(form.getRoles(), principal);
+        validateCombination(form.getRoles());
 
         User user = new User();
         user.setUsername(form.getUsername());
@@ -153,16 +168,25 @@ public class UserService {
     @Transactional
     public User update(Long id, EditUserForm form, AppUserPrincipal principal) {
         User user = getAuthorized(id, principal);
-        validateRoles(form.getRoles(), principal);
+        validateAssignable(form.getRoles(), principal);
 
         // Snapshotted before the setters below mutate the managed entity, so the audit row can
         // record the actual role/enabled transition rather than just the end state.
         Set<Role> rolesBefore = Set.copyOf(user.getRoles());
+        Set<Role> roles = mergeWithRolesTheActorCannotAssign(rolesBefore, form.getRoles(), principal);
+        // The COMBINATION is checked on the merged result, not on what was submitted. The submitted
+        // set can be perfectly legal on its own and still produce an illegal account once a retained
+        // role is added back - and the exclusivity rules exist to describe the ACCOUNT, not the
+        // request. This is also what stops the care-provider side going quiet: it is safe today only
+        // because HOME_STAFF may not be combined with anything, so relaxing that rule later would
+        // silently re-open this if the check still looked at the submission.
+        validateCombination(roles);
+        refuseToRemoveYourOwnAdministrativeRole(user, rolesBefore, roles, principal);
         boolean enabledBefore = user.isEnabled();
         applyProfile(user, form.getFirstName(), form.getLastName(), form.getEmail(), form.getContactPhone());
-        user.setRoles(form.getRoles());
-        user.setOrganisation(needsOrganisation(form.getRoles()) ? resolveOrganisation(form.getOrganisationId(), principal) : null);
-        user.setHomes(resolveHomes(form.getRoles(), form.getHomeIds(), principal));
+        user.setRoles(roles);
+        user.setOrganisation(needsOrganisation(roles) ? resolveOrganisation(form.getOrganisationId(), principal) : null);
+        user.setHomes(resolveHomes(roles, form.getHomeIds(), principal));
         user.setEnabled(form.isEnabled());
         boolean passwordChanged = form.getNewPassword() != null && !form.getNewPassword().isBlank();
         if (passwordChanged) {
@@ -173,13 +197,71 @@ public class UserService {
         return saved;
     }
 
-    private void validateRoles(Set<Role> roles, AppUserPrincipal principal) {
+    /**
+     * A role the actor cannot grant, they cannot remove (T275, Oscar's rule).
+     *
+     * <p>{@code update} used to do {@code user.setRoles(form.getRoles())}, and the submitted set was
+     * checked only for being a SUBSET OF WHAT THE ACTOR MAY ASSIGN - it never looked at what the
+     * target already held. So every role outside the actor's assignable set was replaced away.
+     *
+     * <p><strong>And it was not merely uneditable, it was invisible.</strong> The edit template
+     * iterates the actor's assignable roles, so such a role rendered no checkbox at all: unrendered,
+     * unsubmitted, and silently gone. A supplier org-admin editing their own contact details saved
+     * away their own ORG_ADMIN, and only a platform admin could put it back.
+     *
+     * <p>So the retained set is computed from the TARGET's roles rather than from the form: the form
+     * cannot be trusted to carry what it was never shown.
+     */
+    private Set<Role> mergeWithRolesTheActorCannotAssign(Set<Role> held, Set<Role> submitted,
+            AppUserPrincipal principal) {
+        List<Role> assignable = allowedRolesFor(principal);
+        Set<Role> merged = new LinkedHashSet<>(submitted == null ? Set.of() : submitted);
+        held.stream().filter(role -> !assignable.contains(role)).forEach(merged::add);
+        return merged;
+    }
+
+    /**
+     * An actor may not remove their own ADMIN or ORG_ADMIN role.
+     *
+     * <p>The merge above closes the SILENT case - a role nobody was shown cannot be dropped. This
+     * closes the VISIBLE one: a role the actor can both see and assign, unticked on their own
+     * account. Everything else on this screen is recoverable by the person who did it; this is the
+     * one action that is not, because removing the role removes the ability to put it back.
+     *
+     * <p><strong>Scope, stated accurately rather than generously:</strong> no ORG_ADMIN can reach
+     * this today. {@code RoleMatrix.assignableRoles} gives a care-provider org-admin
+     * {HOME_STAFF, VIEWER} and a supplier org-admin {COORDINATOR, VISITOR, REVIEWER} - neither
+     * includes ORG_ADMIN, so their own role is retained by the merge and never offered as a
+     * checkbox. In practice this guard fires for a platform ADMIN removing their own ADMIN.
+     * ORG_ADMIN is listed anyway because the guard should not start depending on a matrix entry that
+     * a later card may widen - which is the same mistake as the care-provider side being safe only
+     * by accident of HOME_STAFF exclusivity.
+     */
+    private void refuseToRemoveYourOwnAdministrativeRole(User user, Set<Role> before, Set<Role> after,
+            AppUserPrincipal principal) {
+        if (!user.getId().equals(principal.getUserId())) {
+            return;
+        }
+        for (Role role : List.of(Role.ADMIN, Role.ORG_ADMIN)) {
+            if (before.contains(role) && !after.contains(role)) {
+                throw new IllegalArgumentException("You cannot remove your own " + role.getDisplayName()
+                        + " role. Ask another administrator to change it, or you will not be able to "
+                        + "change it back.");
+            }
+        }
+    }
+
+    private void validateAssignable(Set<Role> roles, AppUserPrincipal principal) {
         if (roles == null || roles.isEmpty()) {
             throw new IllegalArgumentException("At least one role is required");
         }
         if (!allowedRolesFor(principal).containsAll(roles)) {
             throw new AccessDeniedException("You cannot assign one or more of the selected roles");
         }
+    }
+
+    /** The rules about what an ACCOUNT may hold at once - asked of the result, never of the request. */
+    private void validateCombination(Set<Role> roles) {
         if (roles.size() > 1 && roles.contains(Role.HOME_STAFF)) {
             throw new IllegalArgumentException("Home Staff cannot be combined with any other role");
         }

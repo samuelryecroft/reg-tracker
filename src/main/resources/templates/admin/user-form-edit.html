@@ -55,6 +55,23 @@
                         <input type="checkbox" th:field="*{roles}" th:value="${r}"/>
                         <span th:text="${r.displayName}">Role</span>
                     </label>
+                    <!--/* T275. Roles this person holds that YOU cannot assign. Oscar's rule is
+                         "a role the actor cannot grant, they cannot remove: VISIBLE, NOT EDITABLE",
+                         and before this they were neither - the loop above renders only the actor's
+                         assignable roles, so such a role had no checkbox at all and was replaced
+                         away by a save that never mentioned it.
+
+                         Checked and disabled. A disabled checkbox submits nothing, which is exactly
+                         right: UserService merges it back from the TARGET's own roles rather than
+                         trusting the form to carry something it was never shown. The two halves are
+                         deliberately independent - the server does not rely on this markup, and this
+                         markup does not rely on the server, because the failure being fixed is one
+                         where each silently assumed the other had it. */-->
+                    <label class="checkbox-option" th:each="r : ${rolesYouCannotChange}">
+                        <input type="checkbox" checked="checked" disabled="disabled" th:value="${r}"/>
+                        <span th:text="${r.displayName}">Role</span>
+                        <span class="hint">You cannot change this role</span>
+                    </label>
                 </div>
                 <p class="constraint-note" id="roleConstraintNote" aria-live="polite"></p>
             </fieldset>
