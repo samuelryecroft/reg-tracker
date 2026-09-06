@@ -21,7 +21,11 @@
       claiming one. What a reviewer needs instead is how long the report has been waiting, which is
       what the meta line carries.
     */-->
-    <div class="case-list" th:if="${!#lists.isEmpty(queue.reviewable())}">
+    <!--/* T253 (spec 8f/9681e6d): <ul>/<li>, not <div> - fragments/case-card.html's root is
+         <li role="listitem">, th:replace substitutes it for this placeholder tag entirely, so only
+         the container needs changing here. role="list" is load-bearing, see app.css's own comment
+         on .case-list for why. */-->
+    <ul class="case-list" role="list" th:if="${!#lists.isEmpty(queue.reviewable())}">
         <th:block th:each="r : ${queue.reviewable()}" th:with="report=${reports[r.id]}">
             <div th:replace="~{fragments/case-card :: caseCard(
                     identity=${childIdentities[r.child.id]},
@@ -39,7 +43,7 @@
                     noteLabel=null,
                     note=null)}"></div>
         </th:block>
-    </div>
+    </ul>
 
     <!--/*
       D-2d-1: a report this reviewer submitted themselves gets a card with NO action and the reason
@@ -55,7 +59,9 @@
             <span class="case-group-count" th:text="${#lists.size(queue.yourOwn())}">1</span>
             <span class="visually-hidden" th:text="${#lists.size(queue.yourOwn()) == 1} ? 'report' : 'reports'">reports</span>
         </h2>
-        <div class="case-list">
+        <!--/* T253 (spec 8f/9681e6d): <ul>/<li>, not <div>, same reasoning as the reviewable list
+             above. */-->
+        <ul class="case-list" role="list">
             <th:block th:each="r : ${queue.yourOwn()}" th:with="report=${reports[r.id]}">
                 <div th:replace="~{fragments/case-card :: caseCard(
                         identity=${childIdentities[r.child.id]},
@@ -73,7 +79,7 @@
                         noteLabel=null,
                         note=null)}"></div>
             </th:block>
-        </div>
+        </ul>
     </section>
 
     <!--/*

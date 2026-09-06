@@ -71,10 +71,14 @@
         <!--/* Stated positively on the page because the absences are the assurance. This is the
              list §7m fixes; it is not derived from the data, so it must not drift from what the
              projection actually permits - AuditHistoryEntry's javadoc is the contract behind it. */-->
-        <ul class="not-kept">
-            <li><span class="mark" aria-hidden="true">—</span><span>The individual's name — only the role they acted in</span></li>
-            <li><span class="mark" aria-hidden="true">—</span><span>Anything the child said, or any answer from the report</span></li>
-            <li><span class="mark" aria-hidden="true">—</span><span>Before-and-after values, so no version of the report can be reconstructed from this history</span></li>
+        <!--/* T253 (spec 8f/9681e6d): .not-kept sets display:flex on both the <ul> and its <li>
+             (app.css), overriding list-item box generation on both - found on this component in
+             the same sweep that found the case-card lists. Explicit roles restore what the
+             overridden display would otherwise cost. */-->
+        <ul class="not-kept" role="list">
+            <li role="listitem"><span class="mark" aria-hidden="true">—</span><span>The individual's name — only the role they acted in</span></li>
+            <li role="listitem"><span class="mark" aria-hidden="true">—</span><span>Anything the child said, or any answer from the report</span></li>
+            <li role="listitem"><span class="mark" aria-hidden="true">—</span><span>Before-and-after values, so no version of the report can be reconstructed from this history</span></li>
         </ul>
     </div>
 

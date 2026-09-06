@@ -148,7 +148,8 @@ class CaseCardIntegrationTest extends AbstractIntegrationTest {
 
         String html = queueHtml("");
         String card = html.substring(html.indexOf("class=\"case\""));
-        card = card.substring(0, card.indexOf("</div>", card.indexOf("case-action")));
+        // T253: the card's root is <li>, not <div> - it is one item in a real list now.
+        card = card.substring(0, card.indexOf("</li>", card.indexOf("case-action")));
 
         assertThat(card).contains("case-action").contains("Allocate");
         assertThat(card).doesNotContain("caret-right");

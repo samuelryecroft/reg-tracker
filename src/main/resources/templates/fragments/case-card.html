@@ -56,8 +56,16 @@
   the calling template as a whole, which inside a th:each is exactly where a subtle wrong answer
   would be invisible. What actually varies between these four screens is the words, not the shape.
 */-->
-<div th:fragment="caseCard(identity, href, meta, asideLabel, aside, badge, status, actionLabel, actionHref, noAction, noteLabel, note)"
-     th:classappend="${note != null} ? 'case-with-note'" class="case">
+<!--/*
+  T253 (spec 8f/9681e6d): the card is one item in a list, and its every caller places it directly
+  inside a .case-list - so it renders as <li>, not <div>. role="listitem" is not belt-and-braces:
+  .case sets display:flex (below, for its own row layout), and an element whose display overrides
+  its list-item box generation loses its IMPLICIT listitem role in some engines exactly as the
+  parent .case-list does (see that rule's own comment) - the explicit role is what survives that.
+  Do not strip it as redundant; that is the removal this comment exists to prevent.
+*/-->
+<li th:fragment="caseCard(identity, href, meta, asideLabel, aside, badge, status, actionLabel, actionHref, noAction, noteLabel, note)"
+    th:classappend="${note != null} ? 'case-with-note'" class="case" role="listitem">
     <a class="case-link rowlink" th:href="${href}">
         <span class="case-avatar" th:text="${identity.avatar()}">A.B</span>
         <span class="case-ident">
@@ -97,7 +105,7 @@
         <span class="lbl" th:text="${noteLabel}">Reviewer's comment</span>
         <p th:text="${note}">Please add the times you spoke to the young person.</p>
     </div>
-</div>
+</li>
 
 </body>
 </html>

@@ -28,8 +28,11 @@
       what it looks like afterwards. The reason to remove it is that it is a second copy, not that
       it has already gone wrong.
     */-->
-    <div class="case-list">
-        <div class="case" th:each="h : ${homes}">
+    <!--/* T253 (spec 8f/9681e6d): <ul>/<li>, not <div>, so this is a list in the accessibility
+         tree the same way it already reads as one visually - role="list"/"listitem" are load-
+         bearing here, see app.css's own comment on .case-list for why. */-->
+    <ul class="case-list" role="list">
+        <li class="case" role="listitem" th:each="h : ${homes}">
             <span class="case-link">
                 <svg class="icon org-icon" aria-hidden="true"><use th:href="@{/icons/phosphor.svg} + '#ph-buildings'"></use></svg>
                 <span class="case-ident">
@@ -45,8 +48,8 @@
                 <span class="lbl">Local authority</span>
                 <span th:text="${h.localAuthority} ?: 'Not recorded'">Local authority</span>
             </span>
-        </div>
-    </div>
+        </li>
+    </ul>
 
     <div class="empty" th:if="${#lists.isEmpty(homes)}">No homes yet.</div>
 </main>

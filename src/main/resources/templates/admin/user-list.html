@@ -32,8 +32,11 @@
       list families no longer scan down identical edges - flagged for Creed rather than settled
       here, since which of the two wins is a design call and not a build one.
     */-->
-    <div class="case-list">
-        <div class="case" th:each="u : ${users}" th:classappend="${!u.enabled} ? 'case-inactive'">
+    <!--/* T253 (spec 8f/9681e6d): <ul>/<li>, not <div>, so this is a list in the accessibility
+         tree the same way it already reads as one visually - role="list"/"listitem" are load-
+         bearing here, see app.css's own comment on .case-list for why. */-->
+    <ul class="case-list" role="list">
+        <li class="case" role="listitem" th:each="u : ${users}" th:classappend="${!u.enabled} ? 'case-inactive'">
             <a class="case-link rowlink" th:href="@{/admin/users/{id}/edit(id=${u.id})}">
                 <span class="case-avatar" aria-hidden="true" th:text="${u.initials}">NC</span>
                 <span class="case-ident">
@@ -79,8 +82,8 @@
                 <svg class="icon" aria-hidden="true"><use th:href="@{/icons/phosphor.svg} + '#ph-pencil-simple'"></use></svg>
                 <span class="visually-hidden" th:text="'Edit ' + ${u.fullName}">Edit</span>
             </a>
-        </div>
-    </div>
+        </li>
+    </ul>
 
     <!--/* R-Q13's signed-off copy, and my first version was a paraphrase of it - "No users yet."
          I had written that R-Q13 said nothing about users; Pam audited it for 5e and it does,
