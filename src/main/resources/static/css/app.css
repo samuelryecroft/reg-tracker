@@ -1686,7 +1686,20 @@ nav.seg .seg-opt { color: inherit; text-decoration: none; }
    has no button. */
 .case-edit { flex: none; display: grid; place-items: center; color: var(--muted); }
 .case-edit:hover { color: var(--accent-dark); }
-.role-chips { flex-wrap: wrap; }
+/* T270: the human's report - "the orgs shift depending on the number of permissions". .case-tags
+   is `flex: none` (intrinsic width), so a row with four role chips was WIDER than a row with one,
+   and every flex sibling after it - .case-aside, the org/home column a person actually scans down
+   - started further right. The defect was never the chips; it was that one column's horizontal
+   POSITION depended on another column's CONTENT.
+   A max-width alone is not enough - measured: it caps how wide the box CAN get, but below that
+   cap a flex item with flex-basis:auto (what `flex: none` sets) still sizes to its own content, so
+   a one-chip row and a four-chip row still differed even with both under a 200px ceiling. `width`
+   sets the flex-basis directly with grow/shrink already at 0 from `flex: none`, so the box is the
+   same size regardless of content, and overflow wraps to a second line WITHIN it - reusing the
+   wrap this rule already had (below 720px), rather than a new overflow treatment. Scoped to
+   .role-chips (used only here) so no other .case-list screen's typically-single status tag is
+   affected. UserListRoleChipsUiTest pins the actual rendered position, not this declaration. */
+.role-chips { flex-wrap: wrap; width: 200px; }
 /* The username under the name, as a second identifier rather than a second name - monospace so
    a login key reads as one and cannot be mistaken for the person's own spelling of themselves. */
 .case-username { font-family: ui-monospace, Menlo, Consolas, monospace; }
