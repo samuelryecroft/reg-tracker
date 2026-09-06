@@ -4487,3 +4487,106 @@ that is no longer there. **My proposal, for Oscar's ruling, not my decision:**
 Self-anchoring, names the measurement the answer is scored against, and **removes the dependence on question
 order** — the property whose loss caused this. It also stops the two labels being identical strings, which is
 what let the removal go unnoticed. **Routed to god for Oscar and a card; I have raised neither.**
+
+---
+
+## §7z — T231 ruled, and the half Oscar thinks is prospective is live on two screens
+
+Oscar adopted my wording with one edit and pushed my own generalisation a step further than I took it.
+**Ruled label, all three surfaces:**
+
+> **"If this interview was not offered and completed within 72 hours of the child's return, why not?"**
+
+### D-7z-1 — why "offered and completed" and not "held", which is not taste
+
+I wrote that *a question which loses its antecedent becomes a different question, and the record still scores
+the answer against the old one.* Oscar's extension:
+
+> **It is not enough for the question to HAVE an antecedent. The antecedent has to be the thing the export
+> prints beside it.**
+
+The record measures *"offered and completed within 72 hours"* (`interview/detail.html:288`). A reason labelled
+*"not held"* answers **a different question from the one the record scores** — arguable in a council-facing
+document. And *"held"* would make some visitors **explain something that is not a failure**: an interview
+offered inside 72 hours and **refused by the child** is not a breach, and the form already captures that
+separately (*"Interview accepted?"* → its own *"If not, why?"*). **My wording would have invited a visitor
+whose interview was properly offered and declined to justify a breach that did not happen, in the field a
+court reads.** That is the same harm I found, one step downstream of my fix.
+
+**The second occurrence stays.** `report-fields.html:172`/`:181` (*"Interview accepted?"* → *"If not, why?"*)
+is anchored by its neighbour — *improvable is not a licence to change*, and breaking an identical-string
+collision needs only **one** of the pair to move: the broken one. **Noted here because it sits on the same
+dependency:** if anything is ever inserted above it, that is **the second occurrence of a known defect, not a
+new discovery.**
+
+### D-7z-2 — Oscar's addresses are on a ref that has not existed for a long time
+
+His four citations are to `report/view.html`. **That file is not on `main` (`7e7cbb7`) and is not on any
+current branch** — only on nineteen long-lived stale ones. The content is real; the addresses are not:
+
+| Oscar's citation | actually, on `main` |
+| --- | --- |
+| `report/view.html:27` "offered and completed" | `interview/detail.html:288` |
+| `:28` "Not measurable — interview time not recorded" | `interview/detail.html:289` |
+| `:30` "must take the same string" | `interview/detail.html:292-293` |
+| `:90` "Interview accepted?" → "If not, why?" | `report-fields.html:172`/`:181`, `detail.html:320` |
+
+**This is not pedantry and it is not a point.** `report/view.html` is **sitting untracked on disk in the shared
+checkout right now** — the same stale artefact that made my own first read of this field return nothing. A
+builder handed *":30 must take the same string"* would either find no file, or find that one and edit it, and
+**a green build proves nothing about a file no ref contains.** Re-point before it becomes a card.
+
+> The floor rule this generalises is the one god adopted from my own miss two days ago. **The habit is not
+> "be careful"; it is that an address is a claim about a ref, and a citation without one is unresolvable.**
+
+### D-7z-3 — 🔑 the half Oscar rules as a decision is **already built for the export and already broken on the screens**
+
+Oscar's requirement, and he is right that it is the part Jim and I both stopped short of:
+
+> **The reason must be scored against the derived answer, never alone.** Late+blank → *"No reason recorded"*.
+> Within-72h+blank → **not applicable**, never a missing reason. Not-measurable+blank → not applicable.
+
+He rules it cheap *because* `SeventyTwoHourReading` is not on main yet, so it is "a decision rather than a
+change". **Two corrections, and they point in opposite directions:**
+
+**(a) The export half is already built AND pinned.** `SeventyTwoHourReading.reason(report, owed)` on #77 keys
+on *whether an explanation was owed*, not on verdict truth — MET+blank and NOT_MEASURABLE+blank both give
+*"Not applicable"*, MISSED+blank gives *"No reason recorded"* — and
+`aReasonIsOnlyOwedWhenTheWindowWasMeasuredAndMissed` pins all three. **His ruling is that behaviour exactly.**
+So it wants **adopting as the stated requirement behind an existing pin**, not specifying as new work.
+
+**(b) The screens do it wrong today, on `main`, and that half is a live defect rather than a decision.**
+
+* `interview/detail.html:293` — blank `ifNotWhyLate` renders **"Not answered"** with the `unanswered` styling
+  **regardless of the verdict**. On an on-time interview the record screen states the visitor did not answer a
+  question that was never asked of them.
+* `fragments/report-fields.html:139` — the same on the capture and review screens.
+* **And the count, which is worse than the row.** `detail.html:255` and `report-fields.html:66` both add
+  `(ifNotWhyLate == null ? 1 : 0)` into the section's **"N not answered"** badge. A fully completed, on-time
+  interview therefore shows **"1 not answered"** — a compliance-shaped number, on the screen a reviewer
+  approves from, counting a question nobody was owed.
+
+**This is exactly the harm Oscar names — *the harm lands on the honest on-time visitor as readily as on the
+confused one* — except it is not waiting on a decision. It is rendering now.**
+
+### D-7z-4 — and the timing argument inverts for the screens half
+
+Oscar's reason for acting now is that the export code is not on main. **For the screens the reason is the
+opposite: it is on main, and T185 step 2 is about to copy it into the single source of truth.**
+
+`ReportQuestion.isAnsweredOn()` (merged in #126) documents blank-is-unanswered as deliberately *"matching what
+both existing renderers already do"* — an accurate reconciliation of a defective pair. When step 2 moves the
+badges onto the model, **the defect stops being two templates and becomes the definition.** That is precisely
+the hazard Jim's own `reader` javadoc names for `heldAt`: *reproducing the defect from the single source of
+truth would put it everywhere at once, which is the risk a single source buys you along with the benefit.*
+
+**Step 2 is blocked on Pam and has not landed, so this is the cheap moment for the screens half too — for the
+opposite reason to the one Oscar gave.** After it lands, the fix moves from two templates into the model plus
+whatever has been built on it.
+
+> **A single source of truth does not make a wrong answer right; it makes it unanimous.** The window in which
+> a reconciliation is cheap to correct closes when the thing it reconciles becomes canonical — and a
+> reconciliation is *most* convincing exactly when it has faithfully copied something wrong.
+
+**Not gated by T187** — as Oscar says, the human's answer governs *the words on the form*; it says nothing
+about whether an absence is rendered as a declination. **That is ours either way.**
