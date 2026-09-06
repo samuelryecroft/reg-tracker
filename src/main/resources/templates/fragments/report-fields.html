@@ -151,7 +151,26 @@
       time. The capture branch below is untouched - there the visitor is being ASKED, and the rule
       is about presenting an absence as an answer, which only a read-only rendering can do.
     */-->
-    <label th:id="${readonly} ? 'ifNotWhyLate-label' : null" th:for="${readonly} ? null : 'ifNotWhyLate'">If not, why?</label>
+    <!--/*
+      T231. "If not, why?" until now - and it followed nothing. The question it referred to was
+      "was this interview offered and completed within 72 hours of return", which stopped being
+      asked when within72Hours became derived rather than declared, leaving its follow-up hanging
+      under "Location of this interview". A visitor read "Location of this interview" and then
+      "If not, why?" - if not WHAT. Section 2 has an identically worded question that IS still
+      anchored, to "Interview accepted?", which is why this one survived review for so long: the
+      string looks like a string that works, three questions further down.
+
+      The human ruled the labels are ours to write. The wording is Oscar's and it says "offered and
+      completed" rather than "held" for a reason that is legal rather than stylistic: AN INTERVIEW
+      OFFERED WITHIN 72 HOURS AND DECLINED BY THE CHILD IS NOT A BREACH, and "not held" would invite
+      that visitor to justify one that did not occur, in the field a court reads. It also mirrors
+      the measurement word for word, which is the question this answer is scored against.
+
+      interview/detail.html carries the SAME STRING over the same answer. If the two diverge the
+      form asks one question while the record displays another above the reply, and the record
+      contradicts itself. A guard pins that they match.
+    */-->
+    <label th:id="${readonly} ? 'ifNotWhyLate-label' : null" th:for="${readonly} ? null : 'ifNotWhyLate'">If this interview was not offered and completed within 72 hours of the child's return, why not?</label>
     <div class="readonly-val" th:classappend="${lateExplanationMissing} ? ' empty' : ''" role="group" aria-labelledby="ifNotWhyLate-label"
          th:if="${readonly}" th:text="${lateExplanationMissing} ? 'No reason recorded'
                 : (${#strings.isEmpty(form.ifNotWhyLate)} ? 'Not applicable' : ${form.ifNotWhyLate})">Answer</div>

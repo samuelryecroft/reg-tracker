@@ -326,7 +326,7 @@
               the second definition. The words are this screen's own - the state is shared, the
               rendering is not.
             */-->
-            <dt>If not, why?</dt>
+            <dt>If this interview was not offered and completed within 72 hours of the child's return, why not?</dt>
             <dd th:classappend="${report.lateExplanationMissing} ? 'unanswered'"
                 th:text="${report.lateExplanationMissing} ? 'No reason recorded'
                          : (${#strings.isEmpty(report.ifNotWhyLate)} ? 'Not applicable' : ${report.ifNotWhyLate})">—</dd>
