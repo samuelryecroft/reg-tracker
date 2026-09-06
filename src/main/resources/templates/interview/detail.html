@@ -262,7 +262,24 @@
             <dt>Visitor</dt>
             <dd th:text="${report.visitor.fullName}">Visitor</dd>
 
-            <dt>Date of interview</dt>
+            <!--/*
+              T227 / spec §7x. "Date of interview" until now, on the one field the statutory
+              72-hour measurement reads - and the <dd> below has always rendered a time under it.
+              The wording is Creed's ruling and is REUSED VERBATIM from fragments/report-fields.html
+              rather than newly written: every other question in this <dl> already reuses that
+              fragment's label word for word, so heldAt was the outlier inside its own list before
+              it was an outlier against the capture screen, and the shortening is what dropped the
+              word carrying the clock.
+
+              NOT to be tidied while in here (spec §7x records both, so a later reader does not
+              "finish" this fix): the 'dd MMM' here versus 'dd MMMM' in report-fields is a
+              difference the invariant deliberately permits - both carry the time - and unifying
+              them is the string-pinning Kevin ruled against. And #temporals.format uses the
+              request locale, which is correct for a screen; it must NOT pick up ReportService's
+              Locale.UK pin, which exists only because a statutory DOCUMENT cannot print month
+              names in whatever language the container happens to default to.
+            */-->
+            <dt>Date and time the interview was held</dt>
             <dd th:classappend="${report.heldAt == null} ? 'unanswered'" th:text="${report.heldAt} != null ? ${#temporals.format(report.heldAt, 'dd MMM yyyy HH:mm')} : 'Not answered'">Date</dd>
 
             <dt>Location of this interview</dt>
