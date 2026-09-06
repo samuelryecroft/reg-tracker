@@ -5479,5 +5479,150 @@ the sent-back branch**, which is precisely where a predicate like this gets copi
 **And it strengthens Oscar's own copy reason.** He anchored *"Continue draft"* to *"Save draft"* on the form.
 **There is a third anchor: `DRAFT("Draft")` — the word is already the system's name for this state, in an
 enum, with that display name.** So the string is not introduced for this row, it is the state's own name
-surfacing on a second screen. *(`getDisplayName()` has no production caller yet, so this is an argument about
-vocabulary rather than a proposal to render it.)*
+surfacing on a second screen. *(Written when `getDisplayName()` had no production caller. **Corrected 6 Sep:** `c24b989` made
+`AuditHistoryService.statusDetail` its first caller, so the display name is now rendered. The argument is
+unchanged — the point was that `DRAFT("Draft")` is already the state's own name, and a caller existing makes
+that more true, not less.)*
+
+## §8m — D-1c/1d: the capture screen's affordances, reconciled with two fixes that landed outside the build
+
+**Verified against `origin/main` @ `44bec31`, not against this document.** §7h ruled 1d **in scope and merged
+into 1c** — one build, one PR — and left three things named but unspecified: *what the panel lists, how a
+partly-answered section reads, focus on close.* This section closes those and specifies 1c around them.
+
+### D-1c-0 · Reconciliation with the two ad-hoc fixes — read this before building
+
+Two fixes reached this screen outside the formal queue. **A 1c build that redraws the chrome from this
+document alone will silently revert both.**
+
+| Landed | What it did | This spec |
+|---|---|---|
+| **T247** `1171602` (human, direct) | `report-form.html` passes `data-saved-at=${draftSavedAt}`; `report-stepper.js` seeds the save state from it instead of hard-coding *"Not yet saved"* on every load | **PRESERVE, unchanged** |
+| **T257** `5bb714c` (Pam) | The visitor list's action label reads **"Continue draft"** when a DRAFT report exists | **PRESERVE** — it is 1c's entry point, and 1c must not contradict it on arrival |
+| T7 / roadmap 2.4 | `.dots` + `‹ Back` / `Next ›` as the only navigation | **SUPERSEDED** by D-1c-2 — a formal build, not an ad-hoc fix |
+
+**Nothing in T247 or T257 is superseded by anything below.**
+
+#### The two fixes are coupled, and neither commit says so
+T257 makes the list **promise a draft is waiting**. T247 is what makes 1c **keep that promise** — a visitor
+who presses *"Continue draft"* lands on a screen that says *"Saved 14:32"* rather than *"Not yet saved"*.
+**Revert either and the other becomes a lie**: without T247 the promised draft announces itself as unsaved;
+without T257 the door to it is still labelled *"Submit report"*. Treat them as one behaviour with two commits.
+
+#### Three specific things about T247 that a restyle destroys without erroring
+1. **One element, not two.** T247's stated reason is that the state a visitor lands on and the state they
+   watch appear a moment later must be *"one sentence rather than two that resemble each other."* The panel in
+   D-1d-1 **must not carry its own save indicator.** A second one is precisely the defect T247 removed.
+2. **`aria-live="polite"` is load-bearing**, and its comment says why: *a save state that reaches only sighted
+   users is the same defect as a state-bearing icon marked `aria-hidden`.* If the element moves, the attribute
+   moves with it — and it must keep a **stable identity in the DOM**, not be destroyed and recreated per
+   render, or the live region stops announcing.
+3. **Only the GET carries `data-saved-at`, deliberately.** It describes *the work on this page*, not the row
+   in the database. On a validation-error redisplay the form holds rejected, unstored edits and *"Not yet
+   saved"* is **correct**. Do not "fix" that by seeding it on POST.
+
+### D-1c-1 · The structural contract that may not change
+
+`report-stepper.js` is a progressive enhancement over six `<fieldset class="step" data-step="N">` groups with
+a `<legend class="section-title">`, in `fragments/report-fields.html`. That fragment is **shared with 1b**
+(`reviewerFields()` renders the same field content in the numbered-card shape).
+
+> **Nothing in D-1c or D-1d changes `fragments/report-fields.html`.** The panel reads the legends from the
+> DOM, exactly as `render()` already does for the step label. **This is a template + JS + CSS build on
+> `report-form.html` and `report-stepper.js` only, and it requires no new model attribute** — so 1b cannot
+> regress from it, and Pam is not blocked on a controller change.
+
+### D-1c-2 · The defect: the wizard can be advanced but not navigated
+
+`.dots` show six positions and **none of them is reachable**. Movement is `‹ Back` / `Next ›`, `current = 0`
+on every load. §7h's load-bearing case: **the sent-back loop** — a reviewer returns a report with comments
+about two specific answers, the visitor reopens at section 1 and pages through a statutory instrument to
+reach them, on a phone, often with the child still present.
+
+**The dots are progress that cannot be navigated; a section index is navigation that cannot survive the
+stepper** (a jump link to a `hidden` fieldset scrolls nowhere and never matches `:target`). **Merge them.**
+
+### D-1d-1 · The control: the step label becomes the disclosure
+
+D-Q2 placed 1d as *"a panel toggled from the sticky progress bar"*. The bar already renders the sentence that
+names the current position — **make that sentence the button.**
+
+- `.step-label` (*"Step 3 of 6 · Future Incidents"*) becomes `<button type="button" aria-expanded aria-controls>`.
+- **`type="button"` is not optional.** The control sits inside `<form>`; the existing `backBtn` and `nextBtn`
+  both set it explicitly for this reason. A default-type button here submits the report.
+- `.dots` stay as the at-a-glance progress and are **not** made interactive — 9px targets fail 2.5.5, and
+  duplicating the panel's job in an undersized control is worse than leaving them decorative.
+
+> **The element that states where you are becomes the element that takes you elsewhere** — the T257
+> principle: put the affordance in the thing the person is already reading, not beside it.
+
+**Panel contents:** six rows, in document order, each `<n>. <legend text>`, read from the DOM. Numbered
+because the sections are a numbered instrument in 1b and in the produced document — **the same section is the
+same number on every surface.**
+
+### D-1d-2 · How a partly-answered section reads — and why it carries NO count
+
+Four row states, and only these:
+
+| state | meaning | marker |
+|---|---|---|
+| **current** | where the visitor is | `aria-current="step"` + filled marker |
+| **visited** | opened at least once this session | solid marker |
+| **not yet reached** | never opened | outline marker |
+| **needs attention** | the browser reports an invalid field in it | `--warn` marker + text `Needs attention` |
+
+**There is deliberately no `"N not answered"` badge on 1c**, though 1b has exactly that. Two reasons, and the
+second is a defect the obvious implementation would reintroduce:
+
+1. **1b's count describes a stored report; 1c's would describe a moving target.** The 1b badge is computed
+   server-side from the persisted report. On the capture screen the visitor is typing, so a server count is
+   stale the moment they answer anything — it would tell someone a section is incomplete immediately after
+   they completed it.
+2. **A client-side "count the blanks" repeats T233 exactly.** `ifNotWhyLate` is **conditional** — asked only
+   when the 72-hour window was measured and missed — so a blank there means two opposite things, and counting
+   every blank made a fully completed, on-time report read *"1 not answered"*. The condition lives on the
+   model. **A hand-written expression in the client cannot get it right without repeating it, which is the
+   same second-source-of-truth that T185 removed from this very fragment.**
+
+**"Needs attention" is read from `checkValidity()`** — the *same* predicate `stepIsValid()` already uses to
+gate `Next ›`. So the panel and the wizard can never disagree, and the panel asserts nothing the form itself
+does not already assert. *(Prefer the thing that is already true over a proxy that happens to agree.)*
+
+### D-1d-3 · Jumping is never gated by validity
+
+`Next ›` stays gated by `stepIsValid`. **Selecting a row in the panel is not.**
+
+> `Next ›` asserts *"I have finished this section."* Selecting a row asserts *"I want to be somewhere else."*
+> **Different claims, so they take different gates.** Gating the jump would trap a visitor on a section they
+> cannot complete — and the sent-back loop, which is the whole reason this control exists, is exactly the case
+> where a visitor needs to leave an incomplete section to reach the two answers a reviewer asked about.
+
+**Selecting a row autosaves**, on the same terms as `Next ›`: after the step changes, never before it (the
+wizard must not wait on the network), and the whole form is posted, so nothing behind is blanked.
+
+### D-1d-4 · Focus, open and close
+
+- **Open** → focus moves to the panel's current row.
+- **Select a row** → panel closes, `current` changes, and focus lands where `render()` already puts it: the
+  first invalid field in the new step, else its first field. **No new focus rule — reuse the built one.**
+- **Escape, or re-pressing the toggle** → panel closes and focus **returns to the toggle**, not into the form.
+  A dismissal returns you where you were; a selection takes you where you chose.
+- The panel is a disclosure, not a modal: **no focus trap, no inert background, no scroll lock.**
+
+### D-1c-3 · What is unchanged, stated so it is not redrawn
+
+The sticky action row (`Submit for review` / `Save draft` / `Cancel`, revealed on the last step), validation
+on advance only, the whole-form autosave payload, and the terminal-vs-transient save messaging are all
+**unchanged**. The reasoning for each is written into `report-stepper.js`'s own header and is better argued
+there than here.
+
+### D-1c-4 · Out of scope, per A1
+
+**No offline affordances.** Per §A1 the offline behaviour of 1c/1d is HELD pending the data-protection
+decision on Article 9 data cached to visitor phones. Server autosave is *not* held and is what this specs.
+**Ship no copy that promises offline capability** — including in the panel.
+
+### Decision needed from nobody
+This section requires no ruling from Oscar or the human to build. **The one thing I have not specified is the
+panel's own copy beyond the row labels** (which are the legends, already written) — if the toggle needs
+wording beyond the step sentence it already renders, that is a one-line question for Oscar, not a blocker.
