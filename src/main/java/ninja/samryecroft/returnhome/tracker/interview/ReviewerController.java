@@ -5,8 +5,6 @@ import java.util.stream.Stream;
 import ninja.samryecroft.returnhome.tracker.audit.AuditHistoryEntry;
 import ninja.samryecroft.returnhome.tracker.audit.AuditHistoryService;
 import ninja.samryecroft.returnhome.tracker.audit.AuditHistorySection;
-import ninja.samryecroft.returnhome.tracker.child.ChildIdentities;
-import ninja.samryecroft.returnhome.tracker.child.ChildIdentity;
 import ninja.samryecroft.returnhome.tracker.child.NameRevealService;
 import ninja.samryecroft.returnhome.tracker.report.ReportService;
 import ninja.samryecroft.returnhome.tracker.report.InterviewReport;
@@ -52,7 +50,7 @@ public class ReviewerController {
         List<InterviewRequest> shown = Stream.concat(queue.reviewable().stream(), queue.yourOwn().stream()).toList();
         model.addAttribute("queue", queue);
         model.addAttribute("childIdentities",
-                ChildIdentities.mapOf(shown, InterviewRequest::getChild, nameRevealService.isRevealed()));
+                nameRevealService.identitiesFor(shown, InterviewRequest::getChild));
         model.addAttribute("reports", reportService.reportsByRequestId(shown));
         return "reviewer/queue";
     }
@@ -93,7 +91,7 @@ public class ReviewerController {
      */
     private void populateReviewModel(InterviewRequest request, AppUserPrincipal principal, Model model) {
         model.addAttribute("request", request);
-        model.addAttribute("childIdentity", ChildIdentity.of(request.getChild(), nameRevealService.isRevealed()));
+        model.addAttribute("childIdentity", nameRevealService.identityFor(request.getChild()));
 
         // D-1b-7: canReview's own formula (InterviewRequestDetailController), replicated here
         // because getAuthorized's broader visibility (HOME_STAFF/VIEWER/ORG_ADMIN/COORDINATOR can

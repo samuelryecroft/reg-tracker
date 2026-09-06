@@ -2,6 +2,9 @@ package ninja.samryecroft.returnhome.tracker.child;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
 import org.springframework.stereotype.Service;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
@@ -41,12 +44,33 @@ import org.springframework.web.context.request.ServletRequestAttributes;
  * #arm} set a fresh one, for the request the redirect triggers. A handler that armed and rendered
  * in the same request (no redirect) would silently fail to reveal that render (the cache already
  * says false) and would leak the reveal into whatever page came next instead.
+ *
+ * <p><strong>T236 (Kevin's ruling): this class also carries the signal for whether the current
+ * page has anything masked to reveal in the first place.</strong> The header's Reveal/Hide control
+ * used to render on every page, including ones with no {@link ChildIdentity} on them at all. Two
+ * things ruled out {@link ChildIdentity#of} and {@link ChildIdentities#mapOf} as the place to fix
+ * this: both are deliberately pure - a static, injection-free {@code (Child, boolean) -> X}
+ * function with no business knowing about a viewer's session-scoped state. So the impure half lives
+ * here instead, in the one class that already owns request-scoped reveal state: {@link
+ * #identityFor} and {@link #identitiesFor} delegate to the pure functions UNCHANGED and
+ * additionally mark a request attribute when the result is non-empty.
+ *
+ * <p><strong>Why {@link #hasMaskedNames} is read directly from the template
+ * ({@code @nameRevealService.hasMaskedNames()}), never exposed as a {@code GlobalControllerAdvice}
+ * {@code @ModelAttribute}.</strong> {@code @ModelAttribute} methods on a {@code @ControllerAdvice}
+ * run BEFORE the handler method - so at the point such a method would run, no controller has
+ * called {@link #identityFor}/{@link #identitiesFor} yet, and the flag would read {@code false} on
+ * every single request, including ones with masked names on them. The control would silently never
+ * appear. Reading the bean directly from the template resolves it after the handler has fully run
+ * and the flag (if any) has been set, which is the only point in the request lifecycle where the
+ * answer can be correct.
  */
 @Service
 public class NameRevealService {
 
     static final String SESSION_KEY = "childNames.armedForNextPage";
     private static final String REQUEST_CACHE_KEY = "childNames.revealedThisRequest";
+    private static final String REQUEST_MASKED_NAMES_KEY = "childNames.maskedNamesPresentThisRequest";
 
     /** True only for the single page rendered immediately after {@link #arm}. */
     public boolean isRevealed(HttpServletRequest request) {
@@ -71,6 +95,62 @@ public class NameRevealService {
     /** Arms the flag so the very next page rendered - the reveal POST's own redirect target - comes back revealed. */
     public void arm(HttpServletRequest request) {
         request.getSession(true).setAttribute(SESSION_KEY, Boolean.TRUE);
+    }
+
+    /**
+     * T236: whether the CURRENT page has at least one maskable child identity on it, regardless of
+     * whether it is currently shown revealed or masked - true either way, because a page showing
+     * revealed names still needs the "Hide" control to re-mask them, and a page showing masked
+     * names needs "Reveal". Only false on a page that never resolved a {@link ChildIdentity} at
+     * all, which is precisely what T236 asks the header to stop offering a control for.
+     *
+     * <p>Read this directly from a template as {@code @nameRevealService.hasMaskedNames()} - see
+     * the class javadoc for why this must not be exposed as a {@code GlobalControllerAdvice}
+     * {@code @ModelAttribute}.
+     */
+    public boolean hasMaskedNames() {
+        return Boolean.TRUE.equals(currentRequest().getAttribute(REQUEST_MASKED_NAMES_KEY));
+    }
+
+    private void markMaskedNamesPresent(HttpServletRequest request) {
+        request.setAttribute(REQUEST_MASKED_NAMES_KEY, Boolean.TRUE);
+    }
+
+    /**
+     * T236: the single-identity call sites' replacement for {@code ChildIdentity.of(child,
+     * nameRevealService.isRevealed())} - resolves the identity exactly as before and additionally
+     * records that this page has something to reveal, so {@link #hasMaskedNames} answers correctly
+     * for the header rendered afterwards. {@link ChildIdentity#of} itself is untouched.
+     */
+    public ChildIdentity identityFor(Child child, HttpServletRequest request) {
+        ChildIdentity identity = ChildIdentity.of(child, isRevealed(request));
+        markMaskedNamesPresent(request);
+        return identity;
+    }
+
+    /** Convenience for callers already inside a request thread - see {@link #isRevealed()}. */
+    public ChildIdentity identityFor(Child child) {
+        return identityFor(child, currentRequest());
+    }
+
+    /**
+     * T236: the bulk call sites' replacement for {@code ChildIdentities.mapOf(items, childOf,
+     * nameRevealService.isRevealed())} - delegates to {@link ChildIdentities#mapOf} UNCHANGED and
+     * additionally records presence when the result is non-empty, so a request that resolves zero
+     * identities (an empty list) correctly leaves {@link #hasMaskedNames} false.
+     */
+    public <T> Map<Long, ChildIdentity> identitiesFor(List<T> items, Function<T, Child> childOf,
+            HttpServletRequest request) {
+        Map<Long, ChildIdentity> identities = ChildIdentities.mapOf(items, childOf, isRevealed(request));
+        if (!identities.isEmpty()) {
+            markMaskedNamesPresent(request);
+        }
+        return identities;
+    }
+
+    /** Convenience for callers already inside a request thread - see {@link #isRevealed()}. */
+    public <T> Map<Long, ChildIdentity> identitiesFor(List<T> items, Function<T, Child> childOf) {
+        return identitiesFor(items, childOf, currentRequest());
     }
 
     private static HttpServletRequest currentRequest() {

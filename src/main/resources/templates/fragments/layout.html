@@ -234,7 +234,17 @@
              constant-label-plus-aria-pressed pattern are two different, complete solutions - never
              combine them. The appearance cycle below already uses the changing-label pattern
              correctly with no aria-pressed; this brings the two header controls into line. */-->
-        <form th:if="${!namesRevealed}" method="post" th:action="@{/account/reveal-names}" class="shell-reveal-form">
+        <!--/* T236: only show a control for something the page actually has to reveal/hide. Read
+             directly from the bean (@nameRevealService.hasMaskedNames()), never as a
+             GlobalControllerAdvice @ModelAttribute - see NameRevealService's own javadoc for why:
+             an @ModelAttribute there would run BEFORE the handler resolves any ChildIdentity, so it
+             would read false on every request including ones with masked names on them, and this
+             control would silently never appear. This does not change WHO can see the control: a
+             page can only make it appear if the viewer's role already has route-level access to
+             that page's children (masking is a shoulder-surfing mitigation, not access control), so
+             conditioning on this grants nothing and implies nothing new. */-->
+        <form th:if="${!namesRevealed and @nameRevealService.hasMaskedNames()}" method="post"
+              th:action="@{/account/reveal-names}" class="shell-reveal-form">
             <input type="hidden" name="returnTo" th:value="${currentPath}">
             <button type="submit" class="shell-toggle shell-reveal-toggle">
                 <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-eye-slash'"></use></svg>
@@ -245,7 +255,8 @@
                 <span class="visually-hidden">names on this page</span>
             </button>
         </form>
-        <a th:if="${namesRevealed}" th:href="${currentPath}" class="shell-toggle shell-reveal-toggle">
+        <a th:if="${namesRevealed and @nameRevealService.hasMaskedNames()}" th:href="${currentPath}"
+           class="shell-toggle shell-reveal-toggle">
             <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-fill-eye-slash'"></use></svg>
             <span>Hide</span>
             <span class="visually-hidden">names on this page</span>

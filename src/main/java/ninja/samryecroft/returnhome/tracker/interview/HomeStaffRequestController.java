@@ -3,7 +3,6 @@ package ninja.samryecroft.returnhome.tracker.interview;
 import jakarta.validation.Valid;
 import java.util.List;
 import ninja.samryecroft.returnhome.tracker.child.Child;
-import ninja.samryecroft.returnhome.tracker.child.ChildIdentities;
 import ninja.samryecroft.returnhome.tracker.child.ChildRepository;
 import ninja.samryecroft.returnhome.tracker.child.NameRevealService;
 import ninja.samryecroft.returnhome.tracker.interview.dto.NewRequestForm;
@@ -45,7 +44,7 @@ public class HomeStaffRequestController {
         model.addAttribute("requests", requests);
         model.addAttribute("dueGroups", deadlineTrackingService.groupByUrgency(requests));
         model.addAttribute("childIdentities",
-                ChildIdentities.mapOf(requests, InterviewRequest::getChild, nameRevealService.isRevealed()));
+                nameRevealService.identitiesFor(requests, InterviewRequest::getChild));
         // D-5e-4 (spec §7q): R-Q13's own sentence ("...raise a request now") is only followable
         // when a child exists to select on the form it links to - so an empty list needs a SECOND
         // state, not a rewritten one, for the home(s) this user covers having no children at all.

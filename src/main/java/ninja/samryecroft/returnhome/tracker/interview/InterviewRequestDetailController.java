@@ -2,7 +2,6 @@ package ninja.samryecroft.returnhome.tracker.interview;
 
 import ninja.samryecroft.returnhome.tracker.audit.AuditEventPublisher;
 import ninja.samryecroft.returnhome.tracker.audit.AuditHistoryService;
-import ninja.samryecroft.returnhome.tracker.child.ChildIdentity;
 import ninja.samryecroft.returnhome.tracker.child.NameRevealService;
 import ninja.samryecroft.returnhome.tracker.report.InterviewReport;
 import ninja.samryecroft.returnhome.tracker.report.ReportService;
@@ -101,7 +100,7 @@ public class InterviewRequestDetailController {
         InterviewReport reportForRail = reportService.findByRequestId(id).orElse(null);
         model.addAttribute("statusRail", StatusRail.forRequest(request, reportForRail));
         model.addAttribute("request", request);
-        model.addAttribute("childIdentity", ChildIdentity.of(request.getChild(), nameRevealService.isRevealed()));
+        model.addAttribute("childIdentity", nameRevealService.identityFor(request.getChild()));
         model.addAttribute("canAllocate", canAllocate);
         model.addAttribute("canSubmitReport", canSubmitReport);
         model.addAttribute("canConfirmSchedule", canConfirmSchedule);
