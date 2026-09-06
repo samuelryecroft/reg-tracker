@@ -39,7 +39,7 @@ import java.time.format.DateTimeFormatter;
  * appearing elsewhere in the document.
  */
 public record SeventyTwoHourReading(String returnedLine, String heldLine, String elapsedLine,
-        Verdict verdict, String reasonLine) {
+        Verdict verdict, String reasonLine, boolean explanationMissing) {
 
     /**
      * The decision, held as a state rather than as a sentence.
@@ -95,7 +95,12 @@ public record SeventyTwoHourReading(String returnedLine, String heldLine, String
             DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm", java.util.Locale.UK);
     private static final String NOT_RECORDED = "Not recorded";
 
-    static SeventyTwoHourReading of(InterviewReport report) {
+    /**
+     * Public because the reading now has <b>two</b> renderers, which is the whole reason it exists
+     * as an object: the exported document and the record screen state the same three cases, and a
+     * screen that recomputed them would be the second definition this class was extracted to remove.
+     */
+    public static SeventyTwoHourReading of(InterviewReport report) {
         LocalDateTime returnedAt = report.getInterviewRequest() == null
                 ? null : report.getInterviewRequest().getReturnedAt();
         LocalDateTime heldAt = report.getHeldAt();
@@ -114,11 +119,12 @@ public record SeventyTwoHourReading(String returnedLine, String heldLine, String
             // split a reading the rate does not split.
             return new SeventyTwoHourReading(returnedLine, heldLine,
                     notMeasurableCause(returnedAt, heldAt), Verdict.NOT_MEASURABLE,
-                    reason(report, false));
+                    reason(report, false), explanationMissing(report, false));
         }
         boolean met = within;
         return new SeventyTwoHourReading(returnedLine, heldLine, elapsed(returnedAt, heldAt),
-                met ? Verdict.MET : Verdict.MISSED, reason(report, !met));
+                met ? Verdict.MET : Verdict.MISSED, reason(report, !met),
+                explanationMissing(report, !met));
     }
 
     /**
@@ -164,10 +170,34 @@ public record SeventyTwoHourReading(String returnedLine, String heldLine, String
      * something a visitor took the trouble to write.
      */
     private static String reason(InterviewReport report, boolean owed) {
-        String recorded = report.getIfNotWhyLate();
-        if (recorded != null && !recorded.isBlank()) {
-            return recorded;
+        if (recorded(report)) {
+            return report.getIfNotWhyLate();
         }
         return owed ? "No reason recorded" : "Not applicable";
+    }
+
+    /**
+     * Whether this reading has a <b>gap</b> in it, as opposed to a row that simply does not apply.
+     *
+     * <p>Carried as state rather than left for a renderer to work out, because two renderers now
+     * need it and the second one is a screen that styles the row. Deriving it there would mean
+     * either recomputing "was an explanation owed" - a second definition of the rule this whole
+     * class exists to hold once - or, worse, testing {@link #reasonLine()} against the string
+     * {@code "No reason recorded"}. That is the mistake Creed already named here: <b>a state must
+     * reach a second renderer as the state, not as a substring of the first rendering.</b> The
+     * failure mode is identical to the one recorded on {@link Verdict} - reword the sentence and the
+     * styling silently stops matching the meaning - and it would fail in the same direction, with a
+     * real gap quietly rendering as an ordinary answer.
+     *
+     * <p>False whenever a reason was written down, and false whenever none was owed. Only a measured,
+     * missed window with nothing written is a gap.
+     */
+    private static boolean explanationMissing(InterviewReport report, boolean owed) {
+        return owed && !recorded(report);
+    }
+
+    private static boolean recorded(InterviewReport report) {
+        String value = report.getIfNotWhyLate();
+        return value != null && !value.isBlank();
     }
 }

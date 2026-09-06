@@ -258,6 +258,58 @@ class SeventyTwoHourReadingTest {
     }
 
     /**
+     * T233. <b>A blank reason means two opposite things, and until now both printed as a gap.</b>
+     * Either the interview was on time and nothing is owed, or it was late and nobody explained why.
+     * The field cannot tell them apart on its own, so it is scored against the derived verdict - and
+     * the result reaches the second renderer as STATE rather than as text it has to interpret.
+     *
+     * <p>Why the state and not just the sentence: the record screen styles this row as a gap, and the
+     * only other way to decide that is to test {@link SeventyTwoHourReading#reasonLine()} against the
+     * literal "No reason recorded". That would make a display sentence load-bearing - the exact
+     * mistake already recorded on {@code Verdict}, where deriving the short answer from
+     * {@code verdictLine()}'s text meant a reword would silently change what a statutory document
+     * asserted. Here it would silently restyle one.
+     *
+     * <p>The direction of the old failure is what makes it worth a test rather than a fix: it landed
+     * on the <b>honest, on-time visitor</b> exactly as readily as on the confused one. Leaving an
+     * inapplicable field empty is the correct thing to do, and doing it correctly was recorded as
+     * declining to justify a breach that never happened.
+     */
+    @Test
+    void onlyAMeasuredMissedWindowWithNothingWrittenCountsAsAMissingExplanation() {
+        assertThat(SeventyTwoHourReading.of(report(RETURNED, RETURNED.plusHours(80), null))
+                .explanationMissing())
+                .as("late, nothing written - a real statutory failure with no explanation, and the "
+                        + "one case that should be prominent")
+                .isTrue();
+
+        assertThat(SeventyTwoHourReading.of(report(RETURNED, RETURNED.plusHours(10), null))
+                .explanationMissing())
+                .as("on time, so no explanation was ever owed. This is the honest answer, and it "
+                        + "must not be styled as a gap in the record")
+                .isFalse();
+
+        assertThat(SeventyTwoHourReading.of(report(RETURNED, null, null)).explanationMissing())
+                .as("not measurable: the system already refuses to assert a breach it cannot "
+                        + "evidence, so it must not assert a refusal to explain one either")
+                .isFalse();
+        assertThat(SeventyTwoHourReading.of(report(RETURNED, RETURNED.minusHours(3), null))
+                .explanationMissing())
+                .as("not measurable for the other cause - an interview recorded before the return")
+                .isFalse();
+
+        assertThat(SeventyTwoHourReading.of(report(RETURNED, RETURNED.plusHours(80), "In hospital"))
+                .explanationMissing())
+                .as("late, but the visitor wrote something - nothing is missing")
+                .isFalse();
+        assertThat(SeventyTwoHourReading.of(report(RETURNED, RETURNED.plusHours(80), "   "))
+                .explanationMissing())
+                .as("whitespace is not an explanation, and the gap flag must agree with the "
+                        + "sentence beside it rather than being decided separately")
+                .isTrue();
+    }
+
+    /**
      * The rate itself, which is what this ruling was actually about. Equality stays measurable - a
      * held time equal to the return is odd, not impossible - so the exclusion is exactly one case
      * wide rather than swallowing a legitimate reading.

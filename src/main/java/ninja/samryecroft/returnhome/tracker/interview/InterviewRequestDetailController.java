@@ -6,6 +6,7 @@ import ninja.samryecroft.returnhome.tracker.child.ChildIdentity;
 import ninja.samryecroft.returnhome.tracker.child.NameRevealService;
 import ninja.samryecroft.returnhome.tracker.report.InterviewReport;
 import ninja.samryecroft.returnhome.tracker.report.ReportService;
+import ninja.samryecroft.returnhome.tracker.report.SeventyTwoHourReading;
 import ninja.samryecroft.returnhome.tracker.user.AppUserPrincipal;
 import ninja.samryecroft.returnhome.tracker.user.Role;
 import org.slf4j.Logger;
@@ -108,6 +109,18 @@ public class InterviewRequestDetailController {
         model.addAttribute("canReview", canReview);
         model.addAttribute("canDownload", canDownload);
         model.addAttribute("report", report);
+        // T233. The 72-hour reason is scored against the derived verdict, not read on its own, and
+        // the scoring happens ONCE - here, off the same object the exported document uses. A blank
+        // reason means two opposite things (the window was met so nothing is owed, or it was missed
+        // and nobody explained why) and the template cannot tell them apart from the field alone.
+        // Rebuilding that rule in Thymeleaf would put a second copy of it on the surface where it is
+        // least visible, which is the defect this page is being fixed FOR.
+        //
+        // Null-safe on the same terms as `report` above: a report that is absent has no reading, and
+        // the block that renders it is already gated on the report existing. The association walk
+        // inside of() is the same one the template performed itself before this change, at the same
+        // point in the request - moving it here changes where it happens, not whether it can.
+        model.addAttribute("reading", report == null ? null : SeventyTwoHourReading.of(report));
         model.addAttribute("auditHistory", auditHistoryService.historyFor(request));
         auditEventPublisher.auditViewOpened("InterviewRequest", request.getId(),
                 request.getHome() == null || request.getHome().getOrganisation() == null

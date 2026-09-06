@@ -280,8 +280,28 @@
             <dd class="unanswered" th:if="${report.within72Hours == null and report.heldAt != null}">Not measurable — the interview is recorded as held before the return</dd>
             <dd th:unless="${report.within72Hours == null}" th:text="${report.within72Hours} ? 'Yes' : 'No'">—</dd>
 
+            <!--/*
+              T233. This row is scored against the verdict above it, never on its own. A blank means
+              two opposite things - the interview was on time so nothing is owed, or it was late and
+              nobody explained why - and the field alone cannot tell them apart. It used to print
+              "Not answered" with the gap styling for BOTH, so an on-time visitor who correctly left
+              it empty was recorded as having declined to justify a breach that never happened. The
+              harm landed on the honest answer as readily as on the confused one.
+
+              Worse, it contradicted the two rows immediately above: those refuse to assert a breach
+              the system cannot evidence, and then this one asserted a refusal to explain that same
+              unevidenced breach. Same family as the export's MISSING_VALUE defect - the system
+              reporting that a person declined to answer, when the system stopped asking.
+
+              Both the text and the gap styling come off the reading rather than being recomputed
+              here. `explanationMissing` is carried as STATE for exactly the reason recorded on
+              SeventyTwoHourReading.Verdict: a second renderer must receive the state, not a
+              substring of the first rendering. Testing this text against "No reason recorded" would
+              make a display sentence load-bearing, and rewording it would silently restyle a
+              statutory record.
+            */-->
             <dt>If not, why?</dt>
-            <dd th:classappend="${report.ifNotWhyLate == null} ? 'unanswered'" th:text="${report.ifNotWhyLate} ?: 'Not answered'">—</dd>
+            <dd th:classappend="${reading.explanationMissing} ? 'unanswered'" th:text="${reading.reasonLine}">—</dd>
 
             <dt>Consultation with home's staff to establish any new information</dt>
             <dd th:classappend="${report.consultationWithHomeStaff == null} ? 'unanswered'" th:text="${report.consultationWithHomeStaff} ?: 'Not answered'">—</dd>
