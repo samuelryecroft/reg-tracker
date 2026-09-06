@@ -9,7 +9,14 @@
 <div th:replace="~{fragments/layout :: nav}"></div>
 <main id="main">
     <h1 th:text="${view.orgName()}">Care Provider</h1>
-    <p class="muted" th:text="${view.homeCount() + (view.homeCount() == 1 ? ' home · ' : ' homes · ') + view.childCount() + ' children · Care Provider'}">Summary</p>
+    <!--/* T251: homeCount() had a singular branch, childCount() never did - the only place in the
+         app that pluralises this noun, so a care provider with exactly one child read "1 children"
+         on their own dashboard. Found while scoping T250 (Oscar's rename), fixed separately and
+         first: the rename's replacement list presumes a singular branch that never existed here, so
+         this removes an inconsistency the rename would otherwise inherit rather than discover
+         itself. Sequencing per god - this fix, not the rename, which stays gated behind the
+         redesign and T244. */-->
+    <p class="muted" th:text="${view.homeCount() + (view.homeCount() == 1 ? ' home · ' : ' homes · ') + view.childCount() + (view.childCount() == 1 ? ' child · Care Provider' : ' children · Care Provider')}">Summary</p>
 
     <!--/* ============ LIVE ZONE ============ */-->
     <section class="zone live" aria-labelledby="z1">
