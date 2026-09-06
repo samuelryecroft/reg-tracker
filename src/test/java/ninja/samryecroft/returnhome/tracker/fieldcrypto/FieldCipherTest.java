@@ -3,6 +3,7 @@ package ninja.samryecroft.returnhome.tracker.fieldcrypto;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 import java.nio.charset.StandardCharsets;
@@ -10,6 +11,8 @@ import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
  * What these assert is not "AES works" - it is the four properties the design actually leans on:
@@ -17,6 +20,7 @@ import org.junit.jupiter.api.Test;
  * between organisations or between columns, and that every failure is a refusal rather than a
  * fallback.
  */
+@ExtendWith(MockitoExtension.class)
 class FieldCipherTest {
 
     private static final long ORG = 7L;
@@ -28,8 +32,13 @@ class FieldCipherTest {
     @BeforeEach
     void setUp() {
         keyService = mock(FieldKeyService.class);
-        when(keyService.dataKeyFor(ORG)).thenReturn(key('a'));
-        when(keyService.dataKeyFor(OTHER_ORG)).thenReturn(key('b'));
+        // lenient, per stub, for two different reasons - not a blanket silence:
+        // ORG is used by every test that actually ciphers, but leavesNullAlone never reaches the key
+        // at all, and failsClosedWhenTheKeyIsUnavailable re-stubs this call to throw.
+        lenient().when(keyService.dataKeyFor(ORG)).thenReturn(key('a'));
+        // OTHER_ORG exists only for the two cross-organisation tests; the other nine never ask for a
+        // second key. It is stubbed here so those two read as a comparison rather than as setup.
+        lenient().when(keyService.dataKeyFor(OTHER_ORG)).thenReturn(key('b'));
         cipher = new FieldCipher(keyService);
     }
 

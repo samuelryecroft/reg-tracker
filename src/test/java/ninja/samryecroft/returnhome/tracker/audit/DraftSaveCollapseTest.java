@@ -3,6 +3,7 @@ package ninja.samryecroft.returnhome.tracker.audit;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.assertj.core.api.InstanceOfAssertFactories.list;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -19,6 +20,8 @@ import ninja.samryecroft.returnhome.tracker.report.InterviewReport;
 import ninja.samryecroft.returnhome.tracker.report.InterviewReportRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
  * T177 - runs of draft saves collapse in the rendered timeline, and the one draft save that means
@@ -34,6 +37,7 @@ import org.junit.jupiter.api.Test;
  * different headings depending on the hour it ran, and one anchored on midnight would be flaky
  * twice a day besides.
  */
+@ExtendWith(MockitoExtension.class)
 class DraftSaveCollapseTest {
 
 
@@ -328,7 +332,11 @@ class DraftSaveCollapseTest {
     private static AuditEvent event(long id, AuditEventType type, LocalDateTime occurredAt, String roles,
             String metadata) {
         AuditEvent event = mock(AuditEvent.class);
-        when(event.getId()).thenReturn(id);
+        // lenient: an event's id is read only when it becomes a rendered row - once per
+        // collapsed run, from the LATEST event of that run (AuditHistoryService:281), or once for
+        // a row that stands alone (:361). Every event folded INTO a run is therefore never asked
+        // for its id. The other four getters are read for every event and stay strict.
+        lenient().when(event.getId()).thenReturn(id);
         when(event.getEventType()).thenReturn(type);
         when(event.getOccurredAt()).thenReturn(occurredAt);
         when(event.getActorRolesAtTime()).thenReturn(roles);

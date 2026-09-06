@@ -16,6 +16,8 @@ import com.azure.security.keyvault.keys.models.KeyProperties;
 import com.azure.security.keyvault.keys.models.KeyVaultKey;
 import java.time.Duration;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
  * T181: {@code currentKeyFor} asked Key Vault on every single encrypted write.
@@ -25,6 +27,7 @@ import org.junit.jupiter.api.Test;
  * container. What the cache must never do is turn a vault problem into a silent success, so the
  * fail-closed cases are tested here alongside the hit.
  */
+@ExtendWith(MockitoExtension.class)
 class KeyHandleCacheTest {
 
     private final KeyClient keyClient = mock(KeyClient.class);
