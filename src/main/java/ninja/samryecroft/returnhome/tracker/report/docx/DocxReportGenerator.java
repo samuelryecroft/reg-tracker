@@ -22,6 +22,7 @@ import org.apache.poi.xwpf.usermodel.XWPFParagraph;
 import org.apache.poi.xwpf.usermodel.XWPFRun;
 import org.apache.poi.xwpf.usermodel.XWPFTable;
 import org.apache.poi.xwpf.usermodel.XWPFTableCell;
+import org.apache.poi.xwpf.usermodel.XWPFTableRow;
 import org.springframework.stereotype.Component;
 
 /**
@@ -71,7 +72,16 @@ public class DocxReportGenerator {
      */
     public void generate(InputStream templateStream, Map<String, String> values,
             String accentColor, String accentColorDark, String tintColor, Path outputPath) throws IOException {
-        byte[] generated = generate(templateStream, values, accentColor, accentColorDark, tintColor);
+        generate(templateStream, values, accentColor, accentColorDark, tintColor, outputPath,
+                RowCollapse.none());
+    }
+
+    /** The file-writing variant, for the generator's own tests, which need a document to reopen. */
+    public void generate(InputStream templateStream, Map<String, String> values,
+            String accentColor, String accentColorDark, String tintColor, Path outputPath,
+            RowCollapse collapse) throws IOException {
+        byte[] generated =
+                generate(templateStream, values, accentColor, accentColorDark, tintColor, collapse);
         Files.createDirectories(outputPath.getParent());
         Files.write(outputPath, generated);
     }
@@ -85,6 +95,23 @@ public class DocxReportGenerator {
      */
     public byte[] generate(InputStream templateStream, Map<String, String> values,
             String accentColor, String accentColorDark, String tintColor) throws IOException {
+        return generate(templateStream, values, accentColor, accentColorDark, tintColor,
+                RowCollapse.none());
+    }
+
+    /**
+     * Questions that were never asked are removed from the document rather than printed empty, and
+     * one statement takes their place (T244).
+     *
+     * <p><b>Why the instruction is a parameter and not another entry in {@code values}.</b> That map
+     * is the substitution channel, and T228 was one key read by two consumers, corrected for one of
+     * them: a sentence meant for a table row became the document's core title. A value that changes
+     * the document's STRUCTURE is not a substitution, and putting it there would invite the same
+     * collapse.
+     */
+    public byte[] generate(InputStream templateStream, Map<String, String> values,
+            String accentColor, String accentColorDark, String tintColor, RowCollapse collapse)
+            throws IOException {
         String accent = stripHash(accentColor, DEFAULT_ACCENT);
         String tint = stripHash(tintColor, DEFAULT_TINT);
         byte[] templateBytes = applyBrandColors(templateBytesOf(templateStream), accent,
@@ -95,6 +122,10 @@ public class DocxReportGenerator {
                 stripHash(ThemeService.readableForegroundOn(tint), DEFAULT_ACCENT_TEXT));
 
         try (XWPFDocument document = new XWPFDocument(new ByteArrayInputStream(templateBytes))) {
+            // BEFORE substitution: the rows are identified by the ${tokens} still in them, which
+            // is what makes the rule derivable from the question model rather than from row indices
+            // in a binary file nobody can diff.
+            collapseUnaskedRows(document, collapse);
             document.getParagraphs().forEach(paragraph -> substitute(paragraph, values));
             for (XWPFTable table : document.getTables()) {
                 processTable(table, values);
@@ -110,6 +141,82 @@ public class DocxReportGenerator {
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             document.write(out);
             return out.toByteArray();
+        }
+    }
+
+    /**
+     * Which question rows to remove, and the sentence that replaces them.
+     *
+     * @param placeholders the {@code ${token}} names whose rows go, taken from the question model so
+     *     that adding a child's question does not require anyone to remember this file exists
+     * @param statement    said ONCE, in place of the first removed question. Nine "not applicable"
+     *     rows would distribute the significant fact - that a missing child was not spoken to -
+     *     across nine lines and bury it, and a court or IRO reading nine of them learns nothing nine
+     *     times.
+     */
+    public record RowCollapse(java.util.Set<String> placeholders, String statement) {
+        public static RowCollapse none() {
+            return new RowCollapse(java.util.Set.of(), "");
+        }
+    }
+
+    /**
+     * Removes each named question's row and the label row above it, and rewrites the FIRST of those
+     * label rows to carry the statement.
+     *
+     * <p>Reusing a row the template author already made is deliberate: building a {@code <w:tr>} by
+     * hand would mean reproducing this table's borders, widths and shading from memory, and getting
+     * any of it wrong produces a malformed statutory document that still opens. The surviving row
+     * keeps whatever styling the template gives it.
+     */
+    private void collapseUnaskedRows(XWPFDocument document, RowCollapse collapse) {
+        if (collapse.placeholders().isEmpty()) {
+            return;
+        }
+        for (XWPFTable table : document.getTables()) {
+            List<Integer> doomed = new java.util.ArrayList<>();
+            Integer statementRow = null;
+            for (int i = 0; i < table.getRows().size(); i++) {
+                if (!namesAny(table.getRow(i), collapse.placeholders())) {
+                    continue;
+                }
+                doomed.add(i);
+                // The label sits in its own row immediately above the answer.
+                if (i > 0) {
+                    if (statementRow == null) {
+                        statementRow = i - 1;
+                    } else {
+                        doomed.add(i - 1);
+                    }
+                }
+            }
+            if (statementRow != null) {
+                replaceText(table.getRow(statementRow), collapse.statement());
+            }
+            doomed.sort(java.util.Comparator.reverseOrder());
+            doomed.forEach(table::removeRow);
+        }
+    }
+
+    private boolean namesAny(XWPFTableRow row, java.util.Set<String> placeholders) {
+        String text = row.getTableCells().stream().map(XWPFTableCell::getText)
+                .reduce("", (a, b) -> a + b);
+        return placeholders.stream().anyMatch(name -> text.contains("${" + name + "}"));
+    }
+
+    /** The statement in the first cell; the rest emptied, so no stray label survives beside it. */
+    private void replaceText(XWPFTableRow row, String statement) {
+        List<XWPFTableCell> cells = row.getTableCells();
+        for (int c = 0; c < cells.size(); c++) {
+            XWPFTableCell cell = cells.get(c);
+            for (XWPFParagraph paragraph : cell.getParagraphs()) {
+                for (int r = paragraph.getRuns().size() - 1; r >= 0; r--) {
+                    paragraph.removeRun(r);
+                }
+            }
+            if (c == 0 && !cell.getParagraphs().isEmpty()) {
+                cell.getParagraphs().get(0).createRun().setText(statement);
+            }
         }
     }
 

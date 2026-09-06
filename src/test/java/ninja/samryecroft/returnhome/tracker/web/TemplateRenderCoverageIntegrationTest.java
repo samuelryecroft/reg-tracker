@@ -328,6 +328,76 @@ class TemplateRenderCoverageIntegrationTest extends AbstractIntegrationTest {
                 .doesNotContain(">Question<");
     }
 
+    /**
+     * T244: a declined interview replaces the nine child's-answer questions with one statement, and
+     * says so where a reader will see it.
+     *
+     * <p><b>Both halves are asserted together on purpose.</b> The nine must stop being counted as
+     * gaps, but removing nine false gaps must not also remove the true signal: a declined report
+     * showing no gaps looks identical on a reviewer's screen to a complete one, and the reviewer
+     * cannot then see that a child was never spoken to. That would be fixing a false alarm by
+     * deleting the alarm. So a test that only checked the rows had gone would pass on the defect.
+     *
+     * <p>The parent or carer's question is checked to SURVIVE, because it sits immediately after the
+     * nine in the model and "everything after the declined-reason question" is the natural wrong
+     * rule - one that would delete the field most likely to hold the only account of the episode.
+     */
+    @Test
+    void aDeclinedInterviewCollapsesTheChildsQuestionsIntoOneStatementAndSaysSo() throws Exception {
+        InterviewReport report = interviewReportRepository
+                .findByInterviewRequestId(approvedRequestId).orElseThrow();
+        report.setInterviewAccepted(false);
+        interviewReportRepository.saveAndFlush(report);
+
+        String declined = renderDetail();
+
+        assertThat(declined)
+                .as("the statement replaces the nine, once, at section level")
+                .contains("The young person was not interviewed, so these questions were not asked.");
+        assertThat(declined)
+                .as("THE TRUE SIGNAL. A count cannot carry this - .section-count is built to recede "
+                        + "- so the state is a chip, in the count's slot and instead of it")
+                .contains("tag-semantic-neutral")
+                .contains("Not interviewed");
+        // Scoped to the card. The first version asserted this against the WHOLE PAGE and failed on
+        // another section's perfectly legitimate count - the same over-broad shape as matching a
+        // short string against a rendered page, which this codebase has been bitten by before. It
+        // failed in the safe direction, but it was measuring the wrong thing either way.
+        assertThat(substringAfter(declined, "id=\"rhi\""))
+                .as("'no gaps' and 'not interviewed' must never be separately readable as two "
+                        + "claims about one section, so the count is suppressed rather than shown "
+                        + "beside the chip")
+                .doesNotContain("not answered</span>");
+
+        for (String childQuestion : List.of("Where were you while missing?",
+                "What made you go missing?", "Any additional comments from the young person?")) {
+            assertThat(declined)
+                    .as("no interview happened, so this was never asked and must not appear as a row")
+                    .doesNotContain(childQuestion);
+        }
+        assertThat(declined.replace("&#39;", "'"))
+                .as("the parent or carer's account is NOT the child's answer, and on a declined "
+                        + "interview it may be the only account of the episode anyone obtains")
+                .contains(ReportQuestions.byId("additionalInfoFromParentCarer").orElseThrow().label());
+
+        report.setInterviewAccepted(true);
+        interviewReportRepository.saveAndFlush(report);
+        String accepted = renderDetail();
+
+        assertThat(accepted)
+                .as("the interview happened, so the questions are live again and a blank one is a "
+                        + "real gap - the child was asked and the answer was not recorded")
+                .contains("Where were you while missing?")
+                .doesNotContain("Not interviewed");
+    }
+
+    private String renderDetail() throws Exception {
+        return mockMvc.perform(get("/interview-requests/{id}", approvedRequestId)
+                        .with(asUser("rc-reviewer" + suffix)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+    }
+
     /** The rendered card: from its id up to the start of the next one. */
     private static String substringAfter(String html, String marker) {
         int start = html.indexOf(marker);

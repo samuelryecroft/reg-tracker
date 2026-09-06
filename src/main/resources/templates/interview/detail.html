@@ -357,11 +357,44 @@
         </dl>
     </div>
 
+    <!--/*
+      T244. When the interview was not accepted, the nine questions put to the young person were
+      never asked, and they collapse into ONE statement rather than nine "not applicable" rows.
+
+      The reason is not readability. The significant fact on such a report is not that nine
+      questions are inapplicable - it is THAT A MISSING CHILD WAS NOT SPOKEN TO, itself a
+      safeguarding event and arguably the most important thing on the record. Nine identical
+      annotations distribute that fact across nine lines and bury it: a reader skims them and takes
+      away "nothing was needed here", when what happened is that the one conversation this whole
+      process exists to produce did not happen. Said once it is a statement; said nine times it is
+      furniture.
+
+      THE CHIP IS IN THE COUNT'S SLOT AND INSTEAD OF IT. Removing nine false gaps must not also
+      remove the true signal: a declined report showing no gaps would look identical to a complete
+      one, and the reviewer could not see that a child was never spoken to. That would be fixing a
+      false alarm by deleting the alarm. A count cannot carry this - .section-count is font-weight
+      400 in muted grey, built to recede, and a state that must be NOTICED cannot be expressed in
+      the vocabulary designed to be skimmed past. It is neutral rather than error because a child
+      not being spoken to is a fact to notice, not a failure to attribute to the visitor.
+      "No gaps" and "not interviewed" must never be separately readable as two claims about one
+      section, which is why the count is suppressed rather than shown alongside.
+
+      The statement does not say "declined" or give a cause: interviewAccepted is a No, and the
+      reason is free text that may be refusal, unavailability or something else. The reason field
+      carries the why; this states only the fact.
+
+      NOTHING HERE KEYS OFF THE SECTION. The nine are gated on the questions being asked, which is a
+      property of WHOSE ANSWER THEY ARE - and that cuts across this card. The parent or carer's
+      question below stays live, because on a declined interview their account may be the only
+      account of the episode anyone obtains.
+    */-->
     <div class="card" id="rhi" tabindex="-1" th:if="${report != null}"
          th:with="notAnswered=${unansweredBySection['rhi']}">
         <h3>Return Home Interview
-            <span class="section-count" th:if="${notAnswered > 0}" th:text="${notAnswered + ' not answered'}"></span>
+            <span class="tag tag-semantic-neutral" th:if="${report.interviewDeclined}">Not interviewed</span>
+            <span class="section-count" th:if="${!report.interviewDeclined and notAnswered > 0}" th:text="${notAnswered + ' not answered'}"></span>
         </h3>
+        <p th:if="${report.interviewDeclined}">The young person was not interviewed, so these questions were not asked. The reason is recorded above.</p>
         <dl class="detail">
             <dt th:text="${questions.interviewAccepted.label}">Question</dt>
             <dd th:classappend="${report.interviewAccepted == null} ? 'unanswered'" th:text="${report.interviewAccepted} == null ? 'Not answered' : (${report.interviewAccepted} ? 'Yes' : 'No')">—</dd>
@@ -369,6 +402,7 @@
             <dt th:text="${questions.interviewDeclinedReason.label}">Question</dt>
             <dd th:classappend="${report.interviewDeclinedReason == null} ? 'unanswered'" th:text="${report.interviewDeclinedReason} ?: 'Not answered'">—</dd>
 
+            <th:block th:if="${report.childInterviewed}">
             <dt th:text="${questions.whereWereYouWhileMissing.label}">Question</dt>
             <dd th:classappend="${report.whereWereYouWhileMissing == null} ? 'unanswered'" th:text="${report.whereWereYouWhileMissing} ?: 'Not answered'">—</dd>
 
@@ -395,6 +429,7 @@
 
             <dt th:text="${questions.additionalCommentsFromYoungPerson.label}">Question</dt>
             <dd th:classappend="${report.additionalCommentsFromYoungPerson == null} ? 'unanswered'" th:text="${report.additionalCommentsFromYoungPerson} ?: 'Not answered'">—</dd>
+            </th:block>
 
             <dt th:text="${questions.additionalInfoFromParentCarer.label}">Question</dt>
             <dd th:classappend="${report.additionalInfoFromParentCarer == null} ? 'unanswered'" th:text="${report.additionalInfoFromParentCarer} ?: 'Not answered'">—</dd>

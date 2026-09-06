@@ -75,8 +75,16 @@ public final class ReportQuestions {
      * cannot measure: an unanswered "Interview accepted?" is a gap in its own right and does not
      * also manufacture one here.
      */
+    /**
+     * The child's questions are live only when the interview was accepted. Null is not accepted
+     * either: an unanswered "Interview accepted?" is a gap in its own right and must not also turn
+     * nine unasked questions into nine more.
+     */
+    private static final Predicate<InterviewReport> ONLY_IF_ACCEPTED =
+            InterviewReport::isChildInterviewed;
+
     private static final Predicate<InterviewReport> ONLY_IF_DECLINED =
-            report -> Boolean.FALSE.equals(report.getInterviewAccepted());
+            InterviewReport::isInterviewDeclined;
 
     /**
      * Every question, in the order asked. Grouped by section for readability only - the sections
@@ -124,7 +132,8 @@ public final class ReportQuestions {
                     "If this interview was not offered and completed within 72 hours of the "
                             + "child's return, why not?",
                     null, LONG_TEXT, false, NOT_ANSWERED, "ifNotWhyLate",
-                    InterviewReport::isLateExplanationOwed, InterviewReport::getIfNotWhyLate),
+                    Respondent.VISITOR, InterviewReport::isLateExplanationOwed,
+                    InterviewReport::getIfNotWhyLate),
             q("consultationWithHomeStaff", DETAILS,
                     "Consultation with home's staff to establish any new information", null,
                     LONG_TEXT, false, InterviewReport::getConsultationWithHomeStaff),
@@ -146,33 +155,41 @@ public final class ReportQuestions {
             q("interviewDeclinedReason", RETURN_HOME_INTERVIEW, "If not, why?", null,
                     LONG_TEXT, false, "interviewDeclinedReason", ONLY_IF_DECLINED,
                     InterviewReport::getInterviewDeclinedReason),
-            q("whereWereYouWhileMissing", RETURN_HOME_INTERVIEW, "Where were you while missing?", null,
-                    LONG_TEXT, false, InterviewReport::getWhereWereYouWhileMissing),
-            q("whoWereYouWithWhileMissing", RETURN_HOME_INTERVIEW, "Who were you with while missing?",
-                    null, LONG_TEXT, false, InterviewReport::getWhoWereYouWithWhileMissing),
-            q("whatMadeYouGoMissing", RETURN_HOME_INTERVIEW, "What made you go missing?", null,
-                    LONG_TEXT, false, InterviewReport::getWhatMadeYouGoMissing),
-            q("whatCanBeDoneToAddressReasons", RETURN_HOME_INTERVIEW,
-                    "What can be done to address these reasons?", null,
-                    LONG_TEXT, false, InterviewReport::getWhatCanBeDoneToAddressReasons),
-            q("consideredSelfMissing", RETURN_HOME_INTERVIEW,
-                    "Did you consider yourself to be missing?", null,
-                    YES_NO, false, InterviewReport::getConsideredSelfMissing),
-            q("whatDidYouDoWhileMissing", RETURN_HOME_INTERVIEW,
-                    "What did you do while you were missing?", null,
-                    LONG_TEXT, false, InterviewReport::getWhatDidYouDoWhileMissing),
-            q("whatHappenedWhenReturned", RETURN_HOME_INTERVIEW,
-                    "What happened when you returned home?", null,
-                    LONG_TEXT, false, InterviewReport::getWhatHappenedWhenReturned),
-            q("preventFutureMissingSuggestions", RETURN_HOME_INTERVIEW,
-                    "Is there anything that can be done to stop you going missing again?", null,
-                    LONG_TEXT, false, InterviewReport::getPreventFutureMissingSuggestions),
-            q("additionalCommentsFromYoungPerson", RETURN_HOME_INTERVIEW,
-                    "Any additional comments from the young person?", null,
-                    LONG_TEXT, false, InterviewReport::getAdditionalCommentsFromYoungPerson),
-            q("additionalInfoFromParentCarer", RETURN_HOME_INTERVIEW,
-                    "Any additional information provided by the parent/carer?", null,
-                    LONG_TEXT, false, InterviewReport::getAdditionalInfoFromParentCarer),
+            child("whereWereYouWhileMissing", RETURN_HOME_INTERVIEW,
+                    "Where were you while missing?",
+                    LONG_TEXT, InterviewReport::getWhereWereYouWhileMissing),
+            child("whoWereYouWithWhileMissing", RETURN_HOME_INTERVIEW,
+                    "Who were you with while missing?",
+                    LONG_TEXT, InterviewReport::getWhoWereYouWithWhileMissing),
+            child("whatMadeYouGoMissing", RETURN_HOME_INTERVIEW,
+                    "What made you go missing?",
+                    LONG_TEXT, InterviewReport::getWhatMadeYouGoMissing),
+            child("whatCanBeDoneToAddressReasons", RETURN_HOME_INTERVIEW,
+                    "What can be done to address these reasons?",
+                    LONG_TEXT, InterviewReport::getWhatCanBeDoneToAddressReasons),
+            child("consideredSelfMissing", RETURN_HOME_INTERVIEW,
+                    "Did you consider yourself to be missing?",
+                    YES_NO, InterviewReport::getConsideredSelfMissing),
+            child("whatDidYouDoWhileMissing", RETURN_HOME_INTERVIEW,
+                    "What did you do while you were missing?",
+                    LONG_TEXT, InterviewReport::getWhatDidYouDoWhileMissing),
+            child("whatHappenedWhenReturned", RETURN_HOME_INTERVIEW,
+                    "What happened when you returned home?",
+                    LONG_TEXT, InterviewReport::getWhatHappenedWhenReturned),
+            child("preventFutureMissingSuggestions", RETURN_HOME_INTERVIEW,
+                    "Is there anything that can be done to stop you going missing again?",
+                    LONG_TEXT, InterviewReport::getPreventFutureMissingSuggestions),
+            child("additionalCommentsFromYoungPerson", RETURN_HOME_INTERVIEW,
+                    "Any additional comments from the young person?",
+                    LONG_TEXT, InterviewReport::getAdditionalCommentsFromYoungPerson),
+            // NOT a child's-answer question, and it must stay live when the interview is not
+            // accepted: ON A DECLINED INTERVIEW THE PARENT OR CARER'S ACCOUNT MAY BE THE ONLY
+            // ACCOUNT OF THE EPISODE ANYONE OBTAINS. It follows the nine in this literal, so
+            // "everything after the declined-reason question" is the natural wrong rule and would
+            // silently delete the field that matters most in exactly the case being handled.
+            new ReportQuestion("additionalInfoFromParentCarer", RETURN_HOME_INTERVIEW,
+                    "Any additional information provided by the parent/carer?", null, LONG_TEXT, false, NOT_ANSWERED, "additionalInfoFromParentCarer",
+                    Respondent.PARENT_OR_CARER, ALWAYS, InterviewReport::getAdditionalInfoFromParentCarer),
 
             // --- 3. Future Incidents ----------------------------------------------------------
             q("risksIdentifiedDuringEpisode", FUTURE_INCIDENTS,
@@ -213,7 +230,8 @@ public final class ReportQuestions {
             new ReportQuestion("dateReportShared", DECLARATION,
                     "Date report shared with relevant professionals",
                     "Leave blank if not yet shared.",
-                    DATE, false, "Not yet shared", "dateReportShared", BLANK_IS_AN_ANSWER,
+                    DATE, false, "Not yet shared", "dateReportShared", Respondent.VISITOR,
+                    BLANK_IS_AN_ANSWER,
                     InterviewReport::getDateReportShared));
 
     private static ReportQuestion q(String id, ReportSection section, String label, String hint,
@@ -221,11 +239,18 @@ public final class ReportQuestions {
         return q(id, section, label, hint, type, required, id, ALWAYS, reader);
     }
 
+    /** A question put to the young person, so asked only when the interview happened. */
+    private static ReportQuestion child(String id, ReportSection section, String label,
+            QuestionType type, Function<InterviewReport, Object> reader) {
+        return new ReportQuestion(id, section, label, null, type, false, NOT_ANSWERED, id,
+                Respondent.CHILD, ONLY_IF_ACCEPTED, reader);
+    }
+
     private static ReportQuestion q(String id, ReportSection section, String label, String hint,
             QuestionType type, boolean required, String exportToken,
             Predicate<InterviewReport> appliesTo, Function<InterviewReport, Object> reader) {
         return new ReportQuestion(id, section, label, hint, type, required, NOT_ANSWERED,
-                exportToken, appliesTo, reader);
+                exportToken, Respondent.VISITOR, appliesTo, reader);
     }
 
     /** Every question, in order, grouped by the section that asks it. */

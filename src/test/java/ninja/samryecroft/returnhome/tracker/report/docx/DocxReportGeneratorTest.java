@@ -4,7 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.InputStream;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.apache.poi.xwpf.usermodel.XWPFParagraph;
 import org.apache.poi.xwpf.usermodel.XWPFTable;
@@ -227,6 +229,80 @@ class DocxReportGeneratorTest {
                     .doesNotContain("Interview time not recorded")
                     .doesNotContain("not recorded");
         }
+    }
+
+    /**
+     * T244: on a declined interview the child's questions leave the document and one statement takes
+     * their place.
+     *
+     * <p><b>The document must not contradict the screen it was generated from.</b> The record view
+     * collapses the same nine, so a .docx that printed nine empty rows would say the child was asked
+     * nine questions and answered none, while the screen says they were never asked - and the
+     * council reads the document.
+     *
+     * <p>Asserted on the document's actual TEXT rather than on the XML, because what matters is what
+     * a reader sees. The parent or carer's question is checked to survive: it sits immediately after
+     * the nine in the template, so an off-by-one in the row arithmetic would take it - and on a
+     * declined interview it may be the only account of the episode anyone obtains.
+     */
+    @Test
+    void aDeclinedInterviewRemovesTheChildsQuestionRowsAndStatesWhyOnce(@TempDir Path tempDir)
+            throws Exception {
+        String statement = "The young person was not interviewed, so these questions were not asked.";
+        Path outputPath = tempDir.resolve("declined.docx");
+        try (InputStream templateStream =
+                new ClassPathResource("docx-templates/rhi-report-template.docx").getInputStream()) {
+            generator.generate(templateStream,
+                    Map.of("childName", "Alex Smith", "titleDate", "20 Jul 2026",
+                            "interviewAccepted", "No",
+                            "interviewDeclinedReason", "The young person declined",
+                            "additionalInfoFromParentCarer", "Parent gave an account"),
+                    null, null, null, outputPath,
+                    new DocxReportGenerator.RowCollapse(
+                            Set.of("whereWereYouWhileMissing", "whoWereYouWithWhileMissing",
+                                    "whatMadeYouGoMissing", "whatCanBeDoneToAddressReasons",
+                                    "consideredSelfMissing", "whatDidYouDoWhileMissing",
+                                    "whatHappenedWhenReturned", "preventFutureMissingSuggestions",
+                                    "additionalCommentsFromYoungPerson"),
+                            statement));
+        }
+
+        String text = textOf(outputPath);
+
+        assertThat(text)
+                .as("said ONCE - nine 'not applicable' rows would bury the significant fact, which "
+                        + "is that a missing child was not spoken to")
+                .containsOnlyOnce(statement);
+        for (String question : List.of("Where were you while missing?", "What made you go missing?",
+                "Any additional comments from the young person?")) {
+            assertThat(text)
+                    .as("this was never asked, so it must not appear in the council's copy")
+                    .doesNotContain(question);
+        }
+        assertThat(text)
+                .as("NOT the child's answer, and the row immediately after the nine - an off-by-one "
+                        + "in the row arithmetic deletes exactly this one")
+                .contains("Any additional information provided by the parent/carer?")
+                .contains("Parent gave an account");
+        assertThat(text)
+                .as("the visitor's own rows are untouched: the reason the interview did not happen "
+                        + "is the thing the statement points at")
+                .contains("If not, why?")
+                .contains("The young person declined");
+        assertThat(text)
+                .as("no placeholder may survive a removal")
+                .doesNotContain("${");
+    }
+
+    /** Every table cell and paragraph, in document order - what a reader would actually see. */
+    private String textOf(Path docx) throws Exception {
+        StringBuilder text = new StringBuilder();
+        try (XWPFDocument document = new XWPFDocument(java.nio.file.Files.newInputStream(docx))) {
+            document.getParagraphs().forEach(p -> text.append(p.getText()).append('\n'));
+            document.getTables().forEach(t -> t.getRows().forEach(r ->
+                    r.getTableCells().forEach(c -> text.append(c.getText()).append('\n'))));
+        }
+        return text.toString();
     }
 
     @Test

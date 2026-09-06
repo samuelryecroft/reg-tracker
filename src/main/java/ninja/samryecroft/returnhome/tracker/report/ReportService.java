@@ -18,6 +18,9 @@ import ninja.samryecroft.returnhome.tracker.interview.InterviewRequestService;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewStatus;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewStatusTransitions;
 import ninja.samryecroft.returnhome.tracker.report.docx.DocxReportGenerator;
+import ninja.samryecroft.returnhome.tracker.report.question.Respondent;
+import ninja.samryecroft.returnhome.tracker.report.question.ReportQuestions;
+import ninja.samryecroft.returnhome.tracker.report.question.ReportQuestion;
 import ninja.samryecroft.returnhome.tracker.report.dto.SubmitReportForm;
 import ninja.samryecroft.returnhome.tracker.theme.ThemeService;
 import ninja.samryecroft.returnhome.tracker.user.AppUserPrincipal;
@@ -308,7 +311,8 @@ public class ReportService {
                 // leaving the other on the old model would leave a call site that cannot tell a
                 // reader which model is in force.
                 document = docxReportGenerator.generate(templateStream, buildValues(request, report),
-                        theme.primaryColor(), theme.docAccent(), theme.accentTint());
+                        theme.primaryColor(), theme.docAccent(), theme.accentTint(),
+                        childQuestionRows(report));
             }
         } catch (IOException e) {
             throw new UncheckedIOException("Failed to generate report document", e);
@@ -398,6 +402,34 @@ public class ReportService {
         report.setRecommendations(form.getRecommendations());
         report.setConductedByStatement(form.getConductedByStatement());
         report.setDateReportShared(form.getDateReportShared());
+    }
+
+    /**
+     * T244. On a declined interview the questions put to the young person were never asked, so their
+     * rows leave the document and one statement takes their place - the same treatment the record
+     * screen gives them, because a document that contradicts the screen it was generated from is
+     * its own defect.
+     *
+     * <p>The set comes from {@link ReportQuestions}, not from a list written out here: the template
+     * is a binary artefact nobody can diff, so a hand-maintained copy of "which questions are the
+     * child's" would be the one that silently fell behind. Adding a child's question to the model
+     * takes it out of a declined document automatically.
+     *
+     * <p>Empty when the interview happened, or when nobody has said whether it did - the statement
+     * asserts that a young person was not spoken to, which is a safeguarding fact and may only be
+     * printed when somebody has actually recorded it.
+     */
+    private DocxReportGenerator.RowCollapse childQuestionRows(InterviewReport report) {
+        if (!report.isInterviewDeclined()) {
+            return DocxReportGenerator.RowCollapse.none();
+        }
+        return new DocxReportGenerator.RowCollapse(
+                ReportQuestions.ALL.stream()
+                        .filter(q -> q.answeredBy() == Respondent.CHILD)
+                        .map(ReportQuestion::exportToken)
+                        .collect(java.util.stream.Collectors.toSet()),
+                "The young person was not interviewed, so these questions were not asked. "
+                        + "The reason is recorded above.");
     }
 
     private Map<String, String> buildValues(InterviewRequest request, InterviewReport report) {
