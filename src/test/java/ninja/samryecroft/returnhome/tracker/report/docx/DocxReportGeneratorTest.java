@@ -9,6 +9,7 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.apache.poi.xwpf.usermodel.XWPFParagraph;
+import org.apache.poi.xwpf.usermodel.XWPFRun;
 import org.apache.poi.xwpf.usermodel.XWPFTable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -292,6 +293,54 @@ class DocxReportGeneratorTest {
         assertThat(text)
                 .as("no placeholder may survive a removal")
                 .doesNotContain("${");
+    }
+
+    /**
+     * The statement keeps the character formatting of the label row it replaces.
+     *
+     * <p>Those label runs carry their bold, colour and size <b>on the run</b>, with no paragraph
+     * style to fall back on, so a bare {@code createRun()} renders the sentence in the document
+     * default among 9pt bold grey labels. Reusing the template author's row keeps borders, widths
+     * and shading - it does not keep run properties, and that is the level which decides how the
+     * sentence actually looks.
+     *
+     * <p>Asserted because it is invisible to every other check here: the text is present and
+     * correct either way, the document opens either way, and the only symptom is that the one
+     * sentence a reader must not mistake for a stray note looks exactly like a stray note.
+     */
+    @Test
+    void theStatementInheritsTheReplacedRowsRunFormatting(@TempDir Path tempDir) throws Exception {
+        String statement = "The young person was not interviewed, so these questions were not asked.";
+        Path outputPath = tempDir.resolve("formatting.docx");
+        try (InputStream templateStream =
+                new ClassPathResource("docx-templates/rhi-report-template.docx").getInputStream()) {
+            generator.generate(templateStream, Map.of("childName", "Alex Smith"),
+                    null, null, null, outputPath,
+                    new DocxReportGenerator.RowCollapse(
+                            Set.of("whereWereYouWhileMissing", "whoWereYouWithWhileMissing",
+                                    "whatMadeYouGoMissing", "whatCanBeDoneToAddressReasons",
+                                    "consideredSelfMissing", "whatDidYouDoWhileMissing",
+                                    "whatHappenedWhenReturned", "preventFutureMissingSuggestions",
+                                    "additionalCommentsFromYoungPerson"),
+                            statement));
+        }
+
+        try (XWPFDocument document = new XWPFDocument(java.nio.file.Files.newInputStream(outputPath))) {
+            XWPFRun statementRun = document.getTables().stream()
+                    .flatMap(t -> t.getRows().stream())
+                    .flatMap(r -> r.getTableCells().stream())
+                    .flatMap(c -> c.getParagraphs().stream())
+                    .flatMap(pr -> pr.getRuns().stream())
+                    .filter(run -> statement.equals(run.getText(0)))
+                    .findFirst()
+                    .orElse(null);
+
+            assertThat(statementRun).as("the statement must be in the document at all").isNotNull();
+            assertThat(statementRun.getCTR().getRPr())
+                    .as("a bare run inherits nothing, and these labels carry their formatting ON "
+                            + "the run - so the sentence would render in the document default")
+                    .isNotNull();
+        }
     }
 
     /** Every table cell and paragraph, in document order - what a reader would actually see. */

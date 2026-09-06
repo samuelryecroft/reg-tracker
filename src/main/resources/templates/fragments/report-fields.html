@@ -90,7 +90,7 @@
         <h2>2. Return Home Interview
             <span class="tag tag-semantic-neutral" th:if="${interviewDeclined}">Not interviewed</span>
             <span class="tag tag-semantic-neutral" th:if="${interviewStatusUnrecorded}">Not yet recorded</span>
-            <span class="section-count" th:if="${childInterviewed and notAnswered > 0}" th:text="${notAnswered + ' not answered'}"></span>
+            <span class="section-count" th:if="${notAnswered > 0}" th:text="${notAnswered + ' not answered'}"></span>
         </h2>
         <p th:if="${interviewDeclined}">The young person was not interviewed, so these questions were not asked. The reason is recorded above.</p>
         <th:block th:insert="~{::section2(true)}"></th:block>

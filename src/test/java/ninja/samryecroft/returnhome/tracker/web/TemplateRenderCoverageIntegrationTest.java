@@ -359,15 +359,18 @@ class TemplateRenderCoverageIntegrationTest extends AbstractIntegrationTest {
                         + "- so the state is a chip, in the count's slot and instead of it")
                 .contains("tag-semantic-neutral")
                 .contains("Not interviewed");
-        // Scoped to the card. The first version asserted this against the WHOLE PAGE and failed on
-        // another section's perfectly legitimate count - the same over-broad shape as matching a
-        // short string against a rendered page, which this codebase has been bitten by before. It
-        // failed in the safe direction, but it was measuring the wrong thing either way.
+        // CHIP AND COUNT ARE ORTHOGONAL AND BOTH BELONG (Creed's amendment). An earlier version of
+        // this test asserted the count was SUPPRESSED here, which protected the zero case and was
+        // wrong as a rule: a declined report still has real gaps - the declined reason and the
+        // parent or carer's account - and hiding them hides live work on the screen a reviewer
+        // approves from.
+        //
+        // Compared against the model rather than a literal, for the reason the badge test gives:
+        // a number written out here would be a second definition of the count.
         assertThat(substringAfter(declined, "id=\"rhi\""))
-                .as("'no gaps' and 'not interviewed' must never be separately readable as two "
-                        + "claims about one section, so the count is suppressed rather than shown "
-                        + "beside the chip")
-                .doesNotContain("not answered</span>");
+                .as("the chip states the status; the count still reports the outstanding work")
+                .contains(ReportQuestions.unansweredIn(ReportSection.RETURN_HOME_INTERVIEW, report)
+                        + " not answered");
 
         for (String childQuestion : List.of("Where were you while missing?",
                 "What made you go missing?", "Any additional comments from the young person?")) {
@@ -423,9 +426,12 @@ class TemplateRenderCoverageIntegrationTest extends AbstractIntegrationTest {
                 .contains("Not yet recorded")
                 .contains("tag-semantic-neutral");
         assertThat(card)
-                .as("the count must not appear beside it: a quiet number and a stated status are two "
-                        + "claims about one section, and the number is the one that misdescribes")
-                .doesNotContain("not answered</span>");
+                .as("the count belongs beside the chip, not instead of it. What made the count "
+                        + "misleading on its own was carrying the SECTION'S STATUS; standing next to "
+                        + "a chip that states the status, it goes back to reporting a quantity, "
+                        + "which is all it was ever able to say")
+                .contains(ReportQuestions.unansweredIn(ReportSection.RETURN_HOME_INTERVIEW, report)
+                        + " not answered");
         assertThat(card)
                 .as("this asserts a young person was not spoken to. On an unrecorded status that "
                         + "names an unknown EVENT, not merely an unknown cause")

@@ -23,6 +23,7 @@ import org.apache.poi.xwpf.usermodel.XWPFRun;
 import org.apache.poi.xwpf.usermodel.XWPFTable;
 import org.apache.poi.xwpf.usermodel.XWPFTableCell;
 import org.apache.poi.xwpf.usermodel.XWPFTableRow;
+import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTRPr;
 import org.springframework.stereotype.Component;
 
 /**
@@ -193,8 +194,14 @@ public class DocxReportGenerator {
             if (statementRow != null) {
                 replaceText(table.getRow(statementRow), collapse.statement());
             }
-            doomed.sort(java.util.Comparator.reverseOrder());
-            doomed.forEach(table::removeRow);
+            // distinct() before removing, and it is structural rather than a fix for today.
+            // If two token-bearing rows were ever ADJACENT the loop adds i and then re-adds i - 1
+            // as the next row's label; removal runs in reverse, so a repeated index deletes the row
+            // that has SHIFTED INTO THAT SLOT - an innocent row silently gone from a statutory
+            // document. It cannot fire against the current template, which is exactly why it needs
+            // to be impossible rather than merely unobserved.
+            doomed.stream().distinct().sorted(java.util.Comparator.reverseOrder())
+                    .forEach(table::removeRow);
         }
     }
 
@@ -204,20 +211,50 @@ public class DocxReportGenerator {
         return placeholders.stream().anyMatch(name -> text.contains("${" + name + "}"));
     }
 
-    /** The statement in the first cell; the rest emptied, so no stray label survives beside it. */
+    /**
+     * The statement in the first cell; the rest emptied, so no stray label survives beside it.
+     *
+     * <p><b>The replaced run keeps the original's character formatting.</b> These label runs carry
+     * their bold, colour and size ON THE RUN, with no paragraph style to fall back on, so a bare
+     * {@code createRun()} would render the sentence in the document default among 9pt bold grey
+     * labels. Reusing the template author's ROW keeps the borders, widths and shading; it does not
+     * keep run properties, and the earlier claim that this "keeps whatever styling the template
+     * gives it" was true at row and cell level and false at the level that decides how the sentence
+     * actually looks.
+     *
+     * <p>It matters more here than formatting usually does: this is a statutory document, and the
+     * sentence is the one thing in it a reader must not mistake for a stray note.
+     */
     private void replaceText(XWPFTableRow row, String statement) {
         List<XWPFTableCell> cells = row.getTableCells();
         for (int c = 0; c < cells.size(); c++) {
             XWPFTableCell cell = cells.get(c);
+            CTRPr formatting = firstRunFormatting(cell);
             for (XWPFParagraph paragraph : cell.getParagraphs()) {
                 for (int r = paragraph.getRuns().size() - 1; r >= 0; r--) {
                     paragraph.removeRun(r);
                 }
             }
             if (c == 0 && !cell.getParagraphs().isEmpty()) {
-                cell.getParagraphs().get(0).createRun().setText(statement);
+                XWPFRun run = cell.getParagraphs().get(0).createRun();
+                if (formatting != null) {
+                    run.getCTR().setRPr(formatting);
+                }
+                run.setText(statement);
             }
         }
+    }
+
+    /** A detached copy - the run it came from is about to be deleted, so a reference would dangle. */
+    private CTRPr firstRunFormatting(XWPFTableCell cell) {
+        for (XWPFParagraph paragraph : cell.getParagraphs()) {
+            for (XWPFRun run : paragraph.getRuns()) {
+                if (run.getCTR().getRPr() != null) {
+                    return (CTRPr) run.getCTR().getRPr().copy();
+                }
+            }
+        }
+        return null;
     }
 
     private String stripHash(String color, String fallback) {
