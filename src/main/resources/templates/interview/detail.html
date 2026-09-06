@@ -286,13 +286,25 @@
             <dd th:classappend="${report.interviewLocation == null} ? 'unanswered'" th:text="${report.interviewLocation} ?: 'Not answered'">Location</dd>
 
             <dt>Was this interview offered and completed within 72 hours of return?</dt>
-            <!-- T187: null widened from "no heldAt" to "the clock cannot be read", which now also
+            <!--/* T187: null widened from "no heldAt" to "the clock cannot be read", which now also
                  covers an interview recorded before the return. This is the one surface that NAMES
                  THE CAUSE, so the two causes are held apart here exactly as they are in Java.
                  "missing or precedes the return" was a disjunction - true, and it told a reader that
                  one of two things happened without saying which, which is the opposite of naming a
                  cause. The distinction also matters for what to DO: a missing time is a gap to fill,
-                 an inconsistent pair is two recorded times to check against each other. -->
+                 an inconsistent pair is two recorded times to check against each other.
+
+                 Converted to the parser-level comment form when main was merged in.
+                 TemplateCommentGuardTest landed on main after this branch was cut, and the plain
+                 form SHIPS TO THE BROWSER. This comment names which safeguarding facts the system
+                 cannot establish about a specific child, so it is not one to serve to a reader.
+                 The guard caught it the moment the two branches met, which is the argument for
+                 merging main in before merging out rather than after.
+
+                 It then caught the first draft of this very paragraph, which quoted the plain form
+                 in order to explain it - the fifth time a scanner in this codebase has read its own
+                 commentary as the thing it was scanning for. Worth stating plainly: describing the
+                 pattern is not an exemption from it. */-->
             <dd class="unanswered" th:if="${report.within72Hours == null and report.heldAt == null}">Not measurable — the interview time is not recorded</dd>
             <dd class="unanswered" th:if="${report.within72Hours == null and report.heldAt != null}">Not measurable — the interview is recorded as held before the return</dd>
             <dd th:unless="${report.within72Hours == null}" th:text="${report.within72Hours} ? 'Yes' : 'No'">—</dd>
