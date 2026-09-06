@@ -806,7 +806,7 @@ reader needs certainty which; never let an empty state read as a rebuke; and whe
 | Audit | "No recorded activity matches these filters. Try widening the date range." + [Clear filters] |
 | Dashboard, no recurrence flags | "No recurring missing episodes have been flagged on open or recent requests. These are flagged by the home on the request form, so this doesn't rule out recurrence." |
 | Dashboard, too few to report | shipped wording stands |
-| Export expired | "This export has expired. You can generate it again from the child's record — each export is recorded separately." + ~~[Back to record]~~ **[Go to children]** — **sentence unchanged; CTA corrected, see D-5e-3a (§7r).** |
+| Export expired | **RULED BY OSCAR, 8 Sep — this row is replaced:** "This download link is no longer valid. You can create a new export from the child's record — each export is recorded separately." + ~~[Back to record]~~ **[Go to dashboard] → `/`** — the CTA is not Oscar's to carry: the destination is unknowable by construction and would 403 for coordinators (D-5e-3b, §7t). |
 
 **The 18th is not needed.** Oscar asked whether a brand-new org with no completed interviews is covered.
 It is, in code: `RateStat.percent()` returns empty whenever `validCompleted < 5`, zero included, and
@@ -3939,11 +3939,14 @@ than a new decision, and `/` is already the app's per-role answer.
 **R-Q13 gives a sentence and a CTA. A page also needs a heading, which a table row never had.** That is the
 whole of the adaptation, and it changes no words:
 
+**⚠️ SUPERSEDED by §7t — Oscar ruled the row on 8 Sep and both the heading and the body change.** The
+table below is kept only to show what moved.
+
 | Slot | String | Status |
 |---|---|---|
-| `<h1>` | **Export expired** | **ADAPTATION.** R-Q13's own row label, promoted to the heading a page requires. Not new copy — it is the state's name. |
-| Body | **You can generate it again from the child's record — each export is recorded separately.** | **R-Q13 verbatim, minus its opening clause**, which the heading now carries. No word altered, one clause relocated. |
-| CTA | **Go to dashboard** → `/` | D-5e-3b. |
+| `<h1>` | ~~Export expired~~ | **WITHDRAWN — it names a cause, which is the one thing Oscar's ruling forbids.** See §7t. |
+| Body | ~~You can generate it again from the child's record…~~ | Superseded by the ruled sentence. |
+| CTA | **Go to dashboard** → `/` | **Stands** — D-5e-3b, and unaffected by the copy ruling. |
 
 **Byte-exact:** `child's` is an ASCII apostrophe (0x27); the dash is a real em dash (U+2014) with a space
 either side.
@@ -3973,3 +3976,76 @@ Jim found that including the app shell in an exception-rendered view **turns a 4
 (*"there is no navigation for someone not signed in"*). A design reason invites a later reviewer to overrule
 it on design grounds. **The mechanical reason does not — and someone was always going to try to "fix" the
 missing nav.**
+## 7t · Oscar ruled the export-expired row — and it invalidates my own heading (Creed, 8 Sep)
+
+I routed *"no longer valid" vs "has expired"* to product rather than absorbing it (§7s). **Oscar ruled the
+row changes**, and made one further edit to Jim's sentence.
+
+### The ruled row, verbatim — R-Q13's "Export expired" row is REPLACED
+
+> **"This download link is no longer valid. You can create a new export from the child's record — each export
+> is recorded separately."**
+
+His edit beyond Jim's wording: *"generate it again"* → **"create a new export"**. Once the first sentence
+says *link*, the *"it"* points at the link — **and you do not regenerate a link, you make a new export that
+comes with one.** It is also true for someone who never had one to regenerate.
+
+### Why it moved, which is not the reason I escalated it
+
+I escalated on accuracy. **Oscar rejected accuracy as sufficient — *"strictly truer is a weak reason to churn
+approved copy"* — and ruled on who lands there:**
+
+- The link is **single-use**, so a double-click or a second click on the same email is a **common** arrival.
+  **Telling someone who downloaded it seconds ago that it *expired* does not read as narrow, it reads as
+  broken.**
+- The forwarded-link case is worse than inaccurate: **a colleague told the link expired goes back for a fresh
+  one, which also will not work for them.** *"The wrong word manufactures a loop between two people who have
+  each behaved reasonably."*
+
+> **A word is not judged by how often it is true, but by what the people it is false for will do next.**
+
+### The rejected alternative, recorded so it is not re-proposed
+
+**"is not valid"** is strictly the most accurate — *"no longer"* implies it once was, which is false for a
+mangled link. **Oscar rejected it:** it reads as a rebuke to someone who did nothing wrong, and **R-Q13's own
+principle is that a state must never read as a rebuke.** *Mildly imprecise for the rarest case beats
+accusatory for the common ones.* **If anyone re-proposes it on accuracy grounds, that is the answer.**
+
+### Oscar's general rule, which generalises past this page
+
+> **Where we deliberately collapse several causes into one response, the copy must not name one of them.
+> Naming a cause we cannot know is a guess presented as a fact, and it is usually wrong for most of the
+> people reading it.**
+
+This is the fifth appearance of the collapsed-response constraint, and **the first that governs the words
+rather than the mechanism.** Nothing else in the templates says *"expired"* today, so it is one page now —
+but the shape recurs wherever a token can be unknown, spent, timed-out or someone else's.
+
+### D-5e-3d · CORRECTION TO MYSELF — my `<h1>` named a cause, and the row label is not copy
+
+§7s promoted **"Export expired"** into the `<h1>`. **Oscar's rule forbids exactly that** — it names one of the
+four collapsed causes, in the largest text on the page.
+
+**And the mechanism of my error is worth more than the fix: I used R-Q13's LEFT column as user-facing copy.**
+The left column names a *state* for designers; the right column is what a person reads. **Promoting the label
+into a heading silently converted an internal name into product copy** — and internal names are written to
+distinguish cases, which is the one thing this page must not do.
+
+> **A row's label is how we refer to a state among ourselves. It is not a candidate string.**
+
+**Corrected, keeping the same page-format adaptation (heading carries the opening clause, body keeps the
+rest, no word altered):**
+
+| Slot | String |
+|---|---|
+| `<title>` | **Link no longer valid — Return Home Tracker** |
+| `<h1>` | **Link no longer valid** |
+| Body | **You can create a new export from the child's record — each export is recorded separately.** |
+| CTA | **Go to dashboard** → `/` (D-5e-3b) |
+
+### The CTA is not Oscar's to carry, and I have not applied it
+
+His ruled row ends **+ [Back to record]**, carried forward from the original. **It cannot be built**:
+`redeem` collapses all four cases before the controller sees anything, so there is **no child id to link to**
+— and it would 403 for a COORDINATOR regardless (D-5e-3b). **That is a structural constraint, not a copy
+preference, so the sentence is applied and the CTA is not.** Flagged to him rather than silently dropped.
