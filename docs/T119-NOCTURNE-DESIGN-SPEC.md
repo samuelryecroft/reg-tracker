@@ -4681,3 +4681,102 @@ while claiming to migrate it.
 migrated screen at once — the same churn hazard god already protected her from on `report-fields.html`.
 **Improvable, not wrong; back to product for sequencing, after the migration and not during it.** The one-line
 fix above is correct under either scale and does not prejudge it.
+
+---
+
+## §8b — `dateReportShared`: both of Jim's calls confirmed, plus the third instance his own fix reveals
+
+### D-8b-0 — the reclassification is right, and it corrects my `heldAt` rule
+
+god's framing, which I am adopting because it names a distinction §7x did not:
+
+> **Two screens disagreeing because one of them was RIGHT is a different thing from two screens disagreeing
+> because one is STALE, and only the second is a defect.**
+
+§7x treated divergence between renderers as drift by default. **That was too strong.** The record screen
+dropped *"(leave blank if not yet shared)"* **correctly** — a read-only screen cannot act on an instruction to
+leave a field empty. The two screens differed because one of them was doing its job.
+
+### D-8b-1 — RULED: hint, not label. And the classification test is the reusable part.
+
+Jim's resolution confirmed: label `Date report shared with relevant professionals`, hint
+`Leave blank if not yet shared.` The reason is not "hints are tidier":
+
+> **A label says WHAT IS BEING ASKED. A hint says HOW TO ANSWER IT.** *"Leave blank if not yet shared"* is an
+> instruction about answering, so it was never part of the question — it was capture guidance the model was
+> carrying inside the label.
+
+**The test, and it is god's own observation turned into a rule:**
+
+> **If a read-only renderer cannot act on it, it is not part of the label.** A read-only screen renders every
+> label and can act on no instruction, so it is a free oracle for this classification — the divergence was the
+> system telling us the answer, and we read it as a fault.
+
+This is the **mirror** of §7x, and the pair is the general rule:
+
+| | |
+| --- | --- |
+| `heldAt` (§7x) | the label must **admit** what the value contains |
+| `dateReportShared` (§8b) | the label must **not contain** what only the capture screen can act on |
+
+Both reduce to: **the label states the question; everything else belongs to a part of the system that can use
+it.** `report-fields.html` already has the mechanism — `<p class="hint" th:unless="${readonly}">` on `heldAt`
+— so this is an existing, proven pattern, not a new one.
+
+### D-8b-2 — RULED: `Not yet shared`, and not merely because it matches
+
+Jim unified *"Not yet shared"* / *"Not shared yet"* on the first, because it matches the form's guidance.
+**Confirmed.** The stronger reason: **the hint and the empty value are read by the same person minutes apart.**
+The visitor is told *leave blank if not yet shared*, and later the record shows the state of that decision.
+**Matching is not tidiness here — it is the reader recognising their own action reflected back.** If the two
+differ, they have to work out that they are the same thing.
+
+Secondary, and only secondary: *"Not shared yet"* puts **yet** at the end, where it lands slightly as
+impatience rather than as a state. Same family as rejecting *"is not valid"* for reading as a rebuke, and not
+on its own sufficient.
+
+### D-8b-3 — 🔑 THE THIRD INSTANCE, and it arrives with this PR
+
+Jim's own javadoc states the principle exactly:
+
+> *"It went unnoticed for as long as it did because the Declaration section had no badge at all. Giving every
+> section a count is what made it visible — **a fix that reveals a defect it did not cause still has to carry
+> it.**"*
+
+**He applied that once. It applies twice.** Section 2, *Return Home Interview*, also had no badge before this
+PR (`report-fields.html:90-91` is new), and it contains:
+
+```java
+q("interviewDeclinedReason", RETURN_HOME_INTERVIEW, "If not, why?", null,
+        LONG_TEXT, false, InterviewReport::getInterviewDeclinedReason),   // → ALWAYS
+```
+
+**`interviewDeclinedReason` is `ALWAYS`, and it is conditional in exactly `ifNotWhyLate`'s shape** — anchored
+to *"Interview accepted?"*, owed only when that answer is **No**. So:
+
+> **An interview that was ACCEPTED — the normal, successful case — will show "1 not answered" in section 2,
+> on the screen a reviewer approves from.** The good outcome is the one that gets flagged.
+
+`interviewAccepted` is a nullable `Boolean`, so the predicate is the same shape as the 72-hour one — a gap
+**only** when the answer is explicitly `false`, with `null` meaning not owed, exactly as `NOT_MEASURABLE` does:
+
+```java
+private static final Predicate<InterviewReport> ONLY_IF_DECLINED =
+        report -> Boolean.FALSE.equals(report.getInterviewAccepted());
+```
+
+**This is not a criticism of the PR — it is the PR's own rule applied to the second section it uncovered.**
+The model is right; `blankIsAGap` being a `Predicate` rather than a flag is what makes the fix one line.
+
+### D-8b-4 — a question I am flagging rather than ruling
+
+When an interview is **declined**, the nine child's-answer questions in section 2 (*"Where were you while
+missing?"* and the rest) are all blank — because no interview happened. Under Oscar's rule (*score against the
+derived answer, never alone*) they are **not applicable**, not unanswered; today they would count as nine
+gaps.
+
+**I am not ruling this.** It is nine questions rather than one, the "not applicable" reading may be wrong for a
+safeguarding record that wants to show an interview did not take place, and it is Oscar's call which of those
+a reviewer needs to see. **Raised, not decided.**
+
+*Verified on `origin/feat/t185-section-counts-from-model`, not on `main`.*
