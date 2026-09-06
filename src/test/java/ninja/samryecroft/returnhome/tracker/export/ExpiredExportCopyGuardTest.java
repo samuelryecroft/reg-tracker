@@ -29,17 +29,18 @@ class ExpiredExportCopyGuardTest {
     private static final Path TEMPLATE = Path.of("src/main/resources/templates/export/expired.html");
 
     /**
-     * R-Q13's body, spec §7s at HEAD 0d9a9ec. Do not reword, and do not retype - copy it.
+     * R-Q13's body, spec §7t at HEAD fda2b34. Do not reword, and do not retype - copy it.
      *
-     * <p>§7s supersedes §7r, which had the opening clause here: it is promoted into the heading, so
-     * this is R-Q13 verbatim minus that clause. No word altered, one clause relocated.
+     * <p>§7t supersedes §7r and §7s: Oscar replaced R-Q13's row outright. "generate it again"
+     * became "create a new export" because, once the first sentence changed, "it" pointed at the
+     * LINK rather than the export - a swapped sentence moves what the next pronoun refers to.
      */
     private static final String RULED_COPY =
-            "You can generate it again from the child's record "
+            "You can create a new export from the child's record "
                     + "— each export is recorded separately.";
 
     /** The heading §7s promotes that clause into - a marked adaptation, not new copy. */
-    private static final String RULED_HEADING = "Export expired";
+    private static final String RULED_HEADING = "Link no longer valid";
 
     @Test
     void thePageCarriesTheRuledSentenceExactly() throws IOException {
@@ -53,14 +54,14 @@ class ExpiredExportCopyGuardTest {
                 .contains(RULED_COPY);
 
         assertThat(html)
-                .as("the heading carries the clause §7s moved out of the body - if it goes, the "
+                .as("the heading carries the clause §7t moved out of the body - if it goes, the "
                         + "page stops saying what happened at all, because the body no longer does")
                 .contains(">" + RULED_HEADING + "<");
 
         assertThat(html)
-                .as("and the clause must not ALSO remain in the body - §7s relocated it, it did "
+                .as("and the clause must not ALSO remain in the body - §7t replaced it, it did "
                         + "not duplicate it")
-                .doesNotContain("This export has expired. You can generate");
+                .doesNotContain("This export has expired");
     }
 
     @Test

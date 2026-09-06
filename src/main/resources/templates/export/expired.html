@@ -2,7 +2,7 @@
 <html xmlns:th="http://www.thymeleaf.org" lang="en" th:attr="data-appearance=${#strings.toLowerCase(appearancePreference)}">
 <head>
     <meta charset="UTF-8"/>
-    <title>Export expired — Return Home Tracker</title>
+    <title>Link no longer valid — Return Home Tracker</title>
     <th:block th:replace="~{fragments/layout :: styles}"></th:block>
 </head>
 <body>
@@ -31,20 +31,28 @@
     */-->
     <div class="error-card">
         <svg class="icon error-icon" aria-hidden="true"><use th:href="@{/icons/phosphor.svg} + '#ph-clock-countdown'"></use></svg>
-        <h1>Export expired</h1>
+        <h1>Link no longer valid</h1>
         <!--/* R-Q13, byte-exact (spec §7r, HEAD 6d3b067). Kept on ONE line so no editor can
              reflow an em dash or an apostrophe into a lookalike: the apostrophe is ASCII 0x27 and
              the dash is U+2014 with a space either side. Creed hexdumped rather than retyped it,
              because retyping is how the last one drifted.
 
-             §7s supersedes §7r: the opening clause "This export has expired." is PROMOTED INTO
-             THE HEADING, which a page needs and a table row never had, so the body carries
-             R-Q13's remainder only. No word altered, one clause relocated.
+             §7t (HEAD fda2b34) SUPERSEDES §7r AND §7s. Oscar replaced R-Q13's row outright, and
+             NOT on the accuracy argument he explicitly declined - on WHO LANDS HERE. The
+             already-used case is common, not exotic: a double-click, a prefetch, a second click on
+             the same email. That person downloaded seconds ago, so "expired" reads as broken
+             rather than narrow. And a forwarded link tells the colleague it EXPIRED, so they ask
+             for a fresh one that also will not work for them - the wrong word manufactures a loop
+             between two people who have each been told something reasonable.
+
+             KNOCK-ON I WOULD NOT HAVE MADE: "generate it again" became "create a new export".
+             Once the first sentence changed, "it" pointed at the LINK, and you do not regenerate a
+             link. A swapped sentence moves what the next pronoun refers to.
 
              It says "from the child's record" while this page cannot link there, and that is
              correct rather than sloppy: THE PAGE does not know which child, but THE READER does -
              they just generated that export. It orients; it does not navigate. */-->
-        <p class="error-body">You can generate it again from the child's record — each export is recorded separately.</p>
+        <p class="error-body">You can create a new export from the child's record — each export is recorded separately.</p>
         <!--/* CTA is "/" with error.html's existing label - Creed's §7s, REPLACING his own §7r
              ruling of [Go to children], which he corrected once this build tested it against the
              audience. The generalisation is now in the spec above the fix: AN ERROR PAGE'S CTA HAS
