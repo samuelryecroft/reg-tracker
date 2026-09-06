@@ -11,6 +11,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
 import java.util.stream.Stream;
+import ninja.samryecroft.returnhome.tracker.organisation.OrgType;
 import ninja.samryecroft.returnhome.tracker.organisation.Organisation;
 
 @Entity
@@ -63,7 +64,46 @@ public class Home {
         return organisation;
     }
 
+    /**
+     * T237: <b>only a CARE_PROVIDER organisation may hold a home</b>, and this is where that is
+     * enforced.
+     *
+     * <p><b>The argument for it being here was already written one level down.</b> The controller
+     * check this joins says <em>"a filtered dropdown is not a constraint - it shapes the form, not
+     * the POST"</em>. That sentence applies to the guard it justifies: a controller check is not a
+     * constraint either, it shapes one endpoint rather than the data. The reasoning was right and
+     * stopped one layer short of its own conclusion - there is no {@code HomeService}, the controller
+     * writes through the repository directly, and {@code DemoDataSeeder} is a second write path that
+     * takes any organisation at all. Not an exposure today ({@code DemoProfileGuard} keeps that
+     * profile out of production), but it is the door a future importer or fixture will resemble.
+     *
+     * <p><b>Two layers, each doing its own job</b>, the same shape as {@code ExportCapability} being
+     * the real gate with the filter chain as defence in depth. The controller keeps its field error
+     * so an admin gets a form message rather than a 500; this setter is the invariant, and every
+     * write path in the application passes through it.
+     *
+     * <p><b>Why the setter and not {@code @PrePersist}</b> - the load-bearing detail, checked rather
+     * than assumed. This entity's {@code @Id} is on the FIELD, so Hibernate uses field access and
+     * <b>never calls setters when hydrating a row</b>. Therefore the guard cannot fire on load: it can
+     * never make a pre-existing bad row unreadable, whatever a survey of existing data turns up. And
+     * it fires at the point of the mistake with the assignment still on the stack, rather than as a
+     * null three frames later. {@code @PrePersist} would instead risk touching a lazy
+     * {@code @ManyToOne} proxy inside a flush, which is a worse failure in a worse place.
+     *
+     * <p>Null is permitted: the controller deliberately nulls this field when it rejects a selection,
+     * so that the form can be redisplayed with its error. A missing organisation is caught by the
+     * NOT NULL column, which is the right layer for "absent" - this method's job is "wrong kind".
+     *
+     * @throws IllegalArgumentException if the organisation is not a {@link OrgType#CARE_PROVIDER}.
+     *     The message names the organisation, its actual type and the rule, because whoever reads it
+     *     is debugging a write they believed was legal.
+     */
     public void setOrganisation(Organisation organisation) {
+        if (organisation != null && organisation.getType() != OrgType.CARE_PROVIDER) {
+            throw new IllegalArgumentException("Home cannot belong to organisation "
+                    + organisation.getId() + " (" + organisation.getName() + "): it is a "
+                    + organisation.getType() + ", and homes belong to CARE_PROVIDER organisations.");
+        }
         this.organisation = organisation;
     }
 
