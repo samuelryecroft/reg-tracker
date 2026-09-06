@@ -24,6 +24,7 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
 /**
@@ -56,8 +57,21 @@ import org.springframework.test.web.servlet.MockMvc;
 @SpringBootTest
 @AutoConfigureMockMvc
 @Import(LockedAccountTimingGuardTest.CountingEncoderConfig.class)
+// PINNED, and the first armed run is why. This class hardcoded MAX_ATTEMPTS = 5 and merely ASSUMED
+// the application agreed; it stated the dependency nowhere and asserted it nowhere. If the two ever
+// diverged, lock() would quietly fail to lock and every measurement below would be taken against an
+// UNLOCKED account - which produces exactly the symmetric (1,1) that arming #2 reported, and produces
+// it while looking like a result rather than a broken precondition.
+// The same reason LoginThrottlingIntegrationTest pins its own: a guard must not depend on ambient
+// configuration it does not state.
+@TestPropertySource(properties = {
+        "app.security.login-throttle.enabled=true",
+        "app.security.login-throttle.max-attempts=5",
+        "app.security.login-throttle.lockout-duration=15m"
+})
 class LockedAccountTimingGuardTest extends AbstractIntegrationTest {
 
+    /** Must equal the pinned {@code max-attempts} above - the two are deliberately adjacent. */
     private static final int MAX_ATTEMPTS = 5;
 
     /**
@@ -96,6 +110,8 @@ class LockedAccountTimingGuardTest extends AbstractIntegrationTest {
     private PasswordEncoder passwordEncoder;
     @Autowired
     private AuditEventRepository auditEventRepository;
+    @Autowired
+    private LoginAttemptService loginAttemptService;
 
     private final String suffix = "-" + System.nanoTime();
 
@@ -119,10 +135,25 @@ class LockedAccountTimingGuardTest extends AbstractIntegrationTest {
                 .andReturn().getResponse();
     }
 
+    /**
+     * Drives the account into lockout and <b>asserts that it actually got there</b>.
+     *
+     * <p>The assertion is the point. Everything this class measures is only meaningful about a LOCKED
+     * account, so an unlocked one is not a result - it is a broken precondition, and it fails in a
+     * direction that looks exactly like a finding: both cases reach the provider, both pay one hash,
+     * and the guard reports a symmetric non-zero count. <b>Without this line that state is
+     * indistinguishable from the defect the class exists to detect.</b>
+     */
     private void lock(String username) throws Exception {
         for (int i = 0; i < MAX_ATTEMPTS; i++) {
             attempt(username);
         }
+        assertThat(loginAttemptService.isLocked(username))
+                .as("PRECONDITION: '%s' must be locked after %d failed attempts before anything below "
+                        + "is measured. If this fails the throttle did not engage, and the counts that "
+                        + "follow would be measurements of an UNLOCKED account - which looks identical "
+                        + "to the timing defect this class detects", username, MAX_ATTEMPTS)
+                .isTrue();
     }
 
     @Test
@@ -147,10 +178,17 @@ class LockedAccountTimingGuardTest extends AbstractIntegrationTest {
                         + "rejected before any compare. That ~53ms gap answered 'does this account "
                         + "exist?' to anyone able to time a response")
                 .isEqualTo(afterReal);
+        // Dwight's suggestion after arming #2: report BOTH counts, not just the sum. "expected 0 but
+        // was 2" forced a round-trip through inference to recover (1,1) from (0,1), and the whole
+        // value of this guard is in WHICH of the two moved. A message change, not a threshold change.
         assertThat(afterReal + afterUnknown)
                 .as("and the equal cost must be ZERO rather than merely equal: balancing the two by "
-                        + "hashing on both paths would be work whose only purpose is to consume "
-                        + "time, invisible in the source and confirmable only by measurement")
+                        + "hashing on both paths would be work whose only purpose is to consume time, "
+                        + "invisible in the source and confirmable only by measurement. "
+                        + "[afterReal=%d, afterUnknown=%d] - an ASYMMETRIC failure means the filter is "
+                        + "gone and the oracle is back (expected when armed); a SYMMETRIC failure means "
+                        + "something else, and the precondition assertions above have already ruled out "
+                        + "the account not being locked", afterReal, afterUnknown)
                 .isZero();
 
         assertThat(unknownResponse.getStatus()).isEqualTo(realResponse.getStatus());
