@@ -88,8 +88,11 @@
     <div class="card" id="rhi" tabindex="-1"
          th:with="notAnswered=${unansweredBySection['rhi']}">
         <h2>2. Return Home Interview
+            <span class="tag tag-semantic-neutral" th:if="${interviewDeclined}">Not interviewed</span>
+            <span class="tag tag-semantic-neutral" th:if="${interviewStatusUnrecorded}">Not yet recorded</span>
             <span class="section-count" th:if="${notAnswered > 0}" th:text="${notAnswered + ' not answered'}"></span>
         </h2>
+        <p th:if="${interviewDeclined}">The young person was not interviewed, so these questions were not asked. The reason is recorded above.</p>
         <th:block th:insert="~{::section2(true)}"></th:block>
     </div>
 
@@ -236,6 +239,17 @@
          th:if="${readonly}" th:text="${#strings.isEmpty(form.interviewDeclinedReason)} ? 'Not answered' : ${form.interviewDeclinedReason}">Answer</div>
     <textarea id="interviewDeclinedReason" th:field="*{interviewDeclinedReason}" th:unless="${readonly}"></textarea>
 
+    <!--/*
+      T244. The nine questions put to the young person, gated together because the condition is
+      WHOSE ANSWER THEY ARE - a property that cuts across this section rather than following it. The
+      parent/carer question after this block stays live for exactly that reason: on a declined
+      interview their account may be the only account of the episode anyone obtains.
+
+      Read-only only. `readonly and !childInterviewed` short-circuits on the capture screen, where
+      the visitor is still filling the form in and may not have answered "Interview accepted?" yet -
+      hiding fields under someone as they type is a different problem, and not this ruling's.
+    */-->
+    <th:block th:unless="${readonly and !childInterviewed}">
     <label th:id="${readonly} ? 'whereWereYouWhileMissing-label' : null" th:for="${readonly} ? null : 'whereWereYouWhileMissing'" th:text="${questions.whereWereYouWhileMissing.label}">Question</label>
     <div class="readonly-val" th:classappend="${#strings.isEmpty(form.whereWereYouWhileMissing)} ? ' empty' : ''" role="group" aria-labelledby="whereWereYouWhileMissing-label"
          th:if="${readonly}" th:text="${#strings.isEmpty(form.whereWereYouWhileMissing)} ? 'Not answered' : ${form.whereWereYouWhileMissing}">Answer</div>
@@ -284,6 +298,7 @@
     <div class="readonly-val" th:classappend="${#strings.isEmpty(form.additionalCommentsFromYoungPerson)} ? ' empty' : ''" role="group" aria-labelledby="additionalCommentsFromYoungPerson-label"
          th:if="${readonly}" th:text="${#strings.isEmpty(form.additionalCommentsFromYoungPerson)} ? 'Not answered' : ${form.additionalCommentsFromYoungPerson}">Answer</div>
     <textarea id="additionalCommentsFromYoungPerson" th:field="*{additionalCommentsFromYoungPerson}" th:unless="${readonly}"></textarea>
+    </th:block>
 
     <label th:id="${readonly} ? 'additionalInfoFromParentCarer-label' : null" th:for="${readonly} ? null : 'additionalInfoFromParentCarer'" th:text="${questions.additionalInfoFromParentCarer.label}">Question</label>
     <div class="readonly-val" th:classappend="${#strings.isEmpty(form.additionalInfoFromParentCarer)} ? ' empty' : ''" role="group" aria-labelledby="additionalInfoFromParentCarer-label"

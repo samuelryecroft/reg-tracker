@@ -28,6 +28,9 @@ import ninja.samryecroft.returnhome.tracker.report.InterviewReport;
  *                  id; carried separately because for one question it is not, and that difference is
  *                  a fact about the exported record rather than a naming quirk - see
  *                  {@link ReportQuestions#ALL} on {@code heldAt}.
+ * @param answeredBy whose account this question records. Load-bearing on a declined interview,
+ *                  where the child's questions stop being asked and the visitor's and the parent or
+ *                  carer's do not - a distinction that cuts across the section they share.
  * @param blankIsAGap whether leaving this question blank is a <b>gap in the record</b>, as opposed
  *                  to a legitimate answer. True for most questions and false for two, for different
  *                  reasons - which is why it is a predicate on the report rather than a flag:
@@ -73,11 +76,30 @@ public record ReportQuestion(
         boolean required,
         String emptyText,
         String exportToken,
+        Respondent answeredBy,
         Predicate<InterviewReport> blankIsAGap,
         Function<InterviewReport, Object> reader) {
 
     /** The default for every question but one. */
     public static final String NOT_ANSWERED = "Not answered";
+
+    /**
+     * Whether this question was put to anyone at all on the given report.
+     *
+     * <p>Only the child's questions can go unasked, and only when the interview was not accepted.
+     * A question that was never asked is not rendered as a row: nine "not applicable" lines would
+     * <em>distribute</em> the significant fact across nine of them and bury it, when the fact is
+     * that <b>a missing child was not spoken to</b> - itself a safeguarding event, and arguably the
+     * most important thing on the record. Said once it is a statement; said nine times it is
+     * furniture.
+     *
+     * <p>Note the third state. When "Interview accepted?" is itself unanswered the child's
+     * questions are <em>also</em> not asked - the system is not in a position to know whether they
+     * should have been - and the single real gap is that one dropdown, upstream of them.
+     */
+    public boolean isAskedOn(InterviewReport report) {
+        return answeredBy != Respondent.CHILD || report.isChildInterviewed();
+    }
 
     /**
      * Whether this question is left <b>unanswered</b> on the given report - blank, and blank meaning
@@ -86,7 +108,7 @@ public record ReportQuestion(
      * <p>This is the question a count must ask, and "is the field empty" is not it.
      */
     public boolean isAGapOn(InterviewReport report) {
-        return !isAnsweredOn(report) && blankIsAGap.test(report);
+        return isAskedOn(report) && !isAnsweredOn(report) && blankIsAGap.test(report);
     }
 
     public Object valueOf(InterviewReport report) {

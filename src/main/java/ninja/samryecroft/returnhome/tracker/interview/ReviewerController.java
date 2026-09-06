@@ -134,6 +134,14 @@ public class ReviewerController {
         model.addAttribute("unansweredBySection", reportRow == null
                 ? Map.<String, Integer>of() : ReportQuestions.unansweredBySection(reportRow));
 
+        // T244. The shared field fragment renders from the form, which cannot answer "was the young
+        // person actually interviewed" - that is a three-state fact about the report. Both come off
+        // InterviewReport so the screen, the count and the export cannot disagree.
+        model.addAttribute("childInterviewed", reportRow != null && reportRow.isChildInterviewed());
+        model.addAttribute("interviewDeclined", reportRow != null && reportRow.isInterviewDeclined());
+        model.addAttribute("interviewStatusUnrecorded",
+                reportRow != null && reportRow.isInterviewStatusUnrecorded());
+
         // The History card (same fragments/audit-history component 1a uses) and D-1b-8's
         // prior-send-back line both read this one fetch - no reason to ask twice.
         List<AuditHistorySection> auditHistory = auditHistoryService.historyFor(request);

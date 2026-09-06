@@ -18,6 +18,9 @@ import ninja.samryecroft.returnhome.tracker.interview.InterviewRequestService;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewStatus;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewStatusTransitions;
 import ninja.samryecroft.returnhome.tracker.report.docx.DocxReportGenerator;
+import ninja.samryecroft.returnhome.tracker.report.question.Respondent;
+import ninja.samryecroft.returnhome.tracker.report.question.ReportQuestions;
+import ninja.samryecroft.returnhome.tracker.report.question.ReportQuestion;
 import ninja.samryecroft.returnhome.tracker.report.dto.SubmitReportForm;
 import ninja.samryecroft.returnhome.tracker.theme.ThemeService;
 import ninja.samryecroft.returnhome.tracker.user.AppUserPrincipal;
@@ -308,7 +311,8 @@ public class ReportService {
                 // leaving the other on the old model would leave a call site that cannot tell a
                 // reader which model is in force.
                 document = docxReportGenerator.generate(templateStream, buildValues(request, report),
-                        theme.primaryColor(), theme.docAccent(), theme.accentTint());
+                        theme.primaryColor(), theme.docAccent(), theme.accentTint(),
+                        childQuestionRows(report));
             }
         } catch (IOException e) {
             throw new UncheckedIOException("Failed to generate report document", e);
@@ -398,6 +402,71 @@ public class ReportService {
         report.setRecommendations(form.getRecommendations());
         report.setConductedByStatement(form.getConductedByStatement());
         report.setDateReportShared(form.getDateReportShared());
+    }
+
+    private static final String DECLINED_STATEMENT =
+            "The young person was not interviewed, so these questions were not asked. "
+                    + "The reason is recorded above.";
+
+    /**
+     * The null state's sentence, and <b>it deliberately does not end the way the declined one does.</b>
+     *
+     * <p>That one closes with "The reason is recorded above". This must not gain an equivalent,
+     * because <b>there is nothing above to point at</b> - the dropdown is blank, and that blankness
+     * IS the situation being described. A cross-reference added for symmetry would point at an empty
+     * field, which is precisely the T231 defect: a sentence referring to something that is not there.
+     * The two sit next to each other in the spec, so the missing second half reads as an oversight
+     * and somebody will helpfully complete it.
+     *
+     * <p>Words ruled out and not to be improved back in: <em>incomplete</em>, <em>missing</em> and
+     * <em>not provided</em> all describe the report as defective, and the last additionally implies
+     * someone was asked and withheld. <em>Not shown</em> and <em>not included</em> imply the answers
+     * exist and we are choosing not to display them. And the two absences are not joined by
+     * "therefore" - the second does not follow from the first, and <b>a false inference in a
+     * court-facing document is worse than a longer sentence.</b>
+     *
+     * <p>The sentence is what makes the hide honest. Bare hiding is a claim; hiding plus a statement
+     * naming both absences is not - which is why hide survived the argument that hiding asserts
+     * something.
+     */
+    private static final String UNRECORDED_STATEMENT =
+            "This report does not record whether the interview took place, "
+                    + "or any answers from the young person.";
+
+    /**
+     * T244. On a declined interview the questions put to the young person were never asked, so their
+     * rows leave the document and one statement takes their place - the same treatment the record
+     * screen gives them, because a document that contradicts the screen it was generated from is
+     * its own defect.
+     *
+     * <p>The set comes from {@link ReportQuestions}, not from a list written out here: the template
+     * is a binary artefact nobody can diff, so a hand-maintained copy of "which questions are the
+     * child's" would be the one that silently fell behind. Adding a child's question to the model
+     * takes it out of a declined document automatically.
+     *
+     * <p><b>Empty only when the interview happened.</b> Oscar overturned the earlier rule that null
+     * should be left alone: bare hiding is a claim, but hiding PLUS a sentence naming both absences
+     * is not, so the sentence is what makes the hide honest rather than decoration on it. The two
+     * collapsed states differ only in which sentence they carry - the declined one names an event
+     * that did not happen, the unrecorded one names two things this record does not say.
+     *
+     * <p>This paragraph previously stated the OVERTURNED rule, directly above the line that reverses
+     * it. In a codebase where the comment carries the reasoning, that is the paragraph a future
+     * reader trusts over the code.
+     */
+    // Static and package-private: a pure function of the report, so the guard comparing this
+    // decision against the screen's can call it without standing a service up. That comparison is
+    // the point - two consumers of one model cannot be told apart by mutating the model.
+    static DocxReportGenerator.RowCollapse childQuestionRows(InterviewReport report) {
+        if (report.isChildInterviewed()) {
+            return DocxReportGenerator.RowCollapse.none();
+        }
+        return new DocxReportGenerator.RowCollapse(
+                ReportQuestions.ALL.stream()
+                        .filter(q -> q.answeredBy() == Respondent.CHILD)
+                        .map(ReportQuestion::exportToken)
+                        .collect(java.util.stream.Collectors.toSet()),
+                report.isInterviewDeclined() ? DECLINED_STATEMENT : UNRECORDED_STATEMENT);
     }
 
     private Map<String, String> buildValues(InterviewRequest request, InterviewReport report) {

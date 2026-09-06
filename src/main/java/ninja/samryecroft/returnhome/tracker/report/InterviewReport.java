@@ -441,6 +441,60 @@ public class InterviewReport implements EncryptedEntity {
         this.interviewAccepted = interviewAccepted;
     }
 
+    /**
+     * Whether the young person was actually interviewed.
+     *
+     * <p><b>Three states, not two</b> (T244). {@code interviewAccepted} is a nullable Boolean and
+     * each value means something different for the nine questions put to the child:
+     *
+     * <ul>
+     *   <li><b>True</b> - the interview happened, so those questions are live and a blank one is a
+     *       real gap: the child was asked and the answer was not recorded.</li>
+     *   <li><b>False</b> - they were never asked. Not gaps, and not rendered as nine "not
+     *       applicable" rows either.</li>
+     *   <li><b>Null</b> - neither of the above is known, so <em>this</em> is the gap, upstream of
+     *       them. Null is not "interviewed" and it is not "declined"; asserting either would name a
+     *       fact nobody has recorded.</li>
+     * </ul>
+     *
+     * <p>Named here rather than tested inline because three screens and a count all need the same
+     * answer, and {@code Boolean.TRUE.equals(...)} written out in a template is a second definition
+     * of a three-state rule - written in the one place where getting it wrong is hardest to see.
+     */
+    @Transient
+    public boolean isChildInterviewed() {
+        return Boolean.TRUE.equals(interviewAccepted);
+    }
+
+    /**
+     * Whether the interview is recorded as not having taken place.
+     *
+     * <p>The exact negation of neither state above: an unrecorded answer is <b>not</b> a declined
+     * interview. The section statement this drives asserts that a young person was not spoken to,
+     * which is a safeguarding fact - so it may only appear when somebody has actually said so.
+     */
+    @Transient
+    public boolean isInterviewDeclined() {
+        return Boolean.FALSE.equals(interviewAccepted);
+    }
+
+    /**
+     * Whether nobody has yet recorded whether the interview happened.
+     *
+     * <p>Named alongside the other two rather than composed in a template as "neither", because a
+     * three-state rule written out as the negation of two others is a second definition of the same
+     * rule - and this is the state a reader is most likely to get wrong.
+     *
+     * <p><b>It is an absence in OUR record, not a fact about the young person.</b> A screen may say
+     * that the interview's status has not been recorded; it may not say the interview did not
+     * happen, and it may not say no work has been done - the interview may have taken place and
+     * simply not been written up yet.
+     */
+    @Transient
+    public boolean isInterviewStatusUnrecorded() {
+        return interviewAccepted == null;
+    }
+
     public String getInterviewDeclinedReason() {
         return interviewDeclinedReason;
     }

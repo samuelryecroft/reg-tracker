@@ -6,6 +6,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
@@ -27,6 +28,7 @@ import ninja.samryecroft.returnhome.tracker.report.InterviewReport;
 import ninja.samryecroft.returnhome.tracker.report.InterviewReportRepository;
 import ninja.samryecroft.returnhome.tracker.report.question.ReportQuestion;
 import ninja.samryecroft.returnhome.tracker.report.question.ReportQuestions;
+import ninja.samryecroft.returnhome.tracker.report.question.Respondent;
 import ninja.samryecroft.returnhome.tracker.report.question.ReportSection;
 import ninja.samryecroft.returnhome.tracker.user.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -326,6 +328,226 @@ class TemplateRenderCoverageIntegrationTest extends AbstractIntegrationTest {
         assertThat(rendered)
                 .as("the design-time placeholder must never survive into a rendered page")
                 .doesNotContain(">Question<");
+    }
+
+    /**
+     * T244: a declined interview replaces the nine child's-answer questions with one statement, and
+     * says so where a reader will see it.
+     *
+     * <p><b>Both halves are asserted together on purpose.</b> The nine must stop being counted as
+     * gaps, but removing nine false gaps must not also remove the true signal: a declined report
+     * showing no gaps looks identical on a reviewer's screen to a complete one, and the reviewer
+     * cannot then see that a child was never spoken to. That would be fixing a false alarm by
+     * deleting the alarm. So a test that only checked the rows had gone would pass on the defect.
+     *
+     * <p>The parent or carer's question is checked to SURVIVE, because it sits immediately after the
+     * nine in the model and "everything after the declined-reason question" is the natural wrong
+     * rule - one that would delete the field most likely to hold the only account of the episode.
+     */
+    @Test
+    void aDeclinedInterviewCollapsesTheChildsQuestionsIntoOneStatementAndSaysSo() throws Exception {
+        InterviewReport report = interviewReportRepository
+                .findByInterviewRequestId(approvedRequestId).orElseThrow();
+        report.setInterviewAccepted(false);
+        interviewReportRepository.saveAndFlush(report);
+
+        String declined = renderDetail();
+
+        assertThat(declined)
+                .as("the statement replaces the nine, once, at section level")
+                .contains("The young person was not interviewed, so these questions were not asked.");
+        assertThat(declined)
+                .as("THE TRUE SIGNAL. A count cannot carry this - .section-count is built to recede "
+                        + "- so the state is a chip, in the count's slot and instead of it")
+                .contains("tag-semantic-neutral")
+                .contains("Not interviewed");
+        // CHIP AND COUNT ARE ORTHOGONAL AND BOTH BELONG (Creed's amendment). An earlier version of
+        // this test asserted the count was SUPPRESSED here, which protected the zero case and was
+        // wrong as a rule: a declined report still has real gaps - the declined reason and the
+        // parent or carer's account - and hiding them hides live work on the screen a reviewer
+        // approves from.
+        //
+        // Compared against the model rather than a literal, for the reason the badge test gives:
+        // a number written out here would be a second definition of the count.
+        assertThat(substringAfter(declined, "id=\"rhi\""))
+                .as("the chip states the status; the count still reports the outstanding work")
+                .contains(ReportQuestions.unansweredIn(ReportSection.RETURN_HOME_INTERVIEW, report)
+                        + " not answered");
+
+        for (String childQuestion : List.of("Where were you while missing?",
+                "What made you go missing?", "Any additional comments from the young person?")) {
+            assertThat(declined)
+                    .as("no interview happened, so this was never asked and must not appear as a row")
+                    .doesNotContain(childQuestion);
+        }
+        assertThat(declined.replace("&#39;", "'"))
+                .as("the parent or carer's account is NOT the child's answer, and on a declined "
+                        + "interview it may be the only account of the episode anyone obtains")
+                .contains(ReportQuestions.byId("additionalInfoFromParentCarer").orElseThrow().label());
+
+        report.setInterviewAccepted(true);
+        interviewReportRepository.saveAndFlush(report);
+        String accepted = renderDetail();
+
+        assertThat(accepted)
+                .as("the interview happened, so the questions are live again and a blank one is a "
+                        + "real gap - the child was asked and the answer was not recorded")
+                .contains("Where were you while missing?")
+                .doesNotContain("Not interviewed");
+    }
+
+    /**
+     * T244, the third state: when nobody has recorded whether the interview happened, the section
+     * says so rather than going quiet.
+     *
+     * <p><b>Silence was the wrong answer and this is why.</b> Hiding the nine and showing only a
+     * count leaves one quiet number carrying a meaning it cannot carry: "2 not answered" says two
+     * small fields are outstanding, when the truth is that nobody knows whether two are outstanding
+     * or eleven. On a declined report the count was merely wrong; here it <em>actively
+     * misdescribes</em>.
+     *
+     * <p>A reviewer pays for the difference. A blank dropdown reads as a tidy-up; the interview's
+     * status being unrecorded reads as <b>do not approve this yet</b> - and the screen rendered
+     * those two decisions identically.
+     *
+     * <p>The statement is checked to STAY AWAY: it asserts that a young person was not spoken to,
+     * and on this state that names not just an unknown cause but an unknown event.
+     */
+    @Test
+    void anUnrecordedInterviewStatusSaysSoRatherThanShowingAQuietCount() throws Exception {
+        InterviewReport report = interviewReportRepository
+                .findByInterviewRequestId(approvedRequestId).orElseThrow();
+        report.setInterviewAccepted(null);
+        interviewReportRepository.saveAndFlush(report);
+
+        String card = substringAfter(renderDetail(), "id=\"rhi\"");
+
+        assertThat(card)
+                .as("an absence in OUR record - never 'not started', which would assert that no work "
+                        + "has happened when the interview may simply not be written up yet")
+                .contains("Not yet recorded")
+                .contains("tag-semantic-neutral");
+        assertThat(card)
+                .as("the count belongs beside the chip, not instead of it. What made the count "
+                        + "misleading on its own was carrying the SECTION'S STATUS; standing next to "
+                        + "a chip that states the status, it goes back to reporting a quantity, "
+                        + "which is all it was ever able to say")
+                .contains(ReportQuestions.unansweredIn(ReportSection.RETURN_HOME_INTERVIEW, report)
+                        + " not answered");
+        assertThat(card)
+                .as("this asserts a young person was not spoken to. On an unrecorded status that "
+                        + "names an unknown EVENT, not merely an unknown cause")
+                .doesNotContain("was not interviewed, so these questions were not asked");
+        assertThat(card)
+                .as("the nine stay hidden - showing them would imply they are owed, and we do not "
+                        + "know that either")
+                .doesNotContain("Where were you while missing?");
+    }
+
+    private String renderDetail() throws Exception {
+        return mockMvc.perform(get("/interview-requests/{id}", approvedRequestId)
+                        .with(asUser("rc-reviewer" + suffix)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+    }
+
+    /** T244: the collapse is READ-ONLY ONLY. The visitor is still filling this form in, and hiding the nine here would stop them completing the section they are there to complete. Guarded by render, not by reading the expression: the gate is safe only because SpEL short-circuits `readonly and ...`, and `childInterviewed` is ABSENT from the visitor model - evaluating it throws EL1001E. */
+    @Test
+    void probeVisitorCaptureFormKeepsTheNineWhenTheReportSaysDeclined() throws Exception {
+        mockMvc.perform(post("/visitor/interviews/{id}/report/draft", allocatedRequestId)
+                        .with(asUser("rc-visitor" + suffix)).with(csrf())
+                        .param("interviewAccepted", "false"))
+                .andExpect(status().isOk());
+
+        String html = mockMvc.perform(get("/visitor/interviews/{id}/report", allocatedRequestId)
+                        .with(asUser("rc-visitor" + suffix)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(html)
+                .as("the visitor is still filling this in and must be able to complete it")
+                .contains("Where were you while missing?")
+                .contains("What made you go missing?")
+                .contains("Any additional comments from the young person?");
+        assertThat(html)
+                .as("and the read-only statement must not appear on the capture form")
+                .doesNotContain("The young person was not interviewed, so these questions were not asked.");
+    }
+
+    /**
+     * Beside Dwight's probe rather than folded into it: a different property, and his is taken
+     * unmodified because he has watched it go red on the mutation it exists to catch.
+     *
+     * <p>His names three of the nine. This asserts the whole set FROM THE MODEL, so a tenth question
+     * put to the young person is covered the day it is added rather than the day someone remembers
+     * this file exists - the same reason the badge and label assertions compare against the model
+     * instead of against literals.
+     */
+    @Test
+    void theCaptureFormOffersEveryQuestionPutToTheYoungPerson() throws Exception {
+        String html = mockMvc.perform(get("/visitor/interviews/{id}/report", allocatedRequestId)
+                        .with(asUser("rc-visitor" + suffix)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        List<ReportQuestion> childQuestions = ReportQuestions.ALL.stream()
+                .filter(q -> q.answeredBy() == Respondent.CHILD)
+                .toList();
+        assertThat(childQuestions)
+                .as("if this reaches zero the loop below asserts nothing at all")
+                .isNotEmpty();
+
+        for (ReportQuestion question : childQuestions) {
+            assertThat(html)
+                    .as("the visitor is here to answer '%s', and a control they cannot see is a "
+                            + "question they cannot answer", question.id())
+                    .contains("id=\"" + question.id() + "\"");
+        }
+    }
+
+    /**
+     * The capture page supplies every attribute the shared fragment reads on its path.
+     *
+     * <p><b>This exists because removing the asymmetry was not self-guarding.</b> Deleting the
+     * controller call again leaves every other test green: the two expressions that read these
+     * attributes are protected by evaluation order - SpEL's {@code and} short-circuits on
+     * {@code readonly=false}, and Thymeleaf drops the T233 row for its {@code th:if} before touching
+     * its other attributes - so an absent attribute renders identically to a false one.
+     *
+     * <p>So the page cannot tell you whether it is safe by rendering correctly, and neither can a
+     * test that only reads the output. <b>The property is about the MODEL, so it is asserted against
+     * the model.</b> Without this, the next controller to render this fragment gets the same
+     * unnoticed asymmetry, and the first sign of it is a 500 on a form a visitor is midway through.
+     */
+    @Test
+    void theCapturePageSuppliesEveryAttributeTheSharedFragmentReads() throws Exception {
+        mockMvc.perform(get("/visitor/interviews/{id}/report", allocatedRequestId)
+                        .with(asUser("rc-visitor" + suffix)))
+                .andExpect(status().isOk())
+                .andExpect(model().attributeExists("childInterviewed", "lateExplanationMissing"));
+    }
+
+    /**
+     * The same attributes on the POST's binding-error re-render.
+     *
+     * <p><b>Two render paths, and only one of them was covered.</b> Supplying the attributes on the
+     * GET and forgetting them here leaves every other test green - the page renders, the errors
+     * show, and the two expressions that would read them are still behind their short-circuits. The
+     * first sign would be a 500 on a visitor who mistyped something, which is the worst moment for
+     * one.
+     *
+     * <p>It is also the path a refactor drops. This project has already shipped a defect where a
+     * fix was applied to a GET handler and not to the validation re-render beside it, and the
+     * re-render is the half nobody opens.
+     */
+    @Test
+    void theCapturePageAlsoSuppliesThemWhenItRedisplaysWithErrors() throws Exception {
+        mockMvc.perform(post("/visitor/interviews/{id}/report", allocatedRequestId)
+                        .with(asUser("rc-visitor" + suffix)).with(csrf())
+                        .param("action", "submit"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("visitor/report-form"))
+                .andExpect(model().attributeExists("childInterviewed", "lateExplanationMissing"));
     }
 
     /** The rendered card: from its id up to the start of the next one. */

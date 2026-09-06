@@ -46,6 +46,14 @@ class ReportSectionCountGuardTest {
             "<div class=\"card\" id=\"([\\w-]+)\"[^>]*?(?:\\n[^>]*?)?>", Pattern.DOTALL);
 
     private static final LocalDateTime RETURNED = LocalDateTime.of(2026, 9, 2, 14, 20);
+    private static final ReportSection SECTION_2 = ReportSection.RETURN_HOME_INTERVIEW;
+
+    /** Every section-2 answer blank, so the counts below are decided only by the interview state. */
+    private InterviewReport blankReportWith(Boolean interviewAccepted) {
+        InterviewReport report = report(RETURNED.plusHours(10), null);
+        report.setInterviewAccepted(interviewAccepted);
+        return report;
+    }
 
     @Test
     void everySectionOfTheReportCarriesACountSoAnAbsentBadgeMeansOneThing() throws IOException {
@@ -170,6 +178,62 @@ class ReportSectionCountGuardTest {
                         + "must not also manufacture a second one here - the same treatment the "
                         + "72-hour reading gives a window it cannot measure")
                 .isFalse();
+    }
+
+    /**
+     * T244, the three states of section 2 - <b>pinned as counts rather than as one number</b>,
+     * because "the single real gap is that dropdown" is about the nine collapsing and not about the
+     * section total. A builder reading only that sentence would pin "exactly 1" and be wrong twice.
+     *
+     * <p>Ten in the accepted case, not nine: {@code additionalInfoFromParentCarer} is live in every
+     * state. It is <em>not</em> a child's-answer question, and on a declined interview the parent or
+     * carer's account may be the only account of the episode anyone obtains - so it is the one field
+     * that must survive precisely when the others do not.
+     */
+    @Test
+    void sectionTwoCountsDifferentlyInEachOfTheThreeInterviewStates() {
+        assertThat(ReportQuestions.unansweredIn(SECTION_2, blankReportWith(true)))
+                .as("accepted: the nine are live and blank, plus the parent/carer question - and "
+                        + "'Interview accepted?' is itself answered")
+                .isEqualTo(10);
+
+        assertThat(ReportQuestions.unansweredIn(SECTION_2, blankReportWith(false)))
+                .as("not accepted: the nine were never asked, so the gaps are the declined reason "
+                        + "and the parent/carer account. NOT ELEVEN, and not one either")
+                .isEqualTo(2);
+
+        assertThat(ReportQuestions.unansweredIn(SECTION_2, blankReportWith(null)))
+                .as("unanswered: the nine are not counted at all - the system is not in a position "
+                        + "to know whether they should have been asked - so the gaps are that one "
+                        + "dropdown, upstream of them, and the parent/carer account")
+                .isEqualTo(2);
+    }
+
+    /**
+     * The twelfth question, asserted by name rather than by arithmetic. The nine are contiguous in
+     * the model literal, so "everything after the declined-reason question" looks like the rule and
+     * would take this one with it - silently, and in exactly the case where it matters most.
+     */
+    @Test
+    void theParentOrCarersAccountSurvivesADeclinedInterview() {
+        ReportQuestion parentCarer =
+                ReportQuestions.byId("additionalInfoFromParentCarer").orElseThrow();
+
+        assertThat(parentCarer.answeredBy())
+                .as("it is not the child's answer, and classifying it as one is how it gets deleted")
+                .isEqualTo(Respondent.PARENT_OR_CARER);
+        assertThat(parentCarer.isAskedOn(blankReportWith(false)))
+                .as("on a declined interview this may be the ONLY account of the episode anyone "
+                        + "obtains, so it is asked when nothing else in this section is")
+                .isTrue();
+        assertThat(parentCarer.isAGapOn(blankReportWith(false)))
+                .as("and a blank one is still a real gap, for the same reason")
+                .isTrue();
+
+        assertThat(ReportQuestions.of(SECTION_2).stream()
+                .filter(q -> q.answeredBy() == Respondent.CHILD).count())
+                .as("exactly nine questions are put to the young person")
+                .isEqualTo(9);
     }
 
     @Test

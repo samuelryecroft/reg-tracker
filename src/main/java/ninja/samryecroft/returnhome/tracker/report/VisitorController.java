@@ -281,12 +281,46 @@ public class VisitorController {
     private static final java.time.format.DateTimeFormatter HELD_AT_FMT =
             java.time.format.DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm", java.util.Locale.UK);
 
+    /**
+     * The two attributes {@code fragments/report-fields} reads on the CAPTURE path, supplied here so
+     * that all three renderers of that fragment populate what it reads.
+     *
+     * <p><b>The form was safe before this, and only by evaluation order.</b> The T244 gate reads
+     * {@code th:unless="${readonly and !childInterviewed}"} and SpEL's {@code and} short-circuits on
+     * {@code readonly=false}, so the right-hand operand was never reached - and it would have
+     * thrown, because the attribute was <em>absent</em> rather than false. The T233 row is the same
+     * shape: its {@code th:classappend} and {@code th:text} read {@code lateExplanationMissing}, and
+     * Thymeleaf removes the element for its {@code th:if="${readonly}"} before evaluating them.
+     * <b>Two expressions whose correctness rested on when they were evaluated rather than on what
+     * they would evaluate to</b>, and the consequence if either were reached is a 500 on a form a
+     * visitor is in the middle of filling in.
+     *
+     * <p><b>Supplying the attributes REMOVES the asymmetry; defaulting the operands would only
+     * compensate for it</b> - and a default would let the next controller that forgets one render
+     * silently wrong instead of failing. That is this floor's rule: prefer removing an asymmetry to
+     * compensating for it.
+     *
+     * <p>Only these two, deliberately. The chip and count attributes are read inside
+     * {@code reviewerFields()}, which the capture screen never renders, so adding them here would be
+     * noise implying a dependency the page does not have.
+     *
+     * <p>Both come from the report rather than the form: they are facts about what has been
+     * recorded, and the form is what is being typed.
+     */
+    private void addCaptureFragmentAttributes(Long requestId, Model model) {
+        InterviewReport report = reportService.findByRequestId(requestId).orElse(null);
+        model.addAttribute("childInterviewed", report != null && report.isChildInterviewed());
+        model.addAttribute("lateExplanationMissing",
+                report != null && report.isLateExplanationMissing());
+    }
+
     @GetMapping("/interviews/{id}/report")
     public String reportForm(@PathVariable Long id, @AuthenticationPrincipal AppUserPrincipal principal, Model model) {
         InterviewRequest request = interviewRequestService.getAuthorized(id, principal);
         model.addAttribute("request", request);
         model.addAttribute("childIdentity", nameRevealService.identityFor(request.getChild()));
         model.addAttribute("form", reportService.formFor(id, principal));
+        addCaptureFragmentAttributes(id, model);
         return "visitor/report-form";
     }
 
@@ -307,6 +341,7 @@ public class VisitorController {
             InterviewRequest request = interviewRequestService.getAuthorized(id, principal);
             model.addAttribute("request", request);
             model.addAttribute("childIdentity", nameRevealService.identityFor(request.getChild()));
+            addCaptureFragmentAttributes(id, model);
             return "visitor/report-form";
         }
         if ("submit".equals(action)) {

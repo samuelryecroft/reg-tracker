@@ -4,9 +4,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.InputStream;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.apache.poi.xwpf.usermodel.XWPFParagraph;
+import org.apache.poi.xwpf.usermodel.XWPFRun;
 import org.apache.poi.xwpf.usermodel.XWPFTable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -227,6 +230,217 @@ class DocxReportGeneratorTest {
                     .doesNotContain("Interview time not recorded")
                     .doesNotContain("not recorded");
         }
+    }
+
+    /**
+     * T244: on a declined interview the child's questions leave the document and one statement takes
+     * their place.
+     *
+     * <p><b>The document must not contradict the screen it was generated from.</b> The record view
+     * collapses the same nine, so a .docx that printed nine empty rows would say the child was asked
+     * nine questions and answered none, while the screen says they were never asked - and the
+     * council reads the document.
+     *
+     * <p>Asserted on the document's actual TEXT rather than on the XML, because what matters is what
+     * a reader sees. The parent or carer's question is checked to survive: it sits immediately after
+     * the nine in the template, so an off-by-one in the row arithmetic would take it - and on a
+     * declined interview it may be the only account of the episode anyone obtains.
+     */
+    @Test
+    void aDeclinedInterviewRemovesTheChildsQuestionRowsAndStatesWhyOnce(@TempDir Path tempDir)
+            throws Exception {
+        String statement = "The young person was not interviewed, so these questions were not asked.";
+        Path outputPath = tempDir.resolve("declined.docx");
+        try (InputStream templateStream =
+                new ClassPathResource("docx-templates/rhi-report-template.docx").getInputStream()) {
+            generator.generate(templateStream,
+                    Map.of("childName", "Alex Smith", "titleDate", "20 Jul 2026",
+                            "interviewAccepted", "No",
+                            "interviewDeclinedReason", "The young person declined",
+                            "additionalInfoFromParentCarer", "Parent gave an account"),
+                    null, null, null, outputPath,
+                    new DocxReportGenerator.RowCollapse(
+                            Set.of("whereWereYouWhileMissing", "whoWereYouWithWhileMissing",
+                                    "whatMadeYouGoMissing", "whatCanBeDoneToAddressReasons",
+                                    "consideredSelfMissing", "whatDidYouDoWhileMissing",
+                                    "whatHappenedWhenReturned", "preventFutureMissingSuggestions",
+                                    "additionalCommentsFromYoungPerson"),
+                            statement));
+        }
+
+        String text = textOf(outputPath);
+
+        assertThat(text)
+                .as("said ONCE - nine 'not applicable' rows would bury the significant fact, which "
+                        + "is that a missing child was not spoken to")
+                .containsOnlyOnce(statement);
+        for (String question : List.of("Where were you while missing?", "What made you go missing?",
+                "Any additional comments from the young person?")) {
+            assertThat(text)
+                    .as("this was never asked, so it must not appear in the council's copy")
+                    .doesNotContain(question);
+        }
+        assertThat(text)
+                .as("NOT the child's answer, and the row immediately after the nine - an off-by-one "
+                        + "in the row arithmetic deletes exactly this one")
+                .contains("Any additional information provided by the parent/carer?")
+                .contains("Parent gave an account");
+        assertThat(text)
+                .as("the visitor's own rows are untouched: the reason the interview did not happen "
+                        + "is the thing the statement points at")
+                .contains("If not, why?")
+                .contains("The young person declined");
+        assertThat(text)
+                .as("no placeholder may survive a removal")
+                .doesNotContain("${");
+    }
+
+    /**
+     * The statement keeps the character formatting of the label row it replaces.
+     *
+     * <p>Those label runs carry their bold, colour and size <b>on the run</b>, with no paragraph
+     * style to fall back on, so a bare {@code createRun()} renders the sentence in the document
+     * default among 9pt bold grey labels. Reusing the template author's row keeps borders, widths
+     * and shading - it does not keep run properties, and that is the level which decides how the
+     * sentence actually looks.
+     *
+     * <p>Asserted because it is invisible to every other check here: the text is present and
+     * correct either way, the document opens either way, and the only symptom is that the one
+     * sentence a reader must not mistake for a stray note looks exactly like a stray note.
+     */
+    @Test
+    void theStatementInheritsTheReplacedRowsRunFormatting(@TempDir Path tempDir) throws Exception {
+        String statement = "The young person was not interviewed, so these questions were not asked.";
+        Path outputPath = tempDir.resolve("formatting.docx");
+        try (InputStream templateStream =
+                new ClassPathResource("docx-templates/rhi-report-template.docx").getInputStream()) {
+            generator.generate(templateStream, Map.of("childName", "Alex Smith"),
+                    null, null, null, outputPath,
+                    new DocxReportGenerator.RowCollapse(
+                            Set.of("whereWereYouWhileMissing", "whoWereYouWithWhileMissing",
+                                    "whatMadeYouGoMissing", "whatCanBeDoneToAddressReasons",
+                                    "consideredSelfMissing", "whatDidYouDoWhileMissing",
+                                    "whatHappenedWhenReturned", "preventFutureMissingSuggestions",
+                                    "additionalCommentsFromYoungPerson"),
+                            statement));
+        }
+
+        try (XWPFDocument document = new XWPFDocument(java.nio.file.Files.newInputStream(outputPath))) {
+            XWPFRun statementRun = document.getTables().stream()
+                    .flatMap(t -> t.getRows().stream())
+                    .flatMap(r -> r.getTableCells().stream())
+                    .flatMap(c -> c.getParagraphs().stream())
+                    .flatMap(pr -> pr.getRuns().stream())
+                    .filter(run -> statement.equals(run.getText(0)))
+                    .findFirst()
+                    .orElse(null);
+
+            assertThat(statementRun).as("the statement must be in the document at all").isNotNull();
+            assertThat(statementRun.getCTR().getRPr())
+                    .as("a bare run inherits nothing, and these labels carry their formatting ON "
+                            + "the run - so the sentence would render in the document default")
+                    .isNotNull();
+        }
+    }
+
+    /**
+     * The unrecorded state's sentence, and the cross-reference it must NOT have.
+     *
+     * <p>The declined sentence ends "The reason is recorded above". This one must not gain an
+     * equivalent: there is nothing above to point at, because the dropdown is blank and that
+     * blankness is the situation. A cross-reference added for symmetry would point at an empty
+     * field - the T231 defect, in a document a court reads.
+     *
+     * <p>The two sentences sit beside each other in the spec, so <b>the missing second half looks
+     * like an oversight and somebody will helpfully complete it.</b> This test is the thing that
+     * stops them.
+     */
+    @Test
+    void theUnrecordedStatementNamesBothAbsencesAndPointsAtNothing(@TempDir Path tempDir)
+            throws Exception {
+        String statement = "This report does not record whether the interview took place, "
+                + "or any answers from the young person.";
+        Path outputPath = tempDir.resolve("unrecorded.docx");
+        try (InputStream templateStream =
+                new ClassPathResource("docx-templates/rhi-report-template.docx").getInputStream()) {
+            generator.generate(templateStream,
+                    Map.of("childName", "Alex Smith", "interviewAccepted", "Not recorded"),
+                    null, null, null, outputPath,
+                    new DocxReportGenerator.RowCollapse(
+                            Set.of("whereWereYouWhileMissing", "whoWereYouWithWhileMissing",
+                                    "whatMadeYouGoMissing", "whatCanBeDoneToAddressReasons",
+                                    "consideredSelfMissing", "whatDidYouDoWhileMissing",
+                                    "whatHappenedWhenReturned", "preventFutureMissingSuggestions",
+                                    "additionalCommentsFromYoungPerson"),
+                            statement));
+        }
+
+        String text = textOf(outputPath);
+
+        assertThat(text).containsOnlyOnce(statement);
+        assertThat(text)
+                .as("there is nothing above to point at - the dropdown is blank, and that IS the "
+                        + "situation. A cross-reference here would point at an empty field")
+                .doesNotContain("The reason is recorded above");
+        assertThat(text)
+                .as("these describe the report as defective, and 'not provided' additionally "
+                        + "implies someone was asked and withheld")
+                .doesNotContain("incomplete")
+                .doesNotContain("not provided");
+        assertThat(text)
+                .as("both imply the answers exist and we are choosing not to display them")
+                .doesNotContain("not shown")
+                .doesNotContain("not included");
+        assertThat(text)
+                .as("the child's questions are gone, as on declined")
+                .doesNotContain("Where were you while missing?");
+    }
+
+    /**
+     * Adjacent token-bearing rows do not take an innocent row with them.
+     *
+     * <p><b>This case is not reachable through the application</b> - the child's questions each sit
+     * under their own label row, so no two of them are adjacent - and it was reported as unarmable
+     * for that reason. It is not: the template's own "Interview accepted?" and "If not, why?" rows
+     * ARE adjacent and both carry tokens, so collapsing that pair exercises the arithmetic directly.
+     *
+     * <p>Without {@code distinct()} the loop adds row <em>i</em> and then re-adds <em>i - 1</em> as
+     * the next row's label. Removal runs in reverse, so the repeated index deletes whatever has
+     * SHIFTED INTO THAT SLOT - here, the first question below the pair. Silently, from a statutory
+     * document, with everything else about the output correct.
+     *
+     * <p>The collapse set is chosen for the arithmetic rather than for a real scenario, and that is
+     * the point: a guard that can only see inputs the application currently produces cannot be
+     * distinguished from one that does nothing.
+     */
+    @Test
+    void collapsingTwoAdjacentRowsDoesNotDeleteTheRowBelowThem(@TempDir Path tempDir)
+            throws Exception {
+        Path outputPath = tempDir.resolve("adjacent.docx");
+        try (InputStream templateStream =
+                new ClassPathResource("docx-templates/rhi-report-template.docx").getInputStream()) {
+            generator.generate(templateStream, Map.of("childName", "Alex Smith"),
+                    null, null, null, outputPath,
+                    new DocxReportGenerator.RowCollapse(
+                            Set.of("interviewAccepted", "interviewDeclinedReason"),
+                            "Collapsed for the purposes of this test."));
+        }
+
+        assertThat(textOf(outputPath))
+                .as("the row immediately below the collapsed pair is innocent, and a repeated "
+                        + "removal index deletes exactly it")
+                .contains("Where were you while missing?");
+    }
+
+    /** Every table cell and paragraph, in document order - what a reader would actually see. */
+    private String textOf(Path docx) throws Exception {
+        StringBuilder text = new StringBuilder();
+        try (XWPFDocument document = new XWPFDocument(java.nio.file.Files.newInputStream(docx))) {
+            document.getParagraphs().forEach(p -> text.append(p.getText()).append('\n'));
+            document.getTables().forEach(t -> t.getRows().forEach(r ->
+                    r.getTableCells().forEach(c -> text.append(c.getText()).append('\n'))));
+        }
+        return text.toString();
     }
 
     @Test
