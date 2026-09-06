@@ -130,6 +130,48 @@ class ReportSectionCountGuardTest {
                 .isZero();
     }
 
+    /**
+     * The third question of this family, and <b>the worst of the three</b>.
+     *
+     * <p>{@code interviewDeclinedReason} is anchored to "Interview accepted?" exactly as the 72-hour
+     * reason is anchored to the window being missed. Counting it meant that an interview which WAS
+     * accepted - the normal, successful outcome - reported "1 not answered" in section 2, on the
+     * screen a reviewer approves from. <b>The good outcome was the one that got flagged.</b> The
+     * other two at least fired on unusual states.
+     *
+     * <p>It surfaced for the same reason as the Declaration case: section 2 had no badge before this
+     * change either, so giving every section a count is what would have revealed it. <b>A fix that
+     * reveals a defect it did not cause still has to carry it</b> - and this is the second time that
+     * rule has applied to this one branch.
+     *
+     * <p>It was a one-line fix because {@code blankIsAGap} is a predicate rather than a flag. The
+     * modelling decision is what made the third instance cheap.
+     */
+    @Test
+    void anAcceptedInterviewDoesNotReportTheDeclinedReasonAsAGap() {
+        ReportQuestion declinedReason = ReportQuestions.byId("interviewDeclinedReason").orElseThrow();
+
+        InterviewReport accepted = report(RETURNED.plusHours(10), null);
+        accepted.setInterviewAccepted(true);
+        assertThat(declinedReason.isAGapOn(accepted))
+                .as("the interview happened, so nobody was ever asked why it did not")
+                .isFalse();
+
+        InterviewReport declined = report(RETURNED.plusHours(10), null);
+        declined.setInterviewAccepted(false);
+        assertThat(declinedReason.isAGapOn(declined))
+                .as("declined and no reason written down - a real gap, and the one case this "
+                        + "question exists for")
+                .isTrue();
+
+        InterviewReport notRecorded = report(RETURNED.plusHours(10), null);
+        assertThat(declinedReason.isAGapOn(notRecorded))
+                .as("'Interview accepted?' is itself unanswered, which is a gap in its own right. It "
+                        + "must not also manufacture a second one here - the same treatment the "
+                        + "72-hour reading gives a window it cannot measure")
+                .isFalse();
+    }
+
     @Test
     void everySectionAppearsInTheCountsIncludingTheOnesThatComeOutZero() {
         Map<String, Integer> counts = ReportQuestions.unansweredBySection(report(null, null));

@@ -65,6 +65,20 @@ public final class ReportQuestions {
     private static final Predicate<InterviewReport> BLANK_IS_AN_ANSWER = report -> false;
 
     /**
+     * Owed only when the interview was declined. {@code interviewDeclinedReason} is anchored to
+     * "Interview accepted?" exactly as the 72-hour reason is anchored to the window being missed -
+     * so on an ACCEPTED interview, the normal and successful case, a blank here means the question
+     * was never put to anyone.
+     *
+     * <p>Counting it made <b>the good outcome the one that got flagged</b>, on the screen a reviewer
+     * approves from. Null is not owed either, matching how the 72-hour reading treats a window it
+     * cannot measure: an unanswered "Interview accepted?" is a gap in its own right and does not
+     * also manufacture one here.
+     */
+    private static final Predicate<InterviewReport> ONLY_IF_DECLINED =
+            report -> Boolean.FALSE.equals(report.getInterviewAccepted());
+
+    /**
      * Every question, in the order asked. Grouped by section for readability only - the sections
      * are carried on each entry, so a regrouping of this literal cannot silently move a question
      * between them.
@@ -126,8 +140,12 @@ public final class ReportQuestions {
             // --- 2. Return Home Interview -----------------------------------------------------
             q("interviewAccepted", RETURN_HOME_INTERVIEW, "Interview accepted?", null,
                     YES_NO, false, InterviewReport::getInterviewAccepted),
+            // Conditional in exactly ifNotWhyLate's shape, and found by Creed the same way: section
+            // 2 also had no badge before this change, so giving it one is what would have surfaced
+            // the miscount. THE PR'S OWN RULE APPLIED TO THE SECOND SECTION IT UNCOVERED.
             q("interviewDeclinedReason", RETURN_HOME_INTERVIEW, "If not, why?", null,
-                    LONG_TEXT, false, InterviewReport::getInterviewDeclinedReason),
+                    LONG_TEXT, false, "interviewDeclinedReason", ONLY_IF_DECLINED,
+                    InterviewReport::getInterviewDeclinedReason),
             q("whereWereYouWhileMissing", RETURN_HOME_INTERVIEW, "Where were you while missing?", null,
                     LONG_TEXT, false, InterviewReport::getWhereWereYouWhileMissing),
             q("whoWereYouWithWhileMissing", RETURN_HOME_INTERVIEW, "Who were you with while missing?",
