@@ -7,6 +7,7 @@ import ninja.samryecroft.returnhome.tracker.child.NameRevealService;
 import ninja.samryecroft.returnhome.tracker.document.DocumentNotFoundException;
 import ninja.samryecroft.returnhome.tracker.document.DocumentSecurityException;
 import ninja.samryecroft.returnhome.tracker.document.KeyUnavailableException;
+import ninja.samryecroft.returnhome.tracker.export.ExportCapability;
 import ninja.samryecroft.returnhome.tracker.fieldcrypto.FieldCryptoException;
 import ninja.samryecroft.returnhome.tracker.home.Home;
 import ninja.samryecroft.returnhome.tracker.home.HomeRepository;
@@ -131,6 +132,29 @@ public class GlobalControllerAdvice {
     @ModelAttribute("canEditTheme")
     public boolean canEditTheme(@AuthenticationPrincipal AppUserPrincipal principal) {
         return themeService.canEditOwnTheme(principal);
+    }
+
+    /**
+     * T271: the nav's Audit entry used to be gated on the role list alone
+     * ({@code hasAnyRole('ORG_ADMIN','VIEWER','COORDINATOR','ADMIN')}) - the same role ceiling
+     * {@code SecurityConfig}'s {@code /audit/**} matcher enforces. But that matcher is not the whole
+     * story: {@link AuditFeedController#authorize} gates every audit route on
+     * {@link ExportCapability#canExport}, which is the role ceiling <em>and</em> a per-account grant
+     * ({@code User#isCanExport}) that an organisation sets on a named safeguarding lead, not on
+     * everyone who holds an eligible role. A VIEWER/ORG_ADMIN/COORDINATOR without that flag passed
+     * the nav's role check, clicked through, and hit a 403 for something the application itself had
+     * just offered - the human's report.
+     *
+     * <p>The fix asks the same method the controller calls, not a restated version of it - the same
+     * shape as {@link #canEditTheme} above, and the same principle {@link
+     * ninja.samryecroft.returnhome.tracker.user.RoleMatrix}'s class javadoc states: "the UI mirrors
+     * this; it never replaces it." {@code SecurityConfig}'s role list is a coarser ceiling than the
+     * real gate here, which is exactly the shape its own comment on {@code /export/**} already
+     * admits: "the filter chain can express the role ceiling but not the per-account grant."
+     */
+    @ModelAttribute("canViewAudit")
+    public boolean canViewAudit(@AuthenticationPrincipal AppUserPrincipal principal) {
+        return ExportCapability.canExport(principal);
     }
 
     /**
