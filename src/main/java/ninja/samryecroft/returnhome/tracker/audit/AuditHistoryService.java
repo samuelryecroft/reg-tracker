@@ -7,6 +7,7 @@ import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -182,7 +183,7 @@ public class AuditHistoryService {
      * what will stop them from not noticing.
      */
     public List<AuditFeedRow> caseActivityFeed(List<InterviewRequest> requestsInScope, Long homeIdFilter,
-            LocalDate from, LocalDate to) {
+            LocalDate from, LocalDate to, AuditFeedScope scope) {
         if (requestsInScope.isEmpty()) {
             return List.of();
         }
@@ -197,7 +198,7 @@ public class AuditHistoryService {
 
         List<AuditFeedRow> rows = new ArrayList<>();
         for (AuditEvent event : auditEventRepository.findByOrganisationIdIn(organisationIds)) {
-            if (!CASE_ACTIVITY_TYPES.contains(event.getEventType())) {
+            if (!typesIn(scope).contains(event.getEventType())) {
                 continue;
             }
             Long requestId = "InterviewRequest".equals(event.getTargetType()) ? event.getTargetId()
@@ -220,6 +221,33 @@ public class AuditHistoryService {
         rows.sort(Comparator.comparing((AuditFeedRow row) -> row.entry().occurredAt()).reversed());
         return rows;
     }
+
+    /**
+     * The event types one scope asks for (T274).
+     *
+     * <p>ACCESS_TYPES is added to the base set rather than replacing any of it, and it holds exactly
+     * one type. <strong>Checked rather than assumed, because the base set is load-bearing for
+     * something else:</strong> the javadoc above says this filter is what keeps the platform-ADMIN
+     * sign-in-export question out of scope "rather than needing a separate exclusion". Sign-in is
+     * LOGIN_SUCCESS and LOGIN_FAILURE; neither is added here by either scope, so that question stays
+     * answered. Anyone adding a third type must re-check that sentence - it is answered today as a
+     * side effect of this filter, not by a rule of its own.
+     *
+     * <p>NAMES_REVEALED is deliberately NOT included. It is access-shaped and arguably belongs, but
+     * the ruling names access events and that type is a reveal ACTION rather than a record opening.
+     * Reported rather than decided.
+     */
+    private static Set<AuditEventType> typesIn(AuditFeedScope scope) {
+        if (scope != AuditFeedScope.WITH_ACCESS_EVENTS) {
+            return CASE_ACTIVITY_TYPES;
+        }
+        Set<AuditEventType> types = EnumSet.copyOf(CASE_ACTIVITY_TYPES);
+        types.addAll(ACCESS_TYPES);
+        return types;
+    }
+
+    /** Opening a record. One type today; a set so a second one is an addition rather than a rewrite. */
+    private static final Set<AuditEventType> ACCESS_TYPES = Set.of(AuditEventType.AUDIT_VIEW_OPENED);
 
     /** A user account's own audit trail - role/enabled/password changes, never sign-in activity. */
     public List<AuditHistorySection> historyForUser(Long userId, DraftSaveRuns draftSaveRuns) {
