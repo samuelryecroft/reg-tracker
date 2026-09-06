@@ -43,6 +43,30 @@ public class AuditHistoryService {
     private static final DateTimeFormatter MONTH_YEAR = DateTimeFormatter.ofPattern("MMM yyyy");
     private static final DateTimeFormatter TIMESTAMP = DateTimeFormatter.ofPattern("dd MMM yyyy, HH:mm");
 
+    /**
+     * Opening a record is not something that happened TO the record, so the record's own history
+     * does not list it (T246).
+     *
+     * <p>The human's words: <em>"When a user views a request it adds a audit view opened event - I
+     * don't think we need an audit view opened event because that is not sensible."</em> Opening the
+     * interview request page emits AUDIT_VIEW_OPENED against that very request
+     * ({@code InterviewRequestDetailController}), so the panel showing the request's own story filled
+     * up with rows about people reading it - and, having no case in {@link #toEntry}'s switch, they
+     * rendered through the default branch as the literal string {@code "AUDIT_VIEW_OPENED"}.
+     *
+     * <p><strong>DISPLAY ONLY, AND REVERSIBLE. The events are still written and still queryable.</strong>
+     * That distinction is the whole reason this is a filter and not a change to
+     * {@code AuditEventPublisher}: a panel you filtered can be unfiltered, but a record you stopped
+     * writing cannot be recovered - and "who looked at this child's data" is a question a council or
+     * a DPO asks, which these rows are the only place to answer.
+     *
+     * <p>Same shape as {@link #EXCLUDED_FROM_USER_HISTORY} below, and deliberately a SEPARATE set:
+     * the two exclusions answer different questions and merging them would make one screen's policy
+     * silently govern the other's.
+     */
+    private static final Set<AuditEventType> EXCLUDED_FROM_RECORD_HISTORY =
+            Set.of(AuditEventType.AUDIT_VIEW_OPENED);
+
     /** Sign-in monitoring is explicitly out of scope for V1 (gated on an unresolved GDPR policy call). */
     private static final Set<AuditEventType> EXCLUDED_FROM_USER_HISTORY =
             Set.of(AuditEventType.LOGIN_SUCCESS, AuditEventType.LOGIN_FAILURE);
@@ -89,6 +113,13 @@ public class AuditHistoryService {
         // draft saves" is a claim about time order, so a run computed over an unsorted list is not
         // the run the reader is looking at.
         events.sort(Comparator.comparing(AuditEvent::getOccurredAt).reversed());
+        // FILTER FIRST, COLLAPSE AFTER, and the order is required rather than incidental. The
+        // draft-save collapse lives downstream inside toEntries, so removing a view event can leave
+        // two runs of draft saves ADJACENT - and they must then collapse into ONE row, because what
+        // the reader sees has to be the collapse of what the reader sees. Filtering after the
+        // collapse would leave two "Draft saved" rows with nothing between them, which is the same
+        // wall of noise T177 removed, reintroduced by the fix for a different kind of noise.
+        events.removeIf(event -> EXCLUDED_FROM_RECORD_HISTORY.contains(event.getEventType()));
         return groupByDay(events, WhenStyle.TIME, draftSaveRuns);
     }
 
