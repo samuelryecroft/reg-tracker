@@ -5550,6 +5550,36 @@ names the current position — **make that sentence the button.**
 - `.step-label` (*"Step 3 of 6 · Future Incidents"*) becomes `<button type="button" aria-expanded aria-controls>`.
 - **`type="button"` is not optional.** The control sits inside `<form>`; the existing `backBtn` and `nextBtn`
   both set it explicitly for this reason. A default-type button here submits the report.
+#### [AMENDED 8 Sep — the risk I introduced here, and it is NOT present as built]
+
+Writing this section I specified a **button** where a `<span>` had been, in a flex row that already ends with
+a right-aligned save state. **A button normally carries padding and a caret, so the element I specified is
+wider than the element it replaced** — and the thing it would squeeze first is `.saved`, T247's element, the
+one thing on the screen that says whether a visitor's work is safe. **I did not name that when I wrote it.**
+
+**Measured against what shipped (`7b87033`), the risk does not occur — and it does not occur for two reasons
+that are load-bearing and were nowhere recorded as such:**
+
+1. **There is no icon.** `T165`/AGSGT rules out CSS generated content and this section never asked for a
+   caret, so the open/closed state is carried by `aria-expanded` plus a background change.
+2. **`.step-label` is `padding: 2px 6px; margin: -2px -6px`.** The negative margin cancels the padding, so the
+   button's *margin box* — which is what flex distributes — is exactly the width of the text it replaced.
+
+**So this is a constraint on future change, not a defect to fix:** the toggle **must not consume more row
+width than the text it replaces.** Adding an icon, or dropping that negative margin during a restyle, silently
+reintroduces the squeeze — and it will not error, it will just take space from the save state.
+
+**And when space genuinely runs out (narrow viewports, a longer legend, a longer save message), the priority
+is ruled:**
+
+> The toggle's **visible** text is the **section name**. *"Step 4 of 6"* moves into the **accessible name** and
+> may be visually hidden below the narrow breakpoint. **The position count is orientation, not identity** — it
+> is the least useful half of that sentence to someone who can see six dots two inches to the left, and the
+> half that can go without loss. **THE SAVE STATE NEVER YIELDS.**
+
+*Corrects my own report to god, which proposed this as a change to shipped code. It is not: Pam's
+implementation had already closed it. What was missing was the record of why those two details matter.*
+
 - `.dots` stay as the at-a-glance progress and are **not** made interactive — 9px targets fail 2.5.5, and
   duplicating the panel's job in an undersized control is worse than leaving them decorative.
 
