@@ -5146,7 +5146,7 @@ was doing. **His worry was well-founded and the answer is no.**
 
 | | |
 | --- | --- |
-| templates using `.case-list` | **7** — `admin/home-list`, `admin/user-list`, `coordinator/requests`, `home-staff/request-list`, `reviewer/queue` (×2), `visitor/interview-list` |
+| `.case-list` containers | **7, in 6 templates** — `admin/home-list`, `admin/user-list`, `coordinator/requests`, `home-staff/request-list`, `reviewer/queue` (**×2**), `visitor/interview-list`. *(Corrected: D-8f-3 first said "7 templates" while its own row said ×2. Counted with comments stripped.)* |
 | of those using `<ul>`/`<li>` | **0** |
 | shared fragment `fragments/case-card.html` root | `<div>` |
 
@@ -5154,6 +5154,16 @@ Every screen that migrated from `<table>` to cards gained responsive behaviour a
 people rather than aggregates — **that design reasoning is sound and is not in question.** But a `<table>`
 announced *"table, 12 rows"* and let a screen-reader user move by row and skip one. **`<div>` inside `<div>`
 announces nothing:** no item count, no boundaries between one home and the next, no way to step through them.
+
+> **CORRECTED IN PLACE (Dwight, and he is right).** *"Seven screens LOST list semantics"* is overstated. **The
+> card stack was always the mobile rendering** — `app.css:1189-1195`, the 720px breakpoint, where
+> `.table-wrap.responsive { display: none }` and `.stack { display: flex }`. `489e8d4`'s `home-list.html`
+> carried both: a captioned `<table>` at `:15` **and** `<div class="stack">` at `:36`. **So below 720px there
+> has been no table and no caption since FE-03/FE-10/FE-25, long before 4e.** The genuine reduction is at
+> **desktop** widths specifically, where readers previously had tabular structure *plus* a caption.
+>
+> **Why the smaller claim is the better one:** *the overstated version is the one a reviewer disproves and
+> then dismisses the whole ticket with.* Same defect, same fix, truer claim.
 
 > **A list that looks like a list must be a list.** WCAG 2.2 **1.3.1 Info and Relationships (Level A)** —
 > structure conveyed visually has to be programmatically determinable. Seven screens present a visually
@@ -5266,3 +5276,37 @@ never heard of the Safari behaviour, which a comment does not.
 strip comments before matching, or **the rationale explaining why `role="list"` is required will itself satisfy
 a check for `role="list"`.** Fifth instance of that shape here, and the first where the prose and the thing it
 protects are on adjacent lines by design.
+
+### D-8f-10 — Dwight's correction shrinks the blame and **grows the ticket**, and only the first half is in either framing
+
+**4e did not remove list semantics. It removed the width at which they existed.** The card stack was the
+≤720px rendering; 4e promoted it to every width. So the defect is not new — **its audience changed, from
+mobile users to everyone.**
+
+That is smaller as a claim about 4e and **larger as a ticket**: the people it serves have been unserved since
+the responsive breakpoint shipped, not since 4e. **A fix framed as a regression gets scoped to the change that
+caused it; this one was never caused by that change.**
+
+**Count settled** — god has *"do not trust either number"* on the card, so: **7 containers in 6 templates**,
+counted with comments stripped. `reviewer/queue.html` carries two. **Dwight's unit was right and mine was
+wrong, and my own table said `×2` while my sentence said seven templates** — the data was in front of me and I
+mis-stated the unit.
+
+**Two people reached `role="list"` + `role="listitem"` independently**, and god is right that this is worth
+more than either of us saying it twice.
+
+### D-8f-11 — god's correction of his own dispatch is the transferable one
+
+His *"probably removed more than once"* hypothesis was **disconfirmed** by Dwight's sweep — all seven surviving
+tables are captioned, 1:1. His own account of the mistake:
+
+> **I carried it into his dispatch as a REASON rather than a HYPOTHESIS, which is a way of asking someone to
+> CONFIRM rather than to CHECK.**
+
+That is the sharpest thing in this exchange and it generalises past captions: **the grammatical form of a
+dispatch decides which of the two jobs the reader does.** *"Check whether X"* and *"X, so go and fix it"* get
+different work back, and only the first can return a negative.
+
+**It also survived contact with the truth in the right direction** — the hypothesis was wrong, Dwight
+disconfirmed it, and the sweep still found the real thing. Which is D-8f-8's point arriving from the other
+side: **a false lead that produces a finding is still a false lead.**
