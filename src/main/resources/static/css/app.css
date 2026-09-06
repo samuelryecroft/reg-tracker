@@ -1041,6 +1041,19 @@ fieldset.checkbox-fieldset > legend {
 .status.CANCELLED { background: var(--error-bg); color: var(--error); }
 /* Same literal-pair bug as REPORT_REJECTED above, but this one actually is a warning ("Consent not
    yet confirmed") - --warn/--warn-bg is the semantically correct token, not --sent-back. */
+/* OrgStatus (T265). Not cosmetic, and not a follow-up to the vocabulary fix - the SAME change.
+   All three org states fell through to base .status, so the colour carried NO information and the
+   shouting-caps constant was the entire signal; fixing the case without these would have made the
+   screen quieter without making it clearer. Pairs reuse existing precedents rather than inventing:
+   a state awaiting an action reads like .status.REQUESTED, a verified-good state like
+   .status.REPORT_APPROVED. */
+.status.PENDING { background: var(--warn-bg); color: var(--warn); }
+.status.ACTIVE { background: var(--ok-bg); color: var(--ok); }
+/* Resolves to what base .status already gives, and is written out ANYWAY so the next person cannot
+   read the absence as an oversight and "fix" it with a colour: archived should recede. Same reason
+   InterviewStatusTransitions records CANCELLED's empty in-edge set explicitly rather than leaving
+   it latent - a deliberate nothing has to be stated to survive. */
+.status.ARCHIVED { background: var(--neutral-bg); color: var(--neutral); }
 .status.warning { background: var(--warn-bg); color: var(--warn); margin-left: 0.4rem; }
 
 /* Roadmap 2.1 due-state badges (ninja...interview.DueBadge). Never colour alone - each carries a
