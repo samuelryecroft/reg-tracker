@@ -46,6 +46,13 @@ class WebkitIconSmokeUiTest extends AbstractUiTest {
      * nothing, and per the SVG spec an {@code SVGGraphicsElement} with no rendered content reports a
      * zero-size {@code getBBox()} - that's the real signal, and it's what this asserts, across every
      * icon in both the sidebar and the header on one migrated screen.
+     *
+     * <p>T282/D-1e added the first two icons in this scope that are CORRECTLY {@code display:none}
+     * at this method's desktop-width default - the narrow-viewport nav toggle and its close
+     * control, both invisible above 900px by design. A zero {@code getBBox()} on a genuinely
+     * unrendered element is indistinguishable from one whose {@code href} failed to resolve, so the
+     * desktop pass now excludes exactly those two and a second pass checks them at the width where
+     * they actually render - not a weaker check, the same one, aimed at each icon's own real width.
      */
     @Test
     void everyShellIconResolvesInWebkit() {
@@ -60,22 +67,53 @@ class WebkitIconSmokeUiTest extends AbstractUiTest {
                 webkitPage.waitForLoadState();
                 webkitPage.waitForSelector(".shell-side");
 
-                @SuppressWarnings("unchecked")
-                List<Object> bboxWidths = (List<Object>) webkitPage.evaluate(
-                        "() => Array.from(document.querySelectorAll('.shell-side .icon use, "
-                                + ".shell-header .icon use')).map(el => el.getBBox().width)");
-
-                assertThat(bboxWidths).as("expected at least the sidebar nav + header icons")
+                List<Object> desktopWidths = iconBBoxWidths(webkitPage,
+                        "() => Array.from(document.querySelectorAll("
+                                + "'.shell-side .icon use, .shell-header .icon use'))"
+                                + ".filter(use => !use.closest('.shell-nav-toggle') && !use.closest('.shell-nav-close'))"
+                                + ".map(el => el.getBBox().width)");
+                assertThat(desktopWidths)
+                        .as("expected at least the sidebar nav + header icons, excluding the two "
+                                + "narrow-viewport-only controls checked separately below")
                         .hasSizeGreaterThan(5);
-                for (Object width : bboxWidths) {
-                    assertThat(((Number) width).doubleValue())
-                            .as("a zero-width <use> bbox means its href did not resolve to anything - "
-                                    + "the icon is rendering blank in WebKit")
-                            .isGreaterThan(0);
-                }
+                assertAllResolve(desktopWidths);
+
+                // The two excluded above: invisible at desktop by design (D-1e-6), so they need
+                // the width where they actually render - and shell-nav-panel.js swaps which of
+                // the two is shown on open (never both, D-1e), so each is checked at the moment
+                // it is actually the visible one rather than both after opening, which would find
+                // the now-hidden toggle exactly as blank as an unresolved href would.
+                webkitPage.setViewportSize(320, 640);
+                List<Object> toggleWidth = iconBBoxWidths(webkitPage,
+                        "() => Array.from(document.querySelectorAll('.shell-nav-toggle .icon use'))"
+                                + ".map(el => el.getBBox().width)");
+                assertThat(toggleWidth).as("expected the toggle's own icon, closed state").hasSize(1);
+                assertAllResolve(toggleWidth);
+
+                webkitPage.click(".shell-nav-toggle");
+                webkitPage.waitForSelector(".shell-nav-close:not([hidden])");
+                List<Object> closeWidth = iconBBoxWidths(webkitPage,
+                        "() => Array.from(document.querySelectorAll('.shell-nav-close .icon use'))"
+                                + ".map(el => el.getBBox().width)");
+                assertThat(closeWidth).as("expected the close control's own icon, open state").hasSize(1);
+                assertAllResolve(closeWidth);
             } finally {
                 webkit.close();
             }
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<Object> iconBBoxWidths(Page webkitPage, String script) {
+        return (List<Object>) webkitPage.evaluate(script);
+    }
+
+    private void assertAllResolve(List<Object> bboxWidths) {
+        for (Object width : bboxWidths) {
+            assertThat(((Number) width).doubleValue())
+                    .as("a zero-width <use> bbox means its href did not resolve to anything - "
+                            + "the icon is rendering blank in WebKit")
+                    .isGreaterThan(0);
         }
     }
 }
