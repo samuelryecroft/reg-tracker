@@ -186,11 +186,19 @@ public class DemoDataSeeder implements ApplicationRunner {
      * the seeder is the system rather than a person, which is the same shape T166 §5's
      * auto-provisioning will need.
      *
-     * <p>It also removes a dependency Kevin spotted between two tickets: without this, demo
+     * <p>It also removed a dependency Kevin spotted between two tickets: without this, demo
      * organisations would be left PENDING and the seeder's children would only be creatable because
-     * {@code autoCreateKeys} defaults to true and mints their KEK on demand. The demo profile would
-     * then break the day that fail-open default is flipped - a failure with no visible connection to
-     * the change that caused it.
+     * {@code autoCreateKeys} then defaulted to true and minted their KEK on demand. The demo
+     * profile would have broken the day that fail-open default was flipped - a failure with no
+     * visible connection to the change that caused it.
+     *
+     * <p><b>That day was T171, and this is why it passed uneventfully.</b> The default is now
+     * {@code false}, and the demo profile did not notice, because activating properly had already
+     * removed its dependence on minting. Left in the past tense rather than deleted: the prediction
+     * is the evidence a reader needs to decide whether the demo profile is still safe, and it is
+     * more useful having been borne out than it was as a warning. (Dwight, reviewing #121 - the
+     * comment was future-tense about a day that had arrived, so a reader could not tell whether the
+     * flip had already happened.)
      */
     private Organisation organisation(String name, OrgType type, Organisation supplier) {
         Organisation org = new Organisation();
