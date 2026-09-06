@@ -996,7 +996,24 @@ fieldset.checkbox-fieldset > legend {
 .btn.sent-back:hover { background: var(--sent-back-bg); }
 .btn.block { width: 100%; }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-.btn-row { display: flex; gap: var(--s3); flex-wrap: wrap; align-items: center; }
+/* T235 / spec §8a (Creed, b5902ab): a button's external margin is a property of WHERE IT SITS,
+   not of what it is. Legacy .btn (:930-ish, "margin-top: var(--s5)") carries the spacing between
+   a form and its actions - but .btn-row rightly zeroes each child's own margin-top below (a flex
+   row owns its own gap, and a stray top margin per child would misalign them), and until now
+   never put the relationship back. So wrapping actions in the one container that spaces buttons
+   correctly against EACH OTHER silently deleted their spacing against the form ABOVE them - the
+   exact "no padding"/"sits flush against the input" the human reported on login, save-changes,
+   and every add-home/add-child form. Not a new number: --s5 (24px) is what a lone .btn already
+   said for this relationship, merely unreachable from inside .btn-row until now. It is also the
+   BLOCK-AFTER-CONTENT rhythm elsewhere in this file (.table-wrap, .stack, two more) - --s4/16px is
+   the WITHIN-FORM field-to-field rhythm (label), and an actions block must read as more separated
+   than one more field. No double-spacing either path: a bare .btn outside a row keeps its own
+   --s5; .btn-row .btn below zeroes it inside a row; both land on the same 24px. The two existing
+   overrides (.srow .act .btn-row, .theme-preview .btn-row) already opt out the only two contexts
+   that would be wrong under this rule - checked, still correct, left untouched.
+   WHEN LEGACY .btn RETIRES: delete its margin-top rather than porting it - Nocturne's .btn has no
+   external margin at all, correctly, and this rule is where the job lives from then on. */
+.btn-row { display: flex; gap: var(--s3); flex-wrap: wrap; align-items: center; margin-top: var(--s5); }
 .btn-row .btn { margin-top: 0; margin-right: 0; }
 
 /* ============================== status / due / banners ============================== */
