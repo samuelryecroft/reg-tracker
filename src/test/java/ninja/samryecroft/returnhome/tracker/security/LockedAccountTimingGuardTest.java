@@ -195,11 +195,12 @@ class LockedAccountTimingGuardTest extends AbstractIntegrationTest {
         int afterUnknown = CountingEncoderConfig.MATCH_CALLS.get();
 
         assertThat(afterUnknown)
-                .as("an unknown but locked username must not pay for a password hash. Before T221 "
-                        + "it did - DaoAuthenticationProvider's mitigateAgainstTimingAttack runs a "
-                        + "full BCrypt when no user is found - while a locked REAL account was "
-                        + "rejected before any compare. That ~53ms gap answered 'does this account "
-                        + "exist?' to anyone able to time a response")
+                .as("the two locked paths must cost the same. NOTE: they already do without this "
+                        + "filter - performPreCheck runs additionalAuthenticationChecks even after "
+                        + "LockedException, because alwaysPerformAdditionalChecksOnUser defaults to "
+                        + "true - so THIS assertion passing is not the interesting part and never "
+                        + "was. The next one is: equal must mean ZERO. See the class comment; an "
+                        + "earlier version of this message claimed a ~53ms gap that does not exist")
                 .isEqualTo(afterReal);
         // Dwight's suggestion after arming #2: report BOTH counts, not just the sum. "expected 0 but
         // was 2" forced a round-trip through inference to recover (1,1) from (0,1), and the whole
