@@ -116,7 +116,41 @@
 <th:block th:fragment="nav" th:with="ico=@{/icons/phosphor.svg}, path=${currentPath}">
 <a class="skip-link" href="#main">Skip to main content</a>
 
-<aside class="shell-side">
+<!--/* D-1e (spec §8n): below 900px, display:none on .shell-side had NOTHING substituted - the
+     entire aside (brand, org identity, nav, AND .shell-user's log-out button, the only one in the
+     application) simply vanished. This restores it as a full-screen panel over the SAME markup,
+     not a link list - D-1e-1's finding was that a nav-only fix would leave log-out unreachable
+     and look complete.
+
+     D-1e-6 GIVES on DOM parentage (Creed, 15066ba): "third control in .shell-header-actions" was
+     never a claim the toggle must be that div's literal child - what's load-bearing is that it
+     READS as part of that row and sits in FOCUS ORDER matching its VISUAL position (D-1e-6), and
+     that .shell-side's presence at desktop width never depends on this element's open state, with
+     no gap between what a screen reader reports and what is shown (Creed's acceptance criterion).
+     A nested-details shape (this button's summary containing .shell-side as its disclosed content)
+     cannot guarantee that without either force-showing closed content via CSS - which leaves the
+     details reporting "collapsed" while the sidebar is visible, a lie to a screen reader - or
+     making the header's own presence conditional on the nav being open, which is not intended.
+
+     .shell-nav-close is added as .shell-side's first child - the "existing children unchanged"
+     of D-1e-3 is about the four ORIGINAL blocks (brand/org/nav/user) needing no restyle or
+     reorder, not a ban on adding the disclosure's own required affordance, the same way D-1e-6
+     adds a toggle that did not exist before.
+
+     It is NOT the discloser - a plain button, HIDDEN BY DEFAULT (the hidden attribute, not CSS
+     alone - see .shell-nav-close[hidden] in app.css, the same [hidden]-fighting shape .btn[hidden]
+     and fieldset.step[hidden] already guard elsewhere in this file) and revealed only by
+     shell-nav-panel.js, because without JS there is no way to close this panel from inside it (a
+     plain <button> cannot toggle a <details> it is not part of, without a script) - D-1e-5's "JS
+     enhances, and enhances only" applied to the one piece that genuinely cannot degrade: without
+     JS, closing is still possible (D-1e-5's native affordance - re-click the toggle, a real,
+     unenhanced <summary>), it is just not THIS control. */-->
+<aside class="shell-side" id="shell-side">
+    <button type="button" class="shell-nav-close" hidden>
+        <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-x'"></use></svg>
+        <span>Close menu</span>
+    </button>
+
     <div class="shell-brand">
         <span class="shell-brand-mark" aria-hidden="true"></span>
         <span class="shell-brand-name">Return Home</span>
@@ -211,6 +245,25 @@
          ticket - a styled control that does nothing is worse than the empty space its absence
          leaves, since it invites a click that goes nowhere. Comes back when it's wired. */-->
     <div class="shell-header-actions">
+        <!--/* D-1e-6 (spec §8n): the toggle for the narrow-viewport shell panel. A real, functional
+             control on the first commit that introduces it (Creed's ruling) - never a placeholder
+             shipped ahead of its behaviour, the exact failure §5f exists to name. D-1e-6 gives on
+             literal DOM parentage (15066ba): what is load-bearing is that this reads as part of the
+             header's control row and sits in focus order matching its visual position, not that it
+             is this div's own child - it is <details>'s <summary>, native, works with JS off
+             (D-1e-5), and .shell-side (app.css) is shown or hidden purely by CSS reading this
+             element's own [open] state via :has() - .shell-side is never nested inside it, so its
+             presence at desktop width never depends on open/closed at all (Creed's acceptance
+             criterion: the sidebar must never become a disclosure). aria-controls names the panel
+             directly since the two are not DOM-adjacent; aria-expanded is native to <summary> and
+             is not duplicated here - two sources for the same state is exactly the drift this
+             floor keeps finding elsewhere. */-->
+        <details class="shell-nav-disclosure">
+            <summary class="shell-toggle shell-nav-toggle" aria-controls="shell-side">
+                <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-list'"></use></svg>
+                <span>Menu</span>
+            </summary>
+        </details>
         <!--/* T138 1c: revealing is a real POST + full-page redirect, not a client-side class toggle -
              a client-side toggle cannot be audited (Kevin's review: no server event, so nothing
              would record that someone unmasked a list of children). Masked is the state on every
@@ -288,9 +341,22 @@
                       th:text="' appearance - switch to ' + ${#strings.toLowerCase(appearanceToggle.next())}"></span>
             </button>
         </form>
-        <svg class="icon shell-bell" aria-hidden="true"><use th:href="${ico} + '#ph-bell'"></use></svg>
+        <!--/* D-1e-6 (spec §8n): removed, same disposition as .shell-search and .shell-org's caret
+             under §5f - a dead control is worse than the space its absence leaves, and below 900px
+             the header is no longer secondary chrome, it is the entire shell, so a non-functional
+             control here sits in the only row of chrome the user has, right beside the one that
+             now actually does something. Comes back when notifications are wired. */-->
     </div>
 </header>
+<!--/* D-1e-5 (spec §8n): the panel already opens, closes and every link inside it already works
+     with zero script - this is enhancement only (focus management, Escape, the trap, inert), the
+     same relationship report-stepper.js has to its own no-JS fallback. Placed inside the shared
+     fragment, not per-page, because the shell is global - a script a page template has to
+     remember to include is a script one of them eventually will not. Everything it queries
+     (.shell-nav-disclosure, #shell-side, .shell-nav-close) is already in the DOM above this point
+     in the same fragment, so no defer/DOMContentLoaded wrapper is needed, matching how
+     report-stepper.js relies on running after its own form. */-->
+<script th:src="@{/js/shell-nav-panel.js}"></script>
 </th:block>
 </body>
 </html>
