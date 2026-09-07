@@ -42,6 +42,14 @@ import org.springframework.web.bind.annotation.RequestMapping;
 @RequestMapping("/children")
 public class ChildController {
 
+    // Pinned rather than left to Thymeleaf's #temporals (which resolves through Spring's
+    // LocaleResolver - the request's Accept-Language, not a fixed locale - see ChildListRow's own
+    // javadoc for why that was already ruled out on this exact page for identical reasons: DOB and
+    // case reference render through Java-side Locale.UK formatters for exactly this consistency,
+    // and an unpinned archivedAt display would be the one date on this page that drifts with the
+    // viewer's browser locale while its neighbours do not.
+    private static final DateTimeFormatter TIMESTAMP_FMT = DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm", Locale.UK);
+
     private final ChildRepository childRepository;
     private final HomeRepository homeRepository;
     private final InterviewRequestRepository interviewRequestRepository;
@@ -350,13 +358,23 @@ public class ChildController {
     private Child mineToManage(Long id, AppUserPrincipal principal) {
         Child child = childRepository.findDetailedById(id)
                 .orElseThrow(() -> new IllegalArgumentException("No such young person: " + id));
-        boolean mine = principal.hasRole(Role.ADMIN)
-                || (roleMatrix.isCareProviderOrgAdmin(principal)
-                        && organisationAccessService.canViewHome(principal, child.getHome()));
-        if (!mine) {
+        if (!canManage(child, principal)) {
             throw new AccessDeniedException("Not authorized to manage this child");
         }
         return child;
+    }
+
+    /**
+     * T328 §5: the WHO predicate above, as a boolean rather than a throw - shared, not re-derived,
+     * so {@code children/detail.html} can gate the Restore button on the SAME rule the route itself
+     * enforces. Sharing a predicate is right here for exactly the reason {@link #mineToManage}'s own
+     * javadoc gives: the two calls must AGREE (a visible-but-refused button is T273's
+     * reachable-but-refused defect), not carry independently drifting privileges.
+     */
+    private boolean canManage(Child child, AppUserPrincipal principal) {
+        return principal.hasRole(Role.ADMIN)
+                || (roleMatrix.isCareProviderOrgAdmin(principal)
+                        && organisationAccessService.canViewHome(principal, child.getHome()));
     }
 
     @GetMapping("/{id}")
@@ -399,6 +417,15 @@ public class ChildController {
         model.addAttribute("caseHistory", auditHistoryService.caseHistoryFor(requests, DraftSaveRuns.COLLAPSED,
                 AuditFeedScope.CASE_ACTIVITY_ONLY));
         model.addAttribute("canExport", ExportCapability.canExport(principal));
+        // T328 §5: pinned locale, not #temporals.format in the template - see TIMESTAMP_FMT's own
+        // comment. Null when never archived, so the template's th:if carries the whole decision.
+        model.addAttribute("archivedAtDisplay", child.isArchived() ? child.getArchivedAt().format(TIMESTAMP_FMT) : null);
+        // T328 §5: whether Restore would succeed if posted, not whether the record IS archived -
+        // the template decides visibility from this and child.archived independently, so a
+        // never-archived record renders no restore chrome regardless, and an archived one a
+        // HOME_STAFF member cannot restore shows the archive date with no button the route would
+        // refuse (the reachable-but-refused defect T273 ruled against).
+        model.addAttribute("canManage", canManage(child, principal));
         model.addAttribute("approvedReportCount", approvedReportCount);
         // Opening a child's case history is professional access to a safeguarding record, and is
         // recorded as such. A cover sheet that invites a reader to verify an export against the
