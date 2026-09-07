@@ -31,6 +31,9 @@ import ninja.samryecroft.returnhome.tracker.report.ReportStatus;
 import ninja.samryecroft.returnhome.tracker.user.AppUserPrincipal;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -38,28 +41,39 @@ import org.springframework.test.util.ReflectionTestUtils;
  * The rules that make this feature safe to ship, expressed as tests: fail closed, never omit
  * silently, and never confirm the existence of a child the account cannot see.
  */
+@ExtendWith(MockitoExtension.class)
 class CaseFileExportServiceTest {
 
     private static final byte[] DOCUMENT = "PK an issued report".getBytes(StandardCharsets.UTF_8);
 
-    private final ChildRepository childRepository = mock(ChildRepository.class);
-    private final InterviewRequestRepository requestRepository = mock(InterviewRequestRepository.class);
-    private final InterviewReportRepository reportRepository = mock(InterviewReportRepository.class);
-    private final OrganisationAccessService accessService = mock(OrganisationAccessService.class);
-    private final AuditHistoryService historyService = mock(AuditHistoryService.class);
-    private final ReportDocumentService documentService = mock(ReportDocumentService.class);
-    private final ExportPackWriter packWriter = mock(ExportPackWriter.class);
+    @Mock
+    private ChildRepository childRepository;
+    @Mock
+    private InterviewRequestRepository requestRepository;
+    @Mock
+    private InterviewReportRepository reportRepository;
+    @Mock
+    private OrganisationAccessService accessService;
+    @Mock
+    private AuditHistoryService historyService;
+    @Mock
+    private ReportDocumentService documentService;
+    @Mock
+    private ExportPackWriter packWriter;
 
-    private final CaseFileExportService service = new CaseFileExportService(childRepository, requestRepository,
-            reportRepository, accessService, historyService, documentService, packWriter);
+    private CaseFileExportService service;
 
-    private final AppUserPrincipal principal = mock(AppUserPrincipal.class);
+    @Mock
+    private AppUserPrincipal principal;
 
     private InterviewRequest requestOne;
     private InterviewRequest requestTwo;
 
     @BeforeEach
     void setUp() {
+        service = new CaseFileExportService(childRepository, requestRepository,
+                reportRepository, accessService, historyService, documentService, packWriter);
+
         Child child = new Child();
         ReflectionTestUtils.setField(child, "id", 5L);
         ReflectionTestUtils.setField(child, "localCaseReference", "CASE-001");
@@ -69,12 +83,44 @@ class CaseFileExportServiceTest {
         requestTwo = interviewRequest(1191L);
         when(requestRepository.findByChildIdOrderByCreatedAtDesc(5L))
                 .thenReturn(List.of(requestOne, requestTwo));
+        when(accessService.homeScopeFor(any())).thenReturn(home -> true);
+    }
+
+    /**
+     * What the EXPORT path needs and the manifest path does not (T297).
+     *
+     * <p><strong>These stubs used to live in {@code setUp}, where they were unused by four of the
+     * seven tests.</strong> Dwight found that when the T263 bound armed strict stubbing, and
+     * reported it rather than silencing it - which is the point, because five {@code lenient()}
+     * calls would have made the structure invisible again. <em>The stubs were always unused; the
+     * guard did not create them, it made them visible.</em>
+     *
+     * <p>So the fixture is narrowed to what every test needs and each test asks for the rest by
+     * name. The method name is the documentation: a reader can now see which tests exercise the
+     * export path without reading the service.
+     */
+    private void bothInterviewsResolve() {
         when(requestRepository.findDetailedById(1182L)).thenReturn(Optional.of(requestOne));
         when(requestRepository.findDetailedById(1191L)).thenReturn(Optional.of(requestTwo));
-        when(accessService.homeScopeFor(any())).thenReturn(home -> true);
+    }
+
+    /**
+     * What is needed only once a pack is actually BUILT - and the split is a finding rather than
+     * tidiness.
+     *
+     * <p>Strict stubbing showed that {@code aReportThatCannotBeRetrievedBlocksTheWholeExport} never
+     * touches either of these: it fails closed before any pack is assembled, so it never asks for
+     * the history or the operator's name. <strong>That is exactly the property that test asserts</strong>,
+     * and having to leave these out of it is the fixture agreeing with the assertion instead of
+     * quietly contradicting it.
+     */
+    private void theWriterHasWhatItNeeds() {
         when(historyService.caseHistoryFor(any(), any(), any())).thenReturn(List.of());
         when(principal.getUsername()).thenReturn("orgadmin");
+    }
 
+    /** Both interviews have an approved report with a stored document. */
+    private void bothInterviewsHaveApprovedReports() {
         approvedReportFor(requestOne, 900L);
         approvedReportFor(requestTwo, 901L);
     }
@@ -116,6 +162,9 @@ class CaseFileExportServiceTest {
      */
     @Test
     void theExportPackAsksForEverySaveOnItsOwnRow() throws Exception {
+        bothInterviewsResolve();
+        theWriterHasWhatItNeeds();
+        bothInterviewsHaveApprovedReports();
         when(documentService.retrieve(any(), any(), any())).thenReturn(DOCUMENT);
 
         service.export(5L, ExportPeriod.all(), ExportPurpose.REGULATORY_INSPECTION,
@@ -127,6 +176,8 @@ class CaseFileExportServiceTest {
 
     @Test
     void aReportThatCannotBeRetrievedBlocksTheWholeExport() {
+        bothInterviewsResolve();
+        bothInterviewsHaveApprovedReports();
         when(documentService.retrieve(any(), any(), any()))
                 .thenReturn(DOCUMENT)
                 .thenThrow(new KeyUnavailableException("Key Vault is unreachable"));
@@ -145,6 +196,9 @@ class CaseFileExportServiceTest {
 
     @Test
     void anAcknowledgedFailureIsCarriedIntoThePackAsAStatedExclusion() {
+        bothInterviewsResolve();
+        theWriterHasWhatItNeeds();
+        bothInterviewsHaveApprovedReports();
         when(documentService.retrieve(any(), any(), any()))
                 .thenReturn(DOCUMENT)
                 .thenThrow(new KeyUnavailableException("Key Vault is unreachable"));
@@ -169,6 +223,7 @@ class CaseFileExportServiceTest {
 
     @Test
     void anInterviewWithNoApprovedReportIsExcludedWithItsReason() {
+        approvedReportFor(requestOne, 900L);
         InterviewReport draft = new InterviewReport();
         ReflectionTestUtils.setField(draft, "id", 901L);
         draft.setStatus(ReportStatus.DRAFT);
@@ -207,6 +262,9 @@ class CaseFileExportServiceTest {
 
     @Test
     void theExportedDocumentsAreTheStoredOnesNotRegenerated() {
+        bothInterviewsResolve();
+        theWriterHasWhatItNeeds();
+        bothInterviewsHaveApprovedReports();
         when(documentService.retrieve(any(), any(), any())).thenReturn(DOCUMENT);
 
         service.export(5L, ExportPeriod.all(), ExportPurpose.LEGAL_PROCEEDINGS, null, Set.of(), "", principal);
