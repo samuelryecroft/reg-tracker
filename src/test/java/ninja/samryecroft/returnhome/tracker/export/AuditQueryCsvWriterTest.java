@@ -92,7 +92,7 @@ class AuditQueryCsvWriterTest {
                 entry("Report approved", "Reviewer", "Submitted to Approved"),
                 "Elm Lodge", "CASE-001", 1182L))), StandardCharsets.UTF_8);
 
-        assertThat(output).contains("Home,Child,Interview,When,What happened,Role,Detail");
+        assertThat(output).contains("Home,Young person,Interview,When,What happened,Role,Detail");
         assertThat(output).contains("\"Elm Lodge\",\"CASE-001\",\"#1182\"");
         assertThat(output).contains("\"Report approved\"");
     }

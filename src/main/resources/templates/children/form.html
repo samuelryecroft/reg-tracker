@@ -2,13 +2,13 @@
 <html xmlns:th="http://www.thymeleaf.org" lang="en" th:attr="data-appearance=${#strings.toLowerCase(appearancePreference)}">
 <head>
     <meta charset="UTF-8"/>
-    <title>Add Young person — Return Home Tracker</title>
+    <title>Add a young person — Return Home Tracker</title>
     <th:block th:replace="~{fragments/layout :: styles}"></th:block>
 </head>
 <body>
 <div th:replace="~{fragments/layout :: nav}"></div>
 <main id="main">
-    <h1>Add Young person</h1>
+    <h1>Add a young person</h1>
 
     <div class="card">
         <form method="post" th:action="@{/children}" th:object="${form}">

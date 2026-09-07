@@ -88,7 +88,7 @@ public class CaseFileExportService {
         // is one added child.getHome() away from a LazyInitializationException outside the session.
         // The eager fetch is one join on a single-row lookup - cheaper than the trap.
         Child child = childRepository.findDetailedById(childId)
-                .orElseThrow(() -> new IllegalArgumentException("No such child"));
+                .orElseThrow(() -> new IllegalArgumentException("No such young person"));
 
         List<InterviewRequest> allForChild =
                 interviewRequestRepository.findByChildIdOrderByCreatedAtDesc(childId);
@@ -236,7 +236,11 @@ public class CaseFileExportService {
     private String referenceFor(Child child) {
         return child.getLocalCaseReference() != null && !child.getLocalCaseReference().isBlank()
                 ? child.getLocalCaseReference()
-                : "Child #" + child.getId();
+                // T320/T250 layer 2. This is the fallback label for a young person with no
+                // local case reference, and it is printed INSIDE the exported pack - read by
+                // people who never saw a screen, which makes it more user-facing than the app,
+                // not less. It names an individual, which is the whole of the layer-2 test.
+                : "Young person #" + child.getId();
     }
 
     private String labelFor(InterviewRequest request) {

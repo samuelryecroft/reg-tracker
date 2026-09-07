@@ -349,7 +349,7 @@ public class ChildController {
      */
     private Child mineToManage(Long id, AppUserPrincipal principal) {
         Child child = childRepository.findDetailedById(id)
-                .orElseThrow(() -> new IllegalArgumentException("No such child: " + id));
+                .orElseThrow(() -> new IllegalArgumentException("No such young person: " + id));
         boolean mine = principal.hasRole(Role.ADMIN)
                 || (roleMatrix.isCareProviderOrgAdmin(principal)
                         && organisationAccessService.canViewHome(principal, child.getHome()));
@@ -362,7 +362,7 @@ public class ChildController {
     @GetMapping("/{id}")
     public String detail(@PathVariable Long id, @AuthenticationPrincipal AppUserPrincipal principal, Model model) {
         Child child = childRepository.findDetailedById(id)
-                .orElseThrow(() -> new IllegalArgumentException("No such child: " + id));
+                .orElseThrow(() -> new IllegalArgumentException("No such young person: " + id));
         if (!principal.hasRole(Role.ADMIN) && !organisationAccessService.canViewHome(principal, child.getHome())) {
             throw new AccessDeniedException("Not authorized to view this child");
         }

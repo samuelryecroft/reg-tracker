@@ -111,7 +111,7 @@ class InterviewBeforeReturnIntegrationTest extends AbstractIntegrationTest {
     void submittingAnInterviewHeldBeforeTheReturnIsRefusedAndBothTimesAreNamed() throws Exception {
         String html = submit("2026-07-18T17:30").andExpect(status().isOk())
                 .andExpect(content().string(org.hamcrest.Matchers.containsString(
-                        "cannot have been held before the child returned")))
+                        "cannot have been held before the young person returned")))
                 .andReturn().getResponse().getContentAsString();
 
         assertThat(html).contains("18 Jul 2026 17:30").contains("18 Jul 2026 19:00");
