@@ -72,7 +72,7 @@ class RoleMergeOnEditTest {
     @Test
     void aRoleTheActorCannotAssignSurvivesAnEditThatNeverMentionedIt() {
         User target = existingUser(Set.of(Role.ORG_ADMIN, Role.COORDINATOR));
-        when(userRepository.findById(TARGET_ID)).thenReturn(Optional.of(target));
+        when(userRepository.findDetailedById(TARGET_ID)).thenReturn(Optional.of(target));
         when(userRepository.save(any(User.class))).thenAnswer(call -> call.getArgument(0));
         stubOrganisationLookup();
 
@@ -88,7 +88,7 @@ class RoleMergeOnEditTest {
     @Test
     void theActorsOwnChangesStillTakeEffectAlongsideTheRetainedRole() {
         User target = existingUser(Set.of(Role.ORG_ADMIN, Role.COORDINATOR));
-        when(userRepository.findById(TARGET_ID)).thenReturn(Optional.of(target));
+        when(userRepository.findDetailedById(TARGET_ID)).thenReturn(Optional.of(target));
         when(userRepository.save(any(User.class))).thenAnswer(call -> call.getArgument(0));
         stubOrganisationLookup();
 
@@ -108,7 +108,7 @@ class RoleMergeOnEditTest {
     @Test
     void aSubmissionThatIsLegalAloneCannotBuildAnIllegalAccountViaARetainedRole() {
         User target = existingUser(Set.of(Role.HOME_STAFF));
-        when(userRepository.findById(TARGET_ID)).thenReturn(Optional.of(target));
+        when(userRepository.findDetailedById(TARGET_ID)).thenReturn(Optional.of(target));
 
         assertThatThrownBy(() ->
                 service().update(TARGET_ID, formSubmitting(Set.of(Role.COORDINATOR)), supplierOrgAdmin(99L)))
@@ -133,7 +133,7 @@ class RoleMergeOnEditTest {
     @Test
     void anActorCannotRemoveTheirOwnAdministrativeRole() {
         User target = existingUser(Set.of(Role.ADMIN));
-        when(userRepository.findById(TARGET_ID)).thenReturn(Optional.of(target));
+        when(userRepository.findDetailedById(TARGET_ID)).thenReturn(Optional.of(target));
 
         assertThatThrownBy(() ->
                 service().update(TARGET_ID, formSubmitting(Set.of(Role.COORDINATOR)), platformAdmin(TARGET_ID)))
@@ -145,7 +145,7 @@ class RoleMergeOnEditTest {
     @Test
     void anAdminMayStillChangeSomebodyElsesRoles() {
         User target = existingUser(Set.of(Role.ADMIN));
-        when(userRepository.findById(TARGET_ID)).thenReturn(Optional.of(target));
+        when(userRepository.findDetailedById(TARGET_ID)).thenReturn(Optional.of(target));
         when(userRepository.save(any(User.class))).thenAnswer(call -> call.getArgument(0));
         stubOrganisationLookup();
 

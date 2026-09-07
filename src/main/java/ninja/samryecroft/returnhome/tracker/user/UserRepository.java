@@ -1,5 +1,6 @@
 package ninja.samryecroft.returnhome.tracker.user;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -11,6 +12,23 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     @EntityGraph(attributePaths = {"homes", "organisation", "roles"})
     Optional<User> findByUsername(String username);
+
+    /**
+     * One user with the collections its authorisation check reads.
+     *
+     * <p><strong>{@code getAuthorized} used a bare {@code findById} and then asked the result for its
+     * homes.</strong> {@code homes} is LAZY and {@code spring.jpa.open-in-view=false}, so outside a
+     * transaction that is a {@code LazyInitializationException} - a 500, on the user edit page, for a
+     * care-provider org admin. It went unseen because the check SHORT-CIRCUITS for a platform admin
+     * before reaching the collection, and every existing test of that page signs in as one.
+     *
+     * <p>Fetched rather than made transactional on purpose: the authorisation decision needs the
+     * data, so the data is what it asks for. Wrapping the method in a transaction would fix the
+     * symptom by holding a session open around a read that has no other reason to want one.
+     */
+    @EntityGraph(attributePaths = {"homes", "organisation", "roles"})
+    @Query("select u from User u where u.id = :id")
+    Optional<User> findDetailedById(@Param("id") Long id);
 
     @EntityGraph(attributePaths = {"homes", "organisation", "roles"})
 
@@ -49,9 +67,22 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Query("select u from User u where u.organisation.id = :organisationId order by u.lastName, u.firstName")
     List<User> findByOrganisationId(@Param("organisationId") Long organisationId);
 
+    /**
+     * Users in this organisation's homes holding ANY of {@code roles} (T281).
+     *
+     * <p>Replaces a HOME_STAFF-only query. The role set is a PARAMETER because the caller passes the
+     * roles it may assign: <strong>a care-provider org admin could create a VIEWER and then never
+     * see it again</strong>, because the grant rule said HOME_STAFF and VIEWER while this query said
+     * HOME_STAFF. Two rules about the same people, agreeing by coincidence until one of them moved.
+     *
+     * <p>The join is through HOMES rather than {@code u.organisation}, unchanged and deliberate: it
+     * is home membership that places a user inside a care provider's tenancy.
+     */
     @EntityGraph(attributePaths = {"homes", "organisation", "roles"})
-    @Query("select distinct u from User u join u.homes h where ninja.samryecroft.returnhome.tracker.user.Role.HOME_STAFF member of u.roles and h.organisation.id = :organisationId order by u.lastName, u.firstName")
-    List<User> findHomeStaffByHomeOrganisationId(@Param("organisationId") Long organisationId);
+    @Query("select distinct u from User u join u.homes h join u.roles r "
+            + "where r in :roles and h.organisation.id = :organisationId order by u.lastName, u.firstName")
+    List<User> findByAnyRoleAndHomeOrganisationId(@Param("roles") Collection<Role> roles,
+            @Param("organisationId") Long organisationId);
 
     /** The homes a user is attached to, whichever role attaches them. Not viewer-specific since V16. */
     @Query("select h.id from User u join u.homes h where u.id = :userId")
