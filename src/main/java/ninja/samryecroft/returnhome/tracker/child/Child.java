@@ -82,6 +82,26 @@ public class Child implements EncryptedEntity {
     @Encrypted(ciphertextField = "localCaseReferenceCiphertext")
     private String localCaseReference;
 
+    /**
+     * Whether this young person is off the active lists (T170).
+     *
+     * <p><strong>Never a physical delete.</strong> The human asked to "remove" a child; a button
+     * saying Delete while the record survives teaches him something false about his own data, so the
+     * word on the screen is ARCHIVE and this is what it sets.
+     *
+     * <p><strong>Archiving must never hide, alter or make unreachable any of this child's interview
+     * records.</strong> An approved report is a statutory document, and if archiving could take
+     * safeguarding history out of view then archiving becomes the way to make it disappear. This
+     * flag is read by the LISTS; it is deliberately not read by anything that resolves a record for
+     * viewing or export.
+     *
+     * <p>The setter is package-private on purpose, the same way {@code Organisation.setStatus} is:
+     * every transition goes through {@code ChildLifecycleService}, so the blocking rule cannot be
+     * reached past by a caller that simply sets the field.
+     */
+    @Column(name = "archived", nullable = false)
+    private boolean archived = false;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 
@@ -171,6 +191,14 @@ public class Child implements EncryptedEntity {
 
     public void setLocalCaseReference(String localCaseReference) {
         this.localCaseReference = localCaseReference;
+    }
+
+    public boolean isArchived() {
+        return archived;
+    }
+
+    void setArchived(boolean archived) {
+        this.archived = archived;
     }
 
     public LocalDateTime getCreatedAt() {

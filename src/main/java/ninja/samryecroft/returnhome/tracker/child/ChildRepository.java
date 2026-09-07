@@ -39,14 +39,21 @@ public interface ChildRepository extends JpaRepository<Child, Long> {
 
     /** Children in any of the caller's homes - the one query both HOME_STAFF and VIEWER use (V16). */
     @EntityGraph(attributePaths = "home")
+    /**
+     * ACTIVE surfaces only (T170): archived young people are off the lists and still retrievable by
+     * id. The filter belongs on the LIST queries and nowhere else - {@code findDetailedById} stays
+     * unfiltered on purpose, because a record that cannot be opened is not "archived", it is gone.
+     */
+    List<Child> findByHomeIdInAndArchivedFalse(Collection<Long> homeIds);
+
     List<Child> findByHomeIdIn(Collection<Long> homeIds);
 
     @EntityGraph(attributePaths = "home")
-    @Query("select c from Child c")
+    @Query("select c from Child c where c.archived = false")
     List<Child> findAllWithHome();
 
     @EntityGraph(attributePaths = "home")
-    @Query("select c from Child c where c.home.organisation.id = :organisationId")
+    @Query("select c from Child c where c.home.organisation.id = :organisationId and c.archived = false")
     List<Child> findByHomeOrganisationIdWithHome(@Param("organisationId") Long organisationId);
 
     @EntityGraph(attributePaths = {"home", "home.organisation"})

@@ -7,6 +7,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import ninja.samryecroft.returnhome.tracker.export.ExportPurpose;
+import ninja.samryecroft.returnhome.tracker.child.Child;
 import ninja.samryecroft.returnhome.tracker.home.Home;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewRequest;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewStatus;
@@ -190,6 +191,33 @@ public class AuditEventPublisher {
      * differently between "archived" and "removed" today, so the difference between what a human
      * meant lives here instead of forking the domain model on a distinction it cannot act on.
      */
+    /**
+     * A young person went off, or back onto, the active lists (T170).
+     *
+     * <p>No values are recorded beyond the identifier and the direction - the trail says WHAT
+     * happened to WHICH record, BY WHOM and WHEN, which is what a reviewer can act on. The child's
+     * own details are encrypted at rest and must not be copied into an append-only table that is
+     * deliberately readable for review.
+     */
+    public void childArchived(Child child, AppUserPrincipal principal) {
+        publish(actor(AuditEventRecord.of(AuditEventType.CHILD_ARCHIVED), principal)
+                .target("Child", child.getId())
+                .scope(organisationIdOfChild(child), child.getHome() == null ? null : child.getHome().getId())
+                .build());
+    }
+
+    public void childRestored(Child child, AppUserPrincipal principal) {
+        publish(actor(AuditEventRecord.of(AuditEventType.CHILD_RESTORED), principal)
+                .target("Child", child.getId())
+                .scope(organisationIdOfChild(child), child.getHome() == null ? null : child.getHome().getId())
+                .build());
+    }
+
+    private Long organisationIdOfChild(Child child) {
+        return child.getHome() == null || child.getHome().getOrganisation() == null
+                ? null : child.getHome().getOrganisation().getId();
+    }
+
     public void organisationArchived(Organisation organisation, String intent,
             AppUserPrincipal principal) {
         publish(actor(AuditEventRecord.of(AuditEventType.ORGANISATION_ARCHIVED), principal)

@@ -88,6 +88,11 @@ public enum AuditEventType {
     // both. The state answers "what may happen now"; the event answers "what did a human mean". A
     // second state would have been two values behaving identically, and every future query would
     // have had to remember to check them together.
+    /** A young person taken off the active lists (T170). Never a deletion - see Child.archived. */
+    CHILD_ARCHIVED,
+    /** A young person put back on them. Restore is a first-class action, not an undo (T170). */
+    CHILD_RESTORED,
+
     ORGANISATION_ARCHIVED,
     ORGANISATION_RESTORED,
 

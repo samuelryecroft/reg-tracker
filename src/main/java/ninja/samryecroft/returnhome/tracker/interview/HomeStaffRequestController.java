@@ -51,7 +51,7 @@ public class HomeStaffRequestController {
         // Scoped to every home this user covers (there is no per-home switcher yet - a separate,
         // still-unspecced gap), matching what this screen already aggregates without one.
         model.addAttribute("hasAnyChildren",
-                !childRepository.findByHomeIdIn(organisationAccessService.homeIdsFor(principal)).isEmpty());
+                !childRepository.findByHomeIdInAndArchivedFalse(organisationAccessService.homeIdsFor(principal)).isEmpty());
         return "home-staff/request-list";
     }
 
@@ -83,7 +83,11 @@ public class HomeStaffRequestController {
      */
     private void populateChildOptions(AppUserPrincipal principal, Model model) {
         model.addAttribute("children",
-                sortedByName(childRepository.findByHomeIdIn(organisationAccessService.homeIdsFor(principal))));
+                // T170: an archived young person must not be selectable for a NEW interview. Their
+                // EXISTING interviews are untouched and stay fully reachable - that is the rule this
+                // feature is bounded by; what archiving removes is future work, not past record.
+                sortedByName(childRepository.findByHomeIdInAndArchivedFalse(
+                        organisationAccessService.homeIdsFor(principal))));
     }
 
     /** The name order the database used to provide, now that the names are ciphertext there. */

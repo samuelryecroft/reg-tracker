@@ -1,0 +1,32 @@
+-- T170: a young person's record can be taken out of the active lists without being destroyed.
+--
+-- ONE LIFECYCLE CONCEPT, NOT FOUR (Oscar). "Archived" must mean the same thing for a user, a home,
+-- an organisation and a child: OUT OF ACTIVE SURFACES, STILL RETRIEVABLE, AUDITED, RESTORABLE. This
+-- column is the child's half of that one word.
+--
+-- A BOOLEAN RATHER THAN A STATUS ENUM, and the difference from organisations is a real one rather
+-- than an inconsistency. OrgStatus has three states because an organisation has an ACTIVATION
+-- CEREMONY - PENDING exists so that no encrypted record can be created before its KEK is confirmed.
+-- A child has no such gate: they are on the roll or they are archived. Giving this column a PENDING
+-- it can never hold would be modelling the organisation's problem on the child's table.
+--
+-- DEFAULT FALSE NOT NULL, AND THE DEFAULT IS LOAD-BEARING FOR THE SAME REASON V19'S WAS. The
+-- DB-plane job runs Flyway to completion BEFORE the new jar goes live, so for a few minutes the OLD
+-- jar talks to this NEW schema. That jar knows nothing about `archived` and omits it from a child
+-- INSERT; against NOT NULL with no default that is a constraint violation, and adding a young
+-- person 500s mid-onboarding.
+--
+-- WHERE THIS DIFFERS FROM V19, AND IT IS WHY THERE IS ONLY ONE STATEMENT HERE: V19 needed a SECOND
+-- statement because the value that was right for the BACKFILL (ACTIVE, so the existing estate stayed
+-- usable) was the wrong value for the DEPLOY WINDOW (PENDING, so a row written by an unaware jar
+-- goes through the KEK gate). For a child those two values are the SAME. Every existing child is on
+-- the roll, and a child created during the window is also on the roll. FALSE is correct for both, so
+-- there is nothing to set differently afterwards.
+--
+-- No DROP DEFAULT follow-up is planned for the same reason V19 wanted one and this does not: there,
+-- the default's absence bought LOUDNESS because the safe window value differed from the entity's
+-- own initialiser. Here the column default, the entity initialiser and the correct value all agree,
+-- so a bypassing insert landing FALSE is not a silent wrong answer - it is the right one.
+
+ALTER TABLE children
+    ADD COLUMN archived BOOLEAN DEFAULT FALSE NOT NULL;

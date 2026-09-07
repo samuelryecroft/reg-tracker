@@ -32,6 +32,7 @@ import org.springframework.validation.BindingResult;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -47,12 +48,14 @@ public class ChildController {
     private final AuditHistoryService auditHistoryService;
     private final AuditEventPublisher auditEventPublisher;
     private final RoleMatrix roleMatrix;
+    private final ChildLifecycleService childLifecycleService;
     private final NameRevealService nameRevealService;
 
     public ChildController(ChildRepository childRepository, HomeRepository homeRepository,
             InterviewRequestRepository interviewRequestRepository, OrganisationAccessService organisationAccessService,
             AuditHistoryService auditHistoryService, AuditEventPublisher auditEventPublisher,
-            RoleMatrix roleMatrix, NameRevealService nameRevealService) {
+            RoleMatrix roleMatrix, NameRevealService nameRevealService,
+            ChildLifecycleService childLifecycleService) {
         this.childRepository = childRepository;
         this.homeRepository = homeRepository;
         this.interviewRequestRepository = interviewRequestRepository;
@@ -60,6 +63,7 @@ public class ChildController {
         this.auditHistoryService = auditHistoryService;
         this.auditEventPublisher = auditEventPublisher;
         this.roleMatrix = roleMatrix;
+        this.childLifecycleService = childLifecycleService;
         this.nameRevealService = nameRevealService;
     }
 
@@ -74,13 +78,13 @@ public class ChildController {
             children = childRepository.findByHomeOrganisationIdWithHome(principal.getOrganisationId());
             showHomeColumn = true;
         } else if (principal.hasRole(Role.VIEWER)) {
-            children = childRepository.findByHomeIdIn(organisationAccessService.homeIdsFor(principal));
+            children = childRepository.findByHomeIdInAndArchivedFalse(organisationAccessService.homeIdsFor(principal));
             showHomeColumn = true;
         } else {
             // Home staff may hold more than one home since V16, so this is the same query the
             // viewer above runs - and the home column now earns its place whenever it is ambiguous.
             List<Long> homeIds = organisationAccessService.homeIdsFor(principal);
-            children = childRepository.findByHomeIdIn(homeIds);
+            children = childRepository.findByHomeIdInAndArchivedFalse(homeIds);
             showHomeColumn = homeIds.size() > 1;
         }
         // Sorted here rather than by the database: the names are encrypted columns now, so an
@@ -250,6 +254,51 @@ public class ChildController {
 
             return new MissingEpisodesSummary(lead, hint);
         }
+    }
+
+    /**
+     * Archive a young person (T170). <strong>The word is ARCHIVE, not Delete</strong> - the human
+     * asked to "remove" one, and a button saying Delete while the record survives teaches him
+     * something false about his own data.
+     *
+     * <p><strong>WHO: a care provider's own organisation.</strong> A SUPPLIER MAY NOT archive a
+     * young person - they hold no homes and no population, they work on episodes. Archiving is a
+     * statement about an organisation's OWN PEOPLE, so the same scope rule as everything else here
+     * rather than a second one invented for removal.
+     */
+    @PostMapping("/{id}/archive")
+    public String archive(@PathVariable Long id, @AuthenticationPrincipal AppUserPrincipal principal,
+            RedirectAttributes redirectAttributes) {
+        Child child = mineToArchive(id, principal);
+        try {
+            childLifecycleService.archive(child, principal);
+        } catch (ChildNotArchivableException refused) {
+            // The refusal carries the count and the route, so it goes back to the page the person is
+            // looking at rather than to an error screen: the obstacle is a piece of work they can go
+            // and finish, and an error page would take them away from the list of it.
+            redirectAttributes.addFlashAttribute("archiveRefusal", refused.getMessage());
+            return "redirect:/children/" + id;
+        }
+        return "redirect:/children/" + id;
+    }
+
+    /** Restore, deliberately the same shape as archive - an asymmetric pair teaches people not to use the cheap half. */
+    @PostMapping("/{id}/restore")
+    public String restore(@PathVariable Long id, @AuthenticationPrincipal AppUserPrincipal principal) {
+        childLifecycleService.restore(mineToArchive(id, principal), principal);
+        return "redirect:/children/" + id;
+    }
+
+    private Child mineToArchive(Long id, AppUserPrincipal principal) {
+        Child child = childRepository.findDetailedById(id)
+                .orElseThrow(() -> new IllegalArgumentException("No such child: " + id));
+        boolean mine = principal.hasRole(Role.ADMIN)
+                || (roleMatrix.isCareProviderOrgAdmin(principal)
+                        && organisationAccessService.canViewHome(principal, child.getHome()));
+        if (!mine) {
+            throw new AccessDeniedException("Not authorized to archive this child");
+        }
+        return child;
     }
 
     @GetMapping("/{id}")
