@@ -43,11 +43,15 @@ public class EditUserForm {
      * UserService.changeEmail for who and why. A field nobody can ever change would be its own
      * defect, so it is narrowed rather than frozen.
      *
-     * AND THIS IS ONE OF THREE. Emailed codes are safe only while all of: no colleague may EDIT an
-     * address (here), there is no SELF-SERVICE RESET (T322 - otherwise one mailbox holds both
-     * factors), and an address is VERIFIED ON FIRST USE (T322 - otherwise whoever created the
-     * account chose where the first code goes). Removing any one reopens the hole. Read
-     * UserService.changeEmail before deciding this restriction is tradeable against convenience.
+     * AND THIS IS ONE OF THREE - OF WHICH ONLY TWO ARE BUILT. Emailed codes are safe only while
+     * all of: no colleague may EDIT an address (here, built); there is NO SELF-SERVICE RESET (built,
+     * as an absence - otherwise one mailbox holds both factors); and an address is VERIFIED ON FIRST
+     * USE - which is NOT BUILT, so whoever created the account still chose where the first code
+     * goes. Removing any of the two that exist makes it worse still.
+     *
+     * READ UserService.changeEmail BEFORE DECIDING THIS RESTRICTION IS TRADEABLE AGAINST
+     * CONVENIENCE - it carries the full argument, which leg is missing, and why the missing one
+     * would not have closed that hole even if it were built.
      */
 
     /**

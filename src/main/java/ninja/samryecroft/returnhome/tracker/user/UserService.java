@@ -253,11 +253,17 @@ public class UserService {
         // address of your choosing creates no person to impersonate. That is wrong, and Kevin
         // measured it: an administrator creating an account CHOOSES WHERE THE FIRST CODE GOES, and
         // can therefore sign in as that person BEFORE the real user ever does. Nothing on this card
-        // closes that; VERIFY-ON-FIRST-USE in T322 does.
+        // closes that, AND NOTHING ELSE DOES EITHER TODAY. This used to say verify-on-first-use in
+        // T322 closes it. It does not: that mechanism is NOT BUILT (User carries no verified state
+        // on main), and as specified it would not have closed this anyway - the confirmation is
+        // delivered TO the address being verified, so the administrator who typed it receives it.
+        // It proves DELIVERABILITY, NOT OWNERSHIP, and ownership is the whole question here.
         //
         // It is left open deliberately rather than overlooked - an account has to be given an
         // address once, by somebody, and refusing that here would only move the problem. Written
-        // down so the next reader knows which half is covered.
+        // down so the next reader knows which half is covered, and that the other half is still
+        // open rather than merely waiting on a card. See UserService.changeEmail for the full
+        // three-condition argument and which leg is missing.
         user.setEmail(trimToNull(form.getEmail()));
         user.setRoles(form.getRoles());
         user.setOrganisation(needsOrganisation(form.getRoles()) ? resolveOrganisation(form.getOrganisationId(), principal) : null);
@@ -368,15 +374,37 @@ public class UserService {
      *       receive the code, whoever reads that mailbox holds both factors and there is only one.
      *       It is handled by NOT BUILDING the reset, so it is an absence, and absences are what get
      *       added back as features.</li>
-     *   <li><b>Verified on first use</b> (T322). See {@code create}: an administrator setting the
-     *       address at creation chooses where the first code goes, and can sign in as that person
-     *       before the real user ever does. Narrowing the EDIT does nothing about that.</li>
+     *   <li><b>Verified on first use</b> - <b>NOT BUILT. THIS LEG IS MISSING TODAY.</b> An
+     *       administrator setting the address at creation chooses where the first code goes, and can
+     *       sign in as that person before the real user ever does (see {@code create}). Narrowing the
+     *       EDIT does nothing about that, and neither does anything else that exists: measured on
+     *       {@code main}, {@link User} carries no verified state of any kind, and
+     *       {@code SecondFactorService.verify} verifies a submitted LOGIN CODE, not an address.</li>
      * </ol>
+     *
+     * <h2>AND THE MISSING LEG WOULD NOT HAVE CLOSED IT AS SPECIFIED</h2>
+     *
+     * <p>Worth more than the fact that it is unbuilt, because it means waiting for it is not a plan.
+     * <b>The confirmation is delivered TO the address being verified, so whoever set that address
+     * receives it.</b> An administrator who typed an inbox they control confirms it as easily as the
+     * real user would. It proves the address is DELIVERABLE; it does not prove who OWNS it, and
+     * ownership is the entire question at creation time.
+     *
+     * <p>So the honest statement is: <b>the creation-time hole is open, and closing it needs a
+     * mechanism nobody has specified yet</b> - something that reaches the person by a channel the
+     * administrator does not control, or an enrolment the account holder completes before the
+     * account can be used. Naming the gap is worth more than a placeholder that sounds like a fix.
      *
      * <p><b>This list is here because a comment that names only its own half is how the field gets
      * restored.</b> A reader who sees "we removed edit so codes cannot be redirected" concludes the
      * problem is solved and treats the restriction as tradeable against convenience. A reader who
      * sees that it is one leg of three does not.
+     *
+     * <p><b>And it says which leg is missing for the same reason it names three at all.</b> The
+     * previous version of this comment listed all three as though all three held. A comment that
+     * names three protections is exactly what stops the next person counting them - so it was
+     * describing a closed hole while the hole was open, which is worse than saying nothing. Kevin
+     * found that, against his own card.
      */
     /**
      * The account whose address is about to be changed, refused to anyone who may not change it.
