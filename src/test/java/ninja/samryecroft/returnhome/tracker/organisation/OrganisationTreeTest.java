@@ -55,7 +55,7 @@ class OrganisationTreeTest {
         OrganisationTree tree = OrganisationTree.from(
                 List.of(beacon, harbourside),
                 List.of(home("Oakwood House", harbourside), home("Marisco Lodge", harbourside)),
-                Map.of(1L, 6), Set.of(1L));
+                Map.of(1L, 6), Set.of(1L), Map.of());
 
         assertThat(tree.suppliers()).hasSize(1);
         OrganisationTree.SupplierNode supplier = tree.suppliers().get(0);
@@ -78,7 +78,7 @@ class OrganisationTreeTest {
         Organisation orphan = org(9, "Unlinked Care Ltd", OrgType.CARE_PROVIDER, null);
 
         OrganisationTree tree = OrganisationTree.from(
-                List.of(beacon, orphan), List.of(), Map.of(), Set.of());
+                List.of(beacon, orphan), List.of(), Map.of(), Set.of(), Map.of());
 
         assertThat(tree.unassigned())
                 .as("a care provider with no supplier must still appear somewhere - it is the row "
@@ -100,7 +100,7 @@ class OrganisationTreeTest {
         Organisation first = org(2, "Zenith Services", OrgType.SUPPLIER, null);
 
         OrganisationTree tree = OrganisationTree.from(
-                List.of(second, first), List.of(), Map.of(2L, 1), Set.of());
+                List.of(second, first), List.of(), Map.of(2L, 1), Set.of(), Map.of());
 
         // Creation order, NOT alphabetical - the canvas asks for the order the data had to be
         // created in, and findAllWithSupplier() returns them ordered by type then name.
@@ -117,7 +117,7 @@ class OrganisationTreeTest {
         Organisation provider = org(2, "New Provider", OrgType.CARE_PROVIDER, beacon);
 
         OrganisationTree tree = OrganisationTree.from(
-                List.of(beacon, provider), List.of(), Map.of(), Set.of());
+                List.of(beacon, provider), List.of(), Map.of(), Set.of(), Map.of());
 
         assertThat(tree.suppliers().get(0).careProviders().get(0).homeNames()).isEqualTo("No homes yet");
     }

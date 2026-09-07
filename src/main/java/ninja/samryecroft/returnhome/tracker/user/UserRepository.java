@@ -120,6 +120,33 @@ public interface UserRepository extends JpaRepository<User, Long> {
     List<User> findByAnyRoleAndHomeOrganisationId(@Param("roles") Collection<Role> roles,
             @Param("organisationId") Long organisationId);
 
+    /**
+     * Which roles are held by ENABLED users, per organisation, reached through {@code u.organisation}
+     * (T267). Returns {@code [organisationId, Role]} pairs.
+     *
+     * <p><b>This is one half of a gathering and is never useful alone</b> - see
+     * {@link #enabledRolesByHomeOrganisation()} for the other, and
+     * {@code OrganisationReadinessService} for why both are needed. T273's finding, stated as a
+     * query rather than as a comment: <b>membership reaches people two ways, and either column
+     * alone is short by somebody.</b> HOME_STAFF carry no organisation at all and belong through
+     * their homes, so this half sees none of them - which on a care provider, whose whole readiness
+     * rule is "has home staff", would report every organisation on the platform as empty.
+     *
+     * <p>{@code distinct} matters for size rather than correctness: the result is then bounded by
+     * organisations times roles instead of by users, which is what makes it affordable to ask for
+     * the whole platform at once and answer one organisation's question out of the same answer.
+     * Two gatherings for one fact is the T281 defect, where two rules about the same people agreed
+     * by coincidence until one of them moved.
+     */
+    @Query("select distinct u.organisation.id, r from User u join u.roles r "
+            + "where u.enabled = true and u.organisation is not null")
+    List<Object[]> enabledRolesByOrganisation();
+
+    /** The other half: roles held by ENABLED users reached through their HOMES (T267). */
+    @Query("select distinct h.organisation.id, r from User u join u.homes h join u.roles r "
+            + "where u.enabled = true")
+    List<Object[]> enabledRolesByHomeOrganisation();
+
     /** The homes a user is attached to, whichever role attaches them. Not viewer-specific since V16. */
     @Query("select h.id from User u join u.homes h where u.id = :userId")
     List<Long> findHomeIds(@Param("userId") Long userId);

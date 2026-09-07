@@ -33,16 +33,19 @@ public class OrganisationAdminController {
     private final OrganisationLifecycleService lifecycleService;
     private final HomeRepository homeRepository;
     private final UserRepository userRepository;
+    private final OrganisationReadinessService readinessService;
 
     public OrganisationAdminController(OrganisationRepository organisationRepository, ThemeService themeService,
             KeyProvider keyProvider, OrganisationLifecycleService lifecycleService,
-            HomeRepository homeRepository, UserRepository userRepository) {
+            HomeRepository homeRepository, UserRepository userRepository,
+            OrganisationReadinessService readinessService) {
         this.organisationRepository = organisationRepository;
         this.themeService = themeService;
         this.keyProvider = keyProvider;
         this.lifecycleService = lifecycleService;
         this.homeRepository = homeRepository;
         this.userRepository = userRepository;
+        this.readinessService = readinessService;
     }
 
     /**
@@ -82,8 +85,12 @@ public class OrganisationAdminController {
         // ThemeService, next to the default it compares against.
         Set<Long> branded = themeService.organisationIdsWithChosenBranding();
 
+        // T267. Two more queries, both bounded by organisations times roles rather than by users,
+        // and the joining stays in memory like the rest of this screen - the alternative is asking
+        // per organisation, which is the N+1 this page was built to avoid.
         model.addAttribute("tree", OrganisationTree.from(organisations,
-                homeRepository.findAllWithOrganisation(), userCounts, branded));
+                homeRepository.findAllWithOrganisation(), userCounts, branded,
+                readinessService.readinessByOrganisationId(organisations)));
         return "admin/organisation-list";
     }
 

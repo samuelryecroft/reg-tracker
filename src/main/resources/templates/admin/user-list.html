@@ -9,6 +9,37 @@
 <div th:replace="~{fragments/layout :: nav}"></div>
 <main id="main">
     <h1>Users</h1>
+    <!--/* T267: this organisation cannot yet do its job, said DURING SETUP to the one person who
+         can fix it, rather than on first use to a coordinator who cannot.
+
+         WARN, NOT ERR. Nothing has failed and nobody has done anything wrong - an organisation
+         part-way through being set up is the normal state of an organisation being set up, and
+         Oscar's own words on the same shape are that a coordinator before any visitor "is not a
+         mistake, it is Tuesday". The err tier on this page's sibling is reserved for an action
+         that was attempted and refused.
+
+         DELIBERATELY SAYS NOTHING ABOUT ACTIVATION. The organisation may also be PENDING for want
+         of an encryption key, which is a different failure with a different remedy: an operator
+         provisions a key, an administrator adds a person. One notice covering both would send half
+         its readers to the wrong one. See OrganisationReadiness for why the rule cannot see the
+         status even if someone later wants it to.
+
+         The route out is the button immediately below rather than a second copy of it inside the
+         banner - the missing thing is named here and the control that fixes it is the next thing
+         the eye reaches. */-->
+    <div class="banner warn" th:if="${organisationReadiness != null and !organisationReadiness.isOperational()}"
+         th:with="ico=@{/icons/phosphor.svg}">
+        <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-warning-circle'"></use></svg>
+        <div>
+            <strong>This organisation cannot do its job yet</strong>
+            <p th:text="'Nobody with an enabled account here holds these roles: '
+                    + ${#strings.listJoin(organisationReadiness.missingRoleNames(), ', ')}
+                    + '. Add someone with each of them to finish setting this organisation up.'">
+                Nobody with an enabled account here holds these roles: Coordinator, Reviewer. Add
+                someone with each of them to finish setting this organisation up.</p>
+        </div>
+    </div>
+
     <a class="btn" href="/admin/users/new" th:if="${can.addUser}">Add user</a>
 
     <!--/*

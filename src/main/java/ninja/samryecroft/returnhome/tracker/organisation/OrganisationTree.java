@@ -31,9 +31,17 @@ import ninja.samryecroft.returnhome.tracker.home.Home;
  */
 public record OrganisationTree(List<SupplierNode> suppliers, List<ProviderNode> unassigned) {
 
-    /** A supplier and the care providers it serves. */
+    /**
+     * A supplier and the care providers it serves.
+     *
+     * <p>{@code readiness} (T267) is carried ON THE NODE rather than handed to the template as a
+     * second map keyed by id. The row and the statement about the row then cannot disagree, which
+     * is this template's own lesson from the empty state below it: a page that decides something
+     * from a different collection than the one it draws can say one thing above a screen showing
+     * another.
+     */
     public record SupplierNode(Organisation organisation, int userCount, boolean brandingSet,
-            List<ProviderNode> careProviders) {
+            OrganisationReadiness readiness, List<ProviderNode> careProviders) {
 
         /** The canvas's second line: "Supplier · 6 users · branding set". */
         public String meta() {
@@ -48,7 +56,7 @@ public record OrganisationTree(List<SupplierNode> suppliers, List<ProviderNode> 
     }
 
     /** A care provider and the homes beneath it. */
-    public record ProviderNode(Organisation organisation, List<Home> homes) {
+    public record ProviderNode(Organisation organisation, OrganisationReadiness readiness, List<Home> homes) {
 
         /**
          * The homes, named, as the canvas renders them - "Oakwood House · Marisco Lodge".
@@ -80,7 +88,8 @@ public record OrganisationTree(List<SupplierNode> suppliers, List<ProviderNode> 
      * value and sort unstably. The identity sequence cannot tie.
      */
     public static OrganisationTree from(List<Organisation> organisations, List<Home> homes,
-            Map<Long, Integer> userCountsByOrgId, Set<Long> orgIdsWithBranding) {
+            Map<Long, Integer> userCountsByOrgId, Set<Long> orgIdsWithBranding,
+            Map<Long, OrganisationReadiness> readinessByOrgId) {
 
         Map<Long, List<Home>> homesByOrgId = new LinkedHashMap<>();
         for (Home home : homes) {
@@ -103,7 +112,7 @@ public record OrganisationTree(List<SupplierNode> suppliers, List<ProviderNode> 
             if (organisation.getType() != OrgType.CARE_PROVIDER) {
                 continue;
             }
-            ProviderNode node = new ProviderNode(organisation,
+            ProviderNode node = new ProviderNode(organisation, readinessOf(readinessByOrgId, organisation),
                     homesByOrgId.getOrDefault(organisation.getId(), List.of()));
             Organisation supplier = organisation.getSupplierOrganisation();
             if (supplier == null) {
@@ -121,9 +130,24 @@ public record OrganisationTree(List<SupplierNode> suppliers, List<ProviderNode> 
             suppliers.add(new SupplierNode(organisation,
                     userCountsByOrgId.getOrDefault(organisation.getId(), 0),
                     orgIdsWithBranding.contains(organisation.getId()),
+                    readinessOf(readinessByOrgId, organisation),
                     providersBySupplierId.getOrDefault(organisation.getId(), List.of())));
         }
 
         return new OrganisationTree(suppliers, unassigned);
+    }
+
+    /**
+     * The organisation's readiness, or an EMPTY one if the caller did not supply it.
+     *
+     * <p>Empty means "holds none of the roles it needs", which is the honest answer to a missing
+     * entry and also the loud one. The tempting default is the opposite - treat an absent key as
+     * nothing-to-report - and that would hide exactly the organisation this card exists to point
+     * at, on the screen built to point at it, with no symptom.
+     */
+    private static OrganisationReadiness readinessOf(Map<Long, OrganisationReadiness> readinessByOrgId,
+            Organisation organisation) {
+        OrganisationReadiness supplied = readinessByOrgId.get(organisation.getId());
+        return supplied != null ? supplied : new OrganisationReadiness(organisation.getType(), Set.of());
     }
 }

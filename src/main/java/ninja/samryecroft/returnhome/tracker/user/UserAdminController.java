@@ -11,6 +11,8 @@ import java.util.List;
 import ninja.samryecroft.returnhome.tracker.organisation.Organisation;
 import ninja.samryecroft.returnhome.tracker.organisation.OrganisationAccessService;
 import ninja.samryecroft.returnhome.tracker.organisation.OrgType;
+import ninja.samryecroft.returnhome.tracker.organisation.OrganisationReadiness;
+import ninja.samryecroft.returnhome.tracker.organisation.OrganisationReadinessService;
 import ninja.samryecroft.returnhome.tracker.user.dto.CreateUserForm;
 import ninja.samryecroft.returnhome.tracker.user.dto.EditUserForm;
 import ninja.samryecroft.returnhome.tracker.user.dto.SetPasswordForm;
@@ -39,11 +41,12 @@ public class UserAdminController {
     private final AuditHistoryService auditHistoryService;
     private final AuditEventPublisher auditEventPublisher;
     private final PasswordPolicy passwordPolicy;
+    private final OrganisationReadinessService readinessService;
 
     public UserAdminController(UserService userService, UserRepository userRepository, HomeRepository homeRepository,
             OrganisationRepository organisationRepository, OrganisationAccessService organisationAccessService,
             AuditHistoryService auditHistoryService, AuditEventPublisher auditEventPublisher,
-            PasswordPolicy passwordPolicy) {
+            PasswordPolicy passwordPolicy, OrganisationReadinessService readinessService) {
         this.userService = userService;
         this.userRepository = userRepository;
         this.homeRepository = homeRepository;
@@ -52,6 +55,7 @@ public class UserAdminController {
         this.auditHistoryService = auditHistoryService;
         this.auditEventPublisher = auditEventPublisher;
         this.passwordPolicy = passwordPolicy;
+        this.readinessService = readinessService;
     }
 
     @GetMapping
@@ -67,6 +71,7 @@ public class UserAdminController {
                 .filter(candidate -> userService.mayAdminister(candidate, principal))
                 .map(User::getId)
                 .collect(java.util.stream.Collectors.toSet()));
+        model.addAttribute("organisationReadiness", readinessOfOwnOrganisation(principal));
         return "admin/user-list";
     }
 
@@ -217,5 +222,29 @@ public class UserAdminController {
                 model.addAttribute("organisations", permitted);
             }
         }
+    }
+
+    /**
+     * T267: whether this administrator's OWN organisation has the people it needs, or {@code null}
+     * where the question does not apply.
+     *
+     * <p><b>This screen rather than only the platform tree, because they are different
+     * administrators and only one of them can act.</b> The 4e tree is the platform admin's, and an
+     * org admin never reaches it; this is the screen where the gap is fixable, with the Add user
+     * button already on it. Oscar's T266 ruling turns on that split - a coordinator who is not an
+     * administrator can only be told to ask someone else - and the same split decides where a
+     * setup-time notice is worth putting.
+     *
+     * <p>{@code null} for the platform admin, deliberately, and not "everything is fine": they have
+     * no organisation of their own, so the question has no subject. They are told the same thing
+     * about every organisation on the tree instead.
+     */
+    private OrganisationReadiness readinessOfOwnOrganisation(AppUserPrincipal principal) {
+        if (principal == null || principal.hasRole(Role.ADMIN) || principal.getOrganisationId() == null) {
+            return null;
+        }
+        return organisationRepository.findById(principal.getOrganisationId())
+                .map(readinessService::readinessFor)
+                .orElse(null);
     }
 }
