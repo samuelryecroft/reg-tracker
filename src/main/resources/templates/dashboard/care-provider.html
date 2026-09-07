@@ -104,8 +104,13 @@
         </table>
         </div>
 
-        <div class="stack">
-            <div class="srow" th:each="row : ${view.rankedHomes()}">
+        <!--/* T300 (spec §8f): display:flex on a list strips list semantics in Safari/VoiceOver -
+             T253 fixed .case-list/.case, not this pattern, and this .stack never carried the role
+             (Creed's sweep after T290 found the same gap on both dashboards). The empty row is a
+             li, not a sibling div outside the ul, matching the table's own always-rendered-header
+             convention on this same page (a fallback row inside tbody, not a hidden table). */-->
+        <ul class="stack" role="list">
+            <li class="srow" role="listitem" th:each="row : ${view.rankedHomes()}">
                 <div class="top"><a class="rowlink name" th:href="${row.href()}" th:text="${row.name()}">Home</a></div>
                 <dl>
                     <dt>Completed</dt><dd th:text="${row.stat().validCompleted()}">0</dd>
@@ -113,9 +118,9 @@
                     <dt>Excluded</dt><dd th:text="${row.stat().excludedNotMeasurable()}">0</dd>
                     <dt>Overdue now</dt><dd th:text="${row.overdueNow()}">0</dd>
                 </dl>
-            </div>
-            <div class="empty" th:if="${#lists.isEmpty(view.rankedHomes())}">No home has reached the minimum base yet this period.</div>
-        </div>
+            </li>
+            <li class="empty" role="listitem" th:if="${#lists.isEmpty(view.rankedHomes())}">No home has reached the minimum base yet this period.</li>
+        </ul>
 
         <div th:if="${not #lists.isEmpty(view.tooFewHomes())}" style="margin-top:20px">
             <h3>Too few to report</h3>
@@ -133,15 +138,17 @@
             </table>
             </div>
 
-            <div class="stack">
-                <div class="srow" th:each="row : ${view.tooFewHomes()}">
+            <!--/* T300: no empty li needed - the enclosing th:if already gates this whole block on
+                 tooFewHomes being non-empty, so this list can never render with zero rows. */-->
+            <ul class="stack" role="list">
+                <li class="srow" role="listitem" th:each="row : ${view.tooFewHomes()}">
                     <div class="top"><a class="rowlink name" th:href="${row.href()}" th:text="${row.name()}">Home</a></div>
                     <dl>
                         <dt>Completed</dt><dd th:text="${row.stat().validCompleted() + ' completed'}">0 completed</dd>
                         <dt>Overdue now</dt><dd th:text="${row.overdueNow()}">0</dd>
                     </dl>
-                </div>
-            </div>
+                </li>
+            </ul>
         </div>
     </section>
 
@@ -171,17 +178,17 @@
         </table>
         </div>
 
-        <div class="stack">
-            <div class="srow" th:each="entry : ${view.recurrence()}">
+        <ul class="stack" role="list">
+            <li class="srow" role="listitem" th:each="entry : ${view.recurrence()}">
                 <div class="top"><a class="rowlink name" th:href="${entry.href()}" th:text="${entry.childLabel()}">Child</a></div>
                 <dl>
                     <dt>Home</dt><dd th:text="${entry.homeName()}">Home</dd>
                     <dt>Flags</dt><dd><span class="pill" th:each="flag : ${entry.flagLabels()}" th:classappend="${flag == '5+ in 30 days'} ? 'flag-high' : 'flag-mid'" th:text="${flag}">Flag</span></dd>
                     <dt>Latest request status</dt><dd th:text="${entry.latestSummary()}">Status</dd>
                 </dl>
-            </div>
-            <div class="empty" th:if="${#lists.isEmpty(view.recurrence())}">No recurring missing episodes have been flagged on open or recent requests. These are flagged by the home on the request form, so this does not rule out recurrence.</div>
-        </div>
+            </li>
+            <li class="empty" role="listitem" th:if="${#lists.isEmpty(view.recurrence())}">No recurring missing episodes have been flagged on open or recent requests. These are flagged by the home on the request form, so this does not rule out recurrence.</li>
+        </ul>
     </section>
 </main>
 </body>
