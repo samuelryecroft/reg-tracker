@@ -14,6 +14,16 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByUsername(String username);
 
     /**
+     * T264/T322. Case-insensitive, matching the {@code LOWER(email)} unique index in V24 - a check
+     * that binds the string while the constraint binds the mailbox would pass here and then fail at
+     * the database, which is the 500 this method exists to prevent.
+     */
+    boolean existsByEmailIgnoreCase(String email);
+
+    /** The same question for an edit, excluding the row being edited from its own answer. */
+    boolean existsByEmailIgnoreCaseAndIdNot(String email, Long id);
+
+    /**
      * One user with the collections its authorisation check reads.
      *
      * <p><strong>{@code getAuthorized} used a bare {@code findById} and then asked the result for its
