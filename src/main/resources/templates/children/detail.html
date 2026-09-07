@@ -25,6 +25,32 @@
         <dd th:text="${identityDetail.caseReference()}">Case reference</dd>
     </dl>
 
+    <!--/* T328 §4-5 (CREED-RULING-t328-archived-match.md): the app's first restore affordance.
+         Belongs on the record, not duplicated onto the blocked create form that surfaces it - "one
+         control, one place", the same rule that kept a second Add user button off T267's readiness
+         banner. Visible to every role that can view this record at all (HOME_STAFF included -
+         ChildController:366 already gates viewing on canViewHome) because that a record is
+         archived, and when, is not itself a privileged fact - only the remedy is. The Restore
+         action inside is gated on canManage, the SAME predicate mineToManage enforces server-side
+         (shared, not re-derived), so nobody sees a button the route would refuse - T273's
+         reachable-but-refused rule. The person who hits the trap this closes at 2am (HOME_STAFF)
+         is precisely the person who cannot perform this remedy (§5, §6) - that gap is Oscar's to
+         rule, not this template's to paper over with a button that 403s.
+         Split-card, matching the export card below: description beside an action, the shape this
+         page already uses (D-4b-5). */-->
+    <div class="card split-card" th:if="${child.archived}">
+        <div class="split-card-info">
+            <h3>Archived</h3>
+            <p th:text="${'Archived ' + archivedAtDisplay}">When</p>
+        </div>
+        <div class="split-card-actions" th:if="${canManage}">
+            <p class="muted">Restoring is recorded</p>
+            <form method="post" th:action="@{/children/{id}/restore(id=${child.id})}">
+                <button type="submit" class="btn">Restore</button>
+            </form>
+        </div>
+    </div>
+
     <!--/* D-4b-5 (spec §7e): the split-card shape - description beside an action, wrapping under a
          narrow viewport - given a class instead of four inline style attributes, because 4a's own
          summary wants this exact shape too. */-->
