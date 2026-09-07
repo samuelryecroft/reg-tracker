@@ -88,6 +88,24 @@ public enum QueueFilter {
      */
     NO_CLOCK("noClock", "Return time not recorded", Placement.OFF_MENU, (r, now) -> isState(r, now, DueState.NO_CLOCK)),
 
+    /**
+     * Allocated to a visitor, with no visit time set yet (T319).
+     *
+     * <p><b>Not the same set as {@link #AWAITING_REPORT}, and the difference is who has to move.</b>
+     * That one covers ALLOCATED, SCHEDULED and REPORT_REJECTED together - everything with a visitor
+     * on it - which answers "whose work is this" and cannot answer "what is stuck". A request that
+     * has been allocated for six days with no date in the diary is a different problem from one
+     * scheduled for Thursday, and pointing the dashboard tile at the broader filter would have made
+     * the tile and the list it opens visibly disagree about what was being counted.
+     *
+     * <p><b>The predicate is {@link InterviewRequestService#isAwaitingSchedule} rather than a second
+     * copy of {@code status == ALLOCATED}.</b> That method is what the confirm-schedule action asks
+     * before it will accept a time, so the queue can only ever show requests the action would
+     * actually take - one rule, asked in two places, instead of two rules that agree today.
+     */
+    AWAITING_SCHEDULE("awaitingSchedule", "Awaiting a visit time", Placement.OFF_MENU,
+            (r, now) -> InterviewRequestService.isAwaitingSchedule(r)),
+
     /** Already allocated to a visitor, but consent is not confirmed. */
     CONSENT("consent", "Consent not confirmed", Placement.OFF_MENU,
             (r, now) -> (r.getStatus() == InterviewStatus.ALLOCATED || r.getStatus() == InterviewStatus.SCHEDULED)
