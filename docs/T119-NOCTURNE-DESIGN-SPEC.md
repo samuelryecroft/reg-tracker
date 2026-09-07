@@ -5924,3 +5924,65 @@ gated, but on conditions that are not the union of their own members.
 **Not folded into this ruling and not a sweep:** it is one template, and it is listed here because **the
 full-screen panel is what makes it visible** — an orphan heading is easy to miss in a 212px rail and hard to
 miss on a 320px screen showing nothing else.
+
+## §8o — T238: the two spacing scales. **STAYS DEFERRED — and the deferral condition was the wrong one.**
+
+**Measured on `origin/main` @ `4eb70ea`.** My call, as asked. The answer is no, and the reason is not timing.
+
+### D-8o-1 · The condition I set could never have cleared
+
+I deferred T238 *"after the redesign migration"*. **That was wrong, and it is worth saying plainly because the
+card has been waiting on it.** The blocker was never sequencing — it is arithmetic, and no amount of waiting
+changes arithmetic.
+
+| legacy | nearest Nocturne | delta |
+|---|---|---|
+| `--s1` 4px | `--space-1` 2.8 / `--space-2` 5.6 | −1.2 / +1.6 |
+| `--s2` 8px | `--space-3` 8.4px | +0.4 |
+| `--s3` 12px | `--space-4` 11.2px | −0.8 |
+| `--s4` 16px | `--space-6` 16.8px | +0.8 |
+| `--s5` 24px | `--space-8` 22.4px — **the largest step there is** | −1.6 |
+| `--s7` 48px | **nothing. More than double the Nocturne maximum.** | — |
+
+> **NOT ONE of the six legacy steps has an exact counterpart, and the top two have no counterpart at all.**
+
+**Still in use today: 151 legacy declarations against 44 Nocturne ones** — `--s4`×41, `--s3`×41, `--s2`×39,
+`--s5`×23, `--s1`×6, `--s7`×1.
+
+> **So a "migration" here is not a migration. It is a redesign of 151 spacing values, expressed as a token
+> rename** — every declaration moving 0.4–1.6px, and one of them having nowhere to go. **That is exactly the
+> trap named when this was deferred: a change that alters the design while claiming to preserve it.** It does
+> not become safe because the screens have shipped; it becomes *more* expensive, because there are now more
+> screens for it to be wrong on.
+
+### D-8o-2 · The new condition, recorded rather than remembered
+
+**T238 unblocks only if one of these becomes true — neither is a migration, and both are decisions above me:**
+
+1. **A decision is taken that spacing may visibly change.** Then this is a design change with a review, not a
+   tidy-up, and it comes back as one.
+2. **The Nocturne scale gains steps matching the legacy values.** That is a change to the design language
+   itself, not to its application.
+
+### D-8o-3 · The smallest honest version, which is not a migration at all
+
+**The harm I originally found was never the two scales existing. It was that a rule written in one is INVISIBLE
+to someone working in the other** — which is how T235's `.btn-row` defect survived: a rule was written in
+`--s5`, and nothing at the Nocturne tokens said the other scale was there.
+
+**That harm is fixable now, at zero visual risk, because it is a documentation defect.** Put this at the
+`--space-*` definitions (`app.css:136`) and a pointer at `--s*` (`:231`):
+
+    /* TWO SPACING SCALES EXIST AND THEY DO NOT ALIGN. Nocturne --space-* (2.8/5.6/8.4/11.2/16.8/22.4)
+       and legacy --s* (4/8/12/16/24/48). NO legacy step has an exact --space-* counterpart, and --s5
+       (24px) and --s7 (48px) have none at all - --space-8 (22.4px) is the largest step there is.
+       So a rule cannot be moved between the scales without changing the spacing (T238, spec §8o).
+       Prefer --space-* in NEW rules, EXCEPT where the rule must line up with legacy values already in
+       the same component: there, match the neighbours and say so. Never rewrite a working declaration
+       from one scale to the other - that is a pixel change wearing a rename. */
+
+**The exception clause is load-bearing.** Without it, a new rule beside `--s3` neighbours takes `--space-4` and
+introduces a 0.8px inconsistency **inside one component** — worse than the consistency it was reaching for.
+
+**No declaration changes. No pixel moves. The next person writing a spacing rule learns both scales exist at
+the moment they need to know.**
