@@ -175,7 +175,6 @@ class RoleMergeOnEditTest {
         EditUserForm form = new EditUserForm();
         form.setFirstName("Pat");
         form.setLastName("Taylor");
-        form.setEmail("pat.taylor@example.org");
         form.setRoles(new HashSet<>(roles));
         form.setOrganisationId(SUPPLIER_ORG_ID);
         form.setEnabled(true);

@@ -77,11 +77,20 @@ public class GlobalControllerAdvice {
                 roleMatrix.canCreateOrganisation(principal),
                 roleMatrix.canCreateHome(principal),
                 roleMatrix.canCreateChild(principal),
-                roleMatrix.canCreateUser(principal));
+                roleMatrix.canCreateUser(principal),
+                roleMatrix.canChangeAnyEmail(principal));
     }
 
-    /** What the signed-in user may create. Named for how it reads in a template: {@code can.addChild}. */
-    public record Capabilities(boolean addOrganisation, boolean addHome, boolean addChild, boolean addUser) {
+    /**
+     * What the signed-in user may do. Named for how it reads in a template: {@code can.addChild}.
+     *
+     * <p>{@code changeAnyEmail} is the odd one out and stays odd on purpose (T323): every other
+     * entry is a CREATE, and this is the one capability the product deliberately withholds from
+     * people who otherwise administer an account. It sits here because a template needs to ask it,
+     * not because it belongs to the family.
+     */
+    public record Capabilities(boolean addOrganisation, boolean addHome, boolean addChild, boolean addUser,
+            boolean changeAnyEmail) {
     }
 
     /**

@@ -15,6 +15,7 @@ import ninja.samryecroft.returnhome.tracker.organisation.OrganisationReadiness;
 import ninja.samryecroft.returnhome.tracker.organisation.OrganisationReadinessService;
 import ninja.samryecroft.returnhome.tracker.user.dto.CreateUserForm;
 import ninja.samryecroft.returnhome.tracker.user.dto.EditUserForm;
+import ninja.samryecroft.returnhome.tracker.user.dto.SetEmailForm;
 import ninja.samryecroft.returnhome.tracker.user.dto.SetPasswordForm;
 import ninja.samryecroft.returnhome.tracker.user.password.PasswordContext;
 import ninja.samryecroft.returnhome.tracker.user.password.PasswordPolicy;
@@ -111,7 +112,6 @@ public class UserAdminController {
         EditUserForm form = new EditUserForm();
         form.setFirstName(user.getFirstName());
         form.setLastName(user.getLastName());
-        form.setEmail(user.getEmail());
         form.setContactPhone(user.getContactPhone());
         form.setRoles(new HashSet<>(user.getRoles()));
         form.setOrganisationId(user.getOrganisation() != null ? user.getOrganisation().getId() : null);
@@ -149,6 +149,34 @@ public class UserAdminController {
             addPickerAttributes(principal, model);
             return "admin/user-form-edit";
         }
+        return "redirect:/admin/users";
+    }
+
+    /**
+     * The email form (T323). Its own screen for the same reason the password one is, and reachable
+     * only by a platform admin - see {@link UserService#changeEmail}.
+     *
+     * <p>The account is loaded through {@code changeEmail}'s own rule rather than through
+     * {@link UserService#getAuthorized}, so a manager reaching this URL directly is refused here
+     * and not merely offered no link to it. A screen whose only protection is that nothing links to
+     * it is not protected.
+     */
+    @GetMapping("/{id}/email")
+    public String emailForm(@PathVariable Long id, @AuthenticationPrincipal AppUserPrincipal principal,
+            Model model) {
+        model.addAttribute("user", userService.getAuthorizedToChangeEmail(id, principal));
+        model.addAttribute("form", new SetEmailForm());
+        return "admin/user-email";
+    }
+
+    @PostMapping("/{id}/email")
+    public String setEmail(@PathVariable Long id, @AuthenticationPrincipal AppUserPrincipal principal,
+            @Valid @ModelAttribute("form") SetEmailForm form, BindingResult bindingResult, Model model) {
+        if (bindingResult.hasErrors()) {
+            model.addAttribute("user", userService.getAuthorizedToChangeEmail(id, principal));
+            return "admin/user-email";
+        }
+        userService.changeEmail(id, form.getEmail(), principal);
         return "redirect:/admin/users";
     }
 

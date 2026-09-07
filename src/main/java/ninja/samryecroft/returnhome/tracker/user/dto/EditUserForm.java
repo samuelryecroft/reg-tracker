@@ -1,6 +1,5 @@
 package ninja.samryecroft.returnhome.tracker.user.dto;
 
-import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.NotEmpty;
@@ -24,15 +23,26 @@ public class EditUserForm {
     @Size(max = 255)
     private String lastName;
 
-    /**
-     * Required on the form though nullable in the database: rows predating T127 have no address,
-     * and inventing one to satisfy a constraint would put fiction in a statutory record. Every user
-     * touched from here on supplies a real one.
+    /*
+     * THERE IS DELIBERATELY NO EMAIL FIELD HERE (T323). DO NOT ADD ONE BACK.
+     *
+     * A colleague may no longer change another account's email address. This is not a tidy-up and
+     * it is not a permissions preference: SECOND-FACTOR CODES ARE SENT TO THAT ADDRESS (T322), and
+     * the entire reason emailed codes are acceptable for this product is that the address cannot be
+     * redirected by somebody who works alongside you. A manager who could edit a colleague's email
+     * could point their codes at an inbox they control and then sign in as them - and a
+     * safeguarding record would show that colleague's name against everything they did.
+     *
+     * IT IS ABSENT FROM THE FORM RATHER THAN GUARDED INSIDE update(), which is T277's lesson
+     * applied a second time in the same class. A permission to reach a form is a permission to
+     * everything in it, so while a credential lived in this bundle, two separate widenings of "who
+     * may edit this user" silently widened "who may set their password". A field that is not here
+     * cannot be carried along by the next widening, because there is nothing to carry.
+     *
+     * Changing an address is its own action on its own screen, for the platform admin only - see
+     * UserService.changeEmail for who and why. A field nobody can ever change would be its own
+     * defect, so it is narrowed rather than frozen.
      */
-    @NotBlank(message = "Email address is required")
-    @Email(message = "Enter a valid email address")
-    @Size(max = 320)
-    private String email;
 
     /**
      * Optional - a contact number is useful, not a reason to block an account. Only length-checked,
@@ -68,13 +78,6 @@ public class EditUserForm {
         this.lastName = lastName;
     }
 
-    public String getEmail() {
-        return email;
-    }
-
-    public void setEmail(String email) {
-        this.email = email;
-    }
 
     public String getContactPhone() {
         return contactPhone;

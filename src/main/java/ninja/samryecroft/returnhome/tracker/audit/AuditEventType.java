@@ -37,6 +37,18 @@ public enum AuditEventType {
      */
     USER_PASSWORD_RESET,
 
+    /**
+     * An administrator changed an account's email address (T323).
+     *
+     * <p>Its own type rather than a field on USER_UPDATED, for the same reason
+     * {@link #USER_PASSWORD_RESET} is: <strong>the address is where second-factor codes are
+     * delivered (T322)</strong>, so changing it is a change to who can sign in as this person, not
+     * a correction to their contact details. "When was this address last changed, and by whom" is a
+     * question an investigation will ask directly, and it must not require reading metadata off an
+     * event about something else.
+     */
+    USER_EMAIL_CHANGED,
+
     INTERVIEW_REQUEST_CREATED,
     INTERVIEW_REQUEST_ALLOCATED,
     INTERVIEW_REQUEST_SCHEDULED,

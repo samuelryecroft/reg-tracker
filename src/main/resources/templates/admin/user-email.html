@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en" th:attr="data-appearance=${#strings.toLowerCase(appearancePreference)}">
+<head>
+    <meta charset="UTF-8"/>
+    <title th:text="${'Change email address: ' + user.username}">Change email address</title>
+    <th:block th:replace="~{fragments/layout :: styles}"></th:block>
+</head>
+<body>
+<div th:replace="~{fragments/layout :: nav}"></div>
+<main id="main">
+    <h1 th:text="${'Change email address: ' + user.username}">Change email address</h1>
+
+    <div class="card">
+        <form method="post" th:action="@{/admin/users/{id}/email(id=${user.id})}" th:object="${form}">
+            <div class="banner err" role="alert" th:if="${#fields.hasErrors('*')}">
+                <span class="ic" aria-hidden="true">▲</span>
+                <div>
+                    <strong>Before this address can be changed</strong>
+                    <ul>
+                        <li th:if="${#fields.hasErrors('email')}">
+                            <a href="#email" th:text="${#fields.errors('email')[0]}">Error</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!--/* T323, and said plainly for the same reason the password screen says its own
+                 uncomfortable thing: the person doing this should know what it does. This is not a
+                 contact-details correction. Second-factor codes go to this address (T322), so
+                 changing it changes who can sign in as this person - which is why nobody but a
+                 platform administrator can reach this screen, and why the sentence is here rather
+                 than in a comment nobody reading the page will see. */-->
+            <p class="hint">Sign-in codes are sent to this address, so changing it changes where this
+                person's codes arrive. Only a platform administrator can do this.</p>
+
+            <p class="field">
+                <span class="lbl">Current address</span>
+                <span th:text="${user.email} ?: 'Not recorded'">someone@example.org</span>
+            </p>
+
+            <label for="email">New email address</label>
+            <input type="email" id="email" th:field="*{email}" required autocomplete="email"
+                   th:errorclass="is-invalid" th:aria-invalid="${#fields.hasErrors('email')}" aria-describedby="email-error"/>
+            <div th:replace="~{fragments/layout :: fieldError('email')}"></div>
+
+            <div class="btn-row">
+                <button type="submit" class="btn">Change address</button>
+                <a class="btn ghost" th:href="@{/admin/users/{id}/edit(id=${user.id})}">Cancel</a>
+            </div>
+        </form>
+    </div>
+</main>
+</body>
+</html>

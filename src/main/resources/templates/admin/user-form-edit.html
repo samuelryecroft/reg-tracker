@@ -19,7 +19,6 @@
                     <ul>
                         <li th:if="${#fields.hasErrors('firstName')}"><a href="#firstName" th:text="${#fields.errors('firstName')[0]}">Error</a></li>
                         <li th:if="${#fields.hasErrors('lastName')}"><a href="#lastName" th:text="${#fields.errors('lastName')[0]}">Error</a></li>
-                        <li th:if="${#fields.hasErrors('email')}"><a href="#email" th:text="${#fields.errors('email')[0]}">Error</a></li>
                         <li th:if="${#fields.hasErrors('contactPhone')}"><a href="#contactPhone" th:text="${#fields.errors('contactPhone')[0]}">Error</a></li>
                     </ul>
                 </div>
@@ -35,11 +34,23 @@
                    th:errorclass="is-invalid" th:aria-invalid="${#fields.hasErrors('lastName')}" aria-describedby="lastName-error"/>
             <div th:replace="~{fragments/layout :: fieldError('lastName')}"></div>
 
-            <label for="email">Email address <span class="req" aria-hidden="true">*</span></label>
-            <p class="hint">Used to contact this person, and to match them to their directory account later.</p>
-            <input type="email" id="email" th:field="*{email}" required autocomplete="email"
-                   th:errorclass="is-invalid" th:aria-invalid="${#fields.hasErrors('email')}" aria-describedby="email-error"/>
-            <div th:replace="~{fragments/layout :: fieldError('email')}"></div>
+            <!--/* T323: VISIBLE, NOT EDITABLE - the same shape T273 used for a colleague's row, and
+                 for a related reason. The address is shown because an administrator looking at an
+                 account needs to know which address it uses; it is not an input because SIGN-IN
+                 CODES GO TO IT (T322), and a colleague who could change it could redirect them and
+                 then act as this person, under this person's name, in a safeguarding record.
+
+                 Removing the input is only half of it - EditUserForm has no email field at all, so
+                 a hand-crafted POST carries nothing to apply. A form control is not a constraint: it
+                 shapes the form, not the request.
+
+                 DO NOT RESTORE THIS AS A USABILITY FIX. The pressure is real - an address mistyped
+                 at creation cannot be corrected from here - and the answer to it is the link below,
+                 not this input. */-->
+            <p class="field">
+                <span class="lbl">Email address</span>
+                <span th:text="${user.email} ?: 'Not recorded'">someone@example.org</span>
+            </p>
 
             <label for="contactPhone">Contact phone number</label>
             <p class="hint">Optional.</p>
@@ -116,6 +127,14 @@
              not the point of the screen. */-->
         <p class="field">
             <a class="rowlink" th:href="@{/admin/users/{id}/password(id=${user.id})}">Set this user's password</a>
+        </p>
+
+        <!--/* T323: the route out, so the narrowing is not a dead end. Offered only where it will
+             work - a platform admin - because a link that 403s teaches a manager that the product is
+             broken rather than that the rule exists. The check here is presentation; the rule is in
+             UserService.changeEmail, which refuses the GET as well as the POST. */-->
+        <p class="field" th:if="${can.changeAnyEmail}">
+            <a class="rowlink" th:href="@{/admin/users/{id}/email(id=${user.id})}">Change this user's email address</a>
         </p>
     </div>
 

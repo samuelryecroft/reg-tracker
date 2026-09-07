@@ -76,6 +76,24 @@ public class RoleMatrix {
     }
 
     /**
+     * Whether this principal may change ANOTHER account's email address (T323). Platform admin only.
+     *
+     * <p>Deliberately not derived from {@link #canCreateUser} or from anything else on this matrix,
+     * even though "platform admin" is expressible several ways here. <strong>The narrowing exists
+     * precisely so this capability stops travelling with the others</strong>: second-factor codes go
+     * to that address (T322), so redirecting it is redirecting who can sign in. A predicate that
+     * shared a definition with a broader capability would be re-attached to that capability by the
+     * next widening of it - which is the failure the card is fixing, expressed one layer up.
+     *
+     * <p>Mirrors {@code UserService.changeEmail}, which refuses the GET as well as the POST. This is
+     * what a template asks in order to avoid offering a link that 403s; it is not what makes the
+     * action safe.
+     */
+    public boolean canChangeAnyEmail(AppUserPrincipal principal) {
+        return principal != null && principal.hasRole(Role.ADMIN);
+    }
+
+    /**
      * T132: whether {@code /children} is reachable at all - the single gate for the nav's ONE
      * children entry. Widening this widens who sees the link; it does not change what {@code
      * ChildController#list} lets them see, which is its own, separately-checked, per-branch query.
