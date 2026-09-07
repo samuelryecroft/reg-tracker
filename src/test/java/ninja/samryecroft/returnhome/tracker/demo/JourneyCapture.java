@@ -32,7 +32,7 @@ import org.junit.jupiter.api.Test;
  */
 class JourneyCapture {
 
-    private static final String PASSWORD = System.getProperty("journey.password", "demo1234");
+    private static final String PASSWORD = System.getProperty("journey.password", "demo-walkthrough");
     private static final int VIEWPORT_WIDTH = 1440;
     private static final int VIEWPORT_HEIGHT = 900;
 

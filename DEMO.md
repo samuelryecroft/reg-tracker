@@ -24,7 +24,7 @@ To get back to the exact starting state:
 
 ## Logins
 
-Every demo account uses the password **`demo1234`**.
+Every demo account uses the password **`demo-walkthrough`**.
 
 | Username | Role | Sees |
 |---|---|---|
