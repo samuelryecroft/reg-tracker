@@ -52,7 +52,14 @@
                  reference, under the same page-level reveal as everywhere else - masking is a
                  screen affordance and this is a screen. */-->
             <dt th:if="${row.childLabel() != null}">Child</dt>
-            <dd th:if="${row.childLabel() != null}" th:text="${row.childLabel()}">A.B. · CH-0041</dd>
+            <!--/* Linked only when the event was ABOUT the child (T292). On a request event the
+                 child is context, and the row above already links the interview; a second link to
+                 the same story reads as two records. */-->
+            <dd th:if="${row.childLabel() != null}">
+                <a class="rowlink" th:if="${row.childId() != null}"
+                   th:href="@{/children/{id}(id=${row.childId()})}" th:text="${row.childLabel()}">A.B. · CH-0041</a>
+                <span th:if="${row.childId() == null}" th:text="${row.childLabel()}">A.B. · CH-0041</span>
+            </dd>
 
             <dt th:if="${row.homeName() != null}">Home</dt>
             <dd th:if="${row.homeName() != null}" th:text="${row.homeName()}">Oakwood House</dd>

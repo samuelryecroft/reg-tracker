@@ -113,7 +113,15 @@
                           th:text="'(' + ${row.entry().actorRole()} + ')'">(Role)</span>
                 </p>
                 <span class="detail" th:if="${row.entry().detail() != null}" th:text="${row.entry().detail()}">Detail</span>
-                <a class="rowlink" th:href="@{/interview-requests/{id}(id=${row.requestId()})}">Open this record</a>
+                <!--/* T292: a row is about a request OR a child, so the destination follows the
+                     target rather than assuming one. Before this every row assumed a request, which
+                     is why an unguarded href here would have rendered /interview-requests/null the
+                     day child rows started arriving. The wording stays identical in both branches:
+                     "this record" means the record the event was ABOUT, whichever kind it is. */-->
+                <a class="rowlink" th:if="${row.requestId() != null}"
+                   th:href="@{/interview-requests/{id}(id=${row.requestId()})}">Open this record</a>
+                <a class="rowlink" th:if="${row.childId() != null}"
+                   th:href="@{/children/{id}(id=${row.childId()})}">Open this record</a>
                 <!--/* 6c's entry point. Without it the event page exists and nothing reaches it,
                      which is the shape of a screen that gets built and then quietly rots. The two
                      links go to different things and say so: the record this event is ABOUT, and
