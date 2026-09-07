@@ -47,10 +47,21 @@ class InterviewStatusTransitionsTest {
 
     /**
      * CANCELLED has no in-edges, and that is the table telling the truth rather than an oversight:
-     * no production path has ever set it. Inventing an edge so the state looks usable would pre-empt
-     * T146's actual question - whether cancellation is intended vocabulary that needs building, or
-     * dead vocabulary that should be deleted. Demo fixtures and tests still construct CANCELLED rows,
-     * because {@code markStatus} treats the first status on a never-persisted row as a construction.
+     * no production path has ever set it.
+     *
+     * <p><b>T146 is now answered - the state STAYS</b> (see {@link InterviewStatus#CANCELLED} for
+     * the evidence), so this assertion has changed job. It was holding a question open; it is now
+     * <b>the tripwire on a settled decision</b>. Adding an in-edge is how cancellation gets built,
+     * and it must cost a reviewed change rather than a line in a map - so this test going red is the
+     * intended cost, not an obstacle to route around.
+     *
+     * <p><b>If you are here because you added an edge and this failed:</b> that is the design
+     * question T146 deliberately did not answer - who may cancel, from which states, whether it
+     * reverses, and what it does to a young person's 72-hour clock. Answer it somewhere a person
+     * reviews before you change this line.
+     *
+     * <p>Demo fixtures and tests still construct CANCELLED rows, because {@code markStatus} treats
+     * the first status on a never-persisted row as a construction.
      */
     @ParameterizedTest
     @EnumSource(InterviewStatus.class)

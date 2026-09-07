@@ -1459,7 +1459,13 @@ fieldset.step[hidden] { display: none; }
 .rail li.rail-SENT_BACK .rail-connector { background: var(--sent-back); }
 .rail li.rail-SENT_BACK .rail-label { color: var(--sent-back); font-weight: 700; }
 
-/* CANCELLED (the position a cancelled request last reached) - a different glyph AND colour pair
+/* T146: these four rules are NOT dead, though nothing in production can reach the state today.
+   CANCELLED was ruled KEPT rather than deleted (see InterviewStatus.CANCELLED), and this styling is
+   one of the reasons why - a designed glyph and colour pair from Creed's D-1a-2a, distinct from
+   REPORT_REJECTED on purpose. Deleting it in a dead-code sweep would quietly remove the argument
+   for keeping the constant, and the demo seeder renders a row through here today.
+
+   CANCELLED (the position a cancelled request last reached) - a different glyph AND colour pair
    from SENT_BACK (D-1a-2a's table gives the two rows distinct treatments), so the two can never
    be confused for each other even at a glance. */
 .rail li.rail-CANCELLED .rail-marker { color: var(--neutral); background: var(--neutral-bg); }
