@@ -77,8 +77,9 @@ public class UserService {
             return userRepository.findAllWithHome();
         }
         if (roleMatrix.isCareProviderOrgAdmin(principal)) {
-            return userRepository.findByAnyRoleAndHomeOrganisationId(
-                    rolesVisibleTo(principal), principal.getOrganisationId());
+            // AXIS 1 (T273): membership, not the grant set. See mayAdminister for the other axis and
+            // for why collapsing the two would make this list short by one.
+            return userRepository.findAllInOrganisation(principal.getOrganisationId());
         }
         if (roleMatrix.isSupplierOrgAdmin(principal)) {
             return userRepository.findByOrganisationId(principal.getOrganisationId());
@@ -136,6 +137,43 @@ public class UserService {
         return allowedRolesFor(principal);
     }
 
+    /**
+     * AXIS 2 (T273): may this principal ACT ON this account? One derivable predicate, no list.
+     *
+     * <p><strong>"Could I have granted every role this person holds?"</strong> Yes, and they are in
+     * my organisation, so they are mine to administer. No, and they are visible with their roles
+     * shown but not editable - a care-provider manager sees another manager and cannot act on them.
+     *
+     * <p><strong>Why peers are excluded, which is the part worth being careful about:</strong> taking
+     * over a peer's account gains NO CAPABILITY - they already hold the same powers. IT GAINS
+     * ATTRIBUTION. Their actions would then appear in the audit trail as somebody else, and in a
+     * safeguarding record attribution is the thing the trail is FOR. So peers must not be able to
+     * quietly become each other.
+     *
+     * <p><strong>The self exception is necessary, not a convenience:</strong> a sole manager who
+     * cannot edit themselves can never correct their own phone number. It is bounded by T278 - they
+     * still cannot remove or disable their own last-administrator status.
+     *
+     * <p><strong>This is the role-level rule one scale up.</strong> "A role the actor cannot grant,
+     * they cannot remove" (T275) becomes "you may act on what you could have granted". One idea, two
+     * scales - and expressing it as a predicate rather than a second list is what stops the two
+     * drifting apart.
+     */
+    public boolean mayAdminister(User user, AppUserPrincipal principal) {
+        if (user.getId() != null && user.getId().equals(principal.getUserId())) {
+            return true;
+        }
+        HomeScope scope = organisationAccessService.homeScopeFor(principal);
+        boolean insideTheOrganisation = (user.getOrganisation() != null
+                && user.getOrganisation().getId().equals(principal.getOrganisationId()))
+                || (!user.getHomes().isEmpty() && user.getHomes().stream().allMatch(scope::canView));
+        // EVERY role, not any: holding one grantable role does not make an account grantable when it
+        // also holds one the actor could never have given it.
+        List<Role> grantable = allowedRolesFor(principal);
+        return insideTheOrganisation && !user.getRoles().isEmpty()
+                && grantable.containsAll(user.getRoles());
+    }
+
     public User getAuthorized(Long id, AppUserPrincipal principal) {
         // findDetailedById, not findById: this method reads the target's homes, and with
         // open-in-view disabled a lazy collection on a detached entity is a 500 rather than a
@@ -158,14 +196,7 @@ public class UserService {
         // controller or a widened rule changes without touching this file.
         boolean visible;
         if (roleMatrix.isCareProviderOrgAdmin(principal)) {
-            HomeScope scope = organisationAccessService.homeScopeFor(principal);
-            // Reads the SAME set as the list query above rather than restating HOME_STAFF, which is
-            // the whole of T281: the list and the detail page must agree about who is visible, and
-            // they now agree because they ask one question rather than because two answers match.
-            List<Role> visibleRoles = rolesVisibleTo(principal);
-            visible = user.getRoles().stream().anyMatch(visibleRoles::contains)
-                    && !user.getHomes().isEmpty()
-                    && user.getHomes().stream().allMatch(scope::canView);
+            visible = mayAdminister(user, principal);
         } else if (roleMatrix.isSupplierOrgAdmin(principal)) {
             visible = user.getOrganisation() != null
                     && user.getOrganisation().getId().equals(principal.getOrganisationId());

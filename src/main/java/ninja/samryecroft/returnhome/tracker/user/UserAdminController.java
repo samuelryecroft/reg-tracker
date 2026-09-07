@@ -56,7 +56,17 @@ public class UserAdminController {
 
     @GetMapping
     public String list(@AuthenticationPrincipal AppUserPrincipal principal, Model model) {
-        model.addAttribute("users", userService.listVisible(principal));
+        List<User> visible = userService.listVisible(principal);
+        model.addAttribute("users", visible);
+        // T273 axis 2. The list shows EVERYONE in the organisation; only some of them are this
+        // principal's to act on. Passing the editable ids lets the row drop its edit affordance
+        // rather than offering a link that the route would then refuse - reachable-but-refused is
+        // the gap Pam-FE checked this very screen for, and it would be a worse outcome than the
+        // omission the ruling exists to prevent.
+        model.addAttribute("editableUserIds", visible.stream()
+                .filter(candidate -> userService.mayAdminister(candidate, principal))
+                .map(User::getId)
+                .collect(java.util.stream.Collectors.toSet()));
         return "admin/user-list";
     }
 
