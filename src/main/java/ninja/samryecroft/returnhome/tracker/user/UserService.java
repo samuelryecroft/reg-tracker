@@ -247,7 +247,18 @@ public class UserService {
         // encoding of an empty string - that would be a real, matchable credential, and anyone
         // submitting a blank password would authenticate as this account.
         user.setPassword(form.getPassword() == null ? null : passwordEncoder.encode(form.getPassword()));
-        applyProfile(user, form.getFirstName(), form.getLastName(), form.getEmail(), form.getContactPhone());
+        applyProfile(user, form.getFirstName(), form.getLastName(), form.getContactPhone());
+        // CREATE still sets the address and EDIT no longer can (T323), and THIS IS A DOOR LEFT OPEN
+        // RATHER THAN A GAP THAT IS NOT THERE. My first note here said creating an account with an
+        // address of your choosing creates no person to impersonate. That is wrong, and Kevin
+        // measured it: an administrator creating an account CHOOSES WHERE THE FIRST CODE GOES, and
+        // can therefore sign in as that person BEFORE the real user ever does. Nothing on this card
+        // closes that; VERIFY-ON-FIRST-USE in T322 does.
+        //
+        // It is left open deliberately rather than overlooked - an account has to be given an
+        // address once, by somebody, and refusing that here would only move the problem. Written
+        // down so the next reader knows which half is covered.
+        user.setEmail(trimToNull(form.getEmail()));
         user.setRoles(form.getRoles());
         user.setOrganisation(needsOrganisation(form.getRoles()) ? resolveOrganisation(form.getOrganisationId(), principal) : null);
         user.setHomes(resolveHomes(form.getRoles(), form.getHomeIds(), principal));
@@ -276,7 +287,10 @@ public class UserService {
         refuseToRemoveYourOwnAdministrativeRole(user, rolesBefore, roles, principal);
         boolean enabledBefore = user.isEnabled();
         refuseToStrandTheOrganisation(user, rolesBefore, roles, form.isEnabled());
-        applyProfile(user, form.getFirstName(), form.getLastName(), form.getEmail(), form.getContactPhone());
+        // NO EMAIL HERE, AND NO GUARD EITHER - EditUserForm has no such field to apply (T323).
+        // Guarding it inside this method would leave the field in the bundle, which is exactly what
+        // let two widenings of "who may edit this user" quietly pick up "and set their password".
+        applyProfile(user, form.getFirstName(), form.getLastName(), form.getContactPhone());
         user.setRoles(roles);
         user.setOrganisation(needsOrganisation(roles) ? resolveOrganisation(form.getOrganisationId(), principal) : null);
         user.setHomes(resolveHomes(roles, form.getHomeIds(), principal));
@@ -306,6 +320,94 @@ public class UserService {
         user.setPassword(passwordEncoder.encode(newPassword));
         User saved = userRepository.save(user);
         auditEventPublisher.userPasswordReset(saved, principal);
+        return saved;
+    }
+
+    /**
+     * Change an account's email address (T323). <b>Platform admin only.</b>
+     *
+     * <h2>Why this is narrower than every other user-admin action</h2>
+     *
+     * <p>Everything else on the edit screen is authorised through {@link #getAuthorized}, so a
+     * manager may do it to a colleague they administer. This one is not, and the reason is
+     * {@code T322}: <b>second-factor codes are sent to this address.</b> Emailed codes are only an
+     * acceptable second factor while the address cannot be redirected by somebody working alongside
+     * you - a manager who could change a colleague's address could point their codes at an inbox
+     * they control, sign in as them, and leave that colleague's name against everything done next.
+     * On a safeguarding record, attribution is what the trail is for.
+     *
+     * <p><b>Why the platform admin still may, and it is not an exception carved out for
+     * convenience.</b> They can already set any account's password ({@link #setPassword}), so they
+     * can already sign in as anybody; being able to redirect a code grants them nothing they do not
+     * have. The narrowing is aimed at the actor who has SOME administrative power over an account
+     * and should not have this particular one - which is exactly the colleague, and exactly not the
+     * platform.
+     *
+     * <p><b>Somebody has to be able to, or the narrowing is a different defect.</b> An address
+     * mistyped at creation would otherwise be uncorrectable for the life of the account, and an
+     * account whose owner cannot receive their codes is an account nobody can sign in to. That
+     * pressure is precisely what would make a later reader restore the field "as a usability fix",
+     * so the route out exists and is written down rather than left to be rediscovered.
+     *
+     * <p><b>Where this should eventually live, flagged rather than built:</b> the person best
+     * placed to change an address is its owner, and there is no self-service profile screen in this
+     * application today. Building one is not this card. When it exists, a self-change must be
+     * gated by the second factor itself - otherwise a stolen session becomes a permanent account
+     * takeover, which is the same hole this method exists to close, entered by the front door.
+     *
+     * <h2>THIS IS ONE OF THREE, AND ONE OF THREE IS NOT ENOUGH</h2>
+     *
+     * <p>Emailed second-factor codes are acceptable for this product only while ALL THREE of these
+     * hold. Remove any one and the hole reopens:
+     *
+     * <ol>
+     *   <li><b>No edit</b> - a colleague cannot redirect an existing person's codes. That is this
+     *       card, and it is the only one of the three that lives here.</li>
+     *   <li><b>No self-service password reset</b> (T322). Kevin's second objection, which this card
+     *       does not touch: CHANNEL COLLISION. If the mailbox can both receive a reset link and
+     *       receive the code, whoever reads that mailbox holds both factors and there is only one.
+     *       It is handled by NOT BUILDING the reset, so it is an absence, and absences are what get
+     *       added back as features.</li>
+     *   <li><b>Verified on first use</b> (T322). See {@code create}: an administrator setting the
+     *       address at creation chooses where the first code goes, and can sign in as that person
+     *       before the real user ever does. Narrowing the EDIT does nothing about that.</li>
+     * </ol>
+     *
+     * <p><b>This list is here because a comment that names only its own half is how the field gets
+     * restored.</b> A reader who sees "we removed edit so codes cannot be redirected" concludes the
+     * problem is solved and treats the restriction as tradeable against convenience. A reader who
+     * sees that it is one leg of three does not.
+     */
+    /**
+     * The account whose address is about to be changed, refused to anyone who may not change it.
+     *
+     * <p><b>One rule, asked twice, rather than two rules that agree today.</b> The screen and the
+     * save both go through {@link #refuseUnlessPlatformAdmin}, so a manager is refused at the GET
+     * rather than shown a form that the POST will reject - and, more to the point, the form's
+     * audience cannot drift away from the action's. That drift is the T281 shape and this is the
+     * screen T281 was about.
+     */
+    public User getAuthorizedToChangeEmail(Long id, AppUserPrincipal principal) {
+        refuseUnlessPlatformAdmin(principal);
+        return userRepository.findDetailedById(id)
+                .orElseThrow(() -> new IllegalArgumentException("No such user: " + id));
+    }
+
+    private void refuseUnlessPlatformAdmin(AppUserPrincipal principal) {
+        if (principal == null || !principal.hasRole(Role.ADMIN)) {
+            throw new AccessDeniedException(
+                    "Only a platform administrator may change an account's email address");
+        }
+    }
+
+    @Transactional
+    public User changeEmail(Long id, String newEmail, AppUserPrincipal principal) {
+        refuseUnlessPlatformAdmin(principal);
+        User user = userRepository.findDetailedById(id)
+                .orElseThrow(() -> new IllegalArgumentException("No such user: " + id));
+        user.setEmail(trimToNull(newEmail));
+        User saved = userRepository.save(user);
+        auditEventPublisher.userEmailChanged(saved, principal);
         return saved;
     }
 
@@ -436,11 +538,15 @@ public class UserService {
      *
      * <p>Trimmed here rather than in the form, because this is the last point before persistence
      * and a name with a trailing space sorts and displays wrongly for the life of the row.
+     *
+     * <p><b>The email address is no longer one of these fields (T323)</b>, and that is why the two
+     * paths now differ where this javadoc says they must not: create sets it, edit cannot. The
+     * sentence above is still the rule for the fields that ARE here - it stopped applying to the
+     * address the moment the address stopped being a profile field and became its own action.
      */
-    private void applyProfile(User user, String firstName, String lastName, String email, String contactPhone) {
+    private void applyProfile(User user, String firstName, String lastName, String contactPhone) {
         user.setFirstName(trimToNull(firstName));
         user.setLastName(trimToNull(lastName));
-        user.setEmail(trimToNull(email));
         user.setContactPhone(trimToNull(contactPhone));
     }
 

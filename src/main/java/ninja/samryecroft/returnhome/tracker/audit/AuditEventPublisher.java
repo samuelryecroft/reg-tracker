@@ -163,6 +163,26 @@ public class AuditEventPublisher {
                 .build());
     }
 
+    /**
+     * An administrator changed an account's email address (T323).
+     *
+     * <p><strong>Neither address is recorded, old or new</strong>, and that is deliberate rather
+     * than an omission. {@code audit_events} refuses UPDATE and DELETE by trigger, so anything
+     * written here is permanent - and an email address is personal data about a named individual
+     * that would then be unerasable. The row answers WHO changed WHOSE address and WHEN, which is
+     * what an investigation into a redirected second factor actually needs; the address itself is
+     * on the account, where it can still be corrected.
+     *
+     * <p>Same shape and same reasoning as {@link #userPasswordReset}, which likewise records the
+     * act and never the value.
+     */
+    public void userEmailChanged(User target, AppUserPrincipal principal) {
+        publish(actor(AuditEventRecord.of(AuditEventType.USER_EMAIL_CHANGED), principal)
+                .target("User", target.getId())
+                .scope(organisationIdOf(target), homeIdOf(target))
+                .build());
+    }
+
     // --- Organisation lifecycle (T168(b)) ---
 
     /**

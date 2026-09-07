@@ -131,8 +131,12 @@ class UserProfileFieldsIntegrationTest extends AbstractIntegrationTest {
         assertThat(userRepository.findByUsername("no-phone" + suffix).orElseThrow().getContactPhone()).isNull();
     }
 
+    /**
+     * Renamed in substance by T323: the form still prefills and still saves, but the EMAIL is no
+     * longer one of the things it saves - it is shown and not editable.
+     */
     @Test
-    void theEditFormIsPrefilledWithTheStoredProfileAndSavesChangesToIt() throws Exception {
+    void theEditFormIsPrefilledWithTheStoredProfileAndSavesChangesToItExceptTheEmail() throws Exception {
         User existing = new User();
         existing.setUsername("editable" + suffix);
         existing.setFirstName("Edith");
@@ -149,10 +153,17 @@ class UserProfileFieldsIntegrationTest extends AbstractIntegrationTest {
                 .andReturn().getResponse().getContentAsString();
         assertThat(html).contains("edith.clarke@example.test").contains("01234 567890").contains("Clarke");
 
+        // THE EMAIL PARAMETER IS SUBMITTED ON PURPOSE AND MUST BE IGNORED (T323). This assertion
+        // used to be its opposite - the edit form saved the address - and it is superseded rather
+        // than deleted, because the interesting question is not "is the field gone from the page"
+        // but "does a POST that mentions it anyway change anything". Removing the input shapes the
+        // form; it does not shape the request. Submitted here by a PLATFORM ADMIN, who is the one
+        // actor allowed to change an address at all, so this proves the edit ROUTE refuses it
+        // rather than that this particular caller is refused everywhere.
         mockMvc.perform(post("/admin/users/" + existing.getId() + "/edit").with(admin()).with(csrf())
                         .param("firstName", "Edith")
                         .param("lastName", "Clarke-Smith")
-                        .param("email", "edith.clarke-smith@example.test")
+                        .param("email", "redirected@attacker.test")
                         .param("contactPhone", "01234 000111")
                         .param("enabled", "true")
                         .param("roles", Role.COORDINATOR.name())
@@ -160,9 +171,13 @@ class UserProfileFieldsIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().is3xxRedirection());
 
         User updated = userRepository.findById(existing.getId()).orElseThrow();
-        assertThat(updated.getLastName()).isEqualTo("Clarke-Smith");
-        assertThat(updated.getEmail()).isEqualTo("edith.clarke-smith@example.test");
+        assertThat(updated.getLastName()).as("the rest of the profile still saves")
+                .isEqualTo("Clarke-Smith");
         assertThat(updated.getContactPhone()).isEqualTo("01234 000111");
+        assertThat(updated.getEmail())
+                .as("second-factor codes go to this address (T322), so the edit route must not "
+                        + "change it even for a caller who could change it on its own screen")
+                .isEqualTo("edith.clarke@example.test");
     }
 
     @Test
