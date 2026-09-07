@@ -2,13 +2,13 @@
 <html xmlns:th="http://www.thymeleaf.org" lang="en" th:attr="data-appearance=${#strings.toLowerCase(appearancePreference)}">
 <head>
     <meta charset="UTF-8"/>
-    <title>Add Child — Return Home Tracker</title>
+    <title>Add Young person — Return Home Tracker</title>
     <th:block th:replace="~{fragments/layout :: styles}"></th:block>
 </head>
 <body>
 <div th:replace="~{fragments/layout :: nav}"></div>
 <main id="main">
-    <h1>Add Child</h1>
+    <h1>Add Young person</h1>
 
     <div class="card">
         <form method="post" th:action="@{/children}" th:object="${form}">
@@ -17,13 +17,13 @@
                  can fix, and the message already says so. No anchor offered. */-->
             <div class="banner err" role="alert" th:if="${orgInactiveError != null}">
                 <span class="ic" aria-hidden="true">▲</span>
-                <div><strong>This child cannot be added yet</strong><p th:text="${orgInactiveError}">Error</p></div>
+                <div><strong>This young person cannot be added yet</strong><p th:text="${orgInactiveError}">Error</p></div>
             </div>
 
             <div class="banner err" role="alert" th:if="${#fields.hasErrors('*')}">
                 <span class="ic" aria-hidden="true">▲</span>
                 <div>
-                    <strong>Before this child can be added</strong>
+                    <strong>Before this young person can be added</strong>
                     <ul>
                         <li th:if="${#fields.hasErrors('firstName')}"><a href="#firstName" th:text="${#fields.errors('firstName')[0]}">Error</a></li>
                         <li th:if="${#fields.hasErrors('lastName')}"><a href="#lastName" th:text="${#fields.errors('lastName')[0]}">Error</a></li>
@@ -54,7 +54,7 @@
             <!--/* D-5d-4: optional is correct - a child can exist here before intake assigns one -
                  but leaving it blank is a safeguarding trade-off (ChildIdentity's masked label
                  degrades to bare initials), and the person leaving it blank was told nothing. */-->
-            <p class="hint">Used to tell children apart when names are masked. Can be added later.</p>
+            <p class="hint">Used to tell young people apart when names are masked. Can be added later.</p>
             <input type="text" id="localCaseReference" th:field="*{localCaseReference}"/>
 
             <div th:if="${needsHomePicker}">
@@ -68,7 +68,7 @@
             </div>
 
             <div class="btn-row">
-                <button type="submit" class="btn">Add child</button>
+                <button type="submit" class="btn">Add young person</button>
                 <a class="btn ghost" href="/children">Cancel</a>
             </div>
         </form>

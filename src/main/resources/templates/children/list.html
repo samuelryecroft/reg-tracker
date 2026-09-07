@@ -2,7 +2,7 @@
 <html xmlns:th="http://www.thymeleaf.org" lang="en" th:attr="data-appearance=${#strings.toLowerCase(appearancePreference)}">
 <head>
     <meta charset="UTF-8"/>
-    <title>Children — Return Home Tracker</title>
+    <title>Young people — Return Home Tracker</title>
     <th:block th:replace="~{fragments/layout :: styles}"></th:block>
 </head>
 <body>
@@ -12,10 +12,10 @@
          multi-home HOME_STAFF sees the column too), and a name after the mechanism it was written
          for rather than the property it encodes is exactly how a future reader mis-reasons about
          who this applies to. Named for what it decides, matching ChildController's own local var. */-->
-    <h1 th:text="${showHomeColumn} ? 'Children' : 'My Children'">Children</h1>
+    <h1 th:text="${showHomeColumn} ? 'Young people' : 'My Young people'">Young people</h1>
     <!--/* The matrix, not a role flag. This hid the button from VIEWER only, so a supplier
          org-admin - who can reach this page - was offered an action the server then refused. */-->
-    <a class="btn" href="/children/new" th:if="${can.addChild}">Add child</a>
+    <a class="btn" href="/children/new" th:if="${can.addChild}">Add young person</a>
 
     <!--/*
       6a (spec §7b): children are people, not an aggregate - R-Q12 rules cards for people and
@@ -45,8 +45,8 @@
 
     <!--/* R-Q13 (spec §5d), final copy - do not reword. */-->
     <div class="empty" th:if="${#lists.isEmpty(children)}">
-        No children added yet. Add a child before you can raise an interview request.
-        <a class="btn secondary" href="/children/new" th:if="${can.addChild}">Add a child</a>
+        No young people added yet. Add a young person before you can raise an interview request.
+        <a class="btn secondary" href="/children/new" th:if="${can.addChild}">Add a young person</a>
     </div>
 </main>
 </body>
