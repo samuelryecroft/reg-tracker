@@ -42,6 +42,17 @@
 // exactly the "two sentences that resemble each other" T247 removed), aria-live stays on the
 // existing #stepper-saved element with a stable DOM identity, and data-saved-at is still read once,
 // on load, from the server - nothing below touches any of that.
+//
+// T317: the stamp reported the last save EVENT, not the current save STATE. Nothing listened for
+// an edit, and Back never called autosave() at all (only Next and the panel jump did) - so a
+// visitor who returned to an earlier step, corrected an answer, and closed the tab saw "Saved
+// HH:MM" the whole time. T247's own fix was built against "believing your work is lost"; Creed
+// named the sharper, opposite harm this leaves standing: "believing your work is saved when it is
+// not" - worse on a statutory record, because nobody goes back to check a stamp that already says
+// Saved. Two changes close it, both below: any edit marks the stamp honestly unsaved the instant
+// it happens (state is asserted from the DOM, not inferred from when a request last succeeded),
+// and saving now runs on its own timer independent of stepper navigation - which also closes a
+// latent trap (see the T317 block below) rather than just the reported symptom.
 (function () {
     var form = document.querySelector('form[data-js="stepper"]');
     if (!form) {
@@ -259,6 +270,9 @@
         if (current > 0) {
             current -= 1;
             render();
+            // T317: Back used to be the one navigation path that never saved. After render(),
+            // never before it - same rule as Next and the panel jump (file header, point 2).
+            autosave();
         }
     });
     nextBtn.addEventListener('click', function () {
@@ -286,6 +300,7 @@
     // --- T174 autosave ---------------------------------------------------------------------
     var autosaveUrl = form.getAttribute('data-autosave-url');
     var autosaveStopped = false;
+    var dirtyDebounce = null;
 
     // One message for every transient failure, deliberately - and NOT because the client cannot
     // tell them apart. It often can. The reason is that what it can tell apart is not what it would
@@ -316,6 +331,13 @@
     }
 
     function autosave() {
+        // Whatever called this - a step transition or the debounced edit timer below - a save is
+        // about to be attempted, so any pending debounce is redundant. Clearing it here rather than
+        // at each call site means neither path has to remember to.
+        if (dirtyDebounce) {
+            clearTimeout(dirtyDebounce);
+            dirtyDebounce = null;
+        }
         if (!autosaveUrl || autosaveStopped) {
             return;
         }
@@ -371,6 +393,43 @@
             state(TRANSIENT, 'pending');
         });
     }
+
+    // --- T317: an edit is unsaved the instant it happens, and saves on its own timer -------
+    //
+    // Delegated on the form rather than per-field: fieldsIn() already enumerates every input,
+    // select and textarea across all six fieldsets, and a hidden fieldset's fields cannot receive
+    // a real 'input'/'change' event (they are not focusable), so nothing here needs to check which
+    // step is current.
+    //
+    // markDirty runs on EVERY keystroke/change, deliberately BEFORE any network activity: the
+    // property this fixes is that the stamp must reflect "does the server have this edit yet",
+    // which is true the instant a field changes and can be asserted without waiting on a request.
+    // Debouncing the SAVE (not the honesty of the indicator) keeps this from posting the whole
+    // form on every keystroke while a visitor is still mid-sentence in a textarea.
+    //
+    // This also closes the latent trap Creed flagged rather than leaving it for the next
+    // contributor to re-discover: nothing in fragments/report-fields.html sets `required` today,
+    // so stepIsValid() never actually blocks anything - but the day it does, Next's autosave call
+    // (guarded behind that same stepIsValid check, above) would stop firing on that step, and Save
+    // draft is hidden until step 6 (D-1c-3, deliberate, unchanged). A visitor stuck on an invalid
+    // early step would have had no way to persist a draft at all. markDirty's debounced autosave()
+    // never calls stepIsValid, so it keeps saving regardless of what Next allows - a draft is
+    // allowed to be incomplete; only submission is not.
+    function markDirty() {
+        if (autosaveStopped) {
+            // A terminal refusal is not a state edits can undo (file header, "the two failures are
+            // told apart because their remedies are opposite") - overwriting it with "Unsaved
+            // changes" would claim a save is still possible when the server has already said no.
+            return;
+        }
+        state('Unsaved changes', 'pending');
+        if (dirtyDebounce) {
+            clearTimeout(dirtyDebounce);
+        }
+        dirtyDebounce = setTimeout(autosave, 600);
+    }
+    form.addEventListener('input', markDirty);
+    form.addEventListener('change', markDirty);
 
     render();
 })();
