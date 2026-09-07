@@ -39,7 +39,8 @@ class OrganisationAdminControllerPreflightTest {
     private final OrganisationLifecycleService lifecycleService = mock(OrganisationLifecycleService.class);
     private final OrganisationAdminController controller =
             new OrganisationAdminController(repository, themeService, keyProvider, lifecycleService,
-                    mock(HomeRepository.class), mock(UserRepository.class));
+                    mock(HomeRepository.class), mock(UserRepository.class),
+                    mock(OrganisationReadinessService.class));
 
     private static CreateOrganisationForm careProviderForm() {
         CreateOrganisationForm form = new CreateOrganisationForm();

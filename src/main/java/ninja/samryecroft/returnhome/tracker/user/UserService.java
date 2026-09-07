@@ -88,6 +88,33 @@ public class UserService {
     }
 
     /**
+     * The ONE organisation {@link #listVisible} is scoped to, or {@code null} where it is not scoped
+     * to one at all (T267).
+     *
+     * <p><b>It lives here, four lines from {@code listVisible}, because it is a statement about that
+     * method's branches and nothing else.</b> A screen decorated with "this organisation is missing
+     * a coordinator" has to be showing one organisation for the sentence to have a subject - and a
+     * platform admin's list is {@code findAllWithHome()}, every user on the platform, so the same
+     * banner there would name an organisation that is not what they are looking at. Asking the
+     * question in the controller would put the branch structure in two files, where the page's
+     * subject and the notice's subject could quietly stop agreeing; that is the T281 shape, and this
+     * is the screen T281 was about.
+     *
+     * <p>The two org-admin branches keep their different queries - membership for a care provider,
+     * organisation for a supplier - so they cannot be collapsed into one call. What they share is
+     * having a single subject, and that is what this states. Move a branch above and move this.
+     */
+    public Long singleOrganisationSubjectOf(AppUserPrincipal principal) {
+        if (principal == null || principal.hasRole(Role.ADMIN)) {
+            return null;
+        }
+        if (roleMatrix.isCareProviderOrgAdmin(principal) || roleMatrix.isSupplierOrgAdmin(principal)) {
+            return principal.getOrganisationId();
+        }
+        return null;
+    }
+
+    /**
      * Which roles this principal is allowed to assign when creating/editing a user.
      *
      * <p>Delegated to {@link RoleMatrix}, which is also what the templates are shown, so the roles

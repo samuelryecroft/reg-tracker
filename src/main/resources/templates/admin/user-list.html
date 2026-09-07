@@ -9,6 +9,57 @@
 <div th:replace="~{fragments/layout :: nav}"></div>
 <main id="main">
     <h1>Users</h1>
+    <!--/* T267, Creed's ruling: an administrator is told DURING SETUP that this organisation cannot
+         yet do its job, rather than a coordinator finding out on first use.
+
+         INFO, NOT WARN, and the precedent is home-staff/request-form.html:44 - which carries Creed's
+         own §5h.4 rule: "an empty collection with a next action is not a warning, it is a state the
+         system reached correctly." An organisation missing a role IS an empty collection with a next
+         action, and the action is the Add user button immediately below. Nothing has failed and
+         nobody has done anything wrong; Oscar's words on the same shape are that a coordinator
+         before any visitor "is not a mistake, it is Tuesday". Same structure as the precedent: the
+         diamond glyph, strong + p, and its split on whether this reader may act.
+
+         ONE DELIBERATE DEPARTURE FROM THE PRECEDENT: no link. That banner keeps its CTA and
+         suppresses a neighbouring one; here it is the reverse, because Add user is this page's
+         PRIMARY control and sits inches below. Copying the precedent literally would ship two
+         Add-user affordances.
+
+         SAYS NOTHING ABOUT ACTIVATION. The organisation may also be PENDING for want of an
+         encryption key - a different failure with a different remedy: an operator provisions a key,
+         an administrator adds a person. One notice covering both sends half its readers to the wrong
+         one. The roles are NAMED for the same reason: "not yet operational" and the tree's "Awaiting
+         activation" are two phrasings of "cannot work yet" with nothing to tell them apart, so
+         labelling the state rather than naming the gap would merge them in the reader's head.
+
+         RENDERED ONLY WHERE THE PAGE HAS ONE ORGANISATION AS ITS SUBJECT - see
+         UserAdminController.readinessOfOwnOrganisation. A platform admin's list is every user on the
+         platform, so a banner about "this organisation" would name one that is not what they are
+         looking at. */-->
+    <div class="banner info" th:if="${organisationReadiness != null and !organisationReadiness.isOperational()}">
+        <span class="ic" aria-hidden="true">◆</span>
+        <div>
+            <strong>Some of this organisation’s roles are not filled</strong>
+            <!--/* Oscar's T266 shape - name the missing thing TWICE at two precisions - fits here
+                 because a banner has the room the tree's meta line does not. The supplier sentence
+                 names the three roles the work needs and then the ones actually absent; the care
+                 provider needs one role, so saying it twice would be padding. */-->
+            <p th:if="${organisationReadiness.type().name() == 'SUPPLIER'}"
+               th:text="'Interviews need a Coordinator, a Visitor and a Reviewer. '
+                       + ${organisationReadiness.missingSummary()} + '.'">
+                Interviews need a Coordinator, a Visitor and a Reviewer. Missing: Coordinator, Reviewer.</p>
+            <p th:unless="${organisationReadiness.type().name() == 'SUPPLIER'}">This organisation needs
+                at least one Home Staff account before interviews can be recorded.</p>
+            <!--/* The precedent's second branch, for a reader who cannot act. MEASURED: it is
+                 unreachable today, because this banner renders only for the two org-admin branches
+                 and canCreateUser is derived from assignableRoles, which is non-empty for both. It
+                 is built anyway rather than left out, and the two facts are recorded together: if
+                 the role matrix ever narrows, this page already says the right thing instead of
+                 telling somebody to press a button they do not have. */-->
+            <p th:unless="${can.addUser}">These can be added by an organisation administrator.</p>
+        </div>
+    </div>
+
     <a class="btn" href="/admin/users/new" th:if="${can.addUser}">Add user</a>
 
     <!--/*

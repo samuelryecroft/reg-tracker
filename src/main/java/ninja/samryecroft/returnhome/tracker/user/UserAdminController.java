@@ -11,6 +11,8 @@ import java.util.List;
 import ninja.samryecroft.returnhome.tracker.organisation.Organisation;
 import ninja.samryecroft.returnhome.tracker.organisation.OrganisationAccessService;
 import ninja.samryecroft.returnhome.tracker.organisation.OrgType;
+import ninja.samryecroft.returnhome.tracker.organisation.OrganisationReadiness;
+import ninja.samryecroft.returnhome.tracker.organisation.OrganisationReadinessService;
 import ninja.samryecroft.returnhome.tracker.user.dto.CreateUserForm;
 import ninja.samryecroft.returnhome.tracker.user.dto.EditUserForm;
 import ninja.samryecroft.returnhome.tracker.user.dto.SetPasswordForm;
@@ -39,11 +41,12 @@ public class UserAdminController {
     private final AuditHistoryService auditHistoryService;
     private final AuditEventPublisher auditEventPublisher;
     private final PasswordPolicy passwordPolicy;
+    private final OrganisationReadinessService readinessService;
 
     public UserAdminController(UserService userService, UserRepository userRepository, HomeRepository homeRepository,
             OrganisationRepository organisationRepository, OrganisationAccessService organisationAccessService,
             AuditHistoryService auditHistoryService, AuditEventPublisher auditEventPublisher,
-            PasswordPolicy passwordPolicy) {
+            PasswordPolicy passwordPolicy, OrganisationReadinessService readinessService) {
         this.userService = userService;
         this.userRepository = userRepository;
         this.homeRepository = homeRepository;
@@ -52,6 +55,7 @@ public class UserAdminController {
         this.auditHistoryService = auditHistoryService;
         this.auditEventPublisher = auditEventPublisher;
         this.passwordPolicy = passwordPolicy;
+        this.readinessService = readinessService;
     }
 
     @GetMapping
@@ -67,6 +71,7 @@ public class UserAdminController {
                 .filter(candidate -> userService.mayAdminister(candidate, principal))
                 .map(User::getId)
                 .collect(java.util.stream.Collectors.toSet()));
+        model.addAttribute("organisationReadiness", readinessOfOwnOrganisation(principal));
         return "admin/user-list";
     }
 
@@ -217,5 +222,30 @@ public class UserAdminController {
                 model.addAttribute("organisations", permitted);
             }
         }
+    }
+
+    /**
+     * T267: whether this administrator's OWN organisation has the people it needs, or {@code null}
+     * where the question has no subject.
+     *
+     * <p><b>This screen as well as the platform tree, because the two answer different questions.</b>
+     * The tree asks "which of these organisations is not working" - a comparison across rows. This
+     * asks "is mine working, and what do I add next" - one subject, with the button that fixes it on
+     * the same page. Neither screen can answer the other's, which is why both are worth having; it
+     * is not that only one audience can act, because a platform admin can add a user to any
+     * organisation too.
+     *
+     * <p>The subject comes from {@link UserService#singleOrganisationSubjectOf}, which is a statement
+     * about {@code listVisible}'s own branches, so the notice's subject and the page's subject
+     * cannot drift apart.
+     */
+    private OrganisationReadiness readinessOfOwnOrganisation(AppUserPrincipal principal) {
+        Long subject = userService.singleOrganisationSubjectOf(principal);
+        if (subject == null) {
+            return null;
+        }
+        return organisationRepository.findById(subject)
+                .map(readinessService::readinessFor)
+                .orElse(null);
     }
 }

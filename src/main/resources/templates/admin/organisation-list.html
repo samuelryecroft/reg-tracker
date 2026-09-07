@@ -63,6 +63,18 @@
                     <span class="case-ident">
                         <span class="case-name" th:text="${s.organisation().name}">Beacon Return Home Services</span>
                         <span class="case-meta" th:text="${s.meta()}">Supplier · 6 users · branding set</span>
+                        <!--/* T267, Creed's ruling: readiness rides IN meta() rather than as a
+                             second line or a fourth chip. NOT A CHIP, and the reason is COUNT
+                             rather than adjacency - the "Empty" tag beside the status chip has
+                             never read as one field, but a newly created supplier is Empty AND
+                             unstaffed AND PENDING at once, which is the DEFAULT state on creation
+                             and not an edge case. Four chips, three of them saying a version of
+                             "not ready" with three unrelated remedies and nothing saying which to
+                             do first. The conflation this card forbids arrives through chip count.
+
+                             Nothing conditional here: meta() replaces the user count with the
+                             readiness phrase when there is one, so an operational supplier's line
+                             is byte-for-byte what it was. */-->
                     </span>
                 </span>
                 <span class="case-tags">
@@ -87,7 +99,7 @@
                         <svg class="icon org-icon" aria-hidden="true"><use th:href="@{/icons/phosphor.svg} + '#ph-buildings'"></use></svg>
                         <span class="case-ident">
                             <span class="case-name" th:text="${p.organisation().name}">Harbourside Children&#39;s Care</span>
-                            <span class="case-meta" th:text="${p.homeNames()}">Oakwood House · Marisco Lodge</span>
+                            <span class="case-meta" th:text="${p.meta()}">Missing: Home Staff · Oakwood House · Marisco Lodge</span>
                         </span>
                     </span>
                     <span class="case-tags">
@@ -135,7 +147,7 @@
                         <svg class="icon org-icon" aria-hidden="true"><use th:href="@{/icons/phosphor.svg} + '#ph-buildings'"></use></svg>
                         <span class="case-ident">
                             <span class="case-name" th:text="${p.organisation().name}">Care provider</span>
-                            <span class="case-meta" th:text="${p.homeNames()}">No homes yet</span>
+                            <span class="case-meta" th:text="${p.meta()}">Missing: Home Staff · No homes yet</span>
                         </span>
                     </span>
                     <span class="case-tags">

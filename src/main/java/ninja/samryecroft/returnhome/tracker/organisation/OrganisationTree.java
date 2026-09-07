@@ -24,21 +24,52 @@ import ninja.samryecroft.returnhome.tracker.home.Home;
  * test, whereas the same logic inside a controller needs a database container to reach at all. The
  * bugs are then provable on any machine rather than only in CI.
  *
- * <p>It also keeps the query count flat. Four queries build the whole screen - organisations,
- * homes, per-organisation user counts, and which organisations have a theme row - with the joining
- * done in memory. Walking the tree to fetch each provider's homes would have been the obvious
- * shape and an N+1 on the one screen that renders every organisation on the platform.
+ * <p>It also keeps the query count flat. Six queries build the whole screen - organisations,
+ * homes, per-organisation user counts, which organisations have a theme row, and T267's two halves
+ * of the readiness gathering - with the joining done in memory. Walking the tree to fetch each
+ * provider's homes would have been the obvious shape and an N+1 on the one screen that renders
+ * every organisation on the platform.
+ *
+ * <p><b>Flat is the property, not the number four.</b> Every one of those is a single query whose
+ * result is bounded by organisations rather than by rows beneath them, and each new fact the screen
+ * shows arrives as a PRECOMPUTED MAP the way {@code userCountsByOrgId} does. The rule this class
+ * exists to hold is that nothing the template calls per row may reach a repository - a readiness
+ * lookup inside {@link SupplierNode#meta()} would be exactly the N+1 this note is here to prevent,
+ * and it would look like a tidy one-line change.
  */
 public record OrganisationTree(List<SupplierNode> suppliers, List<ProviderNode> unassigned) {
 
-    /** A supplier and the care providers it serves. */
+    /**
+     * A supplier and the care providers it serves.
+     *
+     * <p>{@code readiness} (T267) is carried ON THE NODE rather than handed to the template as a
+     * second map keyed by id. The row and the statement about the row then cannot disagree, which
+     * is this template's own lesson from the empty state below it: a page that decides something
+     * from a different collection than the one it draws can say one thing above a screen showing
+     * another.
+     */
     public record SupplierNode(Organisation organisation, int userCount, boolean brandingSet,
-            List<ProviderNode> careProviders) {
+            OrganisationReadiness readiness, List<ProviderNode> careProviders) {
 
-        /** The canvas's second line: "Supplier · 6 users · branding set". */
+        /**
+         * The canvas's second line: "Supplier · 6 users · branding set".
+         *
+         * <p>T267, Creed's ruling: where the supplier is not operational the readiness phrase
+         * <b>REPLACES</b> the user count rather than being appended - "6 users" and "Missing:
+         * Coordinator, Reviewer" are the same fact at two precisions, and the count is the weaker
+         * one. Beside a broken organisation it actively misleads: it invites "it is populated, it
+         * is fine". Three segments either way, so nothing here has to decide how to truncate.
+         *
+         * <p>Composed here rather than in the template because this line already was - and because
+         * the readiness must arrive as a value on the node. A repository call from a method the
+         * template invokes per row is the N+1 this class's javadoc exists to prevent, on the one
+         * screen that renders every organisation on the platform.
+         */
         public String meta() {
-            String users = userCount == 1 ? "1 user" : userCount + " users";
-            return "Supplier · " + users + (brandingSet ? " · branding set" : " · no branding set");
+            String middle = readiness.isOperational()
+                    ? (userCount == 1 ? "1 user" : userCount + " users")
+                    : readiness.missingSummary();
+            return "Supplier · " + middle + (brandingSet ? " · branding set" : " · no branding set");
         }
 
         /** A supplier serving nobody is tagged "Empty" on the canvas rather than hidden. */
@@ -48,7 +79,7 @@ public record OrganisationTree(List<SupplierNode> suppliers, List<ProviderNode> 
     }
 
     /** A care provider and the homes beneath it. */
-    public record ProviderNode(Organisation organisation, List<Home> homes) {
+    public record ProviderNode(Organisation organisation, OrganisationReadiness readiness, List<Home> homes) {
 
         /**
          * The homes, named, as the canvas renders them - "Oakwood House · Marisco Lodge".
@@ -62,6 +93,23 @@ public record OrganisationTree(List<SupplierNode> suppliers, List<ProviderNode> 
                 return "No homes yet";
             }
             return String.join(" · ", homes.stream().map(Home::getName).toList());
+        }
+
+        /**
+         * The provider's line, with readiness FIRST (T267, Creed's ruling).
+         *
+         * <p>A care provider has no user count to replace, so here the phrase is added - and it
+         * leads. {@link #homeNames()} is UNBOUNDED, so a finding placed after it is the part that
+         * gets clipped on a provider with a dozen homes. <b>The general rule, worth more than this
+         * one line: where a line mixes a bounded phrase with an unbounded list, the bounded phrase
+         * goes first.</b>
+         *
+         * <p>"Missing: Home Staff" and "No homes yet" will usually appear together on a brand new
+         * provider, and that is correct rather than redundant - home staff belong to a provider
+         * THROUGH their homes, so one says what is missing and the other says which to add first.
+         */
+        public String meta() {
+            return readiness.isOperational() ? homeNames() : readiness.missingSummary() + " · " + homeNames();
         }
     }
 
@@ -80,7 +128,8 @@ public record OrganisationTree(List<SupplierNode> suppliers, List<ProviderNode> 
      * value and sort unstably. The identity sequence cannot tie.
      */
     public static OrganisationTree from(List<Organisation> organisations, List<Home> homes,
-            Map<Long, Integer> userCountsByOrgId, Set<Long> orgIdsWithBranding) {
+            Map<Long, Integer> userCountsByOrgId, Set<Long> orgIdsWithBranding,
+            Map<Long, OrganisationReadiness> readinessByOrgId) {
 
         Map<Long, List<Home>> homesByOrgId = new LinkedHashMap<>();
         for (Home home : homes) {
@@ -103,7 +152,7 @@ public record OrganisationTree(List<SupplierNode> suppliers, List<ProviderNode> 
             if (organisation.getType() != OrgType.CARE_PROVIDER) {
                 continue;
             }
-            ProviderNode node = new ProviderNode(organisation,
+            ProviderNode node = new ProviderNode(organisation, readinessOf(readinessByOrgId, organisation),
                     homesByOrgId.getOrDefault(organisation.getId(), List.of()));
             Organisation supplier = organisation.getSupplierOrganisation();
             if (supplier == null) {
@@ -121,9 +170,24 @@ public record OrganisationTree(List<SupplierNode> suppliers, List<ProviderNode> 
             suppliers.add(new SupplierNode(organisation,
                     userCountsByOrgId.getOrDefault(organisation.getId(), 0),
                     orgIdsWithBranding.contains(organisation.getId()),
+                    readinessOf(readinessByOrgId, organisation),
                     providersBySupplierId.getOrDefault(organisation.getId(), List.of())));
         }
 
         return new OrganisationTree(suppliers, unassigned);
+    }
+
+    /**
+     * The organisation's readiness, or an EMPTY one if the caller did not supply it.
+     *
+     * <p>Empty means "holds none of the roles it needs", which is the honest answer to a missing
+     * entry and also the loud one. The tempting default is the opposite - treat an absent key as
+     * nothing-to-report - and that would hide exactly the organisation this card exists to point
+     * at, on the screen built to point at it, with no symptom.
+     */
+    private static OrganisationReadiness readinessOf(Map<Long, OrganisationReadiness> readinessByOrgId,
+            Organisation organisation) {
+        OrganisationReadiness supplied = readinessByOrgId.get(organisation.getId());
+        return supplied != null ? supplied : new OrganisationReadiness(organisation.getType(), Set.of());
     }
 }
