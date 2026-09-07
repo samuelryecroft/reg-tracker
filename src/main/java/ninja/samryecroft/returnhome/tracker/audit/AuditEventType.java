@@ -11,6 +11,24 @@ public enum AuditEventType {
     LOGIN_FAILURE,
 
     /**
+     * T322, the second factor. These sit BETWEEN LOGIN_FAILURE and LOGIN_SUCCESS in the story of a
+     * sign-in, and the ordering matters to a reader: a MFA_CHALLENGE_ISSUED with no following
+     * MFA_SUCCESS is somebody who knew the password and could not read the mailbox, which is the
+     * single most interesting pattern this catalogue can show. LOGIN_SUCCESS is still only written
+     * when BOTH factors have passed, so its meaning does not change with this card.
+     */
+    MFA_CHALLENGE_ISSUED,
+    MFA_SUCCESS,
+    MFA_FAILURE,
+
+    /**
+     * The challenge was burned - too many wrong codes against one issued code. Distinct from
+     * MFA_FAILURE because the difference is exactly the one a reviewer cares about: a wrong digit,
+     * versus somebody working through the space.
+     */
+    MFA_LOCKED,
+
+    /**
      * A sign-in through the emergency local credential path, and the highest-attention event in this
      * catalogue. Recorded IN ADDITION to LOGIN_SUCCESS rather than instead of it: the ordinary event
      * keeps the sign-in trail uniform, and this one exists so that "did anyone use break-glass" is a

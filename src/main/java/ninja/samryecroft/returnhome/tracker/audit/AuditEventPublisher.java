@@ -102,6 +102,78 @@ public class AuditEventPublisher {
                 .build());
     }
 
+    // --- Second factor (T322) ---
+
+    /**
+     * A code was issued: the password was right, and the session is not yet authenticated.
+     *
+     * <p>The actor id IS recorded here, unlike {@link #loginFailure}, and the difference is real
+     * rather than incidental - by this point the password has been verified, so we know which
+     * account this is even though nobody is signed in yet.
+     *
+     * <p><b>The code is not recorded, and neither is the destination address.</b> Recording either
+     * would put a live credential, or the exact thing the credential is delivered to, into a trail
+     * that is by design kept forever and readable by administrators. What a reviewer can act on is
+     * that a code was sent, to whom, and when.
+     */
+    public void mfaChallengeIssued(User user) {
+        publish(AuditEventRecord.of(AuditEventType.MFA_CHALLENGE_ISSUED)
+                .actor(user.getId(), user.getUsername(), roleNames(user.getRoles()))
+                .target("User", user.getId())
+                .scope(detachedOrganisationId(user), homeIdByQuery(user.getId()))
+                .build());
+    }
+
+    public void mfaSuccess(User user) {
+        publish(AuditEventRecord.of(AuditEventType.MFA_SUCCESS)
+                .actor(user.getId(), user.getUsername(), roleNames(user.getRoles()))
+                .target("User", user.getId())
+                .scope(detachedOrganisationId(user), homeIdByQuery(user.getId()))
+                .build());
+    }
+
+    /** {@code reason} is a fixed vocabulary - never the submitted value, which is a live guess. */
+    public void mfaFailure(User user, String reason) {
+        publish(AuditEventRecord.of(AuditEventType.MFA_FAILURE)
+                .actor(user.getId(), user.getUsername(), roleNames(user.getRoles()))
+                .target("User", user.getId())
+                .scope(detachedOrganisationId(user), homeIdByQuery(user.getId()))
+                .meta("reason", reason)
+                .build());
+    }
+
+    public void mfaLocked(User user) {
+        publish(AuditEventRecord.of(AuditEventType.MFA_LOCKED)
+                .actor(user.getId(), user.getUsername(), roleNames(user.getRoles()))
+                .target("User", user.getId())
+                .scope(detachedOrganisationId(user), homeIdByQuery(user.getId()))
+                .build());
+    }
+
+    /**
+     * Scope helpers for the second factor, and they exist because the ordinary ones are UNSAFE here.
+     *
+     * <p>{@link #organisationIdOf(User)} and {@link #homeIdOf(User)} both read {@code user.getHomes()}.
+     * That is fine for the user-admin flows they were written for, which hold an attached entity
+     * inside a transaction. The sign-in path does not: the {@code User} is loaded in a controller and
+     * is detached by the time these run, so touching the LAZY collection throws
+     * {@code LazyInitializationException} - <b>and it throws during a sign-in, which is the worst
+     * place in the application to discover it.</b>
+     *
+     * <p>{@code User}'s own javadoc warns about exactly this and prescribes the fix used here: a
+     * targeted repository query rather than a collection read. It is the same approach
+     * {@link #actorHomeId(AppUserPrincipal)} already takes for LOGIN_SUCCESS, for the same reason.
+     */
+    private Long homeIdByQuery(Long userId) {
+        List<Long> homeIds = userRepository.findHomeIds(userId);
+        return homeIds.size() == 1 ? homeIds.get(0) : null;
+    }
+
+    /** Safe on a detached user: reading the id off a LAZY {@code @ManyToOne} does not initialise it. */
+    private Long detachedOrganisationId(User user) {
+        return user.getOrganisation() != null ? user.getOrganisation().getId() : null;
+    }
+
     // --- User administration (A.2) ---
 
     public void userCreated(User created, AppUserPrincipal principal) {
