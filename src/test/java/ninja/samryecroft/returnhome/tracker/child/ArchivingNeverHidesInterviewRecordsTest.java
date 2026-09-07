@@ -134,14 +134,74 @@ class ArchivingNeverHidesInterviewRecordsTest extends AbstractIntegrationTest {
     /** They do leave the active list, which is the whole point of the feature. */
     @Test
     void theArchivedChildLeavesTheActiveList() {
-        assertThat(childRepository.findByHomeIdInAndArchivedFalse(Set.of(home.getId())))
+        assertThat(childRepository.findByHomeIdInAndArchivedAtIsNull(Set.of(home.getId())))
                 .as("present before, or this proves nothing")
                 .extracting(Child::getId).contains(child.getId());
 
         childLifecycleService.archive(child, manager);
 
-        assertThat(childRepository.findByHomeIdInAndArchivedFalse(Set.of(home.getId())))
+        assertThat(childRepository.findByHomeIdInAndArchivedAtIsNull(Set.of(home.getId())))
                 .extracting(Child::getId).doesNotContain(child.getId());
+    }
+
+    /**
+     * T321: the record says WHEN, not merely THAT - which is the whole of the human's rework.
+     *
+     * <p>A boolean answers "was this archived". A safeguarding question asked in 2029 is "when was
+     * this archived", and there is no answering it from a flag. <strong>The audit trail records the
+     * moment too, and that is not a reason for the row not to</strong>: the trail answers what
+     * happened, the row answers what is true now, and a list query cannot join to an audit table to
+     * find out whether to show somebody.
+     */
+    @Test
+    void archivingRecordsWhenItHappened() {
+        LocalDateTime beforeTheArchive = LocalDateTime.now();
+
+        childLifecycleService.archive(child, manager);
+
+        assertThat(childRepository.findDetailedById(child.getId()).orElseThrow().getArchivedAt())
+                .as("a boolean would satisfy every other assertion in this file")
+                .isNotNull()
+                .isAfterOrEqualTo(beforeTheArchive)
+                .isBeforeOrEqualTo(LocalDateTime.now());
+    }
+
+    /**
+     * AND THE STATE IS DERIVED FROM THE DATE, never stored beside it.
+     *
+     * <p>This is the arm that fails if someone reintroduces a companion boolean as a convenience -
+     * two fields that must agree are two fields that can disagree, and the failure mode is a young
+     * person who reads as archived on one screen and active on another. Asserted in both directions
+     * because a getter hard-wired to either constant satisfies one of them.
+     */
+    @Test
+    void beingArchivedIsDerivedFromHavingADateAndNothingElse() {
+        assertThat(child.isArchived()).as("no date, not archived").isFalse();
+        assertThat(child.getArchivedAt()).isNull();
+
+        Child archived = childLifecycleService.archive(child, manager);
+
+        assertThat(archived.isArchived()).as("a date, therefore archived").isTrue();
+        assertThat(archived.getArchivedAt()).isNotNull();
+    }
+
+    /**
+     * RESTORE CLEARS THE DATE, and it has to.
+     *
+     * <p>Keeping the last archive date on a restored record would make "archived_at is not null"
+     * stop meaning "archived" - and every list query on this column relies on exactly that, so the
+     * young person would be restored and still invisible. Nothing is lost by forgetting: both
+     * transitions are on {@code audit_events}, which refuses UPDATE and DELETE by trigger.
+     */
+    @Test
+    void restoreClearsTheDateRatherThanKeepingIt() {
+        childLifecycleService.archive(child, manager);
+
+        Child restored = childLifecycleService.restore(
+                childRepository.findDetailedById(child.getId()).orElseThrow(), manager);
+
+        assertThat(restored.getArchivedAt()).isNull();
+        assertThat(restored.isArchived()).isFalse();
     }
 
     /**
@@ -182,7 +242,7 @@ class ArchivingNeverHidesInterviewRecordsTest extends AbstractIntegrationTest {
 
         childLifecycleService.restore(childRepository.findDetailedById(child.getId()).orElseThrow(), manager);
 
-        assertThat(childRepository.findByHomeIdInAndArchivedFalse(Set.of(home.getId())))
+        assertThat(childRepository.findByHomeIdInAndArchivedAtIsNull(Set.of(home.getId())))
                 .extracting(Child::getId).contains(child.getId());
     }
 

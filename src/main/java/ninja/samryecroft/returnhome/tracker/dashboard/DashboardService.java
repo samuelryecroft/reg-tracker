@@ -82,7 +82,7 @@ public class DashboardService {
             homes = homeIds.isEmpty() ? List.of() : homeRepository.findAllById(homeIds);
             requests = homeIds.isEmpty() ? List.of() : interviewRequestRepository.findByHomeIdIn(homeIds);
             reports = homeIds.isEmpty() ? List.of() : interviewReportRepository.findByHomeIdIn(homeIds);
-            childCount = homeIds.isEmpty() ? 0 : childRepository.findByHomeIdInAndArchivedFalse(homeIds).size();
+            childCount = homeIds.isEmpty() ? 0 : childRepository.findByHomeIdInAndArchivedAtIsNull(homeIds).size();
         } else {
             Long orgId = principal.getOrganisationId();
             homes = homeRepository.findByOrganisationIdWithOrganisation(orgId);

@@ -4,29 +4,53 @@
 -- an organisation and a child: OUT OF ACTIVE SURFACES, STILL RETRIEVABLE, AUDITED, RESTORABLE. This
 -- column is the child's half of that one word.
 --
--- A BOOLEAN RATHER THAN A STATUS ENUM, and the difference from organisations is a real one rather
+-- A TIMESTAMP RATHER THAN A BOOLEAN (T321, the human's rework, and he is right). A boolean records
+-- THAT a record was archived; a timestamp records WHEN, and on a safeguarding record the when is
+-- the part somebody needs later - a question about a young person's care in 2029 is a question
+-- about dates. NULL MEANS NOT ARCHIVED: the same information as the boolean, in one column, with
+-- no second field to keep in agreement. There is deliberately NO companion boolean, because two
+-- columns that must agree are two columns that can disagree.
+--
+-- A TIMESTAMP RATHER THAN A STATUS ENUM, and the difference from organisations is a real one rather
 -- than an inconsistency. OrgStatus has three states because an organisation has an ACTIVATION
 -- CEREMONY - PENDING exists so that no encrypted record can be created before its KEK is confirmed.
 -- A child has no such gate: they are on the roll or they are archived. Giving this column a PENDING
 -- it can never hold would be modelling the organisation's problem on the child's table.
 --
--- DEFAULT FALSE NOT NULL, AND THE DEFAULT IS LOAD-BEARING FOR THE SAME REASON V19'S WAS. The
--- DB-plane job runs Flyway to completion BEFORE the new jar goes live, so for a few minutes the OLD
--- jar talks to this NEW schema. That jar knows nothing about `archived` and omits it from a child
--- INSERT; against NOT NULL with no default that is a constraint violation, and adding a young
--- person 500s mid-onboarding.
+-- REWRITTEN IN PLACE rather than superseded by a V22, because V21 has never run against production
+-- (T321). That is a statement about the environments, not about the file: `validate-on-migrate`
+-- defaults true, so editing an APPLIED migration is a checksum mismatch and an app that refuses to
+-- start. Re-verify before doing this again; the licence is the deployment history, and it expires.
 --
--- WHERE THIS DIFFERS FROM V19, AND IT IS WHY THERE IS ONLY ONE STATEMENT HERE: V19 needed a SECOND
--- statement because the value that was right for the BACKFILL (ACTIVE, so the existing estate stayed
--- usable) was the wrong value for the DEPLOY WINDOW (PENDING, so a row written by an unaware jar
--- goes through the KEK gate). For a child those two values are the SAME. Every existing child is on
--- the roll, and a child created during the window is also on the roll. FALSE is correct for both, so
--- there is nothing to set differently afterwards.
+-- ============================================================================================
+-- THE DEPLOY-WINDOW ARGUMENT, RE-ANSWERED RATHER THAN INHERITED. It does not carry over from the
+-- boolean, and this is the one place where a timestamp is not simply a boolean with more detail.
 --
--- No DROP DEFAULT follow-up is planned for the same reason V19 wanted one and this does not: there,
--- the default's absence bought LOUDNESS because the safe window value differed from the entity's
--- own initialiser. Here the column default, the entity initialiser and the correct value all agree,
--- so a bypassing insert landing FALSE is not a silent wrong answer - it is the right one.
+-- The DB-plane job runs Flyway to completion BEFORE the new jar goes live, so for a few minutes the
+-- OLD jar talks to this NEW schema. That jar knows nothing about this column and omits it from a
+-- child INSERT.
+--
+-- THE BOOLEAN SURVIVED THAT BECAUSE OF ITS DEFAULT: NOT NULL with DEFAULT FALSE meant the omitted
+-- column was filled in with the right value. THERE IS NOW NO DEFAULT - so if that were still the
+-- argument, this column would be a constraint violation and adding a young person would 500
+-- mid-onboarding.
+--
+-- IT HOLDS FOR A DIFFERENT REASON, AND A STRONGER ONE: there is no NOT NULL either. An omitted
+-- column lands NULL, and NULL is not a placeholder here - it IS "not archived", which is the
+-- correct state for a child created during the window. The boolean needed a default in order to be
+-- correct; this column is correct with no default at all, because the representation of "unset" and
+-- the meaning "not archived" are the same value.
+--
+-- WHAT THAT COSTS, STATED SO IT IS A CHOICE: the column can no longer refuse a row that fails to
+-- mention it, because "fails to mention it" is a legitimate state. That is not a loss - a NOT NULL
+-- on this column would be asserting that every child has an archive date, which is false for every
+-- child on the roll.
+-- ============================================================================================
+--
+-- NOT BACKFILLED, and there is nothing to backfill TO. Every existing child is on the roll, so the
+-- honest value for all of them is "no archive date", which is what they get by existing. This is
+-- where V19 needed a second statement and this does not: V19's right BACKFILL value differed from
+-- its right DEPLOY-WINDOW value, and here both are the same absence.
 
 ALTER TABLE children
-    ADD COLUMN archived BOOLEAN DEFAULT FALSE NOT NULL;
+    ADD COLUMN archived_at TIMESTAMP;

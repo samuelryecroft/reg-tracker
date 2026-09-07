@@ -43,17 +43,23 @@ public interface ChildRepository extends JpaRepository<Child, Long> {
      * ACTIVE surfaces only (T170): archived young people are off the lists and still retrievable by
      * id. The filter belongs on the LIST queries and nowhere else - {@code findDetailedById} stays
      * unfiltered on purpose, because a record that cannot be opened is not "archived", it is gone.
+     *
+     * <p>{@code ArchivedAtIsNull} rather than {@code ArchivedFalse} since T321 - the column is a
+     * timestamp and absence is the state. A derived query name resolves against the PERSISTENT
+     * ATTRIBUTES, so this could not have gone on reading {@code Archived} against a
+     * {@link Child#isArchived()} that is now computed: it would fail when the context starts, which
+     * is the right kind of failure for a rename to cause.
      */
-    List<Child> findByHomeIdInAndArchivedFalse(Collection<Long> homeIds);
+    List<Child> findByHomeIdInAndArchivedAtIsNull(Collection<Long> homeIds);
 
     List<Child> findByHomeIdIn(Collection<Long> homeIds);
 
     @EntityGraph(attributePaths = "home")
-    @Query("select c from Child c where c.archived = false")
+    @Query("select c from Child c where c.archivedAt is null")
     List<Child> findAllWithHome();
 
     @EntityGraph(attributePaths = "home")
-    @Query("select c from Child c where c.home.organisation.id = :organisationId and c.archived = false")
+    @Query("select c from Child c where c.home.organisation.id = :organisationId and c.archivedAt is null")
     List<Child> findByHomeOrganisationIdWithHome(@Param("organisationId") Long organisationId);
 
     @EntityGraph(attributePaths = {"home", "home.organisation"})
