@@ -3,11 +3,13 @@ package ninja.samryecroft.returnhome.tracker.user;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -19,6 +21,7 @@ import ninja.samryecroft.returnhome.tracker.organisation.OrganisationRepository;
 import ninja.samryecroft.returnhome.tracker.organisation.OrgType;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.access.AccessDeniedException;
@@ -93,13 +96,29 @@ class UserServiceVisibilityTest {
         assertThat(service().listVisible(principal)).containsExactly(theirs);
     }
 
+    /**
+     * The care-provider branch still queries by home organisation - and now asks for exactly the
+     * roles this principal may ASSIGN (T281).
+     *
+     * <p>The captured argument is the assertion that matters. Before T281 the query was
+     * HOME_STAFF-only while the grant matrix allowed HOME_STAFF and VIEWER, so a viewer could be
+     * created and then never seen again. Asserting the ROLE SET here rather than only the branch is
+     * what stops the two drifting apart a second time; asserting {@code containsExactly(staff)}
+     * alone would pass just as happily against the old query.
+     */
     @Test
-    void aCareProviderOrgAdminStillGetsTheHomeStaffQuery() {
+    void aCareProviderOrgAdminAsksForEveryRoleTheyMayAssign() {
         AppUserPrincipal principal = principal(Set.of(Role.ORG_ADMIN), organisation(9L, OrgType.CARE_PROVIDER));
         User staff = new User();
-        when(userRepository.findHomeStaffByHomeOrganisationId(9L)).thenReturn(List.of(staff));
+        ArgumentCaptor<Collection<Role>> roles = ArgumentCaptor.captor();
+        when(userRepository.findByAnyRoleAndHomeOrganisationId(any(), eq(9L))).thenReturn(List.of(staff));
 
         assertThat(service().listVisible(principal)).containsExactly(staff);
+
+        verify(userRepository).findByAnyRoleAndHomeOrganisationId(roles.capture(), eq(9L));
+        assertThat(roles.getValue())
+                .containsExactlyInAnyOrderElementsOf(new RoleMatrix().assignableRoles(principal));
+        assertThat(roles.getValue()).contains(Role.VIEWER);
     }
 
     @Test
@@ -127,7 +146,7 @@ class UserServiceVisibilityTest {
         AppUserPrincipal principal = principal(Set.of(Role.HOME_STAFF), organisation(7L, OrgType.CARE_PROVIDER));
         User target = new User();
         target.setOrganisation(organisation(7L, OrgType.CARE_PROVIDER));
-        when(userRepository.findById(42L)).thenReturn(Optional.of(target));
+        when(userRepository.findDetailedById(42L)).thenReturn(Optional.of(target));
 
         assertThatThrownBy(() -> service().getAuthorized(42L, principal))
                 .isInstanceOf(AccessDeniedException.class);
@@ -139,7 +158,7 @@ class UserServiceVisibilityTest {
         AppUserPrincipal principal = principal(Set.of(Role.ORG_ADMIN), organisation(7L, OrgType.SUPPLIER));
         User target = new User();
         target.setOrganisation(organisation(7L, OrgType.SUPPLIER));
-        when(userRepository.findById(42L)).thenReturn(Optional.of(target));
+        when(userRepository.findDetailedById(42L)).thenReturn(Optional.of(target));
 
         assertThat(service().getAuthorized(42L, principal)).isSameAs(target);
     }

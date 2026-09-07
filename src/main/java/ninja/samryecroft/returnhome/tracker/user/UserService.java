@@ -77,7 +77,8 @@ public class UserService {
             return userRepository.findAllWithHome();
         }
         if (roleMatrix.isCareProviderOrgAdmin(principal)) {
-            return userRepository.findHomeStaffByHomeOrganisationId(principal.getOrganisationId());
+            return userRepository.findByAnyRoleAndHomeOrganisationId(
+                    rolesVisibleTo(principal), principal.getOrganisationId());
         }
         if (roleMatrix.isSupplierOrgAdmin(principal)) {
             return userRepository.findByOrganisationId(principal.getOrganisationId());
@@ -110,8 +111,36 @@ public class UserService {
         return user.getRoles().stream().filter(role -> !assignable.contains(role)).sorted().toList();
     }
 
+    /**
+     * Which roles a principal may SEE, and it is deliberately the same list as the roles they may
+     * ASSIGN (T281).
+     *
+     * <p><strong>The defect this closes: a care-provider org admin could create a VIEWER and then
+     * never see it again.</strong> {@code RoleMatrix.assignableRoles} said HOME_STAFF and VIEWER;
+     * visibility said HOME_STAFF. Both rules were right on their own and neither was wrong when it
+     * was written - they were two statements about the same people that agreed by coincidence, and
+     * one of them moved. An account you can create but never afterwards see, disable or correct is
+     * broken on its own terms, and on a safeguarding system it is an account nobody can retire.
+     *
+     * <p><strong>This is a method rather than an inlined call so the RELATIONSHIP is the thing in
+     * the code</strong>, not a coincidence a reader has to reconstruct. Derived, not duplicated:
+     * add a role to the grant matrix and visibility follows it, which is the only reason the two
+     * cannot drift apart again.
+     *
+     * <p><strong>Why identity is the right relationship rather than merely a safe one:</strong> the
+     * capability being granted is "administer this person". Being able to create an account you
+     * cannot then reach is not a narrower permission, it is a broken one. If a case is ever found
+     * for seeing more than you may assign - or less - it belongs here, stated, with its reason.
+     */
+    private List<Role> rolesVisibleTo(AppUserPrincipal principal) {
+        return allowedRolesFor(principal);
+    }
+
     public User getAuthorized(Long id, AppUserPrincipal principal) {
-        User user = userRepository.findById(id)
+        // findDetailedById, not findById: this method reads the target's homes, and with
+        // open-in-view disabled a lazy collection on a detached entity is a 500 rather than a
+        // decision. See the repository method for why fetching beats wrapping this in a transaction.
+        User user = userRepository.findDetailedById(id)
                 .orElseThrow(() -> new IllegalArgumentException("No such user: " + id));
         if (principal.hasRole(Role.ADMIN)) {
             return user;
@@ -130,7 +159,12 @@ public class UserService {
         boolean visible;
         if (roleMatrix.isCareProviderOrgAdmin(principal)) {
             HomeScope scope = organisationAccessService.homeScopeFor(principal);
-            visible = user.hasRole(Role.HOME_STAFF) && !user.getHomes().isEmpty()
+            // Reads the SAME set as the list query above rather than restating HOME_STAFF, which is
+            // the whole of T281: the list and the detail page must agree about who is visible, and
+            // they now agree because they ask one question rather than because two answers match.
+            List<Role> visibleRoles = rolesVisibleTo(principal);
+            visible = user.getRoles().stream().anyMatch(visibleRoles::contains)
+                    && !user.getHomes().isEmpty()
                     && user.getHomes().stream().allMatch(scope::canView);
         } else if (roleMatrix.isSupplierOrgAdmin(principal)) {
             visible = user.getOrganisation() != null
