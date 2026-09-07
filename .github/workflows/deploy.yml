@@ -290,21 +290,44 @@ jobs:
       #   az webapp deployment slot swap -g <rg> -n <app> --slot staging --target-slot production
       #   rollback: az webapp deployment slot swap ... (swap back)
 
-      # --- Smoke: readiness probe must be green after deploy, else roll back ---
-      - name: Smoke test /actuator/health/readiness
+      # --- Smoke: readiness must be green, but not-green counts as FAILURE only AFTER the app's known
+      # cold-start warmup window (T307). This app cold-boots in ~330-490s (measured, T190/T294): the old
+      # 30 x 10s = 300s loop CANNOT pass a healthy deploy - it would report failure on every good release
+      # and trip the rollback below, and it has not bitten only because that rollback is still a stub.
+      # Budget is 900s, comfortably above the observed ~490s max with headroom, on a 15s interval. The
+      # loop NEVER reports failure before the whole budget is spent, so the rollback step (if: failure())
+      # cannot fire inside the warmup - which is the property T307 exists to guarantee. Revisit the budget
+      # when a staging slot makes readiness observable before swap (T269/tier decision) or T294 makes the
+      # boot fast; a slot would let this assert against the slot, not production, and the budget could drop.
+      - name: Smoke test /actuator/health/readiness (warmup-aware)
+        env:
+          SMOKE_BUDGET_SECONDS: "900"    # > observed max cold boot (~490s) + headroom; see T307/T190
+          SMOKE_INTERVAL_SECONDS: "15"
         run: |
           host="$(az webapp show -g '${{ steps.tf.outputs.rg }}' -n '${{ steps.tf.outputs.app_name }}' \
             --query defaultHostName -o tsv)"
-          for i in $(seq 1 30); do
+          deadline=$(( $(date +%s) + SMOKE_BUDGET_SECONDS ))
+          attempt=0
+          while [ "$(date +%s)" -lt "$deadline" ]; do
+            attempt=$((attempt + 1))
             code="$(curl -s -o /dev/null -w '%{http_code}' "https://${host}/actuator/health/readiness" || true)"
-            [ "$code" = "200" ] && { echo "readiness OK"; exit 0; }
-            echo "attempt $i: HTTP ${code}, retrying..."; sleep 10
+            [ "$code" = "200" ] && { echo "readiness OK after ${attempt} attempt(s)"; exit 0; }
+            remaining=$(( deadline - $(date +%s) ))
+            echo "attempt ${attempt}: HTTP ${code} (still within ${SMOKE_BUDGET_SECONDS}s warmup budget, ~${remaining}s left), retrying..."
+            sleep "$SMOKE_INTERVAL_SECONDS"
           done
-          echo "FATAL: readiness never returned 200 after deploy." >&2
+          echo "FATAL: readiness never returned 200 within ${SMOKE_BUDGET_SECONDS}s - i.e. PAST the known warmup window, so this is a real failure." >&2
           exit 1
+      # --- Rollback on failure. By construction this runs ONLY if the smoke step exhausted its full
+      # SMOKE_BUDGET_SECONDS (readiness still not 200 past the warmup window) - so it cannot fire during
+      # a normal cold start. The concrete rollback is DELIBERATELY still a stub: wiring it (slot swap on
+      # S1+, or redeploy-previous-artifact on B1) is T269 Phase 2 and needs the human's go plus the deploy
+      # identities that do not exist yet (see the GitHub automated-deploy plan). Do NOT implement it here.
       - name: Rollback on failure
         if: failure()
         run: |
-          echo "Deploy/smoke failed. On S1: 'az webapp deployment slot swap' back to the previous"
-          echo "slot for an instant rollback. On B1: redeploy the previous known-good artifact."
-          echo "TODO(WS-E enablement): wire the concrete rollback for the chosen tier."
+          echo "Deploy/smoke failed AFTER the ${SMOKE_BUDGET_SECONDS:-900}s warmup budget (a real failure, not warmup)."
+          echo "Rollback is NOT yet wired - that is T269 Phase 2 (needs human go + deploy identities)."
+          echo "On S1+: 'az webapp deployment slot swap' back to the previous slot for an instant rollback."
+          echo "On B1: redeploy the previous known-good artifact."
+          echo "TODO(T269 Phase 2): wire the concrete rollback for the chosen tier."
