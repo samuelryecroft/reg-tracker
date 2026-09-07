@@ -65,11 +65,15 @@
 
     var current = 0;
     var savedAt = form.getAttribute('data-saved-at');
-    // T318 (CREED-RULING-step-label-affordance.md): the step label needed a non-colour, non-hover
-    // rest-state affordance - :hover alone is invisible on the touch devices this panel is built
-    // for, and the aria-expanded background/colour swap is a colour-only state signal (WCAG 1.4.1).
-    // The sprite has no ph-caret-up, so ph-caret-down is rotated 180deg on [aria-expanded="true"]
-    // instead (CSS, above .step-label). The URL comes from the form's own data-icons attribute,
+    // T318 (CREED-RULING-step-label-affordance.md, corrected 11 Sep): the step label needed a
+    // non-colour, non-hover rest-state affordance - :hover alone is invisible on the touch devices
+    // this panel is built for, and the aria-expanded background/colour swap is a colour-only state
+    // signal (WCAG 1.4.1). The first draft rotated a single ph-caret-down; the corrected version
+    // follows the app's OWN existing pattern instead - the caret-closed/caret-open two-glyph swap
+    // already used by this same page's own <details> disclosure ("View full request details") and
+    // by reviewer/review-form.html's equivalent (CSS drives them off [aria-expanded="true"] the
+    // same way those drive them off [open]). A rotated single glyph is one icon doing double duty,
+    // which is exactly what R-Q11 rejects. The URL comes from the form's own data-icons attribute,
     // never hardcoded - a literal '/icons/phosphor.svg' would break under a context path.
     var iconsUrl = form.getAttribute('data-icons');
     var chrome = document.createElement('div');
@@ -78,7 +82,8 @@
         '<span class="dots"></span>' +
         '<button type="button" class="step-label" aria-expanded="false" aria-controls="stepper-panel">' +
         '<span class="step-label-text"></span>' +
-        '<svg class="icon" aria-hidden="true"><use href="' + iconsUrl + '#ph-caret-down"></use></svg>' +
+        '<svg class="icon caret-closed" aria-hidden="true"><use href="' + iconsUrl + '#ph-caret-right"></use></svg>' +
+        '<svg class="icon caret-open" aria-hidden="true"><use href="' + iconsUrl + '#ph-caret-down"></use></svg>' +
         '</button>' +
         // aria-live, because this is the only thing on the screen that says whether a visitor's
         // work is safe, and it changes without anything moving focus. A save state that reaches

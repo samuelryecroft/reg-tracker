@@ -1334,21 +1334,30 @@ fieldset.step[hidden] { display: none; }
    their parent in most engines - without this it would silently stop matching .steps's own type). */
 .step-label {
     font: inherit; color: inherit; background: none; border: none; cursor: pointer;
-    display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px; border-radius: 6px;
+    display: inline-flex; align-items: center; gap: var(--s2); padding: 2px 6px; border-radius: 6px;
 }
 .step-label:hover { background: var(--tint); }
-/* T318 (CREED-RULING-step-label-affordance.md): the original no-icon call was wrong - "without a
-   decorative icon" mistook a bound on ::before/::after (T165/AGSGT) for a bound on icons generally,
-   and left the open/closed state conveyed by colour alone (WCAG 1.4.1), with the only rest-state
-   affordance being :hover - invisible on the touch devices this panel is built for. The caret is a
-   real DOM child (untouched by T165/AGSGT), rotated on state rather than swapped, so it needs no
-   generated content and no second glyph.
-   LOAD-BEARING, DO NOT TRIM: the caret is what discharges 1.4.1 here. Removing it without adding a
-   border in its place puts this control straight back to a colour-only state signal. The transition
-   is guarded by the existing prefers-reduced-motion block above, not a new one. */
-.step-label .icon { transition: transform 150ms ease; }
+/* T318 (CREED-RULING-step-label-affordance.md, corrected 11 Sep): the original no-icon call was
+   wrong, and so was this fix's first draft. The app already asserts the ground in its own words,
+   stronger than the ruling first put it - see .disclosure's own 1.4.11 comment above: a caret is a
+   REQUIRED graphical object, the only visual cue a disclosure gives beyond its content appearing,
+   so it needs 3:1 contrast rather than a decorative-icon exemption. And AnnouncedGlyphSourceGuardTest
+   (T165/AGSGT) does not merely permit an icon here, its own failure message PRESCRIBES one: "if a
+   visual marker is wanted, add it as aria-hidden markup" - the guard only ever bars ::before/::after
+   generated content, never a real DOM icon.
+   So this follows the app's OWN existing pattern rather than inventing one: the same two-glyph
+   caret-closed/caret-open swap already used twice on THIS SAME PAGE's own disclosure
+   (visitor/report-form.html's "View full request details") and on reviewer/review-form.html's
+   equivalent - not a rotated single glyph, which is one icon doing double duty (R-Q11 rejects that
+   shape). No resting border either, for the same reason those two disclosures have none: the caret
+   pair already is the non-colour rest-state signal a border would otherwise supply.
+   LOAD-BEARING, DO NOT TRIM: the caret pair is what discharges 1.4.1 here. Removing it without
+   adding a border in its place puts this control straight back to a colour-only state signal. */
+.step-label .icon { color: var(--muted); }
+.step-label .caret-open { display: none; }
 .step-label[aria-expanded="true"] { background: var(--tint); color: var(--accent-dark); }
-.step-label[aria-expanded="true"] .icon { transform: rotate(180deg); }
+.step-label[aria-expanded="true"] .caret-open { display: block; }
+.step-label[aria-expanded="true"] .caret-closed { display: none; }
 
 .step-panel { list-style: none; margin: 0; padding: var(--s2) 0; background: var(--surface); border-bottom: 1px solid var(--border); }
 .step-panel-row {
