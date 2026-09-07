@@ -101,13 +101,13 @@ class RoleMatrixGatingIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     void theThreeAccountsThatMayAddAChildAreAllOfferedIt() throws Exception {
-        // "Add child" is not a blanket hide - a platform admin, a care-provider org-admin and home
+        // The add action is not a blanket hide - a platform admin, a care-provider org-admin and home
         // staff may all do it, so gating on "is an admin" would be wrong in both directions.
         for (String username : new String[]{"mx-platform-admin", "mx-provider-admin", "mx-home-staff"}) {
             String html = mockMvc.perform(get("/children").with(asUser(username + suffix)))
                     .andExpect(status().isOk())
                     .andReturn().getResponse().getContentAsString();
-            assertThat(html).as("%s is offered Add child", username).contains("/children/new");
+            assertThat(html).as("%s is offered the add-young-person action", username).contains("/children/new");
 
             mockMvc.perform(get("/children/new").with(asUser(username + suffix)))
                     .andExpect(status().isOk());

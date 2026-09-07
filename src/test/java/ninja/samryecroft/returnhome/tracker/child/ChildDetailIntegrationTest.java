@@ -202,8 +202,14 @@ class ChildDetailIntegrationTest extends AbstractIntegrationTest {
         String html = getDetail(child.getId());
 
         // D-4b-2: the caption promises content that isn't there if the table renders regardless.
-        assertThat(html).doesNotContain("Every interview request raised for this child");
-        assertThat(html).contains("No return home interviews for this child yet. They'll appear here once one is raised.");
+        // T320 found this could never fail: the string it named - "Every interview request raised
+        // for this child" - is not on this page and never was. The page says "Every return home
+        // interview raised for ...". A doesNotContain pinned to a string the template does not
+        // contain passes for the wrong reason, and passes just as happily on the day the thing
+        // it was guarding against actually appears. Repointed at the real sentence, in the
+        // renamed vocabulary, so it can fail again.
+        assertThat(html).doesNotContain("Every return home interview raised for this young person");
+        assertThat(html).contains("No return home interviews for this young person yet. They'll appear here once one is raised.");
     }
 
     private static int occurrencesOf(String haystack, String needle) {

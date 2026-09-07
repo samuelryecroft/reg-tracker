@@ -195,7 +195,7 @@
         <a th:if="${childrenNav.visible()}" href="/children"
            th:aria-current="${path == '/children' or #strings.startsWith(path, '/children/')} ? 'page'">
             <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-users-three'"></use></svg>
-            <span th:text="${childrenNav.label()}">Children</span>
+            <span th:text="${childrenNav.label()}">Young people</span>
         </a>
         <a th:if="${#authorization.expression('hasAnyRole(''ADMIN'',''ORG_ADMIN'')')}" href="/admin/homes"
            th:aria-current="${path == '/admin/homes' or #strings.startsWith(path, '/admin/homes/')} ? 'page'">

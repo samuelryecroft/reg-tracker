@@ -549,6 +549,29 @@ public class AuditHistoryService {
             // Says what actually happened - the code stopped being usable - rather than "locked",
             // which would read as the ACCOUNT being locked. It is not; the person can start again.
             case MFA_LOCKED -> entry("Security code refused too many times", event, when, role, null, "info");
+            // T320 (scope ruled in T250). These three arrived with T170 and went straight to the
+            // default, so this timeline has been rendering "Child Updated" - retired vocabulary,
+            // reinstated by a formatter, exactly the way "Rejected" came back after the product had
+            // renamed it. Not a competing decision: the ABSENCE of one.
+            //
+            // THE STORED CONSTANT IS NOT TOUCHED. eventType is @Enumerated(STRING) and
+            // @Column(updatable = false) on an append-only table; renaming CHILD_UPDATED would not
+            // rename history, it would SPLIT it - old rows keep the old name, new rows get the new
+            // one, and a query across the boundary answers half a question while looking like it
+            // answered all of it. Display mapping only, which is the whole point of this switch.
+            //
+            // AND THE DEFAULT IS WHY THESE NEED CASES AT ALL. The default is ruled (T295 §5) and it
+            // is a good rule - titleCase is plain enough that "Names Revealed" reads as something
+            // nobody chose. That property is what fails here: "Child Updated" does NOT read as
+            // undesigned. It reads as ruled copy, on a document a DPO or a court may read, and there
+            // is nothing about it that would make a reader doubt it. A safety net is safe for a
+            // constant whose plain rendering is merely unchosen; it is not safe for one whose plain
+            // rendering is a word the product has retired. AuditEventVocabularyTest holds that line
+            // for every constant this enum declares, including the ones added after today.
+            case CHILD_UPDATED -> entry("Young person's details updated", event, when, role,
+                    fieldsChangedDetail(meta), "info");
+            case CHILD_ARCHIVED -> entry("Young person archived", event, when, role, null, "info");
+            case CHILD_RESTORED -> entry("Young person restored", event, when, role, null, "info");
             // ACCESS_DENIED has no meaningful target linkage for a per-record view, and its metadata
             // is free text throughout; LOGIN_SUCCESS/FAILURE are excluded upstream for the user page
             // and never match a request/report/child target in the first place.
@@ -630,6 +653,16 @@ public class AuditHistoryService {
 
     private String rolesDetail(String roles) {
         return roles == null ? null : "Roles: " + formatRoles(roles);
+    }
+
+    /**
+     * T170 records WHICH fields changed and deliberately never what they changed to - "was this young
+     * person's date of birth changed, and by whom" is a question this trail answers; "what was it
+     * before" is one it is built not to answer from here. So the detail is the field names, verbatim.
+     */
+    private String fieldsChangedDetail(Map<String, String> meta) {
+        String changed = meta.get("fieldsChanged");
+        return changed == null || changed.isBlank() ? null : changed;
     }
 
     private String userUpdateDetail(Map<String, String> meta) {

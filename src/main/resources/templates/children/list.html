@@ -12,7 +12,18 @@
          multi-home HOME_STAFF sees the column too), and a name after the mechanism it was written
          for rather than the property it encodes is exactly how a future reader mis-reasons about
          who this applies to. Named for what it decides, matching ChildController's own local var. */-->
-    <h1 th:text="${showHomeColumn} ? 'Young people' : 'My Young people'">Young people</h1>
+    <!--/* T320/T250: the ruled split - a nav item NAMES, a page heading can EXPLAIN. "Young people in
+         your homes" says why the list is shorter, which is worth saying once on the page and never in
+         a fixed-width nav rail.
+         DELIBERATELY still keyed on showHomeColumn and NOT on
+         RoleMatrix#isChildrenListPersonalisedToOwnHomes, so this rename changes wording and nothing
+         else. The two are NOT equivalent: showHomeColumn is homeIds.size() > 1 for HOME_STAFF
+         (ChildController:89), while the predicate ignores how many homes. A HOME_STAFF with two homes
+         is personalised to their own homes and still gets the column - so today the nav says "My
+         Children" while this heading says "Children". That disagreement is PRE-EXISTING and is left
+         exactly as it was; keying the heading to the predicate instead would be a behaviour change,
+         and it belongs on its own card rather than inside a rename. */-->
+    <h1 th:text="${showHomeColumn} ? 'Young people' : 'Young people in your homes'">Young people</h1>
     <!--/* The matrix, not a role flag. This hid the button from VIEWER only, so a supplier
          org-admin - who can reach this page - was offered an action the server then refused. */-->
     <a class="btn" href="/children/new" th:if="${can.addChild}">Add young person</a>

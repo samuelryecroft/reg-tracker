@@ -186,7 +186,7 @@ class CaseFileExportPageIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
 
-        assertThat(html).contains("This pack contains special-category personal data about a child.");
+        assertThat(html).contains("This pack contains special-category personal data about a young person.");
         assertThat(html).contains("1 report document(s) will be attached");
     }
 

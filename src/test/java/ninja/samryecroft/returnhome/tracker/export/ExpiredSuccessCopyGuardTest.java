@@ -30,7 +30,7 @@ import org.junit.jupiter.api.Test;
  *
  * <p><b>Byte-exact, not "contains roughly this".</b> Same drift risk as T218's expired-page guard
  * (Jim, {@code ExpiredExportCopyGuardTest}): the two pages' sentences differ in exactly one clause
- * ("audit trail" vs "this child's case history"), which is precisely the kind of near-miss that
+ * ("audit trail" vs "this young person's case history"), which is precisely the kind of near-miss that
  * survives review because it reads as correct. Copied from spec §7w (HEAD {@code cd2bbfb}), not
  * retyped.
  */
@@ -49,8 +49,18 @@ class ExpiredSuccessCopyGuardTest {
     private static final String AUDIT_RULED_COPY =
             SHARED_OPENING + " Each one writes its own row in the audit trail, which is the point.";
 
+    /**
+     * T320: {@code child's} -> {@code young person's}, and this constant moves WITH the template, in
+     * the same commit, on purpose. That is the one way this sentence is allowed to change. The guard
+     * exists to stop a near-miss paraphrase winning by accident during some unrelated tidy-up; it is
+     * not a veto on the copy's own author ruling it differently later. T250 rules the vocabulary of
+     * user-facing copy in full and its replacement table names {@code child's -> young person's}
+     * exactly, so this is spec §7w still being the source of truth, said in the word the product now
+     * uses. Nothing else in the sentence moved - not a clause, not a comma - and the byte-exact check
+     * is what proves that rather than my saying so.
+     */
     private static final String CASE_FILE_RULED_COPY =
-            SHARED_OPENING + " Each one is recorded on this child's case history, which is the point.";
+            SHARED_OPENING + " Each one is recorded on this young person's case history, which is the point.";
 
     /**
      * The literal segment of the countdown badge's {@code th:text} expression - present in the raw

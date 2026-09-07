@@ -76,8 +76,15 @@ class NavChildrenDedupeUiTest extends AbstractUiTest {
                 .isEqualTo("page");
     }
 
+    /**
+     * T320/T250 moved this framing, it did not delete it. A nav item NAMES and a page heading can
+     * EXPLAIN, so the rail now says the same thing to everyone and "in your homes" - the part that
+     * says WHY this list is shorter - is on the heading, where there is room to read it. Both halves
+     * are asserted here rather than only the new one, because dropping the second assertion would
+     * turn a relocation into a silent deletion and nothing would have gone red.
+     */
     @Test
-    void aPureHomeStaffAccountStillGetsTheOwnHomesFraming() {
+    void aPureHomeStaffAccountStillGetsTheOwnHomesFramingOnTheHeadingNotTheRail() {
         createStackedUser("nav-dedupe-staff-only", Role.HOME_STAFF);
         login("nav-dedupe-staff-only", PASSWORD);
         page.navigate(url("/children"));
@@ -85,6 +92,8 @@ class NavChildrenDedupeUiTest extends AbstractUiTest {
 
         assertThat(page.locator(".shell-nav a[href='/children']").count()).isEqualTo(1);
         assertThat(page.locator(".shell-nav a[href='/children']").textContent().trim())
-                .isEqualTo("My Children");
+                .isEqualTo("Young people");
+        assertThat(page.locator("main h1").textContent().trim())
+                .isEqualTo("Young people in your homes");
     }
 }
