@@ -64,8 +64,12 @@
       disabled button (permanent, not provisional - there is nothing that could later enable one).
     */-->
     <p class="muted" th:if="${canDecide}">You did not submit this report.</p>
-    <div class="banner warn" th:unless="${canDecide}">
-        <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-warning-circle'"></use></svg>
+    <!--/* T286 (spec §5h.4): warn -> info - separation of duties working as designed is not a
+         warning. ph-lock-simple rather than a new icon: this is the same page's OTHER info banner
+         below (D-1b-9, "can't be edited here") in different words - both are permission facts
+         about this specific report, not problems, and sharing the glyph says so. */-->
+    <div class="banner info" th:unless="${canDecide}">
+        <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-lock-simple'"></use></svg>
         <div>
             <strong>You can't decide this report</strong>
             <p>A reviewer cannot approve or send back a report they submitted themselves - this

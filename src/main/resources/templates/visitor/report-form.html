@@ -58,8 +58,14 @@
         </dl>
     </details>
 
-    <div class="banner warn" th:if="${request.status.name() == 'REPORT_REJECTED'}" role="alert">
-        <span class="ic" aria-hidden="true">↩</span>
+    <!--/* T156/T286 (spec §5h.3): being sent back is the process working, not something going
+         wrong - .banner.sent-back has existed unused since D-1a-2a's tokens were locked (app.css),
+         waiting for this. ph-arrow-u-up-left matches the rail's own exception state and
+         reviewer/review-form.html's prior-send-back note, so all three surfaces read as one
+         decision. Dropped role="alert": that role is for interruption, and this is a fact, not
+         one - matching .banner.ok's own "Activated." notice above, which never carried it either. */-->
+    <div class="banner sent-back" th:if="${request.status.name() == 'REPORT_REJECTED'}">
+        <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-arrow-u-up-left'"></use></svg>
         <div>
             <strong>Sent back for revision</strong>
             <p th:text="${form.reviewComments}">Reviewer comments</p>

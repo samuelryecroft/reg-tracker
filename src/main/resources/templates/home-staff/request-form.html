@@ -36,9 +36,13 @@
               list that declines to send you here is only a courtesy. Reusing the list's own two
               branches, not new copy (D-5e-2). Suppresses the "+ Add a child not in this list"
               line below, which would otherwise duplicate this banner's own CTA.
+
+              T286 (spec §5h.4): warn -> info - an empty collection with a next action is not a
+              warning, it is a state the system reached correctly. Icon follows the reclassification
+              (the generic diamond glyph, matching this page's other info-tier facts).
             */-->
-            <div class="banner warn" th:if="${#lists.isEmpty(children)}">
-                <svg class="icon" aria-hidden="true"><use th:href="@{/icons/phosphor.svg} + '#ph-warning-circle'"></use></svg>
+            <div class="banner info" th:if="${#lists.isEmpty(children)}">
+                <span class="ic" aria-hidden="true">◆</span>
                 <div>
                     <strong>No children are recorded for this home yet</strong>
                     <p th:if="${can.addChild}">Add a child before you can raise an interview request. <a href="/children/new">Add a child</a></p>
