@@ -217,6 +217,7 @@ public class UserService {
         validateCombination(roles);
         refuseToRemoveYourOwnAdministrativeRole(user, rolesBefore, roles, principal);
         boolean enabledBefore = user.isEnabled();
+        refuseToStrandTheOrganisation(user, rolesBefore, roles, form.isEnabled());
         applyProfile(user, form.getFirstName(), form.getLastName(), form.getEmail(), form.getContactPhone());
         user.setRoles(roles);
         user.setOrganisation(needsOrganisation(roles) ? resolveOrganisation(form.getOrganisationId(), principal) : null);
@@ -271,6 +272,49 @@ public class UserService {
      * a later card may widen - which is the same mistake as the care-provider side being safe only
      * by accident of HOME_STAFF exclusivity.
      */
+    /**
+     * An organisation must always have at least one ENABLED org administrator (T278, Oscar's hole 2).
+     *
+     * <p><strong>Two routes lead to one outcome, and only one of them is a role change.</strong>
+     * T275 closed the accidental role route - a merged submission cannot strip a role the actor
+     * could not grant - but that fix has nothing to say about the {@code enabled} flag, which is a
+     * CHECKBOX ON THE SAME FORM. A whole week of discussion about roles would not have led anyone to
+     * look there. A third route, archiving a user (T170), does not exist yet and will arrive here
+     * rather than somewhere new: <strong>this lives in the service because that is where the routes
+     * converge</strong>, and a rule placed on the form would have to be rewritten for each of them.
+     *
+     * <p><strong>Why the consequence is not administrative tidiness.</strong> An organisation with no
+     * enabled administrator cannot add users and cannot fix itself; it has to come to us. For a care
+     * provider that means it cannot onboard home staff - so a home that needs to raise a request for
+     * a missing young person has nobody able to give them an account. <em>The failure is
+     * administrative; the consequence is that a child's interview does not get requested.</em>
+     *
+     * <p>The refusal states the reason rather than only refusing, because the actor's next move
+     * ("appoint another administrator first") is not guessable from a bare denial.
+     *
+     * <p>Deliberately checked against the MERGED role set and the SUBMITTED enabled flag - the state
+     * the account would actually be left in. Checking the submission alone would miss the case where
+     * a retained role keeps them an administrator, and checking roles alone would miss disabling
+     * entirely, which is the route this card exists for.
+     */
+    private void refuseToStrandTheOrganisation(User user, Set<Role> before, Set<Role> after,
+            boolean enabledAfter) {
+        Long organisationId = user.getOrganisation() == null ? null : user.getOrganisation().getId();
+        boolean wasTheirOrganisationsAdmin = organisationId != null
+                && before.contains(Role.ORG_ADMIN) && user.isEnabled();
+        if (!wasTheirOrganisationsAdmin) {
+            return;
+        }
+        boolean stillIs = after.contains(Role.ORG_ADMIN) && enabledAfter;
+        if (stillIs || userRepository.hasAnotherEnabledOrgAdmin(organisationId, user.getId())) {
+            return;
+        }
+        throw new IllegalArgumentException(
+                "This is the last enabled administrator for " + user.getOrganisation().getName()
+                        + ". Appoint another administrator first, or the organisation will have "
+                        + "nobody able to manage its accounts.");
+    }
+
     private void refuseToRemoveYourOwnAdministrativeRole(User user, Set<Role> before, Set<Role> after,
             AppUserPrincipal principal) {
         if (!user.getId().equals(principal.getUserId())) {

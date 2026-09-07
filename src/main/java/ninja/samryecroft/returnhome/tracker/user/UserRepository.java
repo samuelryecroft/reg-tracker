@@ -36,6 +36,21 @@ public interface UserRepository extends JpaRepository<User, Long> {
     boolean existsByRole(@Param("role") Role role);
 
     /**
+     * Whether this organisation still has an enabled org administrator OTHER than {@code excludedId}
+     * (T278).
+     *
+     * <p>Asks about the SURVIVORS rather than counting admins, because the question the invariant
+     * actually poses is "would this action leave the organisation with none" - and the user being
+     * changed must be excluded from their own answer, since the change under consideration has not
+     * been written yet.
+     */
+    @Query("select case when count(u) > 0 then true else false end from User u "
+            + "where u.organisation.id = :organisationId and u.id <> :excludedId and u.enabled = true "
+            + "and ninja.samryecroft.returnhome.tracker.user.Role.ORG_ADMIN member of u.roles")
+    boolean hasAnotherEnabledOrgAdmin(@Param("organisationId") Long organisationId,
+            @Param("excludedId") Long excludedId);
+
+    /**
      * Per-organisation account counts for the 4e tree, in one query.
      *
      * <p>Returns {@code [organisationId, count]} pairs rather than a map, because JPQL cannot
