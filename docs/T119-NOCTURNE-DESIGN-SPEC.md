@@ -1327,6 +1327,62 @@ component:**
 human's first reading was the correct one; the notice is oversized because it is the wrong component, and it
 would still be oversized in any colour.
 
+### 6. T303 — the ruling. **Delete the banner. The pattern already exists on a sibling page.**
+
+**Measured on `origin/main`. I nearly specified a component that is already built.**
+
+#### The banner is doing three jobs and two of them already have homes
+
+`coordinator/requests.html` renders `<nav class="seg" aria-label="Filter these requests">` **three lines
+above** the banner (D-2a-6/S-3): the stage filter as chips, single-choice, selection carried by
+`aria-current`, with an "All" chip that clears it.
+
+| the banner states | already stated by |
+|---|---|
+| the `filter` stage | **the `.seg` chip row, with `aria-current`** — duplicate |
+| `homeId` | **nothing. This is the only real content.** |
+| "Clear filters" | the "All" chip clears `filter` but **deliberately preserves `homeId`** — so this is the only control that clears the home |
+
+> **S-3 kept the banner because it "states it in ordinary running text, and carries the one control that gets
+> you back out."** Both halves were true when written. **The first is now a restatement; the second is true
+> only because the home filter has no representation in the control.**
+
+#### `audit/feed.html` already solves this, and does not use a banner
+
+Same problem, sibling page: `<nav class="seg" aria-label="Filter by home">` — **the home filter AS CHIPS**,
+`aria-current` for selection, and an all-homes chip whose href simply omits `homeId`. **No filter-state banner
+anywhere on that page.** Its empty branch says *"No recorded activity matches these filters"* with a
+`.btn secondary` "Clear filters" — **the identical idiom `coordinator/requests.html` already uses in its own
+empty branch.**
+
+> **Two sibling pages, the same single-choice home filter, two treatments — and the one that is not a banner is
+> already built, already contrast-swept, and already understood by assistive technology.**
+
+#### RULED
+
+1. **Delete the `.banner.info` filter notice.** Not a smaller banner, not a different variant, not running
+   text. **State that can be undone belongs with the control that undoes it** (§5h.5), and here the control
+   exists.
+2. **Give `homeId` a chip, in `audit/feed.html`'s idiom.** It is a **scope** filter, not a **stage** filter, so
+   it does **not** join the `.seg` stage row — that row is a single-choice menu of one dimension. A second
+   `.seg` row labelled for the home dimension, or a removable `.tag-outline` chip whose href drops `homeId` and
+   **preserves `filter`**. Either satisfies this ruling; the second dimension having its own control is what
+   matters.
+3. **The chip names the HOME.** The banner currently renders `'One home only (id ' + homeId + ')'` — **a raw
+   database id in user-facing copy**, which is T265's defect in a second costume. `CoordinatorController:71`
+   supplies `homeId` and **no name**; `audit/feed.html` already has `homes` in its model. **Adding the name is
+   a required part of this change, not a follow-up.** If a name cannot be supplied, the id is still not shown.
+4. **The empty branch is untouched.** It already carries R-Q13's disambiguation and its own "Clear filters",
+   and it is the only place running text is warranted — because there an empty list is genuinely ambiguous.
+
+#### It does NOT generalise — measured, and stated so nobody sweeps
+
+Four templates mention filtering. **`audit/feed.html` already uses the correct pattern. `audit/event.html`'s
+only mention is inside a comment. Only `coordinator/requests.html` states filter state in a banner.**
+
+> **One instance. No sweep.** The value here is not a new component — it is that **one of two sibling pages
+> drifted from a pattern the other already had**, and nothing compared them.
+
 ## 5i · Screen 1a, the last open item — the original request disclosure (Creed, 4 Sep)
 
 Pam flagged that the collapsed `<details>` and the "the record leads with the report" ordering were the one
