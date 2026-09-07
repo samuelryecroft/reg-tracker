@@ -8,11 +8,13 @@ import jakarta.validation.constraints.Size;
 import java.util.HashSet;
 import java.util.Set;
 import ninja.samryecroft.returnhome.tracker.user.Role;
-import ninja.samryecroft.returnhome.tracker.user.password.PasswordCandidate;
-import ninja.samryecroft.returnhome.tracker.user.password.StrongPassword;
 
-@StrongPassword
-public class EditUserForm implements PasswordCandidate {
+/**
+ * <strong>This form no longer sets passwords (T277).</strong> The credential moved to
+ * {@link SetPasswordForm} and its own action, so that no future widening of "who may edit this user"
+ * can include "and therefore set their password" by accident. It had happened twice.
+ */
+public class EditUserForm {
 
     @NotBlank(message = "First name is required")
     @Size(max = 255)
@@ -49,13 +51,6 @@ public class EditUserForm implements PasswordCandidate {
     private Set<Long> homeIds = new HashSet<>();
 
     private boolean enabled;
-
-    /**
-     * The length rule that used to sit here as {@code @Size(min = 8)} is the class-level
-     * {@link StrongPassword} constraint now - the same object {@code CreateUserForm} and
-     * {@code AdminUserSeeder} use.
-     */
-    private String newPassword;
 
     public String getFirstName() {
         return firstName;
@@ -122,45 +117,4 @@ public class EditUserForm implements PasswordCandidate {
         this.enabled = enabled;
     }
 
-    public String getNewPassword() {
-        return newPassword;
-    }
-
-    public void setNewPassword(String newPassword) {
-        this.newPassword = newPassword;
-    }
-
-    // --- PasswordCandidate (T272) ---
-
-    @Override
-    public String passwordBeingSet() {
-        return newPassword;
-    }
-
-    @Override
-    public String passwordFieldName() {
-        return "newPassword";
-    }
-
-    /**
-     * NULL, AND THIS IS A STATED GAP RATHER THAN AN OVERSIGHT. This form does not edit the username
-     * and does not carry it, so the constraint cannot check the username context value here. Adding
-     * a hidden field would make a validation input user-controllable, which is worse than the gap it
-     * closes. {@code UserAdminController} supplies the real username from the loaded account instead,
-     * through the same {@link ninja.samryecroft.returnhome.tracker.user.password.PasswordPolicy}.
-     */
-    @Override
-    public String usernameForPolicy() {
-        return null;
-    }
-
-    @Override
-    public String emailForPolicy() {
-        return email;
-    }
-
-    @Override
-    public Long organisationIdForPolicy() {
-        return organisationId;
-    }
 }

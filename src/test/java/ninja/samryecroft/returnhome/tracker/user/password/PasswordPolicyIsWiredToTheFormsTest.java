@@ -7,7 +7,6 @@ import jakarta.validation.Validator;
 import java.util.Set;
 import ninja.samryecroft.returnhome.tracker.AbstractIntegrationTest;
 import ninja.samryecroft.returnhome.tracker.user.dto.CreateUserForm;
-import ninja.samryecroft.returnhome.tracker.user.dto.EditUserForm;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -49,16 +48,12 @@ class PasswordPolicyIsWiredToTheFormsTest extends AbstractIntegrationTest {
                 .allSatisfy(message -> assertThat(message).contains("72 bytes"));
     }
 
-    @Test
-    void anOverLongPasswordOnEditIsAFieldErrorRatherThanAnEncoderCrash() {
-        EditUserForm form = new EditUserForm();
-        form.setEmail("existing@example.org");
-        form.setNewPassword(OVER_THE_ENCODER_CEILING);
-
-        assertThat(violationsOn(validator.validate(form), "newPassword"))
-                .isNotEmpty()
-                .allSatisfy(message -> assertThat(message).contains("72 bytes"));
-    }
+    // The edit-form case that used to sit here MOVED rather than went (T277). EditUserForm no
+    // longer sets passwords, so there is no form-level constraint left to validate - the second
+    // path that sets one is a dedicated route, and it reaches the SAME PasswordPolicy through the
+    // controller rather than through a bean-validation annotation. A validator test could not see
+    // that wiring at all, which is precisely the failure this class exists to catch, so the
+    // assertion is now a route-level one in PasswordIsItsOwnActionTest.
 
     /** And the ordinary case still gets through, so the guard is not simply refusing everything. */
     @Test

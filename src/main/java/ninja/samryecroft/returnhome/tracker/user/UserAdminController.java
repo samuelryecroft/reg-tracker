@@ -13,6 +13,7 @@ import ninja.samryecroft.returnhome.tracker.organisation.OrganisationAccessServi
 import ninja.samryecroft.returnhome.tracker.organisation.OrgType;
 import ninja.samryecroft.returnhome.tracker.user.dto.CreateUserForm;
 import ninja.samryecroft.returnhome.tracker.user.dto.EditUserForm;
+import ninja.samryecroft.returnhome.tracker.user.dto.SetPasswordForm;
 import ninja.samryecroft.returnhome.tracker.user.password.PasswordContext;
 import ninja.samryecroft.returnhome.tracker.user.password.PasswordPolicy;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -116,7 +117,6 @@ public class UserAdminController {
     @PostMapping("/{id}/edit")
     public String update(@PathVariable Long id, @AuthenticationPrincipal AppUserPrincipal principal,
             @Valid @ModelAttribute("form") EditUserForm form, BindingResult bindingResult, Model model) {
-        rejectAPasswordBuiltFromTheUsername(id, principal, form, bindingResult);
         if (bindingResult.hasErrors()) {
             User target = userService.getAuthorized(id, principal);
             model.addAttribute("user", target);
@@ -138,23 +138,44 @@ public class UserAdminController {
     }
 
     /**
-     * The one context value {@code EditUserForm} cannot supply (T272 R2).
-     *
-     * <p>The form does not edit the username and does not carry it, so the class-level constraint
-     * checks the email, organisation and application values but not this one. Carrying the username
-     * in a hidden field would close the gap by making a validation input user-controllable, which
-     * trades a small hole for a worse shape. So the real username is read from the loaded account
-     * here - the SAME {@link PasswordPolicy} object, not a second copy of the rule, and only the
-     * username context is supplied because everything else has already been checked.
+     * The password form (T277). Its own screen because it is its own action.
      */
-    private void rejectAPasswordBuiltFromTheUsername(Long id, AppUserPrincipal principal,
-            EditUserForm form, BindingResult bindingResult) {
-        if (form.getNewPassword() == null || form.getNewPassword().isBlank()) {
-            return;
+    @GetMapping("/{id}/password")
+    public String passwordForm(@PathVariable Long id, @AuthenticationPrincipal AppUserPrincipal principal,
+            Model model) {
+        model.addAttribute("user", userService.getAuthorized(id, principal));
+        model.addAttribute("form", new SetPasswordForm());
+        return "admin/user-password";
+    }
+
+    /**
+     * <strong>The policy context is read from the LOADED ACCOUNT, not from the submission</strong>,
+     * and that is stronger than what it replaces.
+     *
+     * <p>On the edit form the username could not be carried at all (a hidden field would have made a
+     * validation input user-controllable), so only the email and organisation reached the policy -
+     * and those arrived IN THE SAME POST, so a caller could weaken their own policy context by
+     * editing the email field while setting a password. Here the form carries only the password and
+     * every context value comes from the account on the server, so all four of T272 R2's context
+     * values apply and none of them is attacker-supplied.
+     *
+     * <p>The same {@code PasswordPolicy} object, not a second copy of the rule (T272 R4).
+     */
+    @PostMapping("/{id}/password")
+    public String setPassword(@PathVariable Long id, @AuthenticationPrincipal AppUserPrincipal principal,
+            @Valid @ModelAttribute("form") SetPasswordForm form, BindingResult bindingResult, Model model) {
+        User target = userService.getAuthorized(id, principal);
+        if (!bindingResult.hasErrors()) {
+            passwordPolicy.rejectionFor(form.getNewPassword(), new PasswordContext(target.getUsername(),
+                            target.getEmail(), target.getOrganisation() == null ? null : target.getOrganisation().getName()))
+                    .ifPresent(message -> bindingResult.rejectValue("newPassword", "password.policy", message));
         }
-        String username = userService.getAuthorized(id, principal).getUsername();
-        passwordPolicy.rejectionFor(form.getNewPassword(), new PasswordContext(username, null, null))
-                .ifPresent(message -> bindingResult.rejectValue("newPassword", "password.policy", message));
+        if (bindingResult.hasErrors()) {
+            model.addAttribute("user", target);
+            return "admin/user-password";
+        }
+        userService.setPassword(id, form.getNewPassword(), principal);
+        return "redirect:/admin/users";
     }
 
     private void rejectDuplicateUsername(BindingResult bindingResult) {

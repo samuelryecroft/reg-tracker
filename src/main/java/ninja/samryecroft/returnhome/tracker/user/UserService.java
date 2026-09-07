@@ -223,12 +223,31 @@ public class UserService {
         user.setOrganisation(needsOrganisation(roles) ? resolveOrganisation(form.getOrganisationId(), principal) : null);
         user.setHomes(resolveHomes(roles, form.getHomeIds(), principal));
         user.setEnabled(form.isEnabled());
-        boolean passwordChanged = form.getNewPassword() != null && !form.getNewPassword().isBlank();
-        if (passwordChanged) {
-            user.setPassword(passwordEncoder.encode(form.getNewPassword()));
-        }
+        // No password handling here any more (T277). Setting a credential is its own action on its
+        // own form, so no future widening of "who may edit this user" can include it by accident -
+        // which is what happened twice while it was a field in this bundle.
         User saved = userRepository.save(user);
-        auditEventPublisher.userUpdated(saved, rolesBefore, enabledBefore, passwordChanged, principal);
+        auditEventPublisher.userUpdated(saved, rolesBefore, enabledBefore, principal);
+        return saved;
+    }
+
+    /**
+     * Set another account's password (T277).
+     *
+     * <p>Authorised through the SAME {@link #getAuthorized} the edit form uses, so this action is
+     * reachable by exactly the people who could already administer the account - the card removes a
+     * capability from a BUNDLE, it does not narrow or widen who holds it.
+     *
+     * <p>Audited as its own event rather than a flag on a user update, because a credential change
+     * is the one user-admin action whose consequence is that somebody else can sign in as this
+     * person.
+     */
+    @Transactional
+    public User setPassword(Long id, String newPassword, AppUserPrincipal principal) {
+        User user = getAuthorized(id, principal);
+        user.setPassword(passwordEncoder.encode(newPassword));
+        User saved = userRepository.save(user);
+        auditEventPublisher.userPasswordReset(saved, principal);
         return saved;
     }
 
