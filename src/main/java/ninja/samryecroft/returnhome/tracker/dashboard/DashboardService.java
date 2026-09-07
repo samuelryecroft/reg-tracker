@@ -18,6 +18,7 @@ import ninja.samryecroft.returnhome.tracker.interview.DeadlineTracker;
 import ninja.samryecroft.returnhome.tracker.interview.DueState;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewRequest;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewRequestRepository;
+import ninja.samryecroft.returnhome.tracker.interview.InterviewRequestService;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewStatus;
 import ninja.samryecroft.returnhome.tracker.interview.QueueFilter;
 import ninja.samryecroft.returnhome.tracker.organisation.OrganisationAccessService;
@@ -155,7 +156,7 @@ public class DashboardService {
         return new SupplierDashboard(
                 orgName, careProviders.size(), allHomes.size(),
                 options, careProviderFilterId,
-                supplierLiveTiles(requests, now, supplierScope.orElse(null)),
+                supplierLiveTiles(requests, reports, now, supplierScope.orElse(null)),
                 period, overallRate,
                 ranked(rows), tooFew(rows),
                 homeLevelRecurrenceCounts(requests));
@@ -184,17 +185,49 @@ public class DashboardService {
                         QueueFilter.CONSENT.href(), "View requests →", consentMissing > 0 ? "warn" : ""));
     }
 
-    private List<LiveTile> supplierLiveTiles(List<InterviewRequest> requests, LocalDateTime now, Long supplierOrgId) {
+    /**
+     * The supplier's "needs attention" tiles - four of them deadline-derived, and THREE OF THEM
+     * STAGE-DERIVED since T319.
+     *
+     * <p><b>A deadline metric reports; a stage-duration metric assigns.</b> Every tile here used to
+     * come from the 72-hour clock, which answers <i>what is late</i> and names nobody to chase. A
+     * request can sit unallocated for six days and appear on no tile at all, because its clock has
+     * not started or its deadline is still ahead.
+     *
+     * <p><b>Oscar's premise was false for one of the three stages and that is worth keeping</b>: the
+     * Unallocated tile ALREADY carried an age, as {@code "oldest waiting 144 hours"}. So T319 is not
+     * "add the missing measurement" - it is one genuinely missing stage plus a format that nobody
+     * converts in their head. All three are normalised to the one form (god's ruling): shipping the
+     * new tile as "oldest 6 days" beside an existing one in raw hours would have put two formats for
+     * one concept on a single screen, which is a smaller copy of the defect being fixed.
+     */
+    private List<LiveTile> supplierLiveTiles(List<InterviewRequest> requests, List<InterviewReport> reports,
+            LocalDateTime now, Long supplierOrgId) {
         List<InterviewRequest> live = requests.stream().filter(r -> DeadlineTracker.tracksDeadline(r.getStatus())).toList();
         int overdue = countByState(live, now, DueState.OVERDUE);
 
+        // STAGE ENTRY, NOT CREATION, for each of the three - the distinction is the whole point. A
+        // request raised nine days ago and allocated an hour ago is not stuck, and a tile that says
+        // it is trains people to ignore the tile. Unallocated is the one stage where the two
+        // coincide, because being raised IS entering it.
         List<InterviewRequest> unallocated = requests.stream().filter(r -> r.getStatus() == InterviewStatus.REQUESTED).toList();
-        String oldestWaiting = unallocated.stream().map(InterviewRequest::getCreatedAt).min(Comparator.naturalOrder())
-                .map(created -> Duration.between(created, now).toHours() + " hours")
-                .map(hours -> "oldest waiting " + hours)
-                .orElse("none waiting");
+        StageWait waitingToAllocate = StageWait.of(unallocated, InterviewRequest::getCreatedAt, now);
+
+        List<InterviewRequest> awaitingSchedule = requests.stream()
+                .filter(InterviewRequestService::isAwaitingSchedule).toList();
+        StageWait waitingForADate = StageWait.of(awaitingSchedule, InterviewRequest::getAllocatedAt, now);
 
         List<InterviewRequest> awaitingReview = requests.stream().filter(r -> r.getStatus() == InterviewStatus.REPORT_SUBMITTED).toList();
+        // The stage began when the report was SUBMITTED, which is on the report and not the request.
+        // Taken from the pending report rather than the newest one: a rejected-then-resubmitted
+        // interview re-entered this stage at the resubmission, and dating it from the first
+        // submission would report a reviewer as slow for time they spent waiting on the visitor.
+        Map<Long, LocalDateTime> submittedAt = reports.stream()
+                .filter(report -> report.getStatus() == ReportStatus.SUBMITTED && report.getSubmittedAt() != null)
+                .collect(Collectors.toMap(report -> report.getInterviewRequest().getId(),
+                        InterviewReport::getSubmittedAt, (a, b) -> a.isAfter(b) ? a : b));
+        StageWait waitingToReview = StageWait.of(awaitingReview,
+                request -> submittedAt.get(request.getId()), now);
 
         List<User> visitors = userRepository.findByRoleAndOrganisationId(Role.VISITOR, supplierOrgId);
         Set<InterviewStatus> openStatuses = Set.of(InterviewStatus.ALLOCATED, InterviewStatus.SCHEDULED,
@@ -208,9 +241,13 @@ public class DashboardService {
         return List.of(
                 new LiveTile("Overdue now", String.valueOf(overdue), "across every care provider we serve",
                         QueueFilter.OVERDUE.href(), "View overdue →", overdue > 0 ? "urgent" : ""),
-                new LiveTile("Unallocated", String.valueOf(unallocated.size()), oldestWaiting,
+                // The three stage tiles, in workflow order, each naming the person who has to move:
+                // coordinator, then visitor, then reviewer.
+                new LiveTile("Unallocated", String.valueOf(unallocated.size()), waitingToAllocate.detail(),
                         QueueFilter.UNALLOCATED.href(), "Allocate now →", unallocated.isEmpty() ? "" : "warn"),
-                new LiveTile("Awaiting review", String.valueOf(awaitingReview.size()), "reports pending a decision",
+                new LiveTile("Awaiting a visit time", String.valueOf(awaitingSchedule.size()), waitingForADate.detail(),
+                        QueueFilter.AWAITING_SCHEDULE.href(), "View these →", awaitingSchedule.isEmpty() ? "" : "warn"),
+                new LiveTile("Awaiting review", String.valueOf(awaitingReview.size()), waitingToReview.detail(),
                         QueueFilter.AWAITING_REVIEW.href(), "Go to review queue →", awaitingReview.isEmpty() ? "" : "warn"),
                 new LiveTile("Visitors with no work", String.valueOf(visitorsWithNoWork), "of " + visitors.size() + " active visitors",
                         "/admin/users", "View visitors →", ""));
