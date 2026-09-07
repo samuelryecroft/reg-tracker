@@ -40,7 +40,8 @@
     <div class="banner err" role="alert"
          th:if="${param.error != null and param.error[0] != 'locked'
                  and param.error[0] != 'nofactor' and param.error[0] != 'nodelivery'
-                 and param.error[0] != 'codeburned' and param.error[0] != 'codeexpired'}">
+                 and param.error[0] != 'codeburned' and param.error[0] != 'codeexpired'
+                 and param.error[0] != 'unverified'}">
         <svg class="icon" aria-hidden="true"><use th:href="@{/icons/phosphor.svg} + '#ph-warning-circle'"></use></svg>
         <div><strong>We couldn't sign you in</strong><p>Check your username and password and try again.</p></div>
     </div>
@@ -50,6 +51,13 @@
     <div class="banner err" role="alert" th:if="${param.error != null and param.error[0] == 'nofactor'}">
         <svg class="icon" aria-hidden="true"><use th:href="@{/icons/phosphor.svg} + '#ph-warning-circle'"></use></svg>
         <div><strong>This account can't complete sign-in</strong><p>It has no email address for security codes. Your organisation's administrator can add one.</p></div>
+    </div>
+    <!--/* Deliberately says the address may be WRONG rather than that codes were not received.
+         "You didn't get the codes" invites the reader to wait or retry; "the address may be wrong"
+         names the thing that has to change and who can change it. */-->
+    <div class="banner err" role="alert" th:if="${param.error != null and param.error[0] == 'unverified'}">
+        <svg class="icon" aria-hidden="true"><use th:href="@{/icons/phosphor.svg} + '#ph-warning-circle'"></use></svg>
+        <div><strong>We can't confirm your email address</strong><p>Security codes were sent but never used, so the address on this account may be wrong. Your organisation's administrator can check and correct it.</p></div>
     </div>
     <div class="banner err" role="alert" th:if="${param.error != null and param.error[0] == 'nodelivery'}">
         <svg class="icon" aria-hidden="true"><use th:href="@{/icons/phosphor.svg} + '#ph-warning-circle'"></use></svg>

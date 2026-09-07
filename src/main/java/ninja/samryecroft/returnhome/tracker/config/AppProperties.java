@@ -66,6 +66,14 @@ public class AppProperties {
 
         /** Resends allowed inside {@link #resendWindow}, so the form is not a mail amplifier. */
         private int maxResends = 3;
+
+        /**
+         * How many codes may be sent to an address that has never been proven to receive mail
+         * (T322). This is what bounds a mistyped address: without a ceiling, a wrong mailbox gets a
+         * sign-in code on every attempt, forever. Small on purpose - a correct address is proven by
+         * the first code that is used.
+         */
+        private int maxUnverifiedChallenges = 3;
         private Duration resendWindow = Duration.ofMinutes(15);
 
         /** From-address for the code. No default: a deployment must state who the mail is from. */
@@ -112,6 +120,14 @@ public class AppProperties {
 
         public int getMaxResends() {
             return maxResends;
+        }
+
+        public int getMaxUnverifiedChallenges() {
+            return maxUnverifiedChallenges;
+        }
+
+        public void setMaxUnverifiedChallenges(int maxUnverifiedChallenges) {
+            this.maxUnverifiedChallenges = maxUnverifiedChallenges;
         }
 
         public void setMaxResends(int maxResends) {

@@ -79,6 +79,21 @@ public abstract class AbstractIntegrationTest {
     @DynamicPropertySource
     static void documentStoreDirectory(DynamicPropertyRegistry registry) {
         registry.add("app.documents.local.directory", DOCUMENT_STORE::toString);
+        // T322: the arithmetic in this class's javadoc, given a ceiling instead of a warning.
+        //
+        // T148 removed five surplus contexts and the connection exhaustion went away, but the
+        // HEADROOM was never fixed: the default Hikari pool is ten, Postgres allows a hundred
+        // clients, so the eleventh context has always been the one that dies. Adding second-factor
+        // tests that legitimately need their own configuration - a throwing sender, an emergency
+        // window - put the count back over the line, and it presented exactly as the javadoc
+        // predicts: "FATAL: sorry, too many clients already", in whichever unrelated class happened
+        // to be eleventh, passing when run alone.
+        //
+        // Consolidating again would only move the line. Four connections per context is ample for
+        // integration tests, which drive one request at a time, and it turns ten contexts into
+        // twenty-five - so the next person to add a test class with its own properties does not
+        // spend an afternoon debugging somebody else's test.
+        registry.add("spring.datasource.hikari.maximum-pool-size", () -> "4");
     }
 
     /**

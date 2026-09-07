@@ -2,10 +2,12 @@ package ninja.samryecroft.returnhome.tracker.security.secondfactor;
 
 import java.security.SecureRandom;
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.Optional;
 import ninja.samryecroft.returnhome.tracker.audit.AuditEventPublisher;
 import ninja.samryecroft.returnhome.tracker.config.AppProperties;
 import ninja.samryecroft.returnhome.tracker.user.User;
+import ninja.samryecroft.returnhome.tracker.user.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -33,17 +35,20 @@ public class SecondFactorService {
     private final SecureRandom random = new SecureRandom();
 
     private final LoginChallengeRepository challenges;
+    private final UserRepository users;
     private final VerificationCodeSender sender;
     private final PasswordEncoder passwordEncoder;
     private final AuditEventPublisher audit;
     private final AppProperties appProperties;
 
     public SecondFactorService(LoginChallengeRepository challenges,
+            UserRepository users,
             VerificationCodeSender sender,
             PasswordEncoder passwordEncoder,
             AuditEventPublisher audit,
             AppProperties appProperties) {
         this.challenges = challenges;
+        this.users = users;
         this.sender = sender;
         this.passwordEncoder = passwordEncoder;
         this.audit = audit;
@@ -63,7 +68,15 @@ public class SecondFactorService {
      * address turning MFA OFF for that account is precisely the bypass this method exists to avoid.
      */
     public boolean canChallenge(User user) {
-        return user.getEmail() != null && !user.getEmail().isBlank();
+        if (user.getEmail() == null || user.getEmail().isBlank()) {
+            return false;
+        }
+        // An address that has never been proven to receive mail gets a small, bounded allowance.
+        // Once it is spent, this account cannot sign in until an administrator corrects the address
+        // - which is the intended outcome for a typo, and the only way to stop a stranger receiving
+        // sign-in codes for a child's record on every attempt from here to eternity.
+        return user.isEmailVerified()
+                || user.getUnverifiedChallengeCount() < config().getMaxUnverifiedChallenges();
     }
 
     /**
@@ -96,6 +109,14 @@ public class SecondFactorService {
         // transaction rolls the challenge back. A stored challenge whose code never left the
         // building is a guaranteed lockout that looks like a mail problem.
         sender.send(user.getEmail(), code);
+
+        // Counted only AFTER the transport accepted it, so a mail outage does not burn a user's
+        // allowance for an address that may be perfectly correct.
+        if (!user.isEmailVerified()) {
+            user.recordUnverifiedChallenge();
+            users.save(user);
+        }
+
         audit.mfaChallengeIssued(user);
         return true;
     }
@@ -140,6 +161,19 @@ public class SecondFactorService {
 
         challenge.consume(now);
         challenges.save(challenge);
+
+        // "Verified on first use": a code that was received and used is the proof, so no separate
+        // confirmation step exists and a correct address costs the user nothing.
+        //
+        // THE LIMIT, stated here because this line is where someone will later read a guarantee into
+        // it: this proves the address is DELIVERABLE, not that it belongs to the intended person. A
+        // confirmation sent to an address can always be completed by whoever controls that address,
+        // so this is not - and cannot be made into - a control against whoever chose the address.
+        if (!user.isEmailVerified()) {
+            user.markEmailVerified(LocalDateTime.now());
+            users.save(user);
+        }
+
         audit.mfaSuccess(user);
         return Outcome.PASSED;
     }

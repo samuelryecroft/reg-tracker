@@ -259,10 +259,11 @@ public class UserService {
         // already sign in as that person. Choosing where the first code goes adds nothing to a
         // capability they already hold.
         //
-        // (An earlier version of this comment said verify-on-first-use in T322 closes it. That was
-        // wrong twice: the mechanism is NOT BUILT, and as specified it proves DELIVERABILITY rather
-        // than OWNERSHIP - the confirmation goes TO the address being verified, so whoever set it
-        // completes it.)
+        // (An earlier version of this comment said verify-on-first-use in T322 closes it. It does
+        // not, and now that the mechanism EXISTS the point is easier to get wrong rather than
+        // harder: it proves DELIVERABILITY, not OWNERSHIP - the confirmation goes TO the address
+        // being verified, so whoever set it completes it. It bounds a mistyped address; it does not
+        // constrain whoever chose the address.)
         //
         // The escalation that DOES exist is the one changeEmail refuses: a manager may set an
         // EXISTING colleague's password but may not move their address, so a second factor still
@@ -377,14 +378,21 @@ public class UserService {
      *       what get added back as features.</li>
      * </ol>
      *
-     * <p><b>A third condition, "an address is VERIFIED ON FIRST USE", was specified in T322 and is
-     * NOT BUILT.</b> Measured on {@code main}: {@link User} carries no verified state of any kind,
-     * and {@code SecondFactorService.verify} verifies a submitted LOGIN CODE, not an address.
+     * <p><b>A third condition, "an address is VERIFIED ON FIRST USE", was specified in T322. Something
+     * has since been BUILT under that name, and it is deliberately NOT a third leg of this
+     * argument.</b> {@link User} now carries {@code emailVerifiedAt}, set by the first login code
+     * that is successfully used, and an unproven address gets a bounded number of codes before
+     * sign-in is refused (V23).
      *
-     * <p><b>It would also not have done the job attributed to it.</b> The confirmation is delivered
-     * TO the address being verified, so a creator who set a mailbox they control simply completes
-     * it. <b>It proves DELIVERABILITY, not OWNERSHIP</b> - which is a distinction worth carrying
-     * past this file: ask what a control PROVES, not whether it EXISTS.
+     * <p><b>It proves DELIVERABILITY, not OWNERSHIP, so it adds nothing here.</b> The confirmation is
+     * delivered TO the address being verified, so a creator who set a mailbox they control simply
+     * completes it. What it defends against is a MISTYPED address - a likely accident, not an
+     * adversary - where codes for a young person's record would otherwise be posted to a stranger on
+     * every attempt, indefinitely. <b>Two conditions still hold, not three.</b>
+     *
+     * <p>That distinction is the thing worth carrying past this file: <b>ask what a control PROVES,
+     * not whether it EXISTS.</b> The mechanism arriving is exactly when the argument is most likely
+     * to be quietly upgraded to three, by someone counting names rather than reading them.
      *
      * <h2>AND THE THREAT IT NAMED WAS NOT AN ESCALATION - WHICH IS WHERE I WAS WRONG TWICE</h2>
      *
@@ -443,6 +451,11 @@ public class UserService {
         User user = userRepository.findDetailedById(id)
                 .orElseThrow(() -> new IllegalArgumentException("No such user: " + id));
         user.setEmail(trimToNull(newEmail));
+        // T322: a new address is unproven, and its predecessor's proof does not transfer. This also
+        // restores the allowance, so correcting a typo actually unblocks the account - without it the
+        // fix would appear not to have worked, because the old address's exhausted count would still
+        // be barring sign-in.
+        user.resetEmailVerification();
         User saved = userRepository.save(user);
         auditEventPublisher.userEmailChanged(saved, principal);
         return saved;

@@ -75,6 +75,29 @@ public class User {
     @Column(name = "email", length = 320)
     private String email;
 
+    /**
+     * When this address was first proven to receive mail, or null if it never has been (T322).
+     *
+     * <p><b>It records deliverability, not ownership</b>, and the difference is the whole of what
+     * this column may be used to claim. Somebody received a code here; that somebody is not proven
+     * to be the person whose account this is. A verification delivered TO an address can always be
+     * completed by whoever controls that address.
+     *
+     * <p>What it defends against is a <em>mistyped</em> address - a likely event rather than an
+     * adversary - where sign-in codes for a child's record would otherwise be posted to a stranger
+     * once per attempt, indefinitely, while the real user reports only that codes never arrive.
+     */
+    @Column(name = "email_verified_at")
+    private LocalDateTime emailVerifiedAt;
+
+    /**
+     * Challenges sent to an address that has never been proven deliverable. Bounded, because an
+     * unbounded count is the leak: a wrong address receives a code on every attempt forever.
+     * Reset whenever the address changes, since a new address earns its own small allowance.
+     */
+    @Column(name = "unverified_challenge_count", nullable = false)
+    private int unverifiedChallengeCount = 0;
+
     /** Optional throughout: a contact number is useful, not something to block an account on. */
     @Column(name = "contact_phone", length = 30)
     private String contactPhone;
@@ -177,6 +200,36 @@ public class User {
 
     public void setEmail(String email) {
         this.email = email;
+    }
+
+    public LocalDateTime getEmailVerifiedAt() {
+        return emailVerifiedAt;
+    }
+
+    public boolean isEmailVerified() {
+        return emailVerifiedAt != null;
+    }
+
+    public void markEmailVerified(LocalDateTime when) {
+        this.emailVerifiedAt = when;
+    }
+
+    public int getUnverifiedChallengeCount() {
+        return unverifiedChallengeCount;
+    }
+
+    public void recordUnverifiedChallenge() {
+        this.unverifiedChallengeCount++;
+    }
+
+    /**
+     * A new address is unproven and gets its own allowance. Called wherever the address changes -
+     * if it were not, correcting a typo would leave the account still barred by the old address's
+     * exhausted count, and the fix would look like it had not worked.
+     */
+    public void resetEmailVerification() {
+        this.emailVerifiedAt = null;
+        this.unverifiedChallengeCount = 0;
     }
 
     public String getContactPhone() {
