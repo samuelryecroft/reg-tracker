@@ -186,13 +186,11 @@ class AuditHistoryIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
 
-        // The curated headlines, roles and status-transition details are present...
-        assertThat(html).contains("Interview requested").contains("(Home Staff)");
-        assertThat(html).contains("Visitor allocated").contains("(Coordinator)").contains("Requested → Scheduled");
-        assertThat(html).contains("Report submitted for review").contains("(Visitor)");
-        assertThat(html).contains("Report approved").contains("(Reviewer)").contains("Status: Approved");
-        assertThat(html).contains("Report document produced");
-
+        // T301: the disclosure checks come FIRST. They used to sit behind the five curated-content
+        // assertions below, so a copy change to any headline made the test red and the free-text
+        // checks were never reached - and a red test reports only its first failure, so one fix
+        // would have looked complete while a leak went unexamined. Nothing here depends on those
+        // assertions; they read the same immutable response string.
         // ...but nothing free-text off the underlying rows ever reaches the page through the History
         // section specifically. Scoped to that section's own markup, not the whole page: the page
         // legitimately shows request.notes in its own "Additional Notes" card, the logged-in user's
@@ -203,6 +201,12 @@ class AuditHistoryIntegrationTest extends AbstractIntegrationTest {
         // rows must never surface, because AuditHistoryService's allow-list is what makes this
         // fragment GDPR-safe to print/export - a leak there, unlike in the report card above it,
         // would bypass that curation entirely.
+        // T301: this assertion runs BEFORE the disclosure checks below because the substring
+        // that isolates the History section throws on a -1 index, and an exception here would
+        // report as a broken test rather than as a missing section. It is the disclosure
+        // check's own precondition, which is the only kind of assertion that belongs in front
+        // of it.
+        assertThat(html).contains("<h2 style=\"margin-top:0\">History</h2>");
         String historySection = html.substring(html.indexOf("<h2 style=\"margin-top:0\">History</h2>"));
         assertThat(historySection).doesNotContain("Recorded for the history test");
         assertThat(historySection).doesNotContain("hist-home" + suffix)
@@ -214,6 +218,14 @@ class AuditHistoryIntegrationTest extends AbstractIntegrationTest {
                 .orElseThrow().getMetadata();
         assertThat(generatedFilename).contains("filename=");
         assertThat(historySection).doesNotContain(generatedFilename.replaceAll(".*filename=", "").split(";")[0]);
+
+        // ...and the curated headlines, roles and status-transition details are present...
+        assertThat(html).contains("Interview requested").contains("(Home Staff)");
+        assertThat(html).contains("Visitor allocated").contains("(Coordinator)").contains("Requested → Scheduled");
+        assertThat(html).contains("Report submitted for review").contains("(Visitor)");
+        assertThat(html).contains("Report approved").contains("(Reviewer)").contains("Status: Approved");
+        assertThat(html).contains("Report document produced");
+
     }
 
     @Test
@@ -269,7 +281,10 @@ class AuditHistoryIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
 
-        assertThat(html).contains("History").contains("User account created").contains("Roles: Visitor");
+        // T301: the exclusion this test is named for runs first. It used to sit behind the three
+        // curated-content assertions below, so a copy change to any of them made the test red while
+        // leaving "does sign-in activity leak into a user's history" unevaluated.
         assertThat(html).doesNotContain("Signed in").doesNotContain("signed in");
+        assertThat(html).contains("History").contains("User account created").contains("Roles: Visitor");
     }
 }
