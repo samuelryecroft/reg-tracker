@@ -1164,13 +1164,10 @@ fieldset.checkbox-fieldset > legend {
 .banner.warn { background: var(--warn-bg); color: var(--warn); border: 1px solid transparent; border-color: color-mix(in srgb, var(--warn) 25%, transparent); }
 .banner.ok { background: var(--ok-bg); color: var(--ok); border: 1px solid transparent; border-color: color-mix(in srgb, var(--ok) 25%, transparent); }
 .banner.info { background: var(--info-bg); color: var(--info); border: 1px solid transparent; border-color: color-mix(in srgb, var(--info) 25%, transparent); }
-/* Not currently consumed by 1b - D-1b-8's own final placement (spec §6d) is a context line, not a
-   banner (see .prior-send-back near main.review's own rules) - but the SAME --sent-back-on-.banner
-   need is a real, flagged backlog item for 1c (T156: visitor/report-form.html's REPORT_REJECTED
-   banner currently borrows .banner.warn, the wrong vocabulary for the identical event). Keeping
-   this ready rather than deleting and re-adding it when T156 lands. --sent-back is the vocabulary
-   the rail marker, the status tag and the visitor's own banner already share; the tokens
-   themselves were already locked (D-1a-2a). */
+/* T156/T286: now consumed by visitor/report-form.html's REPORT_REJECTED banner, which used to
+   borrow .banner.warn - the wrong vocabulary for the identical event D-1b-8's own
+   .prior-send-back note and the rail marker already used correctly. --sent-back is the
+   vocabulary all three surfaces share; the tokens themselves were locked earlier (D-1a-2a). */
 .banner.sent-back { background: var(--sent-back-bg); color: var(--sent-back); border: 1px solid transparent; border-color: color-mix(in srgb, var(--sent-back) 25%, transparent); }
 
 .muted { color: var(--muted); }
