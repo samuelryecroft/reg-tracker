@@ -181,8 +181,11 @@ class CaseCardIntegrationTest extends AbstractIntegrationTest {
         String html = queueHtml("?filter=overdue");
 
         assertThat(html).contains("aria-current=\"true\"").contains(QueueFilter.OVERDUE.label());
-        assertThat(html).as("S-3: the banner is what puts the filter state in ordinary running text")
-                .contains("Showing a filtered view");
+        // T303 (spec §5h.6): the banner this used to assert on is deleted - it stated the filter
+        // stage in running text, which the chip's own aria-current already carries to assistive
+        // tech, making the banner's first half a duplicate. Regression guard, not just an updated
+        // assertion: a reintroduced banner would fail this.
+        assertThat(html).doesNotContain("Showing a filtered view");
     }
 
     private String queueHtml(String query) throws Exception {

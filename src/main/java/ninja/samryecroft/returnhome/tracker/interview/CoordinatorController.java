@@ -2,10 +2,14 @@ package ninja.samryecroft.returnhome.tracker.interview;
 
 import jakarta.validation.Valid;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import ninja.samryecroft.returnhome.tracker.child.NameRevealService;
+import ninja.samryecroft.returnhome.tracker.home.Home;
 import ninja.samryecroft.returnhome.tracker.interview.dto.AllocateAndScheduleForm;
 import ninja.samryecroft.returnhome.tracker.user.AppUserPrincipal;
 import ninja.samryecroft.returnhome.tracker.user.Role;
@@ -54,6 +58,15 @@ public class CoordinatorController {
      * counting across homes the queue is not showing would name a number this screen cannot
      * produce. Counts and narrowing both go through {@link QueueFilter#matches}, so they cannot
      * disagree - see {@link QueueFilterChip}.
+     *
+     * <p>T303 (spec §5h.6): {@code homesInScope} is derived from the SAME {@code listVisible} call
+     * as everything else on this page, before either narrowing is applied - not a second,
+     * independently role-branched scope query (the shape {@link
+     * ninja.samryecroft.returnhome.tracker.audit.AuditFeedController}'s own {@code homesInScope}
+     * uses, and its own javadoc warns against duplicating: two implementations of "what this
+     * principal may see" can drift, silently, and the drift is a disclosure). Deriving the option
+     * list from the request set this controller already computed means the home chip row can never
+     * offer, or be missing, a home this page's own authority disagrees with.
      */
     @GetMapping("/requests")
     public String list(@AuthenticationPrincipal AppUserPrincipal principal,
@@ -61,7 +74,10 @@ public class CoordinatorController {
         LocalDateTime now = LocalDateTime.now();
         QueueFilter selected = QueueFilter.byKey(filter).orElse(null);
 
-        List<InterviewRequest> requests = interviewRequestService.listVisible(principal);
+        List<InterviewRequest> allVisible = interviewRequestService.listVisible(principal);
+        model.addAttribute("homesInScope", homesInScope(allVisible));
+
+        List<InterviewRequest> requests = allVisible;
         if (homeId != null) {
             requests = requests.stream().filter(r -> r.getHome().getId().equals(homeId)).toList();
         }
@@ -79,6 +95,23 @@ public class CoordinatorController {
         model.addAttribute("childIdentities",
                 nameRevealService.identitiesFor(requests, InterviewRequest::getChild));
         return "coordinator/requests";
+    }
+
+    /**
+     * T303 (spec §5h.6): the home-scope chip row's options, deduplicated and name-sorted. Built
+     * from the homes actually present in {@code visible} rather than a fresh repository query, so
+     * the offered set can never disagree with what {@code listVisible} already authorized - see the
+     * javadoc on {@link #list}.
+     */
+    private static List<Home> homesInScope(List<InterviewRequest> visible) {
+        Map<Long, Home> byId = new LinkedHashMap<>();
+        for (InterviewRequest request : visible) {
+            Home home = request.getHome();
+            byId.putIfAbsent(home.getId(), home);
+        }
+        List<Home> homes = new ArrayList<>(byId.values());
+        homes.sort(Comparator.comparing(Home::getName, String.CASE_INSENSITIVE_ORDER));
+        return homes;
     }
 
     @GetMapping("/requests/{id}/allocate")

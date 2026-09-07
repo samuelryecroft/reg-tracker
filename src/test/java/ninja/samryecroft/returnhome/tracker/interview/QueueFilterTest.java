@@ -17,6 +17,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 import ninja.samryecroft.returnhome.tracker.child.NameRevealService;
+import ninja.samryecroft.returnhome.tracker.home.Home;
 import ninja.samryecroft.returnhome.tracker.user.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -230,6 +231,7 @@ class QueueFilterTest {
                 requestAt(InterviewStatus.REPORT_APPROVED))                             // no filter at all
                 .map(r -> {
                     r.setChild(THE_CHILD);
+                    r.setHome(THE_HOME);
                     return r;
                 })
                 .toList();
@@ -254,5 +256,24 @@ class QueueFilterTest {
         child.setLastName("Bell");
         ReflectionTestUtils.setField(child, "id", 1L);
         return child;
+    }
+
+    /**
+     * T303: {@code home} is {@code nullable = false} at the JPA level - a request without one is a
+     * state production can never reach. It was invisible here before {@link
+     * CoordinatorController#list} started deriving the home-scope chip row's options from every
+     * visible request unconditionally, rather than only inside the {@code homeId != null} branch;
+     * once something read it, the fixture's own gap surfaced as an NPE that looked exactly like a
+     * defect in the new code. Same shape, same fix, as {@code THE_CHILD} above: give the fixture
+     * the mandatory field it was missing rather than add a null-guard in production code for a
+     * state the schema already forbids.
+     */
+    private static final Home THE_HOME = aHome();
+
+    private static Home aHome() {
+        Home home = new Home();
+        home.setName("Test House");
+        ReflectionTestUtils.setField(home, "id", 1L);
+        return home;
     }
 }
