@@ -106,7 +106,7 @@ class TheSupplierDashboardKnowsWhatIsStuckTest extends AbstractIntegrationTest {
         assertThat(html).contains("Awaiting a visit time");
         assertThat(html).as("the count says how much work there is; the age says whether something "
                         + "has been abandoned, and only the second is actionable at a glance")
-                .contains("oldest 6 days");
+                .contains("oldest waiting 6 days");
     }
 
     /**
@@ -142,20 +142,39 @@ class TheSupplierDashboardKnowsWhatIsStuckTest extends AbstractIntegrationTest {
      * THE FORMAT IS NORMALISED ACROSS ALL THREE STAGE TILES (god's ruling).
      *
      * <p>The Unallocated tile already carried an age before this card, as "oldest waiting 144
-     * hours". Shipping the new tile in days beside that would have put two spellings of one concept
-     * on a single screen - a smaller copy of the defect being fixed, created inside the fix.
+     * hours" - the right prefix and no rule behind the unit. What was wrong was not the word
+     * "hours": it was that one tile chose a unit and nothing else was governed by anything. Now all
+     * three run the same rule, and the rule is what produces the unit.
      */
     @Test
-    void theOldFormatIsGoneFromTheScreenEntirely() throws Exception {
+    void everyStageTileSpeaksTheSameRule() throws Exception {
         InterviewRequest waiting = seedRequest(InterviewStatus.REQUESTED);
         raisedDaysAgo(waiting, 6);
 
         String html = dashboardHtml();
 
         assertThat(html).as("the unallocated tile now speaks the same language as the new one")
-                .contains("oldest 6 days");
-        assertThat(html).as("and the raw-hours form it replaced is gone rather than merely joined")
-                .doesNotContain("oldest waiting");
+                .contains("oldest waiting 6 days");
+    }
+
+    /**
+     * THE ARM THAT A DAYS-ONLY FORMAT WOULD HAVE FAILED, and it is the reason Oscar overruled the
+     * blanket form on the way in.
+     *
+     * <p>The statutory window is 72 hours, so the entire operational range is three days. Twenty
+     * hours into it, a days-only tile reads "oldest waiting 0 days" - <b>looking like nothing is
+     * wrong at the exact moment something is</b>. Asserted here as well as in the unit test because
+     * the unit test could pass against a screen wired to a different formatter.
+     */
+    @Test
+    void insideTheWindowTheScreenSpeaksInHours() throws Exception {
+        allocatedWithNoVisitTime(LocalDateTime.now().minusHours(20));
+
+        String html = dashboardHtml();
+
+        assertThat(html).contains("oldest waiting 20 hours");
+        assertThat(html).as("nothing on this screen may report a real wait as zero of anything")
+                .doesNotContain("0 days");
     }
 
     /**
@@ -169,7 +188,7 @@ class TheSupplierDashboardKnowsWhatIsStuckTest extends AbstractIntegrationTest {
         String html = dashboardHtml();
 
         assertThat(html).contains("Awaiting a visit time").contains("none waiting");
-        assertThat(html).doesNotContain("oldest");
+        assertThat(html).doesNotContain("oldest waiting");
     }
 
     /**
@@ -194,7 +213,7 @@ class TheSupplierDashboardKnowsWhatIsStuckTest extends AbstractIntegrationTest {
 
         assertThat(html).contains("waiting time not recorded");
         assertThat(html).as("and it did NOT quietly date the stage from the request's creation")
-                .doesNotContain("oldest 30 days");
+                .doesNotContain("oldest waiting 30 days");
     }
 
     /**

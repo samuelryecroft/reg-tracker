@@ -33,29 +33,65 @@ class StageWaitTest {
     }
 
     /**
-     * OSCAR'S SPECIFIED FORM, and the one that motivated the card: "4 unallocated - oldest 6 days".
-     * The same request reads "oldest waiting 144 hours" on main today.
+     * OSCAR'S RULE: under 72 hours say hours, at 72 hours and over say days.
+     *
+     * <p>The abandoned case, which is what the days half is for. Past the window the number stops
+     * being read - "147 hours" is arithmetic, "6 days" is a fact.
      */
     @Test
-    void theOldestIsReportedInDaysOnceItPassesOne() {
+    void pastTheStatutoryWindowItSpeaksInDays() {
         StageWait stuck = StageWait.of(
                 List.of(new Item(NOW.minusDays(6)), new Item(NOW.minusHours(2))), ENTRY, NOW);
 
         assertThat(stuck.waiting()).isEqualTo(2);
-        assertThat(stuck.detail()).isEqualTo("oldest 6 days");
+        assertThat(stuck.detail()).isEqualTo("oldest waiting 6 days");
     }
 
-    /** Hours below a day, because "0 days" for something raised this morning says nothing. */
+    /**
+     * THE ARM THAT DAYS-THROUGHOUT WOULD FAIL, and it is the reason the rule has two units.
+     *
+     * <p>The statutory window is 72 hours, so the whole operational range is THREE DAYS. Twenty
+     * hours in, a days-only format reads "0 days" - <b>which looks like nothing is wrong at the
+     * exact moment something is</b>. That is worse than the raw hours it would have replaced: 147
+     * hours is merely hard to read; 0 days is actively reassuring and false.
+     */
     @Test
-    void hoursBelowADayAndSingularWhereItShouldBe() {
-        assertThat(StageWait.of(List.of(new Item(NOW.minusHours(5))), ENTRY, NOW).detail())
-                .isEqualTo("oldest 5 hours");
-        assertThat(StageWait.of(List.of(new Item(NOW.minusHours(1))), ENTRY, NOW).detail())
-                .isEqualTo("oldest 1 hour");
-        assertThat(StageWait.of(List.of(new Item(NOW.minusDays(1))), ENTRY, NOW).detail())
-                .isEqualTo("oldest 1 day");
+    void insideTheWindowItSpeaksInHoursBecauseZeroDaysWouldReassureFalsely() {
+        assertThat(StageWait.of(List.of(new Item(NOW.minusHours(20))), ENTRY, NOW).detail())
+                .isEqualTo("oldest waiting 20 hours");
         assertThat(StageWait.of(List.of(new Item(NOW.minusMinutes(9))), ENTRY, NOW).detail())
-                .isEqualTo("oldest under an hour");
+                .isEqualTo("oldest waiting under an hour");
+    }
+
+    /**
+     * THE SWITCH POINT IS THE STATUTORY WINDOW ITSELF, asserted on both sides of it.
+     *
+     * <p>It is not an arbitrary threshold: it is the same 72 hours the rest of the product is built
+     * on, which is what makes two units one rule rather than two formats. <b>The change of unit is
+     * itself the signal</b> - a tile that has flipped to days has said it left the window before
+     * anyone has read the number - so the exact hour it flips is load-bearing.
+     */
+    @Test
+    void theUnitChangesExactlyAtSeventyTwoHours() {
+        assertThat(StageWait.of(List.of(new Item(NOW.minusHours(71))), ENTRY, NOW).detail())
+                .isEqualTo("oldest waiting 71 hours");
+        assertThat(StageWait.of(List.of(new Item(NOW.minusHours(72))), ENTRY, NOW).detail())
+                .isEqualTo("oldest waiting 3 days");
+    }
+
+    /**
+     * The singulars, which are deliberate rather than polish: T251 is the live "1 children" defect
+     * and this is not shipping "1 days" beside it.
+     */
+    @Test
+    void oneHourAndOneDayAreSingular() {
+        assertThat(StageWait.of(List.of(new Item(NOW.minusHours(1))), ENTRY, NOW).detail())
+                .isEqualTo("oldest waiting 1 hour");
+        // A day is inside the window, so "1 day" can only be reached past 72 hours - which means
+        // the plural rule for days has to be checked where days actually occur, not at 24.
+        assertThat(StageWait.of(List.of(new Item(NOW.minusHours(24))), ENTRY, NOW).detail())
+                .as("24 hours is still inside the window, so it is still hours")
+                .isEqualTo("oldest waiting 24 hours");
     }
 
     /**
@@ -75,11 +111,11 @@ class StageWaitTest {
     @Test
     void rowsWithNoRecordedStageEntryAreNamedRatherThanDroppedOrGuessed() {
         StageWait partlyTimed = StageWait.of(
-                List.of(new Item(NOW.minusDays(2)), new Item(null), new Item(null)), ENTRY, NOW);
+                List.of(new Item(NOW.minusDays(4)), new Item(null), new Item(null)), ENTRY, NOW);
 
         assertThat(partlyTimed.waiting()).isEqualTo(3);
         assertThat(partlyTimed.untimed()).isEqualTo(2);
-        assertThat(partlyTimed.detail()).isEqualTo("oldest 2 days · 2 with no start time");
+        assertThat(partlyTimed.detail()).isEqualTo("oldest waiting 4 days · 2 with no start time");
     }
 
     /**

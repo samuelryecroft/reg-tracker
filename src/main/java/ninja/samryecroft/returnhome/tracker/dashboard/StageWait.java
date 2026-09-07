@@ -61,16 +61,12 @@ public record StageWait(int waiting, Optional<Duration> oldest, int untimed) {
     }
 
     /**
-     * The tile's second line: "oldest 6 days", "none waiting", or the honest version of neither.
+     * The tile's second line: "oldest waiting 6 days", "none waiting", or the honest version of
+     * neither.
      *
-     * <p>Oscar's specified form. It replaced "oldest waiting 144 hours", which is the same fact and
-     * unreadable past a day or two - a number nobody converts in their head is not an answer to
-     * "how long has this been sitting".
-     *
-     * <p><b>All three stage tiles use this one method</b> (god's ruling). Shipping the new tile in
-     * "oldest 6 days" beside an existing one still reading raw hours would have put two formats for
-     * one concept on a single screen - a smaller copy of the defect being fixed, created inside the
-     * fix. A single formatter is also the only way they cannot drift apart later.
+     * <p><b>All three stage tiles use this one method</b>, so the screen cannot end up carrying two
+     * formats for one concept - which is what ships today, where the Unallocated tile says "oldest
+     * waiting 144 hours" and nothing else says anything.
      */
     public String detail() {
         if (waiting == 0) {
@@ -79,24 +75,42 @@ public record StageWait(int waiting, Optional<Duration> oldest, int untimed) {
         if (oldest.isEmpty()) {
             return "waiting time not recorded";
         }
-        String age = "oldest " + humanise(oldest.get());
+        String age = "oldest waiting " + humanise(oldest.get());
         return untimed == 0 ? age : age + " · " + untimed + " with no start time";
     }
 
     /**
-     * Whole hours below a day, whole days above it.
+     * <b>Under 72 hours say hours; at 72 hours and over say days</b> (Oscar's ruling).
      *
-     * <p>Rounded DOWN, which understates by less than the unit shown and never invents time that
-     * has not passed. The switch is at 24 hours rather than at 48: "1 day" is what a person reading
-     * a dashboard means by a day-old request, and the extra precision of "30 hours" is not what the
-     * tile is for.
+     * <p><b>Not days throughout, which is the obvious answer and is wrong here.</b> The statutory
+     * window is 72 hours, so the entire operational range is THREE DAYS - a days-only format has
+     * about three usable values inside it, and a request unallocated for twenty hours would read
+     * "oldest waiting 0 days". <b>That looks like nothing is wrong at the exact moment something
+     * is</b>, which is worse than the raw hours it would have replaced: 147 hours is merely hard to
+     * read, 0 days is actively reassuring and false.
+     *
+     * <p><b>Not hours throughout, which is what ships today.</b> Past the window the number stops
+     * being read - 147 hours is arithmetic, 6 days is a fact - and the reader's question has
+     * changed with it: inside 72 hours it is "can this still be done in time?", past it, "how long
+     * has this been abandoned?". Different questions want different units.
+     *
+     * <p><b>THIS IS ONE RULE PRODUCING TWO UNITS, NOT TWO FORMATS.</b> The distinction is the whole
+     * of why it is allowed on a screen that must not carry two spellings of one concept: the switch
+     * point is the same 72 hours the rest of the product is built on, so it introduces no new
+     * concept, and <b>the change of unit is itself the signal</b> - a tile that has flipped to days
+     * has told you it left the statutory window before you have read the number. What would be two
+     * formats is one tile in days beside another in hours with no rule connecting them.
+     *
+     * <p>Rounded DOWN, which understates by less than the unit shown and never invents time that has
+     * not passed. The singulars are deliberate rather than polish: T251 is the live "1 children"
+     * defect, and this is not shipping "1 days" next to it.
      */
     private static String humanise(Duration waited) {
         long hours = waited.toHours();
         if (hours < 1) {
             return "under an hour";
         }
-        if (hours < 24) {
+        if (hours < 72) {
             return hours == 1 ? "1 hour" : hours + " hours";
         }
         long days = waited.toDays();
