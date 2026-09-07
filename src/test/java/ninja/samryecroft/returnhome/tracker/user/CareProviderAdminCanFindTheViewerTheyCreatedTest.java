@@ -123,9 +123,16 @@ class CareProviderAdminCanFindTheViewerTheyCreatedTest extends AbstractIntegrati
         coordinator.setEnabled(true);
         User saved = userRepository.saveAndFlush(coordinator);
 
+        // SUPERSEDED IN HALF BY T273, and the half that changed is the interesting one. This used to
+        // assert the coordinator was not LISTED. Oscar has since ruled that visibility is MEMBERSHIP -
+        // every user in the organisation, no exceptions - because a manager whose own staff list is
+        // short by one cannot use it to check who has access. So they ARE listed now, and only the
+        // ACTING on them is refused. The assertion this test was written for survives intact; what
+        // was wrong was tying it to the list.
         assertThat(userService.listVisible(ourOrgAdmin))
                 .extracting(User::getId)
-                .doesNotContain(saved.getId());
+                .contains(saved.getId());
+        assertThat(userService.mayAdminister(saved, ourOrgAdmin)).isFalse();
         assertThatThrownBy(() -> userService.getAuthorized(saved.getId(), ourOrgAdmin))
                 .isInstanceOf(AccessDeniedException.class);
     }

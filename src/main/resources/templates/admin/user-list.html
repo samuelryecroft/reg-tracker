@@ -37,7 +37,15 @@
          bearing here, see app.css's own comment on .case-list for why. */-->
     <ul class="case-list" role="list">
         <li class="case" role="listitem" th:each="u : ${users}" th:classappend="${!u.enabled} ? 'case-inactive'">
-            <a class="case-link rowlink" th:href="@{/admin/users/{id}/edit(id=${u.id})}">
+            <!--/* T273: the row links to the edit form ONLY where this principal may act on the
+                 account - but the CONTENT renders either way, which is the whole of the ruling:
+                 VISIBLE, ROLES SHOWN, NOT EDITABLE. Gating the element itself would have deleted the
+                 name and roles along with the link, turning "cannot edit" into "cannot see" and
+                 producing exactly the short list Oscar ruled against. So the anchor keeps its
+                 content and loses its href: without one it is neither clickable nor focusable, and
+                 the row stops offering a control the route would refuse. */-->
+            <a class="case-link" th:classappend="${editableUserIds.contains(u.id)} ? 'rowlink'"
+               th:href="${editableUserIds.contains(u.id)} ? @{/admin/users/{id}/edit(id=${u.id})} : null">
                 <span class="case-avatar" aria-hidden="true" th:text="${u.initials}">NC</span>
                 <span class="case-ident">
                     <span class="case-name" th:text="${u.fullName}">Naomi Clarke</span>
@@ -78,7 +86,8 @@
             <!--/* A real link, not the canvas's bare <i>: it sits where a control sits and a
                  decorative icon there is the dead control Creed removed from the shell org
                  switcher. .rowlink carries the 44px D-Q3 floor. */-->
-            <a class="case-edit rowlink" th:href="@{/admin/users/{id}/edit(id=${u.id})}">
+            <a class="case-edit rowlink" th:if="${editableUserIds.contains(u.id)}"
+               th:href="@{/admin/users/{id}/edit(id=${u.id})}">
                 <svg class="icon" aria-hidden="true"><use th:href="@{/icons/phosphor.svg} + '#ph-pencil-simple'"></use></svg>
                 <span class="visually-hidden" th:text="'Edit ' + ${u.fullName}">Edit</span>
             </a>

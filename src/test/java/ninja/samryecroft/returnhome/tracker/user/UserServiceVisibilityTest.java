@@ -97,28 +97,29 @@ class UserServiceVisibilityTest {
     }
 
     /**
-     * The care-provider branch still queries by home organisation - and now asks for exactly the
-     * roles this principal may ASSIGN (T281).
+     * The care-provider branch asks for EVERY user in the organisation - by MEMBERSHIP, not by the
+     * grant set (T273 axis 1).
      *
-     * <p>The captured argument is the assertion that matters. Before T281 the query was
-     * HOME_STAFF-only while the grant matrix allowed HOME_STAFF and VIEWER, so a viewer could be
-     * created and then never seen again. Asserting the ROLE SET here rather than only the branch is
-     * what stops the two drifting apart a second time; asserting {@code containsExactly(staff)}
-     * alone would pass just as happily against the old query.
+     * <p><strong>This assertion is the reverse of what it was, and the reversal is the ruling.</strong>
+     * T281 made visibility derive from the roles the actor may assign, which fixed a real defect - a
+     * viewer could be created and then never seen again. But Oscar ruled the derivation goes one step
+     * too far: a manager would not see other MANAGERS, and their own staff list would silently be
+     * short by one on the very screen they would use to check who has access.
+     *
+     * <p>So the two axes are separate. Visibility is membership, and editability is
+     * {@code mayAdminister}. Verifying the QUERY rather than the returned list is what stops them
+     * being collapsed back into one - which is invisible until somebody is missing.
      */
     @Test
-    void aCareProviderOrgAdminAsksForEveryRoleTheyMayAssign() {
+    void aCareProviderOrgAdminAsksForEveryoneInTheOrganisation() {
         AppUserPrincipal principal = principal(Set.of(Role.ORG_ADMIN), organisation(9L, OrgType.CARE_PROVIDER));
-        User staff = new User();
-        ArgumentCaptor<Collection<Role>> roles = ArgumentCaptor.captor();
-        when(userRepository.findByAnyRoleAndHomeOrganisationId(any(), eq(9L))).thenReturn(List.of(staff));
+        User everyone = new User();
+        when(userRepository.findAllInOrganisation(9L)).thenReturn(List.of(everyone));
 
-        assertThat(service().listVisible(principal)).containsExactly(staff);
+        assertThat(service().listVisible(principal)).containsExactly(everyone);
 
-        verify(userRepository).findByAnyRoleAndHomeOrganisationId(roles.capture(), eq(9L));
-        assertThat(roles.getValue())
-                .containsExactlyInAnyOrderElementsOf(new RoleMatrix().assignableRoles(principal));
-        assertThat(roles.getValue()).contains(Role.VIEWER);
+        verify(userRepository).findAllInOrganisation(9L);
+        verify(userRepository, never()).findByAnyRoleAndHomeOrganisationId(any(), any());
     }
 
     @Test

@@ -93,6 +93,27 @@ public interface UserRepository extends JpaRepository<User, Long> {
      * <p>The join is through HOMES rather than {@code u.organisation}, unchanged and deliberate: it
      * is home membership that places a user inside a care provider's tenancy.
      */
+    /**
+     * EVERY user in this organisation, by MEMBERSHIP - which reaches them by two different routes
+     * (T273 axis 1).
+     *
+     * <p>A HOME_STAFF account has <strong>no organisation at all</strong> ({@code needsOrganisation}
+     * excludes that role) and belongs through its HOMES; everyone else carries {@code organisation}
+     * directly. So a query on either column alone silently omits half the people, and the half it
+     * omits differs by which column you picked.
+     *
+     * <p><strong>This is deliberately NOT the grant-set query below.</strong> Oscar's ruling: if
+     * visibility derived from what the actor may assign, a manager would not see other managers -
+     * their own staff list would quietly be short by one, on the very screen they would use to check
+     * who has access. Visibility is membership; editability is a separate question with a separate
+     * answer.
+     */
+    @EntityGraph(attributePaths = {"homes", "organisation", "roles"})
+    @Query("select distinct u from User u left join u.homes h "
+            + "where u.organisation.id = :organisationId or h.organisation.id = :organisationId "
+            + "order by u.lastName, u.firstName")
+    List<User> findAllInOrganisation(@Param("organisationId") Long organisationId);
+
     @EntityGraph(attributePaths = {"homes", "organisation", "roles"})
     @Query("select distinct u from User u join u.homes h join u.roles r "
             + "where r in :roles and h.organisation.id = :organisationId order by u.lastName, u.firstName")
