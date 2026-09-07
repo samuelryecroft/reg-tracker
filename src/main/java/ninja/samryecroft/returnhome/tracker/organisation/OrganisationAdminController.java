@@ -51,9 +51,11 @@ public class OrganisationAdminController {
     /**
      * T119 4e: one tree, in creation order - supplier, its care providers, their homes.
      *
-     * <p><b>Four queries, and the joining is done in memory.</b> Walking the tree to fetch each
-     * provider's homes would be the obvious shape and an N+1 on the one screen that renders every
-     * organisation on the platform. The assembly itself lives in {@link OrganisationTree#from} as a
+     * <p><b>Six queries, and the joining is done in memory.</b> Four until T267 added the two halves
+     * of the readiness gathering; the count is updated here rather than left saying "four", because a
+     * javadoc that states a number is making a checkable claim and a stale one is worse than none.
+     * Walking the tree to fetch each provider's homes would be the obvious shape and an N+1 on the
+     * one screen that renders every organisation on the platform. The assembly itself lives in {@link OrganisationTree#from} as a
      * pure function so it can be unit-tested without a database.
      *
      * <p>The flat list is NOT published to the model. It was, with a note saying the activation

@@ -24,10 +24,18 @@ import ninja.samryecroft.returnhome.tracker.home.Home;
  * test, whereas the same logic inside a controller needs a database container to reach at all. The
  * bugs are then provable on any machine rather than only in CI.
  *
- * <p>It also keeps the query count flat. Four queries build the whole screen - organisations,
- * homes, per-organisation user counts, and which organisations have a theme row - with the joining
- * done in memory. Walking the tree to fetch each provider's homes would have been the obvious
- * shape and an N+1 on the one screen that renders every organisation on the platform.
+ * <p>It also keeps the query count flat. Six queries build the whole screen - organisations,
+ * homes, per-organisation user counts, which organisations have a theme row, and T267's two halves
+ * of the readiness gathering - with the joining done in memory. Walking the tree to fetch each
+ * provider's homes would have been the obvious shape and an N+1 on the one screen that renders
+ * every organisation on the platform.
+ *
+ * <p><b>Flat is the property, not the number four.</b> Every one of those is a single query whose
+ * result is bounded by organisations rather than by rows beneath them, and each new fact the screen
+ * shows arrives as a PRECOMPUTED MAP the way {@code userCountsByOrgId} does. The rule this class
+ * exists to hold is that nothing the template calls per row may reach a repository - a readiness
+ * lookup inside {@link SupplierNode#meta()} would be exactly the N+1 this note is here to prevent,
+ * and it would look like a tidy one-line change.
  */
 public record OrganisationTree(List<SupplierNode> suppliers, List<ProviderNode> unassigned) {
 
