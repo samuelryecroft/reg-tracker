@@ -263,12 +263,86 @@ class AuditFeedIntegrationTest extends AbstractIntegrationTest {
 
         // And the omission itself: the CSV must not carry record-access rows. Asserted on the
         // CONTENT, not only on the label, because a label that agrees with a wrong scope is worse
-        // than no label - it is a disclosure asserting something untrue about itself.
-        assertThat(csv)
+        // than no label - it is a disclosure asserting something untrue about itself. The content
+        // half now lives in its own test below (T295): it needs an access event in scope, and an
+        // assertion that cannot run because an earlier one in the same method failed is not a guard.
+    }
+
+    /**
+     * THE SCOPE GUARD, re-anchored (T295) and moved into its own test.
+     *
+     * <p>It was {@code doesNotContain("AUDIT_VIEW_OPENED")} inside the test above, and it had
+     * <strong>two faults, only one of which was known.</strong>
+     *
+     * <ol>
+     *   <li><strong>A negative assertion about a literal is SATISFIED by renaming the literal.</strong>
+     *       The CSV writes {@code entry.headline()}, so T295's rename would have made it pass forever,
+     *       silently, looking exactly like a green build. A POSITIVE assertion against a literal fails
+     *       LOUDLY when copy moves and is merely brittle; a negative one PASSES. The rule is not
+     *       "avoid literals" - it is <em>never write a negative assertion about a literal you
+     *       control</em>.</li>
+     *   <li><strong>It was already vacuous before any rename.</strong> Nothing in that test ever
+     *       created an access event, so it asserted the absence of something that was never in the
+     *       fixture. A zero nobody has made non-zero is not evidence.</li>
+     * </ol>
+     *
+     * <p>So the anchor is the SCOPE ITSELF rather than a rendering of it: an access event is created
+     * in scope, and the export must not grow by a row. That holds whatever the row is called.
+     *
+     * <p><strong>Its own test because the label assertion above ran first and short-circuited it.</strong>
+     * Armed and measured: with the export flipped to {@code WITH_ACCESS_EVENTS} the label assertion
+     * failed and this one never executed - a guard that cannot reach its own subject is not a guard.
+     */
+    @Test
+    void theOrgWideExportDoesNotGrowWhenAnAccessEventExistsInScope() throws Exception {
+        mockMvc.perform(post("/requests").with(asUser("feed-home" + suffix)).with(csrf())
+                        .param("childId", childId.toString())
+                        .param("returnedAt", "2026-07-16T20:30"))
+                .andExpect(status().is3xxRedirection());
+
+        long rowsBefore = dataRowsIn(exportedCsv());
+        assertThat(rowsBefore).as("case activity must be present, or the comparison is between two empties")
+                .isGreaterThan(0);
+
+        openTheRequestPageSoAnAccessEventExists();
+        assertThat(auditEventRepository.findByEventTypeOrderByOccurredAtDesc(AuditEventType.AUDIT_VIEW_OPENED))
+                .as("the control: an access event must EXIST for its absence from the CSV to mean anything")
+                .isNotEmpty();
+
+        assertThat(dataRowsIn(exportedCsv()))
                 .as("an org-wide export containing access rows acquires a SECOND DATA SUBJECT: it "
                         + "becomes an employee-monitoring dataset leaving the building under a "
                         + "purpose and reference that were about a child")
-                .doesNotContain("AUDIT_VIEW_OPENED");
+                .isEqualTo(rowsBefore);
+    }
+
+    private static long dataRowsIn(String csv) {
+        return csv.lines().skip(1).filter(line -> !line.isBlank()).count();
+    }
+
+    /**
+     * Emitted through the production path, so the row under test is the row the application writes.
+     * The request detail page records an access against the request it displays.
+     */
+    private void openTheRequestPageSoAnAccessEventExists() throws Exception {
+        Long requestId = interviewRequestRepository.findAllDetailed().stream()
+                .filter(request -> childId.equals(request.getChild().getId()))
+                .findFirst().orElseThrow().getId();
+        mockMvc.perform(get("/interview-requests/{id}", requestId).with(asUser("feed-home" + suffix)))
+                .andExpect(status().isOk());
+    }
+
+    /** Runs the whole export again - link, download and all - and returns the CSV body. */
+    private String exportedCsv() throws Exception {
+        String readyHtml = mockMvc.perform(post("/audit/export").with(asUser("feed-orgadmin" + suffix)).with(csrf())
+                        .param("purpose", "INTERNAL_SAFEGUARDING_REVIEW"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        java.util.regex.Matcher match = java.util.regex.Pattern.compile("/export/download/([^\"]+)").matcher(readyHtml);
+        assertThat(match.find()).as("download link present on the ready screen").isTrue();
+        return mockMvc.perform(get("/export/download/{token}", match.group(1)).with(asUser("feed-orgadmin" + suffix)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
     }
 
     @Test

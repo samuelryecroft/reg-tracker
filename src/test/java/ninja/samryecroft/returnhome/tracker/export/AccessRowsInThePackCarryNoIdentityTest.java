@@ -11,6 +11,7 @@ import ninja.samryecroft.returnhome.tracker.AbstractIntegrationTest;
 import ninja.samryecroft.returnhome.tracker.audit.AuditEvent;
 import ninja.samryecroft.returnhome.tracker.audit.AuditEventPublisher;
 import ninja.samryecroft.returnhome.tracker.audit.AuditEventRepository;
+import ninja.samryecroft.returnhome.tracker.audit.AuditEventType;
 import ninja.samryecroft.returnhome.tracker.audit.AuditFeedScope;
 import ninja.samryecroft.returnhome.tracker.audit.AuditHistoryEntry;
 import ninja.samryecroft.returnhome.tracker.audit.AuditHistoryService;
@@ -45,9 +46,11 @@ import org.springframework.boot.test.context.SpringBootTest;
  * structural rather than a judgement.</strong> {@link AuditHistoryEntry} has no username component
  * at all, so {@code CaseFileNarrativeWriter} cannot render one however it is written; the event's
  * {@code actorUsernameAtTime} stops at the projection. What remains reachable is free text in
- * {@code detail} - today {@code null} for access rows, because they take {@code toEntry}'s default
- * branch. Give {@code AUDIT_VIEW_OPENED} a case of its own with a detail that names somebody and the
- * property is defeated by the back door, silently, in a document that goes to a court.
+ * {@code detail} - {@code null} for access rows, which T295 made a deliberate choice rather than an
+ * accident of the default branch: {@code AUDIT_VIEW_OPENED} now has its own case, and that case
+ * passes {@code null}. <strong>Give it a detail that names somebody and the property is defeated by
+ * the back door, silently, in a document that goes to a court</strong> - which is exactly why the
+ * case having been written makes this guard more necessary rather than less.
  */
 @SpringBootTest
 class AccessRowsInThePackCarryNoIdentityTest extends AbstractIntegrationTest {
@@ -134,11 +137,7 @@ class AccessRowsInThePackCarryNoIdentityTest extends AbstractIntegrationTest {
         auditEventPublisher.auditViewOpened("InterviewRequest", request.getId(),
                 home.getOrganisation().getId(), home.getId(), new AppUserPrincipal(actor));
 
-        AuditHistoryEntry accessRow = packRowsForThisRequest().stream()
-                .filter(row -> row.headline().contains("AUDIT_VIEW_OPENED"))
-                .findFirst()
-                .orElseThrow(() -> new AssertionError("The pack's scope dropped the access row - "
-                        + "if that is now intended, this whole test has lost its subject"));
+        AuditHistoryEntry accessRow = theAccessRow();
 
         assertThat(accessRow.detail()).isNull();
         // The property rather than the field: no rendered component of the row names the actor,
@@ -155,11 +154,31 @@ class AccessRowsInThePackCarryNoIdentityTest extends AbstractIntegrationTest {
         auditEventPublisher.auditViewOpened("InterviewRequest", request.getId(),
                 home.getOrganisation().getId(), home.getId(), new AppUserPrincipal(actor));
 
-        assertThat(packRowsForThisRequest())
-                .filteredOn(row -> row.headline().contains("AUDIT_VIEW_OPENED"))
-                .singleElement()
-                .extracting(AuditHistoryEntry::actorRole)
-                .isEqualTo("Home Staff");
+        assertThat(theAccessRow().actorRole()).isEqualTo("Home Staff");
+    }
+
+    /**
+     * The access row, found by its EVENT ID rather than by its headline.
+     *
+     * <p>It was found by {@code headline().contains("AUDIT_VIEW_OPENED")} until T295 renamed the copy
+     * to "Record viewed" - and this test failed LOUDLY, which is the point: a POSITIVE assertion
+     * against a literal breaks visibly when copy moves, where the negative one it replaced in the CSV
+     * guard would have passed forever. It is still the wrong anchor though. The subject of this test
+     * is a particular EVENT, so the event's identity is what selects it, and copy can now move again
+     * without pretending this test has lost its subject.
+     */
+    private AuditHistoryEntry theAccessRow() {
+        Long accessEventId = auditEventRepository
+                .findByTargetTypeAndTargetIdOrderByOccurredAtDesc("InterviewRequest", request.getId()).stream()
+                .filter(event -> event.getEventType() == AuditEventType.AUDIT_VIEW_OPENED)
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("no access event was recorded - the fixture, not the code"))
+                .getId();
+        return packRowsForThisRequest().stream()
+                .filter(row -> accessEventId.equals(row.id()))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("The pack's scope dropped the access row - "
+                        + "if that is now intended, this whole test has lost its subject"));
     }
 
     private List<AuditHistoryEntry> packRowsForThisRequest() {

@@ -506,10 +506,33 @@ public class AuditHistoryService {
             case DOCX_DOWNLOADED -> entry("Report downloaded", event, when, role, null, "");
             case USER_CREATED -> entry("User account created", event, when, role, rolesDetail(meta.get("rolesAssigned")), "info");
             case USER_UPDATED -> entry("User account updated", event, when, role, userUpdateDetail(meta), "info");
+            // T295, ruled by Creed. "Viewed", NOT "opened": in children's services OPENING A CASE IS A
+            // TERM OF ART MEANING STARTING ONE, so a row reading "Record opened" beside a date and a
+            // name can be read by a local authority or a court as THE CASE having been opened. That
+            // misreading is invisible outside the domain and consequential inside it.
+            //
+            // TONE IS NEUTRAL AND THAT IS A CATEGORY DECISION, NOT AN AESTHETIC ONE. Every other tone
+            // here marks something that happened TO the record; an access row is the one row type
+            // where NOTHING HAPPENED TO IT. A reader scanning a chronology for what CHANGED will
+            // count a coloured row as a change.
+            //
+            // Detail stays null: actor, timestamp and target already say who, when and which record,
+            // and a sentence here would restate the columns either side of it.
+            case AUDIT_VIEW_OPENED -> entry("Record viewed", event, when, role, null, "");
             // ACCESS_DENIED has no meaningful target linkage for a per-record view, and its metadata
             // is free text throughout; LOGIN_SUCCESS/FAILURE are excluded upstream for the user page
             // and never match a request/report/child target in the first place.
-            default -> entry(event.getEventType().name(), event, when, role, null, "");
+            // THE DEFAULT IS RULED, NOT JUST THE CONSTANT (T295 §5), and that is the whole structural
+            // half of the card. ACCESS_TYPES is a one-element set TODAY and an extension point BY
+            // DESIGN - NAMES_REVEALED is the obvious next member - so giving one constant a case
+            // would leave the next one to arrive HERE and render as a raw SHOUTING literal, on a
+            // court document, with nothing failing.
+            //
+            // titleCase is a SAFETY NET AND NOT A SUBSTITUTE FOR RULED COPY: it guarantees no
+            // unhandled type can reach a reader as a constant, and it is deliberately plain enough
+            // that "Names Revealed" reads as something nobody chose. The same fallback this class
+            // already uses for historic status constants.
+            default -> entry(titleCase(event.getEventType().name()), event, when, role, null, "");
         };
     }
 
