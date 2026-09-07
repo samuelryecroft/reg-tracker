@@ -26,7 +26,42 @@
       was reaching for - not losing your place - comes free from returning to the queue with its
       filter preserved (Cancel below, and the redirect after a successful POST).
     */-->
-    <div class="card">
+    <!--/* T266, ruled by Oscar. THE FORM MUST NOT BE THERE when there is nobody to allocate to.
+         Replacing the copy AROUND an empty required radio group leaves the defect: the control and
+         the submit button ARE the defect, because a required fieldset with no options can never
+         validate and the browser cannot say why. NO CONTROL, NO BUTTON.
+
+         The state is LEGITIMATE and PERMANENT, not a setup wrinkle. It arises twice: while an
+         organisation is being populated one person at a time, and again in normal running when a
+         visitor leaves or is disabled. THE SECOND CASE DECIDES IT - no onboarding order can stop an
+         organisation losing its last visitor - so this screen handles a state rather than explaining
+         a temporary condition. */-->
+    <div class="card" th:if="${visitors.isEmpty()}">
+        <!--/* The missing thing is named TWICE AT DIFFERENT PRECISIONS, and both are needed:
+             "visitors" is what a coordinator calls them, "someone with the visitor role" is what an
+             administrator actually has to grant. The imprecise word and the precise one are doing
+             different jobs. */-->
+        <p><strong>There are no visitors in your organisation, so this interview cannot be
+            allocated.</strong></p>
+
+        <!--/* The route out DIFFERS BY READER. A coordinator is BLOCKED, NOT WRONG, and usually
+             cannot fix it themselves - they are only able to add a user if they also hold an
+             administrative role. "Your organisation's administrator" is A ROLE, NOT A PERSON, which
+             is what keeps this off the unanswered support-contact question blocking T199. */-->
+        <p th:unless="${canAddUsers}">Ask your organisation's administrator to add someone with the
+            visitor role — the request stays in your queue until then.</p>
+
+        <!--/* For a coordinator who IS an administrator the button REPLACES the middle sentence
+             rather than joining it: telling someone to ask themselves reads as a system that has not
+             noticed who it is talking to. */-->
+        <p th:if="${canAddUsers}">The request stays in your queue until then.</p>
+        <div class="btn-row">
+            <a class="btn" th:if="${canAddUsers}" th:href="@{/admin/users/new}">Add a user</a>
+            <a class="btn ghost" href="/coordinator/requests">Back to the queue</a>
+        </div>
+    </div>
+
+    <div class="card" th:unless="${visitors.isEmpty()}">
         <form method="post" th:action="@{/coordinator/requests/{id}/allocate(id=${request.id})}" th:object="${form}">
             <div class="banner err" role="alert" th:if="${#fields.hasErrors('*')}">
                 <svg class="icon" aria-hidden="true"><use th:href="${ico} + '#ph-warning-circle'"></use></svg>

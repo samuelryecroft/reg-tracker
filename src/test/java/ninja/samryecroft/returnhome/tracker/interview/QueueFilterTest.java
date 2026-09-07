@@ -215,7 +215,8 @@ class QueueFilterTest {
         NameRevealService reveal = mock(NameRevealService.class);
         DeadlineTrackingService deadlines = mock(DeadlineTrackingService.class);
         when(deadlines.groupByUrgency(anyList())).thenReturn(List.of());
-        return new CoordinatorController(requests, mock(UserRepository.class), deadlines, reveal);
+        return new CoordinatorController(requests, mock(UserRepository.class), deadlines, reveal,
+                new ninja.samryecroft.returnhome.tracker.user.RoleMatrix());
     }
 
     /** One request per filter, plus one matching none, so "All" is larger than any single chip. */

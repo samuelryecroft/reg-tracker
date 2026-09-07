@@ -10,6 +10,7 @@ import ninja.samryecroft.returnhome.tracker.interview.dto.AllocateAndScheduleFor
 import ninja.samryecroft.returnhome.tracker.user.AppUserPrincipal;
 import ninja.samryecroft.returnhome.tracker.user.Role;
 import ninja.samryecroft.returnhome.tracker.user.User;
+import ninja.samryecroft.returnhome.tracker.user.RoleMatrix;
 import ninja.samryecroft.returnhome.tracker.user.UserRepository;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
@@ -30,13 +31,16 @@ public class CoordinatorController {
     private final UserRepository userRepository;
     private final DeadlineTrackingService deadlineTrackingService;
     private final NameRevealService nameRevealService;
+    private final RoleMatrix roleMatrix;
 
     public CoordinatorController(InterviewRequestService interviewRequestService, UserRepository userRepository,
-            DeadlineTrackingService deadlineTrackingService, NameRevealService nameRevealService) {
+            DeadlineTrackingService deadlineTrackingService, NameRevealService nameRevealService,
+            RoleMatrix roleMatrix) {
         this.interviewRequestService = interviewRequestService;
         this.userRepository = userRepository;
         this.deadlineTrackingService = deadlineTrackingService;
         this.nameRevealService = nameRevealService;
+        this.roleMatrix = roleMatrix;
     }
 
     /**
@@ -84,6 +88,13 @@ public class CoordinatorController {
         model.addAttribute("childIdentity", nameRevealService.identityFor(request.getChild()));
         model.addAttribute("form", new AllocateAndScheduleForm());
         model.addAttribute("visitors", visitorsFor(principal));
+        // T266. The route out of the empty state DIFFERS BY READER, so the screen has to know which
+        // reader it has. canCreateUser rather than a role test, deliberately and for the reason
+        // RoleMatrix.canCreateChild already documents: a page that gates by "is an admin" offers the
+        // button to somebody who would then be refused, or hides it from somebody who would not.
+        // A coordinator is only able to fix this themselves if they ALSO hold an administrative
+        // role, which is exactly what an empty assignable set answers.
+        model.addAttribute("canAddUsers", roleMatrix.canCreateUser(principal));
         return "coordinator/allocate-form";
     }
 
@@ -95,6 +106,7 @@ public class CoordinatorController {
             model.addAttribute("request", request);
             model.addAttribute("childIdentity", nameRevealService.identityFor(request.getChild()));
             model.addAttribute("visitors", visitorsFor(principal));
+            model.addAttribute("canAddUsers", roleMatrix.canCreateUser(principal));
             return "coordinator/allocate-form";
         }
         interviewRequestService.allocateAndSchedule(id, form, principal);
