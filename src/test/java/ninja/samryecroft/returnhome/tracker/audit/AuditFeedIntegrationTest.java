@@ -9,6 +9,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.time.LocalDate;
 import java.util.HashSet;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.Set;
 import ninja.samryecroft.returnhome.tracker.AbstractIntegrationTest;
 import ninja.samryecroft.returnhome.tracker.child.Child;
@@ -146,6 +148,39 @@ class AuditFeedIntegrationTest extends AbstractIntegrationTest {
 
         assertThat(html).contains("Interview requested");
         assertThat(html).doesNotContain("LOGIN_SUCCESS").doesNotContain("Signed in");
+    }
+
+    /**
+     * T298: /audit/{id} was reached only by a platform admin in any test, and requestsInScope()
+     * short-circuits for ADMIN before doing any scoping work - so the branch that actually scopes
+     * the row, and the 404-by-scope behaviour that depends on it, went unexercised on the broadest
+     * read surface in the app.
+     *
+     * <p>Deliberately NOT written with the "if no event was found, return" escape the admin-side
+     * test uses: this test creates the event it then opens, so a feed with no link is a failure and
+     * not a reason to pass quietly. A test that can silently prove nothing is the thing this floor
+     * keeps finding.
+     */
+    @Test
+    void aCareProviderOrgAdminCanOpenAnEventFromTheirOwnFeed() throws Exception {
+        mockMvc.perform(post("/requests").with(asUser("feed-home" + suffix)).with(csrf())
+                        .param("childId", childId.toString())
+                        .param("returnedAt", "2026-07-16T20:30"))
+                .andExpect(status().is3xxRedirection());
+
+        String feed = mockMvc.perform(get("/audit").with(asUser("feed-orgadmin" + suffix)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        Matcher m = Pattern.compile("/audit/(\\d+)").matcher(feed);
+        assertThat(m.find())
+                .as("the org admin's own feed must link to the event just created - without a link "
+                        + "the assertion below would pass without opening anything")
+                .isTrue();
+
+        mockMvc.perform(get("/audit/{id}", Long.parseLong(m.group(1)))
+                        .with(asUser("feed-orgadmin" + suffix)))
+                .andExpect(status().isOk());
     }
 
     @Test

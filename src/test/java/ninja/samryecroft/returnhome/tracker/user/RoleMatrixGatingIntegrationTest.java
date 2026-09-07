@@ -147,6 +147,42 @@ class RoleMatrixGatingIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk());
     }
 
+    /**
+     * T298: the test above proves the care-provider admin is OFFERED the form. It never posted it,
+     * and every existing POST to /admin/homes signs in as a platform admin - so HomeAdminController's
+     * non-admin branch, which pins the home to the principal's OWN organisation instead of reading a
+     * submitted organisationId, was the one branch no test exercised.
+     *
+     * <p>That is the shape T298 was opened for: a platform admin short-circuits the guard, so testing
+     * only as one exercises the least code on a guarded path while reporting full coverage of the route.
+     *
+     * <p>Both assertions here do work, and they catch different things - each was armed separately
+     * rather than assumed. The redirect catches the realistic regression: a care-provider admin posts
+     * NO organisationId, because they have no picker, so a branch that fell through to the admin path
+     * binds an error and re-renders 200 instead of redirecting. The organisation check catches the
+     * case where it redirects having pinned the home to the WRONG organisation, which no status code
+     * would show.
+     */
+    @Test
+    void theCareProviderAdminsNewHomeIsPinnedToTheirOwnOrganisation() throws Exception {
+        Organisation careProvider = seededCareProvider();
+        long before = homeRepository.count();
+
+        mockMvc.perform(post("/admin/homes").with(asUser("mx-provider-admin" + suffix)).with(csrf())
+                        .param("name", "Pinned House" + suffix)
+                        .param("addressLine1", "1 Pinned Street")
+                        .param("postcode", "AB1 2CD"))
+                .andExpect(status().is3xxRedirection());
+
+        assertThat(homeRepository.count()).isEqualTo(before + 1);
+        assertThat(homeRepository.findAllWithOrganisation().stream()
+                .filter(h -> ("Pinned House" + suffix).equals(h.getName()))
+                .findFirst())
+                .get()
+                .extracting(h -> h.getOrganisation().getId())
+                .isEqualTo(careProvider.getId());
+    }
+
     @Test
     void onlyThePlatformAdminIsOfferedAddOrganisation() throws Exception {
         String html = mockMvc.perform(get("/admin/organisations").with(asUser("mx-platform-admin" + suffix)))
