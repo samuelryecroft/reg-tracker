@@ -75,10 +75,18 @@ public class SecondFactorSuccessHandler implements AuthenticationSuccessHandler 
         // login - a missing address silently turning the factor off for that one account is exactly
         // the bypass this feature exists to prevent.
         if (!secondFactorService.canChallenge(user)) {
-            log.warn("Sign-in refused for user id {}: second factor is required and the account has "
-                    + "no email address", user.getId());
+            // TWO reasons, TWO messages, and the distinction is not cosmetic: they need different
+            // people to do different things. "No address" is an administrator adding one; an
+            // exhausted unverified allowance is an administrator CORRECTING a wrong one. Collapsing
+            // them would send whoever reads it to check a field that is already populated and looks
+            // fine - the same defect T215 fixed, where a locked-out user was told to check the one
+            // thing that could not be the problem.
+            boolean hasAddress = user.getEmail() != null && !user.getEmail().isBlank();
+            String reason = hasAddress ? "unverified" : "nofactor";
+            log.warn("Sign-in refused for user id {}: second factor required, reason={}",
+                    user.getId(), reason);
             abandon(request);
-            response.sendRedirect(request.getContextPath() + "/login?error=nofactor");
+            response.sendRedirect(request.getContextPath() + "/login?error=" + reason);
             return;
         }
 

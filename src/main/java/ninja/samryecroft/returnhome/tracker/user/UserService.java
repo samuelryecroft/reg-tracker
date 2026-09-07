@@ -443,6 +443,11 @@ public class UserService {
         User user = userRepository.findDetailedById(id)
                 .orElseThrow(() -> new IllegalArgumentException("No such user: " + id));
         user.setEmail(trimToNull(newEmail));
+        // T322: a new address is unproven, and its predecessor's proof does not transfer. This also
+        // restores the allowance, so correcting a typo actually unblocks the account - without it the
+        // fix would appear not to have worked, because the old address's exhausted count would still
+        // be barring sign-in.
+        user.resetEmailVerification();
         User saved = userRepository.save(user);
         auditEventPublisher.userEmailChanged(saved, principal);
         return saved;
