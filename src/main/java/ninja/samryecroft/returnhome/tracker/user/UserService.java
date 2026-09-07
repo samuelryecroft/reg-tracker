@@ -248,10 +248,16 @@ public class UserService {
         // submitting a blank password would authenticate as this account.
         user.setPassword(form.getPassword() == null ? null : passwordEncoder.encode(form.getPassword()));
         applyProfile(user, form.getFirstName(), form.getLastName(), form.getContactPhone());
-        // CREATE still sets the address and EDIT no longer can (T323). Not an inconsistency: an
-        // account has to be given an address once, and the risk the narrowing exists to remove is
-        // REDIRECTION - pointing an existing person's second-factor codes somewhere else. Creating
-        // an account with an address of your choosing creates no such person to impersonate.
+        // CREATE still sets the address and EDIT no longer can (T323), and THIS IS A DOOR LEFT OPEN
+        // RATHER THAN A GAP THAT IS NOT THERE. My first note here said creating an account with an
+        // address of your choosing creates no person to impersonate. That is wrong, and Kevin
+        // measured it: an administrator creating an account CHOOSES WHERE THE FIRST CODE GOES, and
+        // can therefore sign in as that person BEFORE the real user ever does. Nothing on this card
+        // closes that; VERIFY-ON-FIRST-USE in T322 does.
+        //
+        // It is left open deliberately rather than overlooked - an account has to be given an
+        // address once, by somebody, and refusing that here would only move the problem. Written
+        // down so the next reader knows which half is covered.
         user.setEmail(trimToNull(form.getEmail()));
         user.setRoles(form.getRoles());
         user.setOrganisation(needsOrganisation(form.getRoles()) ? resolveOrganisation(form.getOrganisationId(), principal) : null);
@@ -348,6 +354,29 @@ public class UserService {
      * application today. Building one is not this card. When it exists, a self-change must be
      * gated by the second factor itself - otherwise a stolen session becomes a permanent account
      * takeover, which is the same hole this method exists to close, entered by the front door.
+     *
+     * <h2>THIS IS ONE OF THREE, AND ONE OF THREE IS NOT ENOUGH</h2>
+     *
+     * <p>Emailed second-factor codes are acceptable for this product only while ALL THREE of these
+     * hold. Remove any one and the hole reopens:
+     *
+     * <ol>
+     *   <li><b>No edit</b> - a colleague cannot redirect an existing person's codes. That is this
+     *       card, and it is the only one of the three that lives here.</li>
+     *   <li><b>No self-service password reset</b> (T322). Kevin's second objection, which this card
+     *       does not touch: CHANNEL COLLISION. If the mailbox can both receive a reset link and
+     *       receive the code, whoever reads that mailbox holds both factors and there is only one.
+     *       It is handled by NOT BUILDING the reset, so it is an absence, and absences are what get
+     *       added back as features.</li>
+     *   <li><b>Verified on first use</b> (T322). See {@code create}: an administrator setting the
+     *       address at creation chooses where the first code goes, and can sign in as that person
+     *       before the real user ever does. Narrowing the EDIT does nothing about that.</li>
+     * </ol>
+     *
+     * <p><b>This list is here because a comment that names only its own half is how the field gets
+     * restored.</b> A reader who sees "we removed edit so codes cannot be redirected" concludes the
+     * problem is solved and treats the restriction as tradeable against convenience. A reader who
+     * sees that it is one leg of three does not.
      */
     /**
      * The account whose address is about to be changed, refused to anyone who may not change it.
