@@ -133,6 +133,13 @@
     --font-heading-weight: 500;
     --font-body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
 
+    /* TWO SPACING SCALES EXIST AND THEY DO NOT ALIGN. Nocturne --space-* (2.8/5.6/8.4/11.2/16.8/22.4)
+       and legacy --s* (4/8/12/16/24/48). NO legacy step has an exact --space-* counterpart, and --s5
+       (24px) and --s7 (48px) have none at all - --space-8 (22.4px) is the largest step there is.
+       So a rule cannot be moved between the scales without changing the spacing (T238, spec §8o).
+       Prefer --space-* in NEW rules, EXCEPT where the rule must line up with legacy values already in
+       the same component: there, match the neighbours and say so. Never rewrite a working declaration
+       from one scale to the other - that is a pixel change wearing a rename. */
     --space-1: 2.8px;
     --space-2: 5.6px;
     --space-3: 8.4px;
@@ -228,6 +235,8 @@
     --accent-dark: var(--color-accent-300);
     --tint: var(--color-accent-900);
     --radius: 10px;
+    /* The legacy scale - two spacing scales exist and do not align. See the --space-* definitions
+       above for which one to use and the one exception (T238, spec §8o). */
     --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s7: 48px;
     --t-xs: 12px; --t-sm: 14px; --t-md: 16px; --t-lg: 20px;
 }
