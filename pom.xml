@@ -130,6 +130,13 @@
             <groupId>com.azure</groupId>
             <artifactId>azure-identity</artifactId>
         </dependency>
+        <!-- T322: delivers the second-factor code. Version comes from azure-sdk-bom, like the
+             storage/keyvault/identity dependencies above - never pinned separately, so the whole
+             Azure surface moves together. -->
+        <dependency>
+            <groupId>com.azure</groupId>
+            <artifactId>azure-communication-email</artifactId>
+        </dependency>
 
         <!--
             Export pack assembly (2.5). PDFBox renders the narrative and cover sheet; zip4j is here
