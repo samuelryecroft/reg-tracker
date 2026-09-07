@@ -59,12 +59,13 @@ public class ChildController {
     private final RoleMatrix roleMatrix;
     private final ChildLifecycleService childLifecycleService;
     private final NameRevealService nameRevealService;
+    private final ArchivedRecordMatcher archivedRecordMatcher;
 
     public ChildController(ChildRepository childRepository, HomeRepository homeRepository,
             InterviewRequestRepository interviewRequestRepository, OrganisationAccessService organisationAccessService,
             AuditHistoryService auditHistoryService, AuditEventPublisher auditEventPublisher,
             RoleMatrix roleMatrix, NameRevealService nameRevealService,
-            ChildLifecycleService childLifecycleService) {
+            ChildLifecycleService childLifecycleService, ArchivedRecordMatcher archivedRecordMatcher) {
         this.childRepository = childRepository;
         this.homeRepository = homeRepository;
         this.interviewRequestRepository = interviewRequestRepository;
@@ -74,6 +75,7 @@ public class ChildController {
         this.roleMatrix = roleMatrix;
         this.childLifecycleService = childLifecycleService;
         this.nameRevealService = nameRevealService;
+        this.archivedRecordMatcher = archivedRecordMatcher;
     }
 
     @GetMapping
@@ -510,13 +512,35 @@ public class ChildController {
                         + "An administrator needs to activate it first."
                 : null;
 
-        if (bindingResult.hasErrors() || orgInactiveError != null) {
+        // T328: this young person may already have an ARCHIVED record here, which the picker cannot
+        // show and nothing else would say. Creating a second one splits their history in two -
+        // interviews under the old record, the new work under the new one - with no screen anywhere
+        // reporting that both exist.
+        //
+        // REFUSED RATHER THAN WARNED ABOUT. A line of copy beside the field was the cheaper option
+        // and Oscar refused it: documenting a trap does not disarm it, least of all at 2am under a
+        // 72-hour clock. Blocking closes it for EVERY role, including the one that cannot perform
+        // the remedy - which a Restore button on its own would not have.
+        //
+        // ONLY WHEN THE FORM IS OTHERWISE VALID. Running this before the field errors would mean a
+        // submission with a missing date of birth gets an existence answer it did not earn, and
+        // the date of birth is half the key.
+        Child archivedMatch = bindingResult.hasErrors() || orgInactiveError != null ? null
+                : archivedRecordMatcher.archivedMatchFor(form.getLastName(), form.getDateOfBirth(), principal)
+                        .orElse(null);
+
+        if (bindingResult.hasErrors() || orgInactiveError != null || archivedMatch != null) {
             model.addAttribute("needsHomePicker", needsHomePicker);
             if (needsHomePicker) {
                 model.addAttribute("homes", homeOptions);
             }
             model.addAttribute("dobMax", LocalDate.now());
             model.addAttribute("orgInactiveError", orgInactiveError);
+            // The id, not the name: the notice links to the record, and the record page is where
+            // the identity and the archive date are shown to somebody who has chosen to look. A
+            // create form is not the place to render a young person's details back at whoever typed
+            // a date of birth into it.
+            model.addAttribute("archivedMatchId", archivedMatch == null ? null : archivedMatch.getId());
             return "children/form";
         }
 
