@@ -104,8 +104,11 @@ class MultiHomeScopingIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
 
-        assertThat(html).contains("Ada" + suffix).contains("Bo" + suffix);
+        // T301: the scope check runs first. It used to sit behind the positive assertions
+        // below, so a copy change there would have made the test red without this ever being
+        // evaluated - and a red test reports only its first failure.
         assertThat(html).doesNotContain("Cai" + suffix);
+        assertThat(html).contains("Ada" + suffix).contains("Bo" + suffix);
     }
 
     @Test
@@ -168,8 +171,11 @@ class MultiHomeScopingIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
 
-        assertThat(html).contains("Ada" + suffix).contains("Bo" + suffix);
+        // T301: the scope check runs first. It used to sit behind the positive assertions
+        // below, so a copy change there would have made the test red without this ever being
+        // evaluated - and a red test reports only its first failure.
         assertThat(html).doesNotContain("Cai" + suffix);
+        assertThat(html).contains("Ada" + suffix).contains("Bo" + suffix);
     }
 
     @Test

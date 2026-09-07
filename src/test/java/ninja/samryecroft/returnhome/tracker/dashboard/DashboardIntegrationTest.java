@@ -221,13 +221,17 @@ class DashboardIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
 
+        // T301: the SCOPE assertion runs first. It is the one this test is named for, and it used
+        // to sit last - behind three count/copy assertions, one of which (T251's "1 children") is a
+        // grammar check. A copy change to any of those made the test red without ever evaluating
+        // whether another home's data was on the page, and a red test reports only its first failure.
+        assertThat(html).doesNotContain(homeA2.getName());
         assertThat(html).contains("1 home ·"); // homeCount summary line reflects only their one assigned home
         // T251: childCount had no singular branch at all (unlike homeCount, right above) - a viewer
         // scoped to exactly one child read "1 children". Assigned home has exactly one child here
         // (saveLiveRequest creates it), so this is the real singular case, not a contrived count.
         assertThat(html).contains("1 child ·");
         assertThat(html).doesNotContain("1 children");
-        assertThat(html).doesNotContain(homeA2.getName());
     }
 
     @Test
