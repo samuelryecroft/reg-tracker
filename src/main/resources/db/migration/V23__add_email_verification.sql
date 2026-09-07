@@ -6,10 +6,11 @@
 -- chose where the first code goes", and it CANNOT do that job - the confirmation is delivered TO
 -- THAT ADDRESS, so a creator who set a mailbox they control simply completes it.
 --
--- (That threat turned out not to need a control anyway: whoever may create an account sets its
--- password and its address in the same form, so they can already sign in as that person. The case
--- that IS an escalation - a manager setting an existing colleague's password - is closed by T323
--- making an address change platform-admin-only, so the code goes to the real person's mailbox.)
+-- (And that threat was NEVER LOAD-BEARING - not "not yet closed". Whoever may create an account sets
+-- its password AND its address in the same form, so they can already sign in as that person: the
+-- address adds no capability at all. The case that IS an escalation - a manager setting an existing
+-- colleague's password - is closed by T323 making an address change platform-admin-only, so the code
+-- goes to the real person's mailbox. See SecondFactorPolicy for the three facts in full.)
 --
 -- WHAT IT IS ACTUALLY FOR, which is a likely event rather than an adversary: a MISTYPED address.
 -- Without this, a typo means sign-in codes for a children's-services system are posted to whoever
