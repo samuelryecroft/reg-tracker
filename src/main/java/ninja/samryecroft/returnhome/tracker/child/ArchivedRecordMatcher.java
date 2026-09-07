@@ -67,8 +67,15 @@ import org.springframework.stereotype.Service;
  * scopes to what the principal may see and says nothing narrower. There is an argument for excluding
  * it - records in two organisations are held by two controllers and encrypted under two different
  * keys, so "the same young person" is a claim about two separate sets of records rather than one
- * split history - but that is a product judgement nobody has made, and inventing it here would
- * narrow a safeguarding check on my own authority. Flagged rather than absorbed.
+ * split history - but that is a product judgement, not one to make inside a safeguarding check.
+ *
+ * <p><b>AND THE OPPOSITE CASE IS THE ONE THAT WILL LOOK LIKE A BUG.</b> Where the match is in a home
+ * this principal CANNOT see, nothing happens at all: the duplicate is created, silently, with no
+ * warning. Creed's ruling (§8) says so in terms, and says why it has to be written down -
+ * <b>the correct outcome there is indistinguishable from the defect this check exists to fix.</b> An
+ * auditor who finds it will file it as a miss. It is not one: a refusal would leak the existence of
+ * a young person the asker was never entitled to ask about. Closing it needs a way to warn WITHOUT
+ * answering, which is a different card and not a widening of this method.
  */
 @Service
 public class ArchivedRecordMatcher {
