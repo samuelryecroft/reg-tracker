@@ -253,17 +253,20 @@ public class UserService {
         // address of your choosing creates no person to impersonate. That is wrong, and Kevin
         // measured it: an administrator creating an account CHOOSES WHERE THE FIRST CODE GOES, and
         // can therefore sign in as that person BEFORE the real user ever does. Nothing on this card
-        // closes that, AND NOTHING ELSE DOES EITHER TODAY. This used to say verify-on-first-use in
-        // T322 closes it. It does not: that mechanism is NOT BUILT (User carries no verified state
-        // on main), and as specified it would not have closed this anyway - the confirmation is
-        // delivered TO the address being verified, so the administrator who typed it receives it.
-        // It proves DELIVERABILITY, NOT OWNERSHIP, and ownership is the whole question here.
+        // closes that - AND IT DOES NOT NEED TO, which is the part I got wrong twice before
+        // measuring it. THE ADDRESS SET HERE IS NOT AN ESCALATION: this form carries a PASSWORD as
+        // well, and this method has no platform-admin guard, so whoever creates the account can
+        // already sign in as that person. Choosing where the first code goes adds nothing to a
+        // capability they already hold.
         //
-        // It is left open deliberately rather than overlooked - an account has to be given an
-        // address once, by somebody, and refusing that here would only move the problem. Written
-        // down so the next reader knows which half is covered, and that the other half is still
-        // open rather than merely waiting on a card. See UserService.changeEmail for the full
-        // three-condition argument and which leg is missing.
+        // (An earlier version of this comment said verify-on-first-use in T322 closes it. That was
+        // wrong twice: the mechanism is NOT BUILT, and as specified it proves DELIVERABILITY rather
+        // than OWNERSHIP - the confirmation goes TO the address being verified, so whoever set it
+        // completes it.)
+        //
+        // The escalation that DOES exist is the one changeEmail refuses: a manager may set an
+        // EXISTING colleague's password but may not move their address, so a second factor still
+        // reaches the real person. See UserService.changeEmail for the whole argument.
         user.setEmail(trimToNull(form.getEmail()));
         user.setRoles(form.getRoles());
         user.setOrganisation(needsOrganisation(form.getRoles()) ? resolveOrganisation(form.getOrganisationId(), principal) : null);
@@ -361,50 +364,56 @@ public class UserService {
      * gated by the second factor itself - otherwise a stolen session becomes a permanent account
      * takeover, which is the same hole this method exists to close, entered by the front door.
      *
-     * <h2>THIS IS ONE OF THREE, AND ONE OF THREE IS NOT ENOUGH</h2>
+     * <h2>THIS IS ONE OF TWO CONDITIONS THAT ACTUALLY HOLD</h2>
      *
-     * <p>Emailed second-factor codes are acceptable for this product only while ALL THREE of these
-     * hold. Remove any one and the hole reopens:
+     * <p>Emailed second-factor codes are safe <b>against a colleague</b> only while both of these
+     * hold. Remove either and the hole reopens:
      *
      * <ol>
-     *   <li><b>No edit</b> - a colleague cannot redirect an existing person's codes. That is this
-     *       card, and it is the only one of the three that lives here.</li>
-     *   <li><b>No self-service password reset</b> (T322). Kevin's second objection, which this card
-     *       does not touch: CHANNEL COLLISION. If the mailbox can both receive a reset link and
-     *       receive the code, whoever reads that mailbox holds both factors and there is only one.
-     *       It is handled by NOT BUILDING the reset, so it is an absence, and absences are what get
-     *       added back as features.</li>
-     *   <li><b>Verified on first use</b> - <b>NOT BUILT. THIS LEG IS MISSING TODAY.</b> An
-     *       administrator setting the address at creation chooses where the first code goes, and can
-     *       sign in as that person before the real user ever does (see {@code create}). Narrowing the
-     *       EDIT does nothing about that, and neither does anything else that exists: measured on
-     *       {@code main}, {@link User} carries no verified state of any kind, and
-     *       {@code SecondFactorService.verify} verifies a submitted LOGIN CODE, not an address.</li>
+     *   <li><b>No colleague may EDIT an address</b> - this method.</li>
+     *   <li><b>No self-service password reset</b> (T322). CHANNEL COLLISION: if one mailbox can both
+     *       receive a reset link and receive the code, whoever reads it holds both factors and there
+     *       is only one. Handled by NOT BUILDING the reset, so it is an absence - and absences are
+     *       what get added back as features.</li>
      * </ol>
      *
-     * <h2>AND THE MISSING LEG WOULD NOT HAVE CLOSED IT AS SPECIFIED</h2>
+     * <p><b>A third condition, "an address is VERIFIED ON FIRST USE", was specified in T322 and is
+     * NOT BUILT.</b> Measured on {@code main}: {@link User} carries no verified state of any kind,
+     * and {@code SecondFactorService.verify} verifies a submitted LOGIN CODE, not an address.
      *
-     * <p>Worth more than the fact that it is unbuilt, because it means waiting for it is not a plan.
-     * <b>The confirmation is delivered TO the address being verified, so whoever set that address
-     * receives it.</b> An administrator who typed an inbox they control confirms it as easily as the
-     * real user would. It proves the address is DELIVERABLE; it does not prove who OWNS it, and
-     * ownership is the entire question at creation time.
+     * <p><b>It would also not have done the job attributed to it.</b> The confirmation is delivered
+     * TO the address being verified, so a creator who set a mailbox they control simply completes
+     * it. <b>It proves DELIVERABILITY, not OWNERSHIP</b> - which is a distinction worth carrying
+     * past this file: ask what a control PROVES, not whether it EXISTS.
      *
-     * <p>So the honest statement is: <b>the creation-time hole is open, and closing it needs a
-     * mechanism nobody has specified yet</b> - something that reaches the person by a channel the
-     * administrator does not control, or an enrolment the account holder completes before the
-     * account can be used. Naming the gap is worth more than a placeholder that sounds like a fix.
+     * <h2>AND THE THREAT IT NAMED WAS NOT AN ESCALATION - WHICH IS WHERE I WAS WRONG TWICE</h2>
      *
-     * <p><b>This list is here because a comment that names only its own half is how the field gets
-     * restored.</b> A reader who sees "we removed edit so codes cannot be redirected" concludes the
-     * problem is solved and treats the restriction as tradeable against convenience. A reader who
-     * sees that it is one leg of three does not.
+     * <p>This comment first claimed all three conditions held. Corrected, it then claimed the
+     * creation-time hole was open and unclosable. <b>Both were wrong, in opposite directions, and
+     * both because the create path was reasoned about rather than read.</b> Kevin measured it:
+     * {@code CreateUserForm} carries <b>both a password and an email</b>, and {@link #create} has no
+     * platform-admin guard ({@code /admin/**} is {@code hasAnyRole("ADMIN", "ORG_ADMIN")}). So
+     * whoever creates an account sets its password AND its address in one form - <b>they can already
+     * sign in as that person, and the address grants them nothing further.</b>
      *
-     * <p><b>And it says which leg is missing for the same reason it names three at all.</b> The
-     * previous version of this comment listed all three as though all three held. A comment that
-     * names three protections is exactly what stops the next person counting them - so it was
-     * describing a closed hole while the hole was open, which is worse than saying nothing. Kevin
-     * found that, against his own card.
+     * <p><b>The case that genuinely IS an escalation is the one this method closes</b>, and it is
+     * more than the original comment claimed rather than less: {@link #setPassword} has no
+     * platform-admin guard, so a manager may set an EXISTING colleague's password - but this method
+     * refuses them the address. <b>Under a second factor the code therefore goes to the real
+     * person's mailbox and the manager is stopped.</b> That is a pre-existing impersonation
+     * capability being removed, and it is the thing worth naming.
+     *
+     * <p><b>Both halves of that asymmetry are asserted, so this paragraph is checkable rather than
+     * merely plausible:</b> {@code PasswordIsItsOwnActionTest} posts to the password route as an
+     * ORG_ADMIN and expects it to succeed, and {@code AColleagueCannotRedirectYourSignInCodesTest}
+     * expects the same principal to be refused the address. If either ever flips, the argument above
+     * changes and a test says so.
+     *
+     * <p><b>Why the count is stated at all:</b> a reader who sees "we removed edit, so codes cannot
+     * be redirected" concludes the problem is solved and treats the restriction as tradeable against
+     * convenience. But naming legs is only worth doing while each is TRUE - <b>a comment naming
+     * three protections is exactly what stops the next person counting them</b>, which is how the
+     * first version of this survived while describing a closed hole that was open.
      */
     /**
      * The account whose address is about to be changed, refused to anyone who may not change it.

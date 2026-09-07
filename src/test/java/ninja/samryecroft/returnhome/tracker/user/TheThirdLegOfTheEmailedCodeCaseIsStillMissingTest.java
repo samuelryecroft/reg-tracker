@@ -13,12 +13,12 @@ import org.junit.jupiter.api.Test;
  *
  * <h2>Why this exists at all</h2>
  *
- * <p>{@code UserService.changeEmail} carries the case for emailed second-factor codes: they are safe
- * only while <b>no colleague may edit an address</b>, <b>no self-service password reset exists</b>,
- * and <b>an address is verified on first use</b>. The first two are built. <b>The third is not</b>,
- * and for a while that comment said all three held - so the codebase read as though the hole were
- * closed while it was open, which is worse than saying nothing, because a comment naming three
- * protections is exactly what stops the next person counting them.
+ * <p>{@code UserService.changeEmail} carries the case for emailed second-factor codes. Two
+ * conditions hold - <b>no colleague may edit an address</b> and <b>no self-service password reset
+ * exists</b>. A third, <b>an address is verified on first use</b>, was specified in T322, is NOT
+ * BUILT, and would not have done the job attributed to it. For a while that comment said all three
+ * held, so the codebase read as though a hole were closed, which is worse than saying nothing:
+ * a comment naming three protections is exactly what stops the next person counting them.
  *
  * <p>The comment now says which leg is missing. <b>That correction has the same weakness as the
  * error it replaced:</b> it is a sentence about the world, and the world can move underneath it
@@ -70,8 +70,8 @@ class TheThirdLegOfTheEmailedCodeCaseIsStillMissingTest {
                         confirmation delivered TO the address being verified is received by whoever \
                         SET that address - so it proves DELIVERABILITY, not OWNERSHIP, and ownership \
                         is the whole question when an administrator types the address at account \
-                        creation. If that is what you built, the hole is still open and the comments \
-                        should still say so.
+                        creation. If that is what you built, it has not added a protection and the \
+                        comments should still say so.
 
                         Then delete this test - it has done its job.
 
