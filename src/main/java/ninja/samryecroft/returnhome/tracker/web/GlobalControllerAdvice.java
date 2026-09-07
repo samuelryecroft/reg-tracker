@@ -104,10 +104,24 @@ public class GlobalControllerAdvice {
      * role precedence, so the label can never describe a different scope than the page actually
      * shows.
      */
+    /**
+     * T320 (scope ruled in T250): the label is <strong>"Young people" on both branches</strong>. A nav
+     * item NAMES; a page heading can EXPLAIN, and "Young people in your homes" - twelve characters
+     * where "Child" was five - does not belong in a fixed-width nav rail. That sentence now lives on
+     * {@code children/list.html}'s heading instead, which is where it can be read.
+     *
+     * <p><strong>Flagged, deliberately not acted on inside a rename:</strong> this was
+     * {@link RoleMatrix#isChildrenListPersonalisedToOwnHomes}'s only production caller. The predicate
+     * still has its own unit coverage in {@code RoleMatrixTest} and still describes something true,
+     * but nothing in {@code src/main} asks it any more. Deleting it is a separate decision from
+     * renaming a word, so it is left standing and reported rather than swept up here.
+     *
+     * <p>T132 is unaffected: that defect was TWO {@code /children} links both claiming
+     * {@code aria-current="page"}. There is still exactly one link; only its label stopped varying.
+     */
     @ModelAttribute("childrenNav")
     public ChildrenNav childrenNav(@AuthenticationPrincipal AppUserPrincipal principal) {
-        return new ChildrenNav(roleMatrix.canViewChildrenList(principal),
-                roleMatrix.isChildrenListPersonalisedToOwnHomes(principal) ? "My Children" : "Children");
+        return new ChildrenNav(roleMatrix.canViewChildrenList(principal), "Young people");
     }
 
     public record ChildrenNav(boolean visible, String label) {

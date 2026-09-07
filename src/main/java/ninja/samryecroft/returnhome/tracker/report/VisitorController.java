@@ -273,7 +273,7 @@ public class VisitorController {
             return;
         }
         bindingResult.rejectValue("heldAt", "beforeReturn",
-                "The interview cannot have been held before the child returned. This says the "
+                "The interview cannot have been held before the young person returned. This says the "
                         + "interview was " + form.getHeldAt().format(HELD_AT_FMT) + " and the return "
                         + "was " + returnedAt.format(HELD_AT_FMT) + " - please check which is wrong.");
     }

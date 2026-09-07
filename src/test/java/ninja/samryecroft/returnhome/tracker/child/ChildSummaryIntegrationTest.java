@@ -141,7 +141,7 @@ class ChildSummaryIntegrationTest extends AbstractIntegrationTest {
         // render a table promising columns over nothing) - with zero requests the table, and its
         // caption, correctly do not render at all. Asserting the caption text here was this
         // test's own mistake, not a gap in the page.
-        assertThat(html).doesNotContain("Every missing episode recorded for this child, and the interview raised for it.");
+        assertThat(html).doesNotContain("Every missing episode recorded for this young person, and the interview raised for it.");
     }
 
     @Test

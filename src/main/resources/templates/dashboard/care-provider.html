@@ -16,7 +16,7 @@
          this removes an inconsistency the rename would otherwise inherit rather than discover
          itself. Sequencing per god - this fix, not the rename, which stays gated behind the
          redesign and T244. */-->
-    <p class="muted" th:text="${view.homeCount() + (view.homeCount() == 1 ? ' home · ' : ' homes · ') + view.childCount() + (view.childCount() == 1 ? ' child · Care Provider' : ' children · Care Provider')}">Summary</p>
+    <p class="muted" th:text="${view.homeCount() + (view.homeCount() == 1 ? ' home · ' : ' homes · ') + view.childCount() + (view.childCount() == 1 ? ' young person · Care Provider' : ' young people · Care Provider')}">Summary</p>
 
     <!--/* ============ LIVE ZONE ============ */-->
     <section class="zone live" aria-labelledby="z1">
@@ -158,11 +158,11 @@
             <h2 id="z3">Recurring missing episodes</h2>
             <span class="when">Flagged by the home on the request form</span>
         </div>
-        <p class="hint" style="max-width:74ch;margin:-8px 0 18px">These flags are self-declared on the request form, not computed from episode history — read an unflagged child as "not ticked", not as "no recurrence".</p>
+        <p class="hint" style="max-width:74ch;margin:-8px 0 18px">These flags are self-declared on the request form, not computed from episode history — read an unflagged young person as "not ticked", not as "no recurrence".</p>
         <div class="table-wrap responsive">
         <table>
             <caption>5-in-30-days first, then most recently flagged</caption>
-            <thead><tr><th scope="col">Child</th><th scope="col">Home</th><th scope="col">Flags</th><th scope="col">Latest request status</th></tr></thead>
+            <thead><tr><th scope="col">Young person</th><th scope="col">Home</th><th scope="col">Flags</th><th scope="col">Latest request status</th></tr></thead>
             <tbody>
             <tr th:each="entry : ${view.recurrence()}">
                 <td><a class="rowlink" th:href="${entry.href()}" th:text="${entry.childLabel()}">Child</a></td>

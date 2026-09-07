@@ -171,17 +171,17 @@
             <h2 id="z3">Recurring missing episodes</h2>
             <span class="when">Flagged by the home on the request form</span>
         </div>
-        <p class="hint" style="max-width:74ch;margin:-8px 0 18px">Home-level counts only. Children are named on the existing per-home request list, one click away — nothing new is disclosed by following the link.</p>
+        <p class="hint" style="max-width:74ch;margin:-8px 0 18px">Home-level counts only. Young people are named on the existing per-home request list, one click away — nothing new is disclosed by following the link.</p>
         <div class="table-wrap responsive">
         <table>
-            <caption>Homes with at least one flagged child, most flagged first</caption>
-            <thead><tr><th scope="col">Home</th><th scope="col">Care provider</th><th scope="col">Children flagged</th><th scope="col"></th></tr></thead>
+            <caption>Homes with at least one flagged young person, most flagged first</caption>
+            <thead><tr><th scope="col">Home</th><th scope="col">Care provider</th><th scope="col">Young people flagged</th><th scope="col"></th></tr></thead>
             <tbody>
             <tr th:each="entry : ${view.recurrenceCounts()}">
                 <td th:text="${entry.homeName()}">Home</td>
                 <td th:text="${entry.careProviderName()}">Provider</td>
                 <td th:text="${entry.childCount()}">0</td>
-                <td><a class="rowlink" th:href="${entry.href()}">View children →</a></td>
+                <td><a class="rowlink" th:href="${entry.href()}">View young people →</a></td>
             </tr>
             <!--/* R-Q13 (spec §5d), final copy - drive-by fix (6b, spec §7b) from a shorter,
                  pre-final line this screen shared with care-provider.html. */-->
@@ -195,9 +195,9 @@
                 <div class="top"><span class="name" th:text="${entry.homeName()}">Home</span></div>
                 <dl>
                     <dt>Care provider</dt><dd th:text="${entry.careProviderName()}">Provider</dd>
-                    <dt>Children flagged</dt><dd th:text="${entry.childCount()}">0</dd>
+                    <dt>Young people flagged</dt><dd th:text="${entry.childCount()}">0</dd>
                 </dl>
-                <div class="act"><a class="rowlink" th:href="${entry.href()}">View children →</a></div>
+                <div class="act"><a class="rowlink" th:href="${entry.href()}">View young people →</a></div>
             </li>
             <li class="empty" role="listitem" th:if="${#lists.isEmpty(view.recurrenceCounts())}">No recurring missing episodes have been flagged on open or recent requests. These are flagged by the home on the request form, so this does not rule out recurrence.</li>
         </ul>

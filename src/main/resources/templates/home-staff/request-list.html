@@ -10,7 +10,7 @@
 <main id="main">
     <h1>Return Home Interview Requests</h1>
     <a class="btn" href="/requests/new">Raise new request</a>
-    <p class="muted">Sorted by statutory deadline: most urgent first. Deadline is 72 hours from the child's recorded return.</p>
+    <p class="muted">Sorted by statutory deadline: most urgent first. Deadline is 72 hours from the young person's recorded return.</p>
 
     <!--/*
       5a (spec §7b's remaining-list-screens delta): cards for cases, not a table AND a duplicated
@@ -66,12 +66,12 @@
       inventing new copy (D-5e-2's own principle: R-Q13 stays the one source of truth).
     */-->
     <div class="empty" th:if="${#lists.isEmpty(requests) and !hasAnyChildren}">
-        <th:block th:if="${can.addChild}">No children are recorded for this home yet. Add a child before you can raise an interview request.</th:block>
-        <th:block th:unless="${can.addChild}">No children are recorded for this home yet. A request can be raised once one is added.</th:block>
-        <a class="btn secondary" href="/children/new" th:if="${can.addChild}">Add a child</a>
+        <th:block th:if="${can.addChild}">No young people are recorded for this home yet. Add a young person before you can raise an interview request.</th:block>
+        <th:block th:unless="${can.addChild}">No young people are recorded for this home yet. A request can be raised once one is added.</th:block>
+        <a class="btn secondary" href="/children/new" th:if="${can.addChild}">Add a young person</a>
     </div>
     <div class="empty" th:if="${#lists.isEmpty(requests) and hasAnyChildren}">
-        No open requests for this home. If a child has returned from being missing, raise a request now.
+        No open requests for this home. If a young person has returned from being missing, raise a request now.
         <a class="btn secondary" href="/requests/new">Raise a request</a>
     </div>
 </main>

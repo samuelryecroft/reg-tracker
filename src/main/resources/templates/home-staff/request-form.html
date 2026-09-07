@@ -44,15 +44,15 @@
             <div class="banner info" th:if="${#lists.isEmpty(children)}">
                 <span class="ic" aria-hidden="true">◆</span>
                 <div>
-                    <strong>No children are recorded for this home yet</strong>
-                    <p th:if="${can.addChild}">Add a child before you can raise an interview request. <a href="/children/new">Add a child</a></p>
+                    <strong>No young people are recorded for this home yet</strong>
+                    <p th:if="${can.addChild}">Add a young person before you can raise an interview request. <a href="/children/new">Add a young person</a></p>
                     <p th:unless="${can.addChild}">A request can be raised once one is added.</p>
                 </div>
             </div>
-            <label for="childId">Child <span class="req" aria-hidden="true">*</span></label>
+            <label for="childId">Young person <span class="req" aria-hidden="true">*</span></label>
             <select id="childId" th:field="*{childId}" required
                     th:errorclass="is-invalid" th:aria-invalid="${#fields.hasErrors('childId')}" aria-describedby="childId-error">
-                <option value="">Select a child…</option>
+                <option value="">Select a young person…</option>
                 <option th:each="c : ${children}" th:value="${c.id}" th:text="${c.fullName}">Child</option>
             </select>
             <div th:replace="~{fragments/layout :: fieldError('childId')}"></div>
@@ -62,8 +62,8 @@
                  references, so a masked option they can't resolve isn't a protected control, it's
                  a broken one. Exempting it silently would read as a bug and as an unannounced
                  privacy behaviour, so it's stated here rather than left for someone to notice. */-->
-            <p class="hint">Full names are shown here so you pick the right child, even when names are masked elsewhere.</p>
-            <p class="muted" th:if="${can.addChild and !#lists.isEmpty(children)}"><a href="/children/new">+ Add a child</a> not in this list</p>
+            <p class="hint">Full names are shown here so you pick the right young person, even when names are masked elsewhere.</p>
+            <p class="muted" th:if="${can.addChild and !#lists.isEmpty(children)}"><a href="/children/new">+ Add a young person</a> not in this list</p>
 
             <label for="legalStatus">Legal status</label>
             <input type="text" id="legalStatus" th:field="*{legalStatus}"/>
@@ -83,7 +83,7 @@
             <label for="missingSince">Date of missing episode</label>
             <input type="datetime-local" id="missingSince" th:field="*{missingSince}"/>
 
-            <label for="returnedAt">Date/time child returned <span class="req" aria-hidden="true">*</span></label>
+            <label for="returnedAt">Date/time young person returned <span class="req" aria-hidden="true">*</span></label>
             <p class="hint">This starts the statutory 72-hour clock, so a request cannot be raised without it.</p>
             <input type="datetime-local" id="returnedAt" th:field="*{returnedAt}" required
                    th:errorclass="is-invalid" th:aria-invalid="${#fields.hasErrors('returnedAt')}"

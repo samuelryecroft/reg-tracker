@@ -31,7 +31,7 @@
     <div class="card split-card" th:if="${canExport}">
         <div class="split-card-info">
             <h3>Case file</h3>
-            <p>Every return home interview raised for this child, with its full timeline and its
+            <p>Every return home interview raised for this young person, with its full timeline and its
                 approved report — assembled into one dated evidence pack.</p>
             <p class="hint" th:text="${#lists.size(requests) + ' interview' + (#lists.size(requests) == 1 ? '' : 's') + ' · ' + approvedReportCount + ' approved report' + (approvedReportCount == 1 ? '' : 's')}">Summary</p>
         </div>
@@ -85,7 +85,7 @@
     <table>
         <!--/* T290 (D-4c-7): a caption naming only half of what the table shows is worse than
              none - it named the interview request, never the episode it was raised for. */-->
-        <caption>Every missing episode recorded for this child, and the interview raised for it.</caption>
+        <caption>Every missing episode recorded for this young person, and the interview raised for it.</caption>
         <thead>
         <tr>
             <th scope="col">Status</th>
@@ -177,7 +177,7 @@
          either, and MissingEpisodesSummary's own "No missing episodes recorded" line already says
          so above (D-4c-5's one empty state). Rewording this too would say the same absence twice
          in two different sentences on the same page load. */-->
-    <div class="empty" th:if="${#lists.isEmpty(requests)}">No return home interviews for this child yet. They'll appear here once one is raised.</div>
+    <div class="empty" th:if="${#lists.isEmpty(requests)}">No return home interviews for this young person yet. They'll appear here once one is raised.</div>
 
     <div class="card">
         <h2 style="margin-top:0">Case history</h2>

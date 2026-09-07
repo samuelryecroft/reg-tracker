@@ -136,7 +136,7 @@ public class InterviewRequestService {
     @Transactional
     public InterviewRequest createRequest(NewRequestForm form, AppUserPrincipal principal) {
         Child child = childRepository.findById(form.getChildId())
-                .orElseThrow(() -> new IllegalArgumentException("No such child: " + form.getChildId()));
+                .orElseThrow(() -> new IllegalArgumentException("No such young person: " + form.getChildId()));
         if (!organisationAccessService.canAccessHome(principal, child.getHome().getId())) {
             throw new AccessDeniedException("Child does not belong to one of your homes");
         }

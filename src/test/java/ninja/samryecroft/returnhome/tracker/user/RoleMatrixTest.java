@@ -143,6 +143,13 @@ class RoleMatrixTest {
         // a care-provider org-admin sees their whole org; VIEWER sees their assigned homes via the
         // same homeIdsFor query the home-staff fallback uses) - so "My Children" would describe a
         // narrower scope than the page actually shows. The label must say so.
+        //
+        // T320 NOTE, left rather than rewritten: the nav label no longer varies - it is "Young
+        // people" for everyone, and the own-homes framing moved to the page heading - so this
+        // predicate has no production caller today. The assertions below still state something
+        // true and worth pinning, but they no longer decide a label. Flagged on the PR rather
+        // than deleted here: whether the predicate survives is a decision about dead code, not
+        // about a word, and answering it inside a rename is how the two get confused.
         assertThat(matrix.isChildrenListPersonalisedToOwnHomes(
                 principal(null, Role.HOME_STAFF, Role.VIEWER))).isFalse();
         assertThat(matrix.isChildrenListPersonalisedToOwnHomes(

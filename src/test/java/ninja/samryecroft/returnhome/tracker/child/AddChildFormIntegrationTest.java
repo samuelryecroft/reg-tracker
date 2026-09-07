@@ -90,7 +90,7 @@ class AddChildFormIntegrationTest extends AbstractIntegrationTest {
         // D-5d-2: today, ISO-8601 - the same shape a datetime-local/date input requires.
         assertThat(html).contains("max=\"" + LocalDate.now() + "\"");
         // D-5d-4.
-        assertThat(html).contains("Used to tell children apart when names are masked. Can be added later.");
+        assertThat(html).contains("Used to tell young people apart when names are masked. Can be added later.");
     }
 
     @Test

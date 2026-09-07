@@ -111,7 +111,7 @@ public class ChildLifecycleService {
         // values: the edit appears to succeed and silently changes nothing. Found by this method's
         // own test, not by reasoning.
         Child child = childRepository.findDetailedById(childId)
-                .orElseThrow(() -> new IllegalArgumentException("No such child: " + childId));
+                .orElseThrow(() -> new IllegalArgumentException("No such young person: " + childId));
         List<String> changed = new ArrayList<>();
         if (!Objects.equals(child.getFirstName(), firstName)) {
             changed.add("firstName");

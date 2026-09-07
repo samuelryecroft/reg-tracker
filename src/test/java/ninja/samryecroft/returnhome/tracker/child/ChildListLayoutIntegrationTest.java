@@ -109,7 +109,7 @@ class ChildListLayoutIntegrationTest extends AbstractIntegrationTest {
                 .andReturn().getResponse().getContentAsString();
 
         // R-Q13 (spec §5d), final copy - do not reword.
-        assertThat(html).contains("No children added yet. Add a child before you can raise an "
+        assertThat(html).contains("No young people added yet. Add a young person before you can raise an "
                 + "interview request.");
         assertThat(html).contains("href=\"/children/new\"");
     }

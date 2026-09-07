@@ -86,8 +86,8 @@ class BannerClassificationIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
 
-        assertThat(html).contains("No children are recorded for this home yet");
-        int bannerStart = html.indexOf("No children are recorded for this home yet");
+        assertThat(html).contains("No young people are recorded for this home yet");
+        int bannerStart = html.indexOf("No young people are recorded for this home yet");
         int bannerDivStart = html.lastIndexOf("<div class=\"banner", bannerStart);
         String bannerTag = html.substring(bannerDivStart, html.indexOf('>', bannerDivStart) + 1);
         assertThat(bannerTag).contains("banner info").doesNotContain("banner warn");

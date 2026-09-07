@@ -119,9 +119,9 @@ class HomeStaffRequestListIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
 
-        assertThat(html).contains("No children are recorded for this home yet");
-        assertThat(html).contains("Add a child before you can raise an interview request");
-        assertThat(html).doesNotContain("If a child has returned from being missing");
+        assertThat(html).contains("No young people are recorded for this home yet");
+        assertThat(html).contains("Add a young person before you can raise an interview request");
+        assertThat(html).doesNotContain("If a young person has returned from being missing");
     }
 
     @Test
@@ -141,9 +141,9 @@ class HomeStaffRequestListIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
 
-        assertThat(html).contains("No open requests for this home. If a child has returned from "
+        assertThat(html).contains("No open requests for this home. If a young person has returned from "
                 + "being missing, raise a request now.");
-        assertThat(html).doesNotContain("No children are recorded for this home yet");
+        assertThat(html).doesNotContain("No young people are recorded for this home yet");
     }
 
     @Test
@@ -156,7 +156,7 @@ class HomeStaffRequestListIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
 
-        assertThat(html).contains("No children are recorded for this home yet");
-        assertThat(html).contains("Add a child before you can raise an interview request");
+        assertThat(html).contains("No young people are recorded for this home yet");
+        assertThat(html).contains("Add a young person before you can raise an interview request");
     }
 }

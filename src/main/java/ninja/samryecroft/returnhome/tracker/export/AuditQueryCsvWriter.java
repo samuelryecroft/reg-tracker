@@ -22,7 +22,9 @@ import org.springframework.stereotype.Component;
 public class AuditQueryCsvWriter {
 
     private static final String SECTION_HEADER = "Section,When,What happened,Role,Detail";
-    private static final String FEED_HEADER = "Home,Child,Interview,When,What happened,Role,Detail";
+    // T320: a column heading in a downloaded file is user-facing copy - the reader of this CSV
+    // may never have seen the screen it came from.
+    private static final String FEED_HEADER = "Home,Young person,Interview,When,What happened,Role,Detail";
 
     public byte[] write(List<AuditHistorySection> sections) {
         StringBuilder csv = new StringBuilder();

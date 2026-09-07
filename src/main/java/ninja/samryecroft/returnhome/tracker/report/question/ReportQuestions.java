@@ -117,7 +117,7 @@ public final class ReportQuestions {
             // warning was. The guard below stays armed either way - it does not read this comment,
             // it reads the model - so the divergence still cannot quietly acquire company.
             q("heldAt", DETAILS, "Date and time the interview was held",
-                    "The 72-hour window is measured from the child's return to this time, so the "
+                    "The 72-hour window is measured from the young person's return to this time, so the "
                             + "time of day matters. Needed before this report can be submitted for "
                             + "review — you can save a draft without it.",
                     DATETIME, true, "interviewDate", ALWAYS, InterviewReport::getHeldAt),
@@ -130,7 +130,7 @@ public final class ReportQuestions {
             // all need the same answer.
             new ReportQuestion("ifNotWhyLate", DETAILS,
                     "If this interview was not offered and completed within 72 hours of the "
-                            + "child's return, why not?",
+                            + "young person's return, why not?",
                     null, LONG_TEXT, false, NOT_ANSWERED, "ifNotWhyLate",
                     Respondent.VISITOR, InterviewReport::isLateExplanationOwed,
                     InterviewReport::getIfNotWhyLate),
