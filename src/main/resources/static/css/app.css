@@ -1256,8 +1256,14 @@ table caption { text-align: left; font-size: var(--t-xs); color: var(--muted); p
    announced heading text - this keeps it on the text baseline in both the table and .stack views. */
 .due-group-head { display: inline-flex; align-items: center; gap: 6px; }
 
-/* stacked-card table - the mobile alternative to <table>, shown/hidden by the breakpoint below */
-.stack { display: none; flex-direction: column; gap: var(--s3); margin-top: var(--s5); }
+/* stacked-card table - the mobile alternative to <table>, shown/hidden by the breakpoint below.
+   T290: children/detail.html's own instance is now a <ul role="list"> (T253's rule - display:flex
+   on a list strips list semantics in Safari/VoiceOver - this .stack never carried it before, and
+   T253 never reached this older table-fallback component). list-style/padding reset matches every
+   other <ul>-based component already in this file (.tl, .rail, .manifest, .not-kept); a no-op for
+   the other two pages still using .stack as a plain <div>, which never had a marker or list
+   padding to begin with. */
+.stack { display: none; flex-direction: column; gap: var(--s3); margin-top: var(--s5); list-style: none; padding: 0; }
 /* 6a (spec §7b): a page with no table at all (R-Q12 - cards for people, not a second table copy)
    needs its card list visible at every width, not just below the breakpoint that used to reveal
    it beside a hidden table. A distinct modifier rather than changing .stack itself, which every

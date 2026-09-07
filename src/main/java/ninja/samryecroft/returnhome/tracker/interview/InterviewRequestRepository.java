@@ -78,6 +78,22 @@ public interface InterviewRequestRepository extends JpaRepository<InterviewReque
     @Query("select r from InterviewRequest r where r.child.id = :childId order by r.createdAt desc")
     List<InterviewRequest> findByChildIdOrderByCreatedAtDesc(@Param("childId") Long childId);
 
+    /**
+     * T290 (D-4c-3): a SEPARATE ordering for the same rows, not a change to the one above - the
+     * case-file export ({@link ninja.samryecroft.returnhome.tracker.export.CaseFileExportService},
+     * {@link ninja.samryecroft.returnhome.tracker.export.ExportController}) also calls
+     * {@link #findByChildIdOrderByCreatedAtDesc} and is out of this ticket's scope, so reordering
+     * that method would have silently changed the export's own row order along with the page's.
+     *
+     * <p>{@code returnedAt} is the field this page's episode summary and table are keyed on
+     * (mandatory since V15, unlike the nullable {@code missingSince}) - a request raised late for
+     * an old episode must not sort as though the episode were recent, which ordering by
+     * {@code createdAt} would do.
+     */
+    @EntityGraph(attributePaths = {"child", "home", "requestedBy", "allocatedVisitor"})
+    @Query("select r from InterviewRequest r where r.child.id = :childId order by r.returnedAt desc")
+    List<InterviewRequest> findByChildIdOrderByReturnedAtDesc(@Param("childId") Long childId);
+
     /** A VIEWER's dashboard/list scope: their specific set of visible homes, not a whole organisation. */
     @EntityGraph(attributePaths = {"child", "home", "requestedBy", "allocatedVisitor"})
     @Query("select r from InterviewRequest r where r.home.id in :homeIds order by r.createdAt desc")

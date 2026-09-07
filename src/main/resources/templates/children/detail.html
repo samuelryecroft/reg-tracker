@@ -44,18 +44,57 @@
         </div>
     </div>
 
-    <!--/* D-4b-6: renamed from "Return Home Interview History" - "Case history" below is a different
-         history (the audit trail), and a reader scanning headings needs the two words to differ. */-->
-    <h2>Return home interviews</h2>
+    <!--/* T290 (spec §D-4c-1/D-4c-5): the gap this section closes is the subject, not a missing
+         page - the table below already existed and described the administrative process an
+         episode triggered (Status/Raised/Scheduled/Due) without once describing the episode
+         itself. This block answers WHEN and HOW OFTEN; the narrative (episode details, known
+         risks, the child's own comments) stays on the request page behind its own access-logged
+         path (D-4c-6) - a summary that leaks the story instead of the name defeats the reveal
+         control by another route.
+
+         Reuses .split-card exactly as the export card above does (D-4b-5 already noted this shape
+         wants a second use) - no new class, no new CSS. Recurrence leads (h3->p, body weight); the
+         most-recent episode's date and the time since are both present but subordinate (p.hint) -
+         the human asked for all three, ruled which leads, and was explicit neither of the other
+         two may be dropped to achieve that (D-4c-5). The most-recent fact is its DATE ONLY, never
+         its status - that is one row below in the table, and a summary restating it is a second
+         place for the two to disagree (D-4c-5).
+
+         Exact copy for every count/elapsed-time case is composed once, server-side
+         (MissingEpisodesSummary), never assembled from parts in the template - see the record's
+         own javadoc for why. No split-card-actions: there is no action here the table below does
+         not already offer (D-4c-7). */-->
+    <div class="card split-card">
+        <div class="split-card-info">
+            <h3>Missing episodes</h3>
+            <p th:text="${missingEpisodesSummary.lead()}">Recurrence</p>
+            <p class="hint" th:if="${missingEpisodesSummary.hint() != null}"
+               th:text="${missingEpisodesSummary.hint()}">Most recent · time since</p>
+        </div>
+    </div>
+
+    <!--/* D-4b-6: "Case history" below is a different history (the audit trail), and a reader
+         scanning headings needs the two words to differ. T290 renames this again, from "Return
+         home interviews" - the heading now names both what it always described (the interview
+         process) and what it now also carries (the episode fields), rather than half of it. */-->
+    <h2>Missing episodes and interviews</h2>
     <!--/* D-4b-2: an empty case file must not render a table promising columns over nothing - the
          caption names what the table contains, so both renderings share the same guard as the
          .empty message below, not just the message. */-->
     <div class="table-wrap responsive" th:if="${!#lists.isEmpty(requests)}">
     <table>
-        <caption>Every interview request raised for this child.</caption>
+        <!--/* T290 (D-4c-7): a caption naming only half of what the table shows is worse than
+             none - it named the interview request, never the episode it was raised for. */-->
+        <caption>Every missing episode recorded for this child, and the interview raised for it.</caption>
         <thead>
         <tr>
             <th scope="col">Status</th>
+            <!--/* T290 (D-4c-3/D-4c-7): the episode is the subject, the paperwork is context - the
+                 two new columns lead, ordered by the same field the table itself is sorted on
+                 (returnedAt, never missingSince - see D-4c-3), and Raised moves to sit beside
+                 Returned rather than first. */-->
+            <th scope="col">Returned</th>
+            <th scope="col">Missing from</th>
             <th scope="col">Raised</th>
             <th scope="col">Scheduled</th>
             <th scope="col">Due</th>
@@ -65,6 +104,15 @@
         <tbody>
         <tr th:each="r : ${requests}">
             <td><span class="status" th:classappend="${r.status}" th:text="${r.status.displayName}">STATUS</span></td>
+            <!--/* D-4c-3: returnedAt is mandatory since V15 - never absent, so no unanswered
+                 branch is needed here the way missingSince below needs one. */-->
+            <td th:text="${#temporals.format(r.returnedAt, 'dd MMM yyyy HH:mm')}">Returned</td>
+            <!--/* D-4c-3: missingSince is nullable and often absent - "Not recorded", in
+                 .unanswered (this page's own existing treatment for exactly this), never a blank,
+                 a dash, or a default that would read as a fact about the child rather than about
+                 what was entered. The stack below renders the identical words (D-4b-1's rule). */-->
+            <td th:if="${r.missingSince != null}" th:text="${#temporals.format(r.missingSince, 'dd MMM yyyy HH:mm')}">Missing from</td>
+            <td th:if="${r.missingSince == null}" class="unanswered">Not recorded</td>
             <td th:text="${#temporals.format(r.createdAt, 'dd MMM yyyy HH:mm')}">Raised</td>
             <!--/* D-4b-1: this cell and the card stack below used to word the same absence two
                  different ways - nobody reads both renderings at once, so nobody noticed. Now the
@@ -89,10 +137,24 @@
     </table>
     </div>
 
-    <div class="stack" th:if="${!#lists.isEmpty(requests)}">
-        <div class="srow" th:each="r : ${requests}">
+    <!--/* T290 (D-4c-7): keeps role="list"/"listitem" (T253) - display:flex on a list strips list
+         semantics in Safari/VoiceOver. Correcting the spec here rather than silently: this .stack
+         had NEITHER role before this change (verified against the actual markup, not assumed from
+         T253's .case-list work elsewhere, which is a different component) - T253 never reached
+         this older table-fallback pattern. Added now rather than left as a further gap, since this
+         is exactly the a11y concern T253 exists to close and the build is already touching every
+         row in this block regardless. Flagged to Creed rather than corrected silently. */-->
+    <ul class="stack" role="list" th:if="${!#lists.isEmpty(requests)}">
+        <li class="srow" role="listitem" th:each="r : ${requests}">
             <div class="top"><span class="status" th:classappend="${r.status}" th:text="${r.status.displayName}">STATUS</span></div>
             <dl>
+                <!--/* T290: the same two new fields, in the same words as the table (D-4c-7 /
+                     D-4b-1's rule) - nobody reads both renderings of the same row at once, so the
+                     one place this can be checked is by construction, not by proofreading. */-->
+                <dt>Returned</dt><dd th:text="${#temporals.format(r.returnedAt, 'dd MMM yyyy HH:mm')}">Returned</dd>
+                <dt>Missing from</dt>
+                <dd th:if="${r.missingSince != null}" th:text="${#temporals.format(r.missingSince, 'dd MMM yyyy HH:mm')}">Missing from</dd>
+                <dd th:if="${r.missingSince == null}" class="unanswered">Not recorded</dd>
                 <dt>Raised</dt><dd th:text="${#temporals.format(r.createdAt, 'dd MMM yyyy HH:mm')}">Raised</dd>
                 <dt>Scheduled</dt><dd th:text="${r.scheduledAt} != null ? ${#temporals.format(r.scheduledAt, 'dd MMM yyyy HH:mm')} : 'Not yet scheduled'">Scheduled</dd>
                 <dt th:if="${dueBadges.get(r.id)} != null">Due</dt>
@@ -106,11 +168,15 @@
                 <a class="btn ghost" th:if="${r.status.name() == 'REPORT_APPROVED'}"
                    th:href="@{/reports/{id}/download(id=${r.id})}">Download</a>
             </div>
-        </div>
-    </div>
+        </li>
+    </ul>
 
     <!--/* R-Q13 (spec §5d), final copy - was a pre-final line ("...recorded yet.", no forward
-         pointer) until this 5e pass. */-->
+         pointer) until this 5e pass. T290: the copy stays "return home interviews" here on
+         purpose - this is the n==0 case, where there is nothing to call "missing episodes"
+         either, and MissingEpisodesSummary's own "No missing episodes recorded" line already says
+         so above (D-4c-5's one empty state). Rewording this too would say the same absence twice
+         in two different sentences on the same page load. */-->
     <div class="empty" th:if="${#lists.isEmpty(requests)}">No return home interviews for this child yet. They'll appear here once one is raised.</div>
 
     <div class="card">
