@@ -11,6 +11,8 @@ import ninja.samryecroft.returnhome.tracker.home.HomeRepository;
 import ninja.samryecroft.returnhome.tracker.organisation.OrganisationAccessService;
 import ninja.samryecroft.returnhome.tracker.security.LoginAttemptService;
 import ninja.samryecroft.returnhome.tracker.security.LoginFailureHandler;
+import ninja.samryecroft.returnhome.tracker.security.secondfactor.SecondFactorPolicy;
+import ninja.samryecroft.returnhome.tracker.security.secondfactor.SecondFactorService;
 import ninja.samryecroft.returnhome.tracker.theme.ThemeService;
 import ninja.samryecroft.returnhome.tracker.user.RoleMatrix;
 import ninja.samryecroft.returnhome.tracker.web.LoginController;
@@ -37,6 +39,23 @@ class SecurityConfigTest {
      */
     @MockitoBean
     private LoginFailureHandler loginFailureHandler;
+
+    /**
+     * T322. {@code SecurityConfig} builds {@code SecondFactorSuccessHandler} itself and needs both
+     * of these to do it - the same "a slice with no bean" shape T215 and T221 hit, and for the same
+     * reason: this slice imports {@code SecurityConfig} without component-scanning.
+     *
+     * <p>Mocked rather than imported, and the mock's behaviour is exactly right for this class: a
+     * Mockito {@code SecondFactorPolicy} returns {@code false} from {@code isRequiredFor}, so every
+     * test here signs in without a second factor. That is what these tests are about - which routes
+     * each role may reach once authenticated - and the gate itself is asserted in
+     * {@code SecondFactorGateIntegrationTest} against a real policy and a real database.
+     */
+    @MockitoBean
+    private SecondFactorService secondFactorService;
+
+    @MockitoBean
+    private SecondFactorPolicy secondFactorPolicy;
 
     /**
      * T221. {@code SecurityConfig} builds {@code LockedAccountFilter} itself and needs this to do

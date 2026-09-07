@@ -14,6 +14,9 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import ninja.samryecroft.returnhome.tracker.security.LockedAccountFilter;
 import ninja.samryecroft.returnhome.tracker.security.LoginAttemptService;
+import ninja.samryecroft.returnhome.tracker.security.secondfactor.SecondFactorPolicy;
+import ninja.samryecroft.returnhome.tracker.security.secondfactor.SecondFactorService;
+import ninja.samryecroft.returnhome.tracker.security.secondfactor.SecondFactorSuccessHandler;
 import org.springframework.context.ApplicationEventPublisher;
 
 @Configuration
@@ -29,6 +32,8 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http,
             LoginFailureHandler loginFailureHandler,
             LoginAttemptService loginAttemptService,
+            SecondFactorService secondFactorService,
+            SecondFactorPolicy secondFactorPolicy,
             ApplicationEventPublisher eventPublisher) throws Exception {
         // Constructed here rather than injected as a bean: Boot auto-registers Filter BEANS into the
         // servlet chain as well, which would place this ahead of Spring Security's chain entirely and
@@ -42,7 +47,11 @@ public class SecurityConfig {
                         // permitAll, an unauthenticated fetch of either is intercepted, saved as a
                         // "continue to this URL" target, and redirects a real login back to a font
                         // or icon file instead of the intended landing page.
-                        .requestMatchers("/login", "/css/**", "/js/**", "/fonts/**", "/icons/**", "/webjars/**", "/error").permitAll()
+                        // T322: /login/verify is permitAll for the same reason /login is - the whole point of
+                        // the second-factor step is that it happens while the session is NOT
+                        // authenticated. It protects itself: the page is inert without the pending
+                        // attribute that only a correct password can put in the session.
+                        .requestMatchers("/login", "/login/verify", "/css/**", "/js/**", "/fonts/**", "/icons/**", "/webjars/**", "/error").permitAll()
                         // WS-C: the health endpoint (and its liveness/readiness groups) is public so
                         // App Service probes can reach it unauthenticated. show-details=when-authorized
                         // means anonymous callers still only see {"status":"UP"}. Every OTHER actuator
@@ -80,7 +89,10 @@ public class SecurityConfig {
                         .anyRequest().authenticated())
                 .formLogin(form -> form
                         .loginPage("/login")
-                        .defaultSuccessUrl("/", false)
+                        // T322: replaces .defaultSuccessUrl("/", false), whose behaviour the handler
+                        // reproduces exactly for accounts that do not need a second factor. A
+                        // password being correct is no longer the same thing as being signed in.
+                        .successHandler(new SecondFactorSuccessHandler(secondFactorService, secondFactorPolicy))
                         // T215: without this, EVERY AuthenticationException lands on /login?error
                         // and a locked-out user is told to check their password - the one thing
                         // that cannot work - on every attempt for the whole window.

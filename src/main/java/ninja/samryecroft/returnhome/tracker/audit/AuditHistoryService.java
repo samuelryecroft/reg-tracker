@@ -85,9 +85,20 @@ public class AuditHistoryService {
      */
     private static final Set<AuditEventType> EXCLUDED_FROM_RECORD_HISTORY = ACCESS_TYPES;
 
-    /** Sign-in monitoring is explicitly out of scope for V1 (gated on an unresolved GDPR policy call). */
+    /**
+     * Sign-in monitoring is explicitly out of scope for V1 (gated on an unresolved GDPR policy call).
+     *
+     * <p><b>T322 added four members, and adding them was the point rather than an afterthought.</b>
+     * The second factor's events are sign-in events: MFA_CHALLENGE_ISSUED, MFA_SUCCESS, MFA_FAILURE
+     * and MFA_LOCKED say when a named person tried to sign in, how often, and how often they failed.
+     * Leaving them out of this set would not have raised an error anywhere - it would simply have
+     * delivered per-user sign-in monitoring to the user page through a new door, and the policy call
+     * that deliberately parked it would have been answered by omission.
+     */
     private static final Set<AuditEventType> EXCLUDED_FROM_USER_HISTORY =
-            Set.of(AuditEventType.LOGIN_SUCCESS, AuditEventType.LOGIN_FAILURE);
+            Set.of(AuditEventType.LOGIN_SUCCESS, AuditEventType.LOGIN_FAILURE,
+                    AuditEventType.MFA_CHALLENGE_ISSUED, AuditEventType.MFA_SUCCESS,
+                    AuditEventType.MFA_FAILURE, AuditEventType.MFA_LOCKED);
 
     /**
      * Roadmap 2.5's audit feed is deliberately "case activity" only (Oscar's T35 split) - interview
@@ -522,6 +533,19 @@ public class AuditHistoryService {
             // T277. Its own row because it is its own action - and "Password set" rather than
             // "Password changed", because the person whose account it is did not change anything.
             case USER_PASSWORD_RESET -> entry("Password set by an administrator", event, when, role, null, "info");
+            // T322. Ruled copy even though all four are excluded from the user page above, because
+            // titleCase is a safety net and not a substitute for ruled copy (T295 §5): the exclusion
+            // is a POLICY decision that could be reversed by a later ruling, and the day it is
+            // reversed these rows must not surface to a reader as "Mfa Challenge Issued".
+            //
+            // "Security code" rather than "MFA" or "second factor" throughout - the reader of this
+            // trail may be an IRO or a court, and the phrase has to mean something without a glossary.
+            case MFA_CHALLENGE_ISSUED -> entry("Security code sent", event, when, role, null, "");
+            case MFA_SUCCESS -> entry("Security code accepted", event, when, role, null, "");
+            case MFA_FAILURE -> entry("Security code rejected", event, when, role, null, "info");
+            // Says what actually happened - the code stopped being usable - rather than "locked",
+            // which would read as the ACCOUNT being locked. It is not; the person can start again.
+            case MFA_LOCKED -> entry("Security code refused too many times", event, when, role, null, "info");
             // ACCESS_DENIED has no meaningful target linkage for a per-record view, and its metadata
             // is free text throughout; LOGIN_SUCCESS/FAILURE are excluded upstream for the user page
             // and never match a request/report/child target in the first place.

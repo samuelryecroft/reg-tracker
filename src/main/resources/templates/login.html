@@ -27,9 +27,41 @@
          exactly as much as a blunt one, because its PRESENCE is the signal. That is why the
          selection is made by asking LoginAttemptService.isLocked and never by exception type -
          see LoginFailureHandler. */-->
-    <div class="banner err" role="alert" th:if="${param.error != null and param.error[0] != 'locked'}">
+    <!--/* T322: the exclusion list grew, and for T215's exact reason rather than for tidiness. All
+         four second-factor outcomes arrive here AFTER a correct password, so letting them fall
+         through to the generic banner would tell someone whose password was right to "check your
+         username and password" - the one thing that cannot be the problem. That is the same defect
+         T215 fixed for lockout, arriving by a different door.
+
+         These messages can be specific without disclosing anything: they are only ever reachable by
+         someone who has ALREADY entered the correct password, so they cannot tell a stranger whether
+         an account exists. That is a property of the code path, not of the wording - the same
+         argument the lockout banner above turns on. */-->
+    <div class="banner err" role="alert"
+         th:if="${param.error != null and param.error[0] != 'locked'
+                 and param.error[0] != 'nofactor' and param.error[0] != 'nodelivery'
+                 and param.error[0] != 'codeburned' and param.error[0] != 'codeexpired'}">
         <svg class="icon" aria-hidden="true"><use th:href="@{/icons/phosphor.svg} + '#ph-warning-circle'"></use></svg>
         <div><strong>We couldn't sign you in</strong><p>Check your username and password and try again.</p></div>
+    </div>
+    <!--/* Names the state and what to do, never the account. "No address" is an administrator's job
+         to fix, so the copy points there rather than inviting the person to retry something that
+         will fail identically every time. */-->
+    <div class="banner err" role="alert" th:if="${param.error != null and param.error[0] == 'nofactor'}">
+        <svg class="icon" aria-hidden="true"><use th:href="@{/icons/phosphor.svg} + '#ph-warning-circle'"></use></svg>
+        <div><strong>This account can't complete sign-in</strong><p>It has no email address for security codes. Your organisation's administrator can add one.</p></div>
+    </div>
+    <div class="banner err" role="alert" th:if="${param.error != null and param.error[0] == 'nodelivery'}">
+        <svg class="icon" aria-hidden="true"><use th:href="@{/icons/phosphor.svg} + '#ph-warning-circle'"></use></svg>
+        <div><strong>We couldn't send your security code</strong><p>This is a problem at our end, not with your details. Please try again shortly.</p></div>
+    </div>
+    <div class="banner err" role="alert" th:if="${param.error != null and param.error[0] == 'codeburned'}">
+        <svg class="icon" aria-hidden="true"><use th:href="@{/icons/phosphor.svg} + '#ph-warning-circle'"></use></svg>
+        <div><strong>Too many incorrect codes</strong><p>That code is no longer valid. Sign in again to get a new one.</p></div>
+    </div>
+    <div class="banner err" role="alert" th:if="${param.error != null and param.error[0] == 'codeexpired'}">
+        <svg class="icon" aria-hidden="true"><use th:href="@{/icons/phosphor.svg} + '#ph-warning-circle'"></use></svg>
+        <div><strong>Your security code has expired</strong><p>Sign in again to get a new one.</p></div>
     </div>
     <div class="banner err" role="alert" th:if="${param.error != null and param.error[0] == 'locked'}">
         <svg class="icon" aria-hidden="true"><use th:href="@{/icons/phosphor.svg} + '#ph-warning-circle'"></use></svg>

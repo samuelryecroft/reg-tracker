@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en" th:attr="data-appearance=${#strings.toLowerCase(appearancePreference)}">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Enter your security code — Return Home Tracker</title>
+    <th:block th:replace="~{fragments/layout :: styles}"></th:block>
+</head>
+<body>
+<main id="main" class="narrow">
+    <h1>Check your email</h1>
+    <!--/* Does NOT show the address the code went to, not even partially masked. The person who
+         owns the mailbox already knows it, and anyone who has reached this page holding a stolen
+         password would be told where to go next. A masked address still discloses the domain and
+         the shape - enough to identify the provider to attack. */-->
+    <p class="sub">We've sent a 6-digit code to the email address on your account. It expires in 10 minutes.</p>
+
+    <div class="banner err" role="alert" th:if="${codeError}">
+        <svg class="icon" aria-hidden="true"><use th:href="@{/icons/phosphor.svg} + '#ph-warning-circle'"></use></svg>
+        <div><strong>That code wasn't right</strong><p>Check the code and try again.</p></div>
+    </div>
+    <!--/* The resend cap is stated plainly rather than silently doing nothing, because a button that
+         appears to work and does not is worse than one that explains itself. */-->
+    <div class="banner err" role="alert" th:if="${resendLimitReached}">
+        <svg class="icon" aria-hidden="true"><use th:href="@{/icons/phosphor.svg} + '#ph-warning-circle'"></use></svg>
+        <div><strong>We've sent several codes recently</strong><p>Use the most recent one, or wait a few minutes before signing in again.</p></div>
+    </div>
+
+    <div class="card">
+        <form method="post" th:action="@{/login/verify}">
+            <label for="code">Security code</label>
+            <!--/* inputmode=numeric brings up a number pad on the phones this will mostly be read
+                 on; autocomplete="one-time-code" lets the browser offer the code straight from the
+                 message. maxlength matches the issued length rather than being generous - there is
+                 no valid longer value. */-->
+            <input type="text" id="code" name="code" inputmode="numeric" pattern="[0-9]*"
+                   maxlength="6" autocomplete="one-time-code" autofocus="autofocus" required/>
+            <div class="btn-row"><button type="submit" class="btn block">Verify</button></div>
+        </form>
+    </div>
+    <p class="sub" style="margin-top:16px">
+        Didn't get a code? Check your junk folder, or
+        <a th:href="@{/login}">start again</a>.
+    </p>
+</main>
+</body>
+</html>
