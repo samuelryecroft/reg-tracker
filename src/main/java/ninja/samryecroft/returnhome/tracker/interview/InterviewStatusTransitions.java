@@ -33,8 +33,12 @@ import java.util.Set;
  *
  * <p>{@link InterviewStatus#CANCELLED} has no in-edges. That is not an omission - nothing in
  * production has ever set it, and the table records that reality explicitly rather than leaving it
- * latent in the enum. T146 asks whether that is intended vocabulary needing a way in, or dead
- * vocabulary to delete; inventing an edge here to pre-empt that answer would be the wrong way round.
+ * latent in the enum. <b>T146 is now ANSWERED and the answer is that the state stays</b>, with the
+ * reasons on {@link InterviewStatus#CANCELLED} rather than repeated here; the empty set below is
+ * therefore a settled fact about the machine rather than a placeholder waiting on a decision.
+ * <b>Adding an edge here is how cancellation gets built, and it will turn
+ * {@code InterviewStatusTransitionsTest.noTransitionReachesCancelled} red</b> - which is the point:
+ * the act should cost a reviewed change, not a line in a map.
  * Demo fixtures and tests can still build a CANCELLED row, because setting the initial status of a
  * row that was never persisted is a construction, not a transition - see
  * {@code InterviewRequestService.markStatus}.

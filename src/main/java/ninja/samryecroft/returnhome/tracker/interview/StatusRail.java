@@ -33,11 +33,14 @@ import ninja.samryecroft.returnhome.tracker.report.InterviewReport;
  * (ruling 1) - the status tag on the same screen reads the same enum, so the two can never say two
  * different things for one state.
  *
- * <p><b>{@code CANCELLED} is presently unreachable in production</b> ({@link
- * InterviewStatusTransitions} has no in-edges to it, and T146 has not yet decided whether it is
- * live vocabulary or dead) - this method still implements the ruling correctly and is tested
- * against constructed fixtures (which {@code InterviewStatusTransitions}'s own javadoc explicitly
- * allows), so the rail is already correct the day T146 resolves either way. Because nothing
+ * <p><b>{@code CANCELLED} is unreachable in production and stays</b> - {@link
+ * InterviewStatusTransitions} has no in-edges to it, and T146 ruled the state kept rather than
+ * deleted, partly BECAUSE of what this method does with it. <b>This rendering is one of the reasons
+ * the constant survives</b>, so it is not dead code to be swept: the design chose a distinct glyph
+ * and colour pair for it (Creed's D-1a-2a), and deleting either half would quietly remove the
+ * argument for keeping the other. It is tested against constructed fixtures (which {@code
+ * InterviewStatusTransitions}'s own javadoc explicitly allows), so the rail is already correct on
+ * the day somebody builds cancellation. Because nothing
  * currently transitions a request TO cancelled, "how far it got" cannot be read off a status
  * transition log that does not exist - it is inferred from which of the request/report's own
  * timestamp fields are already populated, the same fields the happy path itself reads.
