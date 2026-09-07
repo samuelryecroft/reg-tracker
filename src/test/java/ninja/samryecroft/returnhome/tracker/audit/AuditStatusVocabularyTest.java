@@ -13,6 +13,10 @@ import ninja.samryecroft.returnhome.tracker.report.InterviewReportRepository;
 import ninja.samryecroft.returnhome.tracker.report.ReportStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 
@@ -32,17 +36,23 @@ import org.junit.jupiter.params.provider.EnumSource;
  * Creed rejected. Asserting every constant against {@code getDisplayName()} is red for that patch,
  * because SUBMITTED renders "Pending review" and no amount of special-casing REJECTED produces it.
  */
+@ExtendWith(MockitoExtension.class)
 class AuditStatusVocabularyTest {
 
     private static final long REQUEST_ID = 1L;
     private static final long REPORT_ID = 9L;
 
-    private final AuditEventRepository auditEventRepository = mock(AuditEventRepository.class);
-    private final InterviewReportRepository interviewReportRepository = mock(InterviewReportRepository.class);
-    private final AuditHistoryService service =
-            new AuditHistoryService(auditEventRepository, interviewReportRepository);
-    private final InterviewRequest request = mock(InterviewRequest.class);
-    private final InterviewReport report = mock(InterviewReport.class);
+    @Mock
+
+    private AuditEventRepository auditEventRepository;
+    @Mock
+    private InterviewReportRepository interviewReportRepository;
+    @InjectMocks
+    private AuditHistoryService service;
+    @Mock
+    private InterviewRequest request;
+    @Mock
+    private InterviewReport report;
 
     @BeforeEach
     void wireTheReportOntoTheRequest() {

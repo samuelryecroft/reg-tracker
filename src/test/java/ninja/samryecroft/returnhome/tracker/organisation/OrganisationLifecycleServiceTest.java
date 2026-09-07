@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -15,6 +16,10 @@ import ninja.samryecroft.returnhome.tracker.document.KeyProvider;
 import ninja.samryecroft.returnhome.tracker.document.KeyUnavailableException;
 import ninja.samryecroft.returnhome.tracker.user.AppUserPrincipal;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 /**
@@ -22,14 +27,20 @@ import org.springframework.test.util.ReflectionTestUtils;
  * column worth having - a status that can be reached without the check is worse than no status,
  * because it is the original incident with a reassurance attached.
  */
+@ExtendWith(MockitoExtension.class)
 class OrganisationLifecycleServiceTest {
 
-    private final OrganisationRepository repository = mock(OrganisationRepository.class);
-    private final KeyProvider keyProvider = mock(KeyProvider.class);
-    private final AuditEventPublisher auditEvents = mock(AuditEventPublisher.class);
-    private final OrganisationLifecycleService service =
-            new OrganisationLifecycleService(repository, keyProvider, auditEvents);
-    private final AppUserPrincipal principal = mock(AppUserPrincipal.class);
+    @Mock
+
+    private OrganisationRepository repository;
+    @Mock
+    private KeyProvider keyProvider;
+    @Mock
+    private AuditEventPublisher auditEvents;
+    @InjectMocks
+    private OrganisationLifecycleService service;
+    @Mock
+    private AppUserPrincipal principal;
 
     /**
      * A real Organisation rather than a mock, because these tests are about the STATE TRANSITION -
@@ -42,7 +53,11 @@ class OrganisationLifecycleServiceTest {
         organisation.setName("Acme Care");
         organisation.setType(OrgType.CARE_PROVIDER);
         ReflectionTestUtils.setField(organisation, "id", 2L);
-        when(repository.save(any(Organisation.class))).thenAnswer(i -> i.getArgument(0));
+        // lenient, and for two distinct reasons rather than one: the refusal tests
+        // (anOrganisationWhoseKeyIsAbsentCannotReachActive, aVaultOutageIsNotReportedAsAMissingKey)
+        // throw before anything is saved, and the archiving test calls this builder TWICE, so the
+        // first registration is shadowed by the second and is redundant rather than unreached.
+        lenient().when(repository.save(any(Organisation.class))).thenAnswer(i -> i.getArgument(0));
         return organisation;
     }
 

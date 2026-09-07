@@ -14,6 +14,9 @@ import ninja.samryecroft.returnhome.tracker.organisation.OrgType;
 import ninja.samryecroft.returnhome.tracker.organisation.Organisation;
 import ninja.samryecroft.returnhome.tracker.organisation.OrganisationRepository;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 /**
@@ -25,10 +28,14 @@ import org.springframework.test.util.ReflectionTestUtils;
  * <em>shape</em> of the warmup: that it never creates a key, never masks an absent one, and can
  * never stop the application starting.
  */
+@ExtendWith(MockitoExtension.class)
 class KeyWarmupRunnerTest {
 
-    private final KeyProvider keyProvider = mock(KeyProvider.class);
-    private final OrganisationRepository organisationRepository = mock(OrganisationRepository.class);
+    @Mock
+
+    private KeyProvider keyProvider;
+    @Mock
+    private OrganisationRepository organisationRepository;
 
     private final com.azure.core.credential.TokenCredential credential =
             mock(com.azure.core.credential.TokenCredential.class);

@@ -25,6 +25,10 @@ import ninja.samryecroft.returnhome.tracker.user.Role;
 import ninja.samryecroft.returnhome.tracker.user.User;
 import ninja.samryecroft.returnhome.tracker.user.UserRepository;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
  * T145 follow-up: the guard in {@code submitForReview} runs <em>before</em> anything is mutated, not
@@ -44,17 +48,38 @@ import org.junit.jupiter.api.Test;
  * it - the explicit {@code save()} is not what would have persisted the damage. Move the guard down
  * and the safety of this method depends entirely on a transaction boundary staying where it is.
  */
+@ExtendWith(MockitoExtension.class)
 class SubmitForReviewGuardPlacementTest {
 
-    private final InterviewReportRepository interviewReportRepository = mock(InterviewReportRepository.class);
-    private final InterviewRequestService interviewRequestService = mock(InterviewRequestService.class);
-    private final UserRepository userRepository = mock(UserRepository.class);
-    private final AuditEventPublisher auditEventPublisher = mock(AuditEventPublisher.class);
+    @Mock
 
-    private final ReportService reportService = new ReportService(
-            interviewReportRepository, interviewRequestService, userRepository,
-            mock(DocxReportGenerator.class), mock(AppProperties.class), mock(ThemeService.class),
-            auditEventPublisher, mock(ReportDocumentService.class));
+    private InterviewReportRepository interviewReportRepository;
+    @Mock
+    private InterviewRequestService interviewRequestService;
+    @Mock
+    private UserRepository userRepository;
+    @Mock
+    private AuditEventPublisher auditEventPublisher;
+
+    @Mock
+
+    private DocxReportGenerator docxReportGenerator;
+
+    @Mock
+
+    private AppProperties appProperties;
+
+    @Mock
+
+    private ThemeService themeService;
+
+    @Mock
+
+    private ReportDocumentService reportDocumentService;
+
+    @InjectMocks
+
+    private ReportService reportService;
 
     @Test
     void anApprovedReportIsRefusedBeforeAnyOfItIsOverwritten() {

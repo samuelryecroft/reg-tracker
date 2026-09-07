@@ -12,6 +12,10 @@ import ninja.samryecroft.returnhome.tracker.organisation.Organisation;
 import ninja.samryecroft.returnhome.tracker.organisation.OrganisationRepository;
 import ninja.samryecroft.returnhome.tracker.user.UserRepository;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
  * T119 4e: "branding set" must mean someone CHOSE a colour, not that a theme row exists.
@@ -28,12 +32,28 @@ import org.junit.jupiter.api.Test;
  * supplier that had never been touched. So the case that matters here is the <em>negative</em> one,
  * and it is first.
  */
+@ExtendWith(MockitoExtension.class)
 class ChosenBrandingPredicateTest {
 
-    private final ThemeSettingsRepository themeSettingsRepository = mock(ThemeSettingsRepository.class);
+    @Mock
 
-    private final ThemeService themeService = new ThemeService(themeSettingsRepository,
-            mock(OrganisationRepository.class), mock(HomeRepository.class), mock(UserRepository.class));
+    private ThemeSettingsRepository themeSettingsRepository;
+
+    @Mock
+
+    private OrganisationRepository organisationRepository;
+
+    @Mock
+
+    private HomeRepository homeRepository;
+
+    @Mock
+
+    private UserRepository userRepository;
+
+    @InjectMocks
+
+    private ThemeService themeService;
 
     /** Organisation has no id setter - the identity column is assigned on persist. */
     private static Organisation org(long id) {
