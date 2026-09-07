@@ -79,13 +79,13 @@ public class ChildController {
             children = childRepository.findByHomeOrganisationIdWithHome(principal.getOrganisationId());
             showHomeColumn = true;
         } else if (principal.hasRole(Role.VIEWER)) {
-            children = childRepository.findByHomeIdInAndArchivedFalse(organisationAccessService.homeIdsFor(principal));
+            children = childRepository.findByHomeIdInAndArchivedAtIsNull(organisationAccessService.homeIdsFor(principal));
             showHomeColumn = true;
         } else {
             // Home staff may hold more than one home since V16, so this is the same query the
             // viewer above runs - and the home column now earns its place whenever it is ambiguous.
             List<Long> homeIds = organisationAccessService.homeIdsFor(principal);
-            children = childRepository.findByHomeIdInAndArchivedFalse(homeIds);
+            children = childRepository.findByHomeIdInAndArchivedAtIsNull(homeIds);
             showHomeColumn = homeIds.size() > 1;
         }
         // Sorted here rather than by the database: the names are encrypted columns now, so an

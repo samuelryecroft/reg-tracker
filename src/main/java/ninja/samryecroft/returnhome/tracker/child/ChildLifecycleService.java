@@ -1,6 +1,7 @@
 package ninja.samryecroft.returnhome.tracker.child;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -145,7 +146,11 @@ public class ChildLifecycleService {
             throw new ChildNotArchivableException(describe(unfinished)
                     + " Finish the interview, then archive this young person.");
         }
-        child.setArchived(true);
+        // T321: the moment, not the fact. Taken here rather than left to a DB default so the value
+        // is the application's clock - the same clock the audit event about to be written uses, so
+        // the row and the trail agree about when this happened rather than being minutes apart on a
+        // server whose time drifted.
+        child.setArchivedAt(LocalDateTime.now());
         Child saved = childRepository.save(child);
         auditEventPublisher.childArchived(saved, principal);
         return saved;
@@ -153,7 +158,11 @@ public class ChildLifecycleService {
 
     @Transactional
     public Child restore(Child child, AppUserPrincipal principal) {
-        child.setArchived(false);
+        // Cleared, not kept. This column is the CURRENT state's date; the history of every archive
+        // and restore is on audit_events, which refuses UPDATE and DELETE by trigger. Keeping the
+        // last archive date on a restored record would make "archived_at is not null" stop meaning
+        // "archived", which is the one thing every list query on this column relies on.
+        child.setArchivedAt(null);
         Child saved = childRepository.save(child);
         auditEventPublisher.childRestored(saved, principal);
         return saved;

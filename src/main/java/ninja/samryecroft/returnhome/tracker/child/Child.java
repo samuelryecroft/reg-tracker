@@ -83,7 +83,15 @@ public class Child implements EncryptedEntity {
     private String localCaseReference;
 
     /**
-     * Whether this young person is off the active lists (T170).
+     * WHEN this young person was taken off the active lists, or {@code null} while they are on them
+     * (T170, reworked by T321).
+     *
+     * <p><strong>A timestamp rather than a boolean, and null rather than a companion flag.</strong>
+     * A boolean records THAT a record was archived; this records WHEN, and on a safeguarding record
+     * the when is the part somebody needs later - a question asked about a young person's care in
+     * 2029 is a question about dates. The absence of a value <em>is</em> "not archived", so there is
+     * one column rather than two that have to agree, and {@link #isArchived()} is derived from it
+     * rather than stored beside it. Two fields that must agree are two fields that can disagree.
      *
      * <p><strong>Never a physical delete.</strong> The human asked to "remove" a child; a button
      * saying Delete while the record survives teaches him something false about his own data, so the
@@ -92,15 +100,22 @@ public class Child implements EncryptedEntity {
      * <p><strong>Archiving must never hide, alter or make unreachable any of this child's interview
      * records.</strong> An approved report is a statutory document, and if archiving could take
      * safeguarding history out of view then archiving becomes the way to make it disappear. This
-     * flag is read by the LISTS; it is deliberately not read by anything that resolves a record for
-     * viewing or export.
+     * column is read by the LISTS; it is deliberately not read by anything that resolves a record
+     * for viewing or export.
+     *
+     * <p><strong>It is the CURRENT state's date, not the history</strong>, which is why
+     * {@code restore} clears it rather than keeping the last value. Every archive and every restore
+     * is an audit event with its own timestamp, on a table that refuses UPDATE and DELETE by
+     * trigger, so nothing is lost by this column forgetting. Asking it to remember previous
+     * archivings would be asking the state to be the trail - the same mistake {@code OrgStatus}
+     * refuses in its own javadoc, where intent is a property of the EVENT rather than of the state.
      *
      * <p>The setter is package-private on purpose, the same way {@code Organisation.setStatus} is:
      * every transition goes through {@code ChildLifecycleService}, so the blocking rule cannot be
      * reached past by a caller that simply sets the field.
      */
-    @Column(name = "archived", nullable = false)
-    private boolean archived = false;
+    @Column(name = "archived_at")
+    private LocalDateTime archivedAt;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
@@ -193,12 +208,25 @@ public class Child implements EncryptedEntity {
         this.localCaseReference = localCaseReference;
     }
 
+    /**
+     * Derived, never stored: a young person is archived exactly when they have an archive date.
+     *
+     * <p>Kept as a method because that is the question every caller actually asks, and deriving it
+     * is what makes a second column impossible to get out of step. <strong>Note that Spring Data
+     * cannot see this</strong> - derived query names resolve against the persistent attributes, not
+     * the getters - which is why {@link ChildRepository} asks {@code ArchivedAtIsNull}. That is a
+     * feature here rather than a nuisance: the queries name the column that exists.
+     */
     public boolean isArchived() {
-        return archived;
+        return archivedAt != null;
     }
 
-    void setArchived(boolean archived) {
-        this.archived = archived;
+    public LocalDateTime getArchivedAt() {
+        return archivedAt;
+    }
+
+    void setArchivedAt(LocalDateTime archivedAt) {
+        this.archivedAt = archivedAt;
     }
 
     public LocalDateTime getCreatedAt() {
