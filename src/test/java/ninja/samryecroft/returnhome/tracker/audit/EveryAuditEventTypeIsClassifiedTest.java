@@ -52,6 +52,12 @@ class EveryAuditEventTypeIsClassifiedTest {
             AuditEventType.USER_CREATED,
             AuditEventType.USER_UPDATED,
             AuditEventType.USER_PASSWORD_RESET,
+            // T323. SHOWN, and this one is close to the point of the whole account history: the
+            // address is where second-factor codes are delivered, so changing it is a change to who
+            // can sign in as this person. "When was this address last changed, and by whom" is a
+            // question an investigation asks directly, and hiding it on the grounds that it is
+            // adjacent to sign-in would remove the answer.
+            AuditEventType.USER_EMAIL_CHANGED,
 
             // Interview request lifecycle.
             AuditEventType.INTERVIEW_REQUEST_CREATED,
