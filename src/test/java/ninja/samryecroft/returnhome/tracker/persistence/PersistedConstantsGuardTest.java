@@ -12,8 +12,10 @@ import java.util.regex.Pattern;
 import ninja.samryecroft.returnhome.tracker.audit.AuditEventType;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewStatus;
 import ninja.samryecroft.returnhome.tracker.interview.QueueFilter;
+import ninja.samryecroft.returnhome.tracker.organisation.OrgStatus;
 import ninja.samryecroft.returnhome.tracker.organisation.OrgType;
 import ninja.samryecroft.returnhome.tracker.report.ReportStatus;
+import ninja.samryecroft.returnhome.tracker.user.AppearancePreference;
 import ninja.samryecroft.returnhome.tracker.user.Role;
 import org.junit.jupiter.api.Test;
 
@@ -155,6 +157,33 @@ class PersistedConstantsGuardTest {
                 .isNotEmpty();
         assertThat(found).containsExactlyInAnyOrder("User", "Organisation", "Child",
                 "InterviewRequest", "InterviewReport", "Page", "HttpRequest");
+    }
+
+    /**
+     * Both of these were missing from the first version of this pin, and how they were missing is
+     * the reason the list is now derived from the annotation rather than from the entities.
+     *
+     * <p>I enumerated the persisted enums by finding the entity classes that carry
+     * {@code @Enumerated(EnumType.STRING)} and then listing, by reading, which enum types they hold.
+     * Five of seven. {@code OrgStatus} and {@code AppearancePreference} were on fields I did not
+     * look at. <b>An enumeration reports the absence of what its instrument could not see as an
+     * absence in the world</b> - and the instrument here was my own reading.
+     *
+     * <p>The check that finds all seven is one line and asks the annotation directly:
+     * {@code grep -rA3 '@Enumerated(EnumType.STRING)' src/main/java | grep 'private'}. If a new
+     * persisted enum appears, that is what to run - this test cannot notice a whole enum it was
+     * never told about, only a constant inside one it holds.
+     */
+    @Test
+    void orgStatusNames() {
+        assertThat(names(OrgStatus.values()))
+                .containsExactlyInAnyOrder("PENDING", "ACTIVE", "ARCHIVED");
+    }
+
+    @Test
+    void appearancePreferenceNames() {
+        assertThat(names(AppearancePreference.values()))
+                .containsExactlyInAnyOrder("LIGHT", "DARK", "AUTO");
     }
 
     private static List<String> names(Enum<?>[] values) {

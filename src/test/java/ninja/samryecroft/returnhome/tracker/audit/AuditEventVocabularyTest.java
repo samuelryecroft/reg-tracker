@@ -49,6 +49,19 @@ import org.mockito.junit.jupiter.MockitoExtension;
  * <em>a safety net is safe for a constant whose plain rendering is merely unchosen; it is not safe
  * for one whose plain rendering is a word the product has retired.</em>
  *
+ * <p><b>This test and {@code PersistedConstantsGuardTest} point at the same identifiers for
+ * opposite reasons, and read alone either one invites the wrong fix.</b> This one says
+ * {@code CHILD_UPDATED} must not reach a reader as "Child Updated" - for which the obvious remedy
+ * is to rename the constant. <b>That remedy is forbidden.</b> {@code eventType} is
+ * {@code @Enumerated(EnumType.STRING)} on an {@code updatable = false} column of an append-only
+ * table, so the constant's own NAME is the stored value; renaming it does not rename history, it
+ * splits it, and a query across the boundary answers half a question while looking like it answered
+ * all of it. T332 pins that name so the forbidden remedy fails loudly instead of looking like a fix.
+ *
+ * <p>So: <b>change the display mapping, never the stored constant.</b> The two guards are not in
+ * tension - one governs what a constant SAYS, the other what it IS - and a constant that reaches a
+ * screen is subject to both at once.
+ *
  * <p>Its two siblings, {@link AuditStatusVocabularyTest} and {@link InterviewStatusVocabularyTest},
  * hold the same line for status vocabulary. {@code AuditEventType} had no such guard, which is
  * precisely how three CHILD constants arrived unnoticed.
