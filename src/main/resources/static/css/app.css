@@ -757,7 +757,31 @@ textarea.input { min-height: 90px; resize: vertical; }
 }
 .shell-toggle:disabled { opacity: 0.6; cursor: default; }
 .shell-toggle .icon { color: var(--color-accent); }
-.shell-bell { color: var(--color-text-muted); }
+
+/* D-1e-6 (spec §8n): the narrow-viewport panel's toggle - <details>'s native <summary>, so it
+   works with JS off (D-1e-5). Hidden at every width by default; the media query below is the
+   ONLY place that shows it, since the desktop rail needs no toggle at all. list-style/marker
+   suppression mirrors .disclosure summary's own comment above almost verbatim - not restated
+   here, that one explains the Firefox/Safari split this needs too. */
+.shell-nav-toggle { display: none; list-style: none; }
+.shell-nav-toggle::-webkit-details-marker { display: none; }
+.shell-nav-toggle[hidden] { display: none; }
+
+/* D-1e (spec §8n): the close control for the same panel. Not the discloser - a plain button,
+   hidden by default via the hidden ATTRIBUTE (shell-nav-panel.js removes it on open) rather than
+   a JS-added class, so a script that fails after load still leaves it correctly absent rather
+   than stuck visible with nothing wired to it. The explicit [hidden] override is the same
+   [hidden]-fighting shape .btn[hidden] and fieldset.step[hidden] already guard above - an
+   unconditional `display: inline-flex` on .shell-nav-close would otherwise always beat the UA
+   stylesheet's own display:none for [hidden], regardless of the attribute being present. */
+.shell-nav-close {
+    display: none; align-items: center; gap: 6px; min-height: 44px; align-self: flex-end;
+    background: transparent; border: 1px solid var(--color-control-border);
+    border-radius: var(--radius-md); padding: 0 10px; color: var(--color-text);
+    font: inherit; font-size: var(--text-data); cursor: pointer;
+}
+.shell-nav-close[hidden] { display: none; }
+.shell-nav-close:not([hidden]) { display: inline-flex; }
 
 /* main is every page's own top-level content element (id="main", present on every template
    already) - these rules apply globally, sidebar or not, so login.html/error.html's sidebar-less
@@ -770,7 +794,43 @@ main {
 main.narrow { max-width: 420px; margin: var(--space-6) auto; }
 
 @media (max-width: 900px) {
-    .shell-side { display: none; }
+    /* D-1e (spec §8n): this used to be an unconditional `.shell-side { display: none }` - nothing
+       replaced it, and that included .shell-user's log-out button, the only one in the app.
+       Restored as a full-screen panel over the SAME markup (D-1e-3: "the pattern that reuses the
+       DOM verbatim is the one in which the asset stays an asset" - no duplicated nav, no second
+       copy of anything inside .shell-side to drift from the first).
+
+       :has() reads .shell-nav-toggle's own native [open] state (fragments/layout.html) rather
+       than .shell-side being nested inside that <details> as its disclosed content - nesting was
+       rejected on Creed's own acceptance criterion: at desktop width .shell-side's presence must
+       NEVER depend on open/closed, and a CSS rule that force-shows a closed <details>'s content
+       can leave the sidebar visible while a screen reader still reports the region collapsed - a
+       lie. Because .shell-side sits OUTSIDE the details entirely, that whole class of failure
+       cannot occur: above this breakpoint neither rule below even applies, so the sidebar is
+       governed purely by its own always-on styling above, with zero reference to [open] anywhere.
+
+       display:none, never moved (D-1e-2, the one ruled most likely to be got wrong) - no
+       transform, no left:-100%, no visibility transition. Any of those keeps the subtree in the
+       tab order and the accessibility tree while only LOOKING closed, turning today's inert,
+       complete, role-gated markup into a focus trap that no test would fail. */
+    body:not(:has(.shell-nav-disclosure[open])) .shell-side { display: none; }
+    body:has(.shell-nav-disclosure[open]) .shell-side {
+        /* D-1e-3: full-screen, not a partial-width drawer - at 320px a usable drawer is nearly
+           the full width anyway, and a partial width is what invites the transform animation
+           D-1e-2 forbids. Overrides the base rule's fixed 212px rail width/positioning; overflow-y
+           and the internal flex-column layout are inherited from that same base rule unchanged. */
+        top: 0; right: 0; bottom: 0; left: 0; width: auto; height: auto; z-index: 100;
+    }
+    .shell-nav-toggle {
+        display: inline-flex;
+        /* Measured: without this, the open panel's z-index:100 paints over the header the toggle
+           lives in, and re-clicking it to close - the ONLY close path D-1e-5 leaves without JS,
+           since the trap/Escape/close-button are all enhancement - hits the panel instead and
+           does nothing. shell-nav-panel.js additionally hides this once it can offer the real
+           close button in its place (never both shown at once), but the no-JS case never runs
+           that script, so the toggle must be able to stand on its own above the panel regardless. */
+        position: relative; z-index: 101;
+    }
     .shell-header { margin-left: 0; }
     main { margin-left: 0; }
 }
