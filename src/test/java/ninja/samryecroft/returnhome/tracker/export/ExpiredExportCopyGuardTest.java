@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test;
  * <p><b>Why bytes and not "contains roughly this".</b> Creed hexdumped the string rather than
  * retyping it, because retyping is how the previous one drifted - my {@code "No users yet."}
  * quietly displaced the signed-off {@code "No accounts yet."} and survived review. The two
- * characters that drift are invisible in a diff: the apostrophe in <em>child's</em> is ASCII
+ * characters that drift are invisible in a diff: the apostrophe in <em>young person's</em> is ASCII
  * {@code 0x27} and not a typographic quote, and the dash is a real em dash {@code U+2014} with a
  * space either side, not a hyphen and not an en dash. An editor, a paste, or a well-meaning
  * "smart quotes" pass changes either without anyone seeing it.
@@ -35,8 +35,16 @@ class ExpiredExportCopyGuardTest {
      * became "create a new export" because, once the first sentence changed, "it" pointed at the
      * LINK rather than the export - a swapped sentence moves what the next pronoun refers to.
      */
+    /**
+     * T320: {@code child's} -> {@code young person's}, moving WITH the template in the same commit.
+     * That is the one sanctioned way this sentence changes. The guard is here to stop a retyped
+     * near-miss displacing signed-off copy unnoticed; it is not a veto on the copy's own author
+     * ruling the vocabulary differently later, and T250's replacement table names this substitution
+     * exactly. Both characters this test exists for - the ASCII apostrophe and the spaced em dash -
+     * are unchanged, which is the point of asserting them below rather than trusting this note.
+     */
     private static final String RULED_COPY =
-            "You can create a new export from the child's record "
+            "You can create a new export from the young person's record "
                     + "— each export is recorded separately.";
 
     /** The heading §7s promotes that clause into - a marked adaptation, not new copy. */
@@ -71,8 +79,8 @@ class ExpiredExportCopyGuardTest {
         assertThat(RULED_COPY)
                 .as("the apostrophe must be ASCII 0x27 - a typographic quote is the drift that "
                         + "survives review because it is invisible in a diff")
-                .contains("child's")
-                .doesNotContain("child’s");
+                .contains("person's")
+                .doesNotContain("person’s");
 
         assertThat(RULED_COPY)
                 .as("a real em dash, spaced - not a hyphen and not an en dash")

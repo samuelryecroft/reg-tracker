@@ -57,8 +57,13 @@ class NavChildrenDedupeUiTest extends AbstractUiTest {
         userRepository.save(user);
     }
 
+    /**
+     * T320/T250: the rail no longer distinguishes scope - it says the same thing to everyone - so
+     * the broader-scope claim is asserted where the ruling moved it, on the heading. The dedupe half
+     * (one link, one aria-current) is T132's actual defect and is untouched.
+     */
     @Test
-    void aHomeStaffAndViewerAccountSeesExactlyOneChildrenLinkLabelledForTheBroaderScope() {
+    void aHomeStaffAndViewerAccountSeesOneChildrenLinkAndTheBroaderScopeOnTheHeading() {
         createStackedUser("nav-dedupe-staff-viewer", Role.HOME_STAFF, Role.VIEWER);
         login("nav-dedupe-staff-viewer", PASSWORD);
         page.navigate(url("/children"));
@@ -67,8 +72,14 @@ class NavChildrenDedupeUiTest extends AbstractUiTest {
         // Exactly one link to /children in the whole nav - the bug was ever having two.
         assertThat(page.locator(".shell-nav a[href='/children']").count()).isEqualTo(1);
 
-        // VIEWER outranks the home-staff fallback in ChildController#list, so the label says so.
-        assertThat(page.locator(".shell-nav a[href='/children']").textContent().trim()).isEqualTo("Children");
+        // The rail names, it no longer scopes: same label for every role that can reach this page.
+        assertThat(page.locator(".shell-nav a[href='/children']").textContent().trim())
+                .isEqualTo("Young people");
+
+        // VIEWER outranks the home-staff fallback in ChildController#list, and the HEADING is where
+        // that now shows: no "in your homes", because this account is not scoped to its own homes.
+        // Asserted against the other test's heading, so the pair still proves the two scopes differ.
+        assertThat(page.locator("main h1").textContent().trim()).isEqualTo("Young people");
 
         // Exactly one "current page" announcement, not two.
         assertThat(page.locator(".shell-nav a[aria-current='page']").count()).isEqualTo(1);
