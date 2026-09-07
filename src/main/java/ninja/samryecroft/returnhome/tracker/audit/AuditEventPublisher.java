@@ -199,6 +199,28 @@ public class AuditEventPublisher {
      * own details are encrypted at rest and must not be copied into an append-only table that is
      * deliberately readable for review.
      */
+    /**
+     * A young person's details were corrected (T170).
+     *
+     * <p><strong>WHICH FIELD CHANGED, BY WHOM, WHEN - NEVER THE VALUES.</strong> That is Oscar's
+     * ruling and it stays inside the existing allow-list rather than carving an exception into it.
+     * A child's name and date of birth are encrypted at rest precisely so they are not lying around
+     * in readable tables; copying them into an append-only trail that exists to be READ during a
+     * review would put them somewhere they can never be removed from, since the audit table refuses
+     * UPDATE and DELETE by database trigger.
+     *
+     * <p>The field NAMES are enough for what the trail is for: a reviewer asking "was this child's
+     * date of birth changed, and by whom" gets an answer, and one asking "what was it before" is
+     * asking a question this system deliberately does not answer from here.
+     */
+    public void childUpdated(Child child, List<String> changedFields, AppUserPrincipal principal) {
+        publish(actor(AuditEventRecord.of(AuditEventType.CHILD_UPDATED), principal)
+                .target("Child", child.getId())
+                .scope(organisationIdOfChild(child), child.getHome() == null ? null : child.getHome().getId())
+                .meta("fieldsChanged", String.join(", ", changedFields))
+                .build());
+    }
+
     public void childArchived(Child child, AppUserPrincipal principal) {
         publish(actor(AuditEventRecord.of(AuditEventType.CHILD_ARCHIVED), principal)
                 .target("Child", child.getId())

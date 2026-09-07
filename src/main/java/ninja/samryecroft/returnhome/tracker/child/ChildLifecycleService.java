@@ -1,6 +1,9 @@
 package ninja.samryecroft.returnhome.tracker.child;
 
+import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import ninja.samryecroft.returnhome.tracker.audit.AuditEventPublisher;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewRequest;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewRequestRepository;
@@ -26,6 +29,33 @@ import org.springframework.transaction.annotation.Transactional;
  * the refusal states the count and the route. <strong>Archiving never cascades:</strong> a child's
  * interviews are not closed, cancelled or hidden to make the archive possible. Finish the record,
  * then archive.
+ *
+ * <h2>Removal does not live here (Kevin, T176)</h2>
+ *
+ * <p><strong>Archive and remove are different acts with different privileges.</strong> Every method
+ * on this class is reversible - that is what makes them safe to reach through one scope check. A
+ * removal is not a bigger archive: destroying a young person is a GRAPH deletion across requests,
+ * reports, documents and draft state, and the export bundle it produces becomes THE ONLY COPY IN
+ * EXISTENCE, so the sequence is export, VERIFY, confirm custody, then destroy.
+ *
+ * <p>This class is called "lifecycle", which makes it the obvious place to add {@code delete}. It is
+ * not one. <strong>Someone tidying a list must not be able to destroy evidence</strong>, and the
+ * cheapest way for that to happen is a destructive method appearing beside two reversible ones and
+ * inheriting their reachability.
+ *
+ * <p><strong>Specifically: do not let this path grow an "export and purge" affordance as a
+ * convenience.</strong> That is how removal arrives without anyone deciding to build it - the
+ * plausible fix a tired builder reaches for, which quietly answers a question nobody asked. It is
+ * the same shape as retargeting an audit event so it resolves: a small change that makes the screen
+ * do the wanted thing and falsifies what the system claims.
+ *
+ * <p><strong>And the fact that settles it, because it is not a matter of taste:</strong> with a
+ * 35-day backup window, <em>"destroyed" does not mean destroyed for 35 days</em>. A restore taken
+ * for an unrelated incident would silently resurrect destroyed records - and because this system
+ * deliberately keeps its audit trail, that trail would point at live records again and RE-IDENTIFY
+ * what was supposed to be anonymous. Removal therefore has a TIME DIMENSION that archiving has no
+ * reason to know about, which is the strongest possible argument for the two never sharing a
+ * control, a predicate, or a class.
  *
  * <h2>Restore is as easy as archive</h2>
  *
@@ -56,6 +86,53 @@ public class ChildLifecycleService {
         this.childRepository = childRepository;
         this.interviewRequestRepository = interviewRequestRepository;
         this.auditEventPublisher = auditEventPublisher;
+    }
+
+    /**
+     * Correct a young person's own details (T170).
+     *
+     * <p><strong>The audit records WHICH FIELDS changed and never their values</strong>, so the
+     * comparison happens here and only field NAMES leave the method. Nothing in this class ever
+     * passes a name, a date of birth or a case reference to the publisher.
+     *
+     * <p>A submission that changes nothing writes NO audit row. An event saying "these fields
+     * changed" when none did is not a harmless extra line - it is a false statement in an
+     * append-only record that cannot be corrected.
+     */
+    @Transactional
+    public Child update(Long childId, String firstName, String lastName, LocalDate dateOfBirth,
+            String localCaseReference, AppUserPrincipal principal) {
+        // LOADED INSIDE THE TRANSACTION, and that is required rather than tidy. The plaintext name
+        // and date of birth are TRANSIENT - only the ciphertext columns are mapped - and the
+        // encryption listener fires on a MANAGED entity at flush. Handed a DETACHED child (which is
+        // all a controller can produce, since open-in-view is off), save() becomes merge(), the
+        // transient fields do not survive the copy, and the ciphertext columns keep their old
+        // values: the edit appears to succeed and silently changes nothing. Found by this method's
+        // own test, not by reasoning.
+        Child child = childRepository.findDetailedById(childId)
+                .orElseThrow(() -> new IllegalArgumentException("No such child: " + childId));
+        List<String> changed = new ArrayList<>();
+        if (!Objects.equals(child.getFirstName(), firstName)) {
+            changed.add("firstName");
+        }
+        if (!Objects.equals(child.getLastName(), lastName)) {
+            changed.add("lastName");
+        }
+        if (!Objects.equals(child.getDateOfBirth(), dateOfBirth)) {
+            changed.add("dateOfBirth");
+        }
+        if (!Objects.equals(child.getLocalCaseReference(), localCaseReference)) {
+            changed.add("localCaseReference");
+        }
+        child.setFirstName(firstName);
+        child.setLastName(lastName);
+        child.setDateOfBirth(dateOfBirth);
+        child.setLocalCaseReference(localCaseReference);
+        Child saved = childRepository.save(child);
+        if (!changed.isEmpty()) {
+            auditEventPublisher.childUpdated(saved, changed, principal);
+        }
+        return saved;
     }
 
     @Transactional

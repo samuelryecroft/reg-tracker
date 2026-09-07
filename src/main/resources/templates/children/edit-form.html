@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en" th:attr="data-appearance=${#strings.toLowerCase(appearancePreference)}">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Edit details — Return Home Tracker</title>
+    <th:block th:replace="~{fragments/layout :: styles}"></th:block>
+</head>
+<body>
+<div th:replace="~{fragments/layout :: nav}"></div>
+<main id="main">
+    <h1>Edit details</h1>
+
+    <div class="card">
+        <!--/* T170: correcting a young person's details is ORDINARY AND NECESSARY - typos, legal
+             name changes, a case reference issued after the record was created - so this is a plain
+             form rather than a ceremony. The HOME is deliberately not on it: moving a young person
+             between homes changes who can see them, which is a different decision from fixing a
+             spelling, and bundling the two is the shape T277 exists to refuse. */-->
+        <form method="post" th:action="@{/children/{id}/edit(id=${child.id})}" th:object="${form}">
+            <div class="banner err" role="alert" th:if="${#fields.hasErrors('*')}">
+                <span class="ic" aria-hidden="true">▲</span>
+                <div>
+                    <strong>Before these changes can be saved</strong>
+                    <ul>
+                        <li th:if="${#fields.hasErrors('firstName')}"><a href="#firstName" th:text="${#fields.errors('firstName')[0]}">Error</a></li>
+                        <li th:if="${#fields.hasErrors('lastName')}"><a href="#lastName" th:text="${#fields.errors('lastName')[0]}">Error</a></li>
+                        <li th:if="${#fields.hasErrors('dateOfBirth')}"><a href="#dateOfBirth" th:text="${#fields.errors('dateOfBirth')[0]}">Error</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <label for="firstName">First name <span class="req" aria-hidden="true">*</span></label>
+            <input type="text" id="firstName" th:field="*{firstName}" required
+                   th:errorclass="is-invalid" th:aria-invalid="${#fields.hasErrors('firstName')}" aria-describedby="firstName-error"/>
+            <div th:replace="~{fragments/layout :: fieldError('firstName')}"></div>
+
+            <label for="lastName">Last name <span class="req" aria-hidden="true">*</span></label>
+            <input type="text" id="lastName" th:field="*{lastName}" required
+                   th:errorclass="is-invalid" th:aria-invalid="${#fields.hasErrors('lastName')}" aria-describedby="lastName-error"/>
+            <div th:replace="~{fragments/layout :: fieldError('lastName')}"></div>
+
+            <label for="dateOfBirth">Date of birth <span class="req" aria-hidden="true">*</span></label>
+            <input type="date" id="dateOfBirth" th:field="*{dateOfBirth}" required th:max="${dobMax}"
+                   th:errorclass="is-invalid" th:aria-invalid="${#fields.hasErrors('dateOfBirth')}" aria-describedby="dateOfBirth-error"/>
+            <div th:replace="~{fragments/layout :: fieldError('dateOfBirth')}"></div>
+
+            <label for="localCaseReference">Local case reference</label>
+            <p class="hint">Optional — the reference your local authority uses for this young person.</p>
+            <input type="text" id="localCaseReference" th:field="*{localCaseReference}"/>
+
+            <div class="btn-row">
+                <button type="submit" class="btn">Save changes</button>
+                <a class="btn ghost" th:href="@{/children/{id}(id=${child.id})}">Cancel</a>
+            </div>
+        </form>
+    </div>
+</main>
+</body>
+</html>
