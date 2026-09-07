@@ -22,15 +22,20 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 /**
- * T318 (CREED-RULING-step-label-affordance.md): D-1d-1's no-caret call is overturned on two
- * mechanical grounds - the open/closed state was conveyed by colour alone (WCAG 1.4.1), and the
- * only rest-state affordance was {@code :hover}, invisible on the touch devices this panel is built
- * for (the progress dots are inert {@code <i>} elements, so the label is the sole entry point).
+ * T318 (CREED-RULING-step-label-affordance.md, corrected 11 Sep): D-1d-1's no-caret call is
+ * overturned on two mechanical grounds - the open/closed state was conveyed by colour alone (WCAG
+ * 1.4.1), and the only rest-state affordance was {@code :hover}, invisible on the touch devices
+ * this panel is built for (the progress dots are inert {@code <i>} elements, so the label is the
+ * sole entry point).
  *
- * <p>The fix is a real {@code <svg><use>} caret - a DOM child, not generated content, so
- * T165/AGSGT's bound on {@code ::before}/{@code ::after} never applies to it - rotated on
- * {@code aria-expanded}, with its URL read from the form's own {@code data-icons} attribute rather
- * than hardcoded (a literal path would break under a context path).
+ * <p>The fix follows the app's own existing caret-closed/caret-open two-glyph swap - the same
+ * pattern this page's own "View full request details" {@code <details>} disclosure and
+ * reviewer/review-form.html's equivalent already use - rather than the first draft's single
+ * rotated glyph, which was one icon doing double duty (R-Q11 rejects that shape). Both are real
+ * {@code <svg><use>} elements, not generated content, so T165/AGSGT's bound on
+ * {@code ::before}/{@code ::after} never applies; the sprite URL is read from the form's own
+ * {@code data-icons} attribute rather than hardcoded (a literal path would break under a context
+ * path).
  */
 class StepLabelAffordanceUiTest extends AbstractUiTest {
 
@@ -100,20 +105,26 @@ class StepLabelAffordanceUiTest extends AbstractUiTest {
     }
 
     /**
-     * Ground 2 of the ruling: a real DOM child, not {@code ::before}/{@code ::after} generated
-     * content, so T165/AGSGT's bound never applies. Asserted as an actual child element rather
-     * than inferred from a screenshot - a generated-content caret would be invisible to this
-     * query even though it looks identical on screen, which is exactly the distinction the
-     * ruling turns on.
+     * Ground 2 of the ruling: real DOM children, not {@code ::before}/{@code ::after} generated
+     * content, so T165/AGSGT's bound never applies. Asserted as actual child elements rather than
+     * inferred from a screenshot - a generated-content caret would be invisible to this query even
+     * though it looks identical on screen, which is exactly the distinction the ruling turns on.
+     *
+     * <p>Two elements, not one - the corrected build follows the house caret-closed/caret-open
+     * swap pattern (the same one this page's own "View full request details" disclosure and
+     * reviewer/review-form.html's equivalent use) rather than the first draft's single rotated
+     * glyph.
      */
     @Test
-    void theToggleCarriesARealSvgCaretAsADomChildNotGeneratedContent() {
+    void theToggleCarriesRealSvgCaretsAsDomChildrenNotGeneratedContent() {
         openReport();
 
-        assertThat(page.locator("button.step-label > svg.icon").count())
+        assertThat(page.locator("button.step-label > svg.caret-closed").count())
                 .as("the caret must be a real element T165/AGSGT's ::before/::after bound never reaches")
                 .isEqualTo(1);
-        assertThat(page.locator("button.step-label > svg.icon").getAttribute("aria-hidden")).isEqualTo("true");
+        assertThat(page.locator("button.step-label > svg.caret-open").count()).isEqualTo(1);
+        assertThat(page.locator("button.step-label > svg.caret-closed").getAttribute("aria-hidden")).isEqualTo("true");
+        assertThat(page.locator("button.step-label > svg.caret-open").getAttribute("aria-hidden")).isEqualTo("true");
     }
 
     /**
@@ -122,41 +133,44 @@ class StepLabelAffordanceUiTest extends AbstractUiTest {
      * path - a hardcoded {@code /icons/phosphor.svg} would break under a context path.
      */
     @Test
-    void theCaretUsesTheSpritePathFromTheFormsOwnDataAttributeNotAHardcodedPath() {
+    void theCaretsUseTheSpritePathFromTheFormsOwnDataAttributeNotAHardcodedPath() {
         openReport();
 
         String dataIcons = page.locator("form[data-js='stepper']").getAttribute("data-icons");
         assertThat(dataIcons).as("the plumbing this fix depends on").isNotBlank();
 
-        String useHref = page.locator("button.step-label use").getAttribute("href");
-        assertThat(useHref)
-                .as("built from data-icons, not a literal string, and naming ph-caret-down - "
-                        + "the sprite has no ph-caret-up (rotation supplies the up state instead)")
-                .isEqualTo(dataIcons + "#ph-caret-down");
+        String closedHref = page.locator("button.step-label svg.caret-closed use").getAttribute("href");
+        String openHref = page.locator("button.step-label svg.caret-open use").getAttribute("href");
+        assertThat(closedHref).as("built from data-icons, not a literal string")
+                .isEqualTo(dataIcons + "#ph-caret-right");
+        assertThat(openHref).isEqualTo(dataIcons + "#ph-caret-down");
     }
 
     /**
-     * Ground 1 of the ruling: open/closed must be conveyed by more than colour. The caret's
-     * rotation is the non-colour signal - read back from computed style, not merely asserted from
-     * the stylesheet, so a selector typo that silently failed to match would show up here as no
-     * rotation rather than as a passing test.
+     * Ground 1 of the ruling: open/closed must be conveyed by more than colour. The corrected
+     * build swaps which glyph is visible (matching the house disclosure pattern) rather than
+     * rotating one - read back from computed {@code display}, not merely asserted from the
+     * stylesheet, so a selector typo that silently failed to match would show up here as both
+     * glyphs (or neither) visible rather than as a passing test.
      */
     @Test
-    void openingThePanelRotatesTheCaretAsANonColourStateSignal() {
+    void openingThePanelSwapsWhichCaretIsVisibleAsANonColourStateSignal() {
         openReport();
 
-        String closedTransform = (String) page.locator("button.step-label svg.icon")
-                .evaluate("el => getComputedStyle(el).transform");
+        assertThat(page.locator("button.step-label svg.caret-closed").isVisible())
+                .as("closed on load")
+                .isTrue();
+        assertThat(page.locator("button.step-label svg.caret-open").isVisible())
+                .as("only one glyph visible at a time")
+                .isFalse();
 
         page.click("button.step-label");
 
-        String openTransform = (String) page.locator("button.step-label svg.icon")
-                .evaluate("el => getComputedStyle(el).transform");
-
-        assertThat(openTransform)
-                .as("aria-expanded=true must rotate the caret - a real, measurable change "
-                        + "independent of the colour/background swap")
-                .isNotEqualTo(closedTransform);
+        assertThat(page.locator("button.step-label svg.caret-open").isVisible())
+                .as("aria-expanded=true must swap which caret is visible - a real, measurable "
+                        + "change independent of the colour/background swap")
+                .isTrue();
+        assertThat(page.locator("button.step-label svg.caret-closed").isVisible()).isFalse();
     }
 
     /**
