@@ -2,11 +2,19 @@ package ninja.samryecroft.returnhome.tracker.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import java.io.IOException;
+import java.lang.reflect.Field;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import ninja.samryecroft.returnhome.tracker.audit.AuditEventType;
@@ -18,6 +26,9 @@ import ninja.samryecroft.returnhome.tracker.report.ReportStatus;
 import ninja.samryecroft.returnhome.tracker.user.AppearancePreference;
 import ninja.samryecroft.returnhome.tracker.user.Role;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.config.BeanDefinition;
+import org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider;
+import org.springframework.core.type.filter.AnnotationTypeFilter;
 
 /**
  * T332: the values that are allowed to be renamed are unbounded and need comprehension. <b>The
@@ -184,6 +195,69 @@ class PersistedConstantsGuardTest {
     void appearancePreferenceNames() {
         assertThat(names(AppearancePreference.values()))
                 .containsExactlyInAnyOrder("LIGHT", "DARK", "AUTO");
+    }
+
+    /**
+     * <b>The set of persisted enums is DERIVED, not read.</b> This exists because the first version
+     * of this class missed two of seven: I found the entities carrying
+     * {@code @Enumerated(EnumType.STRING)} and then listed, by reading them, which enum types they
+     * hold. {@code OrgStatus} and {@code AppearancePreference} were on fields I did not look at.
+     *
+     * <p><b>A grep can be wrong about a path and says so; a reading can be wrong about a list and
+     * produces no error at all.</b> Pinning two more constants fixes those two. Deriving the set
+     * fixes the method - a persisted enum added next year cannot be silently absent, because nothing
+     * here is asking a person which enums exist.
+     *
+     * <p><b>One side is derived and the other is hard-coded, on purpose.</b> Deriving both would
+     * compare the classpath with itself and could never fail. The scan is the actual; the list below
+     * is the claim.
+     */
+    @Test
+    void everyPersistedEnumIsPinned() throws ClassNotFoundException {
+        Set<Class<?>> scanned = persistedEnumTypes();
+
+        assertThat(scanned)
+                .as("the scan found no persisted enums at all - it has stopped measuring rather "
+                        + "than found nothing, and every assertion below would pass vacuously")
+                .isNotEmpty();
+
+        assertThat(scanned).containsExactlyInAnyOrder(AuditEventType.class, InterviewStatus.class,
+                ReportStatus.class, Role.class, OrgType.class, OrgStatus.class,
+                AppearancePreference.class);
+    }
+
+    /** Every enum type reachable as an {@code @Enumerated(STRING)} field of an {@code @Entity}. */
+    private static Set<Class<?>> persistedEnumTypes() throws ClassNotFoundException {
+        ClassPathScanningCandidateComponentProvider scanner =
+                new ClassPathScanningCandidateComponentProvider(false);
+        scanner.addIncludeFilter(new AnnotationTypeFilter(Entity.class));
+        Set<Class<?>> found = new LinkedHashSet<>();
+        for (BeanDefinition bean : scanner.findCandidateComponents(
+                "ninja.samryecroft.returnhome.tracker")) {
+            for (Field field : Class.forName(bean.getBeanClassName()).getDeclaredFields()) {
+                Enumerated enumerated = field.getAnnotation(Enumerated.class);
+                if (enumerated == null || enumerated.value() != EnumType.STRING) {
+                    continue;
+                }
+                enumTypeOf(field.getGenericType()).ifPresent(found::add);
+            }
+        }
+        return found;
+    }
+
+    /** The field type, or the element type when it is a collection - {@code Set<Role>} counts. */
+    private static java.util.Optional<Class<?>> enumTypeOf(Type type) {
+        if (type instanceof Class<?> raw && raw.isEnum()) {
+            return java.util.Optional.of(raw);
+        }
+        if (type instanceof ParameterizedType parameterized) {
+            for (Type argument : parameterized.getActualTypeArguments()) {
+                if (argument instanceof Class<?> element && element.isEnum()) {
+                    return java.util.Optional.of(element);
+                }
+            }
+        }
+        return java.util.Optional.empty();
     }
 
     private static List<String> names(Enum<?>[] values) {
