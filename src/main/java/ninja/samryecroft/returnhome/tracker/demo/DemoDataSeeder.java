@@ -393,12 +393,23 @@ public class DemoDataSeeder implements ApplicationRunner {
                 + "whether the police MFH coordinator was consulted."), new AppUserPrincipal(seed.reviewer));
 
         // 8. CANCELLED - the escape hatch state, so the demo shows it exists.
-        InterviewRequest cancelled = request(seed, seed.tomas, seed.stanmoreHouse, seed.homeStaff,
+        //
+        // T308: this used to call request() (below) and then markStatus the result to CANCELLED -
+        // which crashed the seeder outright, because request() already saves its row at the
+        // implicit REQUESTED status before returning it. By the time markStatus ran, the entity had
+        // an id and a persisted REQUESTED status, so InterviewStatusTransitions correctly refused
+        // REQUESTED -> CANCELLED (it has no in-edges at all, T146) - the comment above this call
+        // claimed "marked before it is persisted", which stopped being true the moment request()'s
+        // own body started saving internally, and nothing had run this demo profile since to notice.
+        //
+        // The fix uses unsavedRequest() (below) - the same field population as request(), minus the
+        // save - so the FIRST persist is markStatus's own, matching InterviewRequestService's own
+        // documented rule: setting the initial status of a row that has never been saved is a
+        // construction, not a transition.
+        InterviewRequest cancelled = unsavedRequest(seed.tomas, seed.stanmoreHouse, seed.homeStaff,
                 now.minusDays(15), "Young person moved placement before the visit could take place.");
-        // Marked before it is persisted: CANCELLED has no in-edges in the transition table because
-        // no production path reaches it (T146), and a fixture built in that state is a construction
-        // rather than a transition out of REQUESTED.
         interviewRequestService.markStatus(cancelled, InterviewStatus.CANCELLED);
+        audit.interviewRequestCreated(cancelled, new AppUserPrincipal(seed.homeStaff));
 
         seed.requests = 8;
     }
@@ -410,6 +421,20 @@ public class DemoDataSeeder implements ApplicationRunner {
     }
 
     private InterviewRequest request(Seed seed, Child child, Home home, User raisedBy,
+            LocalDateTime raisedAt, String notes) {
+        InterviewRequest request = unsavedRequest(child, home, raisedBy, raisedAt, notes);
+        interviewRequestRepository.save(request);
+        audit.interviewRequestCreated(request, new AppUserPrincipal(raisedBy));
+        return request;
+    }
+
+    /**
+     * The same field population {@link #request} uses, minus the save - split out for T308's
+     * CANCELLED row (below), which needs {@code InterviewRequestService.markStatus} to be the FIRST
+     * thing that ever persists it, not a later transition on an already-saved REQUESTED row (see the
+     * comment at that call site for why the two are not interchangeable).
+     */
+    private InterviewRequest unsavedRequest(Child child, Home home, User raisedBy,
             LocalDateTime raisedAt, String notes) {
         InterviewRequest request = new InterviewRequest();
         request.setChild(child);
@@ -444,8 +469,6 @@ public class DemoDataSeeder implements ApplicationRunner {
         request.setSubmitterContactDetails("01234 000002");
         request.setBestTimesToVisit("Weekday afternoons after 15:30 (school hours excluded)");
         request.setUpdatedAt(raisedAt);
-        interviewRequestRepository.save(request);
-        audit.interviewRequestCreated(request, new AppUserPrincipal(raisedBy));
         return request;
     }
 
