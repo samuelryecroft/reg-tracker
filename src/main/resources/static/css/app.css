@@ -1334,13 +1334,21 @@ fieldset.step[hidden] { display: none; }
    their parent in most engines - without this it would silently stop matching .steps's own type). */
 .step-label {
     font: inherit; color: inherit; background: none; border: none; cursor: pointer;
-    display: inline-flex; align-items: center; padding: 2px 6px; margin: -2px -6px; border-radius: 6px;
+    display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px; border-radius: 6px;
 }
 .step-label:hover { background: var(--tint); }
-/* Sighted affordance for the open/closed state - aria-expanded already carries it to a screen
-   reader; this is the equivalent for everyone else, without a decorative icon (T165/AGSGT rules out
-   CSS generated content, and nothing in D-1d-1 asks for one). */
+/* T318 (CREED-RULING-step-label-affordance.md): the original no-icon call was wrong - "without a
+   decorative icon" mistook a bound on ::before/::after (T165/AGSGT) for a bound on icons generally,
+   and left the open/closed state conveyed by colour alone (WCAG 1.4.1), with the only rest-state
+   affordance being :hover - invisible on the touch devices this panel is built for. The caret is a
+   real DOM child (untouched by T165/AGSGT), rotated on state rather than swapped, so it needs no
+   generated content and no second glyph.
+   LOAD-BEARING, DO NOT TRIM: the caret is what discharges 1.4.1 here. Removing it without adding a
+   border in its place puts this control straight back to a colour-only state signal. The transition
+   is guarded by the existing prefers-reduced-motion block above, not a new one. */
+.step-label .icon { transition: transform 150ms ease; }
 .step-label[aria-expanded="true"] { background: var(--tint); color: var(--accent-dark); }
+.step-label[aria-expanded="true"] .icon { transform: rotate(180deg); }
 
 .step-panel { list-style: none; margin: 0; padding: var(--s2) 0; background: var(--surface); border-bottom: 1px solid var(--border); }
 .step-panel-row {
