@@ -226,24 +226,25 @@ public class UserAdminController {
 
     /**
      * T267: whether this administrator's OWN organisation has the people it needs, or {@code null}
-     * where the question does not apply.
+     * where the question has no subject.
      *
-     * <p><b>This screen rather than only the platform tree, because they are different
-     * administrators and only one of them can act.</b> The 4e tree is the platform admin's, and an
-     * org admin never reaches it; this is the screen where the gap is fixable, with the Add user
-     * button already on it. Oscar's T266 ruling turns on that split - a coordinator who is not an
-     * administrator can only be told to ask someone else - and the same split decides where a
-     * setup-time notice is worth putting.
+     * <p><b>This screen as well as the platform tree, because the two answer different questions.</b>
+     * The tree asks "which of these organisations is not working" - a comparison across rows. This
+     * asks "is mine working, and what do I add next" - one subject, with the button that fixes it on
+     * the same page. Neither screen can answer the other's, which is why both are worth having; it
+     * is not that only one audience can act, because a platform admin can add a user to any
+     * organisation too.
      *
-     * <p>{@code null} for the platform admin, deliberately, and not "everything is fine": they have
-     * no organisation of their own, so the question has no subject. They are told the same thing
-     * about every organisation on the tree instead.
+     * <p>The subject comes from {@link UserService#singleOrganisationSubjectOf}, which is a statement
+     * about {@code listVisible}'s own branches, so the notice's subject and the page's subject
+     * cannot drift apart.
      */
     private OrganisationReadiness readinessOfOwnOrganisation(AppUserPrincipal principal) {
-        if (principal == null || principal.hasRole(Role.ADMIN) || principal.getOrganisationId() == null) {
+        Long subject = userService.singleOrganisationSubjectOf(principal);
+        if (subject == null) {
             return null;
         }
-        return organisationRepository.findById(principal.getOrganisationId())
+        return organisationRepository.findById(subject)
                 .map(readinessService::readinessFor)
                 .orElse(null);
     }

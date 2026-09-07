@@ -74,7 +74,13 @@ class AnAdministratorIsToldTheirOrganisationCannotWorkYetTest extends AbstractIn
         orgAdminUsername = "t267-orgadmin" + suffix;
         saveUser(orgAdminUsername, Set.of(Role.ORG_ADMIN), careProvider, null);
         platformAdminUsername = "t267-platformadmin" + suffix;
-        saveUser(platformAdminUsername, Set.of(Role.ADMIN), null, null);
+        // CARRIES AN ORGANISATION, deliberately, and it is the whole reason the platform-admin arm
+        // below is worth running. With organisation null the notice is absent no matter how the
+        // subject is computed - a naive "return principal.getOrganisationId()" would pass, and the
+        // guard would be decorative. This account shape is real rather than contrived: UserService
+        // documents its mirror, "an ORG_ADMIN with no organisation is what a half-applied data
+        // repair leaves behind", and this is the same leftover pointed the other way.
+        saveUser(platformAdminUsername, Set.of(Role.ADMIN), careProvider, null);
     }
 
     /**
@@ -85,9 +91,9 @@ class AnAdministratorIsToldTheirOrganisationCannotWorkYetTest extends AbstractIn
     void theOrgAdminIsToldWhichRoleIsMissingOnTheScreenThatCanFixIt() throws Exception {
         String page = collapsed(pageAs(orgAdminUsername, "/admin/users"));
 
-        assertThat(page).contains("This organisation cannot do its job yet");
+        assertThat(page).contains("Some of this organisation’s roles are not filled");
         // NAMED, not counted. "Something is missing" is not something anyone can act on.
-        assertThat(page).contains("holds these roles: Home Staff");
+        assertThat(page).contains("needs at least one Home Staff account");
         assertThat(page).as("the route out is on the same screen").contains("/admin/users/new");
     }
 
@@ -98,12 +104,62 @@ class AnAdministratorIsToldTheirOrganisationCannotWorkYetTest extends AbstractIn
     @Test
     void andTheNoticeGoesWhenTheMissingPersonIsAdded() {
         assertThat(collapsed(pageAs(orgAdminUsername, "/admin/users")))
-                .contains("This organisation cannot do its job yet");
+                .contains("Some of this organisation’s roles are not filled");
 
         saveUser("t267-staff" + suffix, Set.of(Role.HOME_STAFF), null, home);
 
         assertThat(collapsed(pageAs(orgAdminUsername, "/admin/users")))
-                .doesNotContain("This organisation cannot do its job yet");
+                .doesNotContain("Some of this organisation’s roles are not filled");
+    }
+
+    /**
+     * CREED'S MEASURED CONSTRAINT, GUARDED RATHER THAN TAKEN ON FAITH.
+     *
+     * <p>{@code listVisible} has three branches, and the platform admin's is
+     * {@code findAllWithHome()} - <b>every user on the platform, unscoped</b>. So this page has a
+     * single organisation as its subject only in the two org-admin branches, and a banner reading
+     * "this organisation" here would name one that is not what the reader is looking at. The
+     * organisation in question is genuinely unstaffed, AND this platform admin carries it as their
+     * own organisation, so a subject computed from the principal's organisation id alone would
+     * render the notice here. See the fixture for why that matters.
+     *
+     * <p>The platform admin is not being told less: they are told the same thing about every
+     * organisation at once, on the tree, which is a question this page cannot answer.
+     */
+    @Test
+    void thePlatformAdminsUserListCarriesNoBannerBecauseItHasNoSingleSubject() {
+        String page = collapsed(pageAs(platformAdminUsername, "/admin/users"));
+
+        assertThat(page).as("the unstaffed organisation is on this page, so the notice had a reason "
+                        + "to render and did not")
+                .contains("T267 Screen Provider" + suffix);
+        assertThat(page).doesNotContain("Some of this organisation’s roles are not filled");
+    }
+
+    /**
+     * The tier, which is a ruling rather than a preference and has moved on this codebase before
+     * (T286 walked banners between warn and err across the product).
+     *
+     * <p>Creed's §5h.4 rule: <b>an empty collection with a next action is not a warning, it is a
+     * state the system reached correctly.</b> An organisation missing a role is exactly that, and
+     * the next action is the Add user button below it. Nothing has failed and nobody has done
+     * anything wrong.
+     */
+    @Test
+    void theNoticeIsInfoTierAndOffersNoSecondAddUserLink() {
+        String page = pageAs(orgAdminUsername, "/admin/users");
+        int at = page.indexOf("Some of this organisation’s roles are not filled");
+        int bannerStart = page.lastIndexOf("<div class=\"banner", at);
+        String openingTag = page.substring(bannerStart, page.indexOf('>', bannerStart) + 1);
+
+        assertThat(openingTag).contains("banner info").doesNotContain("banner warn").doesNotContain("banner err");
+
+        String banner = page.substring(bannerStart, page.indexOf("</div>", page.indexOf("</div>", at) + 1));
+        assertThat(banner).as("the departure from the precedent: Add user is this page's primary "
+                        + "control and sits inches below, so a link here ships two of them")
+                .doesNotContain("/admin/users/new");
+        assertThat(collapsed(page)).as("and the one that IS the route out is still there")
+                .contains("/admin/users/new");
     }
 
     /** The platform admin's tree says the same thing about every organisation at once. */
@@ -112,10 +168,9 @@ class AnAdministratorIsToldTheirOrganisationCannotWorkYetTest extends AbstractIn
         String tree = collapsed(pageAs(platformAdminUsername, "/admin/organisations"));
 
         assertThat(tree).contains("T267 Screen Provider" + suffix);
-        assertThat(tree).contains("Not operational yet");
-        assertThat(tree).contains("no Home Staff");
+        assertThat(tree).contains("Missing: Home Staff");
         assertThat(tree).as("and the supplier's three, which is a different statement")
-                .contains("no Coordinator, no Visitor, no Reviewer");
+                .contains("Missing: Coordinator, Visitor, Reviewer");
     }
 
     /**
@@ -132,14 +187,21 @@ class AnAdministratorIsToldTheirOrganisationCannotWorkYetTest extends AbstractIn
         saveUser("t267-staff-row" + suffix, Set.of(Role.HOME_STAFF), null, home);
 
         String tree = pageAs(platformAdminUsername, "/admin/organisations");
-        int nameAt = tree.indexOf("T267 Screen Provider" + suffix);
+        // FROM THE TREE, not from the page. The shell nav renders the signed-in user's own
+        // organisation name, so a page-wide indexOf can anchor OUTSIDE the tree entirely and the
+        // block then runs to the first row of somebody else's - which is how this assertion failed
+        // the moment the fixture gave the platform admin an organisation. The test was right and the
+        // anchor was wrong.
+        int treeStart = tree.indexOf("class=\"org-tree\"");
+        assertThat(treeStart).as("the tree itself has to be on the page").isGreaterThan(-1);
+        int nameAt = tree.indexOf("T267 Screen Provider" + suffix, treeStart);
         assertThat(nameAt).as("the row has to be on the page for its absence to mean anything")
                 .isGreaterThan(-1);
         String identityBlock = tree.substring(nameAt, tree.indexOf("case-tags", nameAt));
 
-        assertThat(collapsed(identityBlock)).doesNotContain("Not operational yet");
+        assertThat(collapsed(identityBlock)).doesNotContain("Missing:");
         assertThat(collapsed(tree)).as("while the screen is still saying it about the unstaffed ones")
-                .contains("Not operational yet");
+                .contains("Missing:");
     }
 
     /**
@@ -165,9 +227,9 @@ class AnAdministratorIsToldTheirOrganisationCannotWorkYetTest extends AbstractIn
 
         assertThat(collapsed(tree)).as("the status chip still says the key is fine").contains(">Active<");
         assertThat(collapsed(tree)).as("and the readiness line still says the people are not")
-                .contains("Not operational yet");
+                .contains("Missing: Home Staff");
 
-        int at = tree.indexOf("Not operational yet");
+        int at = tree.indexOf("Missing: Home Staff");
         int spanStart = tree.lastIndexOf("<span", at);
         String enclosing = tree.substring(spanStart, tree.indexOf('>', spanStart) + 1);
         assertThat(enclosing)

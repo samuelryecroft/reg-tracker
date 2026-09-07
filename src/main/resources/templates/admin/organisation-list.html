@@ -63,24 +63,18 @@
                     <span class="case-ident">
                         <span class="case-name" th:text="${s.organisation().name}">Beacon Return Home Services</span>
                         <span class="case-meta" th:text="${s.meta()}">Supplier · 6 users · branding set</span>
-                        <!--/* T267: a SECOND meta line rather than an addition to meta(), and rather
-                             than a chip beside the status.
+                        <!--/* T267, Creed's ruling: readiness rides IN meta() rather than as a
+                             second line or a fourth chip. NOT A CHIP, and the reason is COUNT
+                             rather than adjacency - the "Empty" tag beside the status chip has
+                             never read as one field, but a newly created supplier is Empty AND
+                             unstaffed AND PENDING at once, which is the DEFAULT state on creation
+                             and not an edge case. Four chips, three of them saying a version of
+                             "not ready" with three unrelated remedies and nothing saying which to
+                             do first. The conflation this card forbids arrives through chip count.
 
-                             NOT A CHIP, and that is the substance of this card rather than a
-                             styling preference. The chip beside it renders OrgStatus - "Awaiting
-                             activation" - which is the KEK gate: cannot decrypt. This says: has
-                             nobody to do the work. Those have DIFFERENT REMEDIES (an operator
-                             provisions a key; an administrator adds a person), and two chips in one
-                             tag row read as one status field with two values, which is the
-                             conflation the card forbids arriving through layout instead of through
-                             code. It sits with the other membership facts because that is what it
-                             is - the same kind of fact as "6 users".
-
-                             A second line rather than a longer first one: meta() is asserted
-                             verbatim by OrganisationTreeTest, and more to the point a supplier that
-                             IS operational should say nothing here at all. */-->
-                        <span class="case-meta" th:unless="${s.readiness().isOperational()}"
-                              th:text="'Not operational yet — no ' + ${#strings.listJoin(s.readiness().missingRoleNames(), ', no ')}">Not operational yet — no Coordinator, no Reviewer</span>
+                             Nothing conditional here: meta() replaces the user count with the
+                             readiness phrase when there is one, so an operational supplier's line
+                             is byte-for-byte what it was. */-->
                     </span>
                 </span>
                 <span class="case-tags">
@@ -105,15 +99,7 @@
                         <svg class="icon org-icon" aria-hidden="true"><use th:href="@{/icons/phosphor.svg} + '#ph-buildings'"></use></svg>
                         <span class="case-ident">
                             <span class="case-name" th:text="${p.organisation().name}">Harbourside Children&#39;s Care</span>
-                            <span class="case-meta" th:text="${p.homeNames()}">Oakwood House · Marisco Lodge</span>
-                            <!--/* The care-provider half of the same statement. A provider with no
-                                 homes cannot have any home staff - home staff belong to an
-                                 organisation THROUGH their homes - so this line and "No homes yet"
-                                 above it will usually appear together on a brand new provider, and
-                                 that is correct rather than redundant: one says what is missing,
-                                 the other says which of the two things to add first. */-->
-                            <span class="case-meta" th:unless="${p.readiness().isOperational()}"
-                                  th:text="'Not operational yet — no ' + ${#strings.listJoin(p.readiness().missingRoleNames(), ', no ')}">Not operational yet — no Home Staff</span>
+                            <span class="case-meta" th:text="${p.meta()}">Missing: Home Staff · Oakwood House · Marisco Lodge</span>
                         </span>
                     </span>
                     <span class="case-tags">
@@ -161,14 +147,7 @@
                         <svg class="icon org-icon" aria-hidden="true"><use th:href="@{/icons/phosphor.svg} + '#ph-buildings'"></use></svg>
                         <span class="case-ident">
                             <span class="case-name" th:text="${p.organisation().name}">Care provider</span>
-                            <span class="case-meta" th:text="${p.homeNames()}">No homes yet</span>
-                            <!--/* The unassigned branch renders the same node type and gets the same
-                                 line. Leaving it off here would mean the ONE branch built because
-                                 "an organisation nobody can reach through the tree is precisely the
-                                 one an admin needs to be told about" was the branch that said the
-                                 least about its organisation. */-->
-                            <span class="case-meta" th:unless="${p.readiness().isOperational()}"
-                                  th:text="'Not operational yet — no ' + ${#strings.listJoin(p.readiness().missingRoleNames(), ', no ')}">Not operational yet — no Home Staff</span>
+                            <span class="case-meta" th:text="${p.meta()}">Missing: Home Staff · No homes yet</span>
                         </span>
                     </span>
                     <span class="case-tags">

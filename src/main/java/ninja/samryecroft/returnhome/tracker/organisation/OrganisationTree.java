@@ -43,10 +43,25 @@ public record OrganisationTree(List<SupplierNode> suppliers, List<ProviderNode> 
     public record SupplierNode(Organisation organisation, int userCount, boolean brandingSet,
             OrganisationReadiness readiness, List<ProviderNode> careProviders) {
 
-        /** The canvas's second line: "Supplier · 6 users · branding set". */
+        /**
+         * The canvas's second line: "Supplier · 6 users · branding set".
+         *
+         * <p>T267, Creed's ruling: where the supplier is not operational the readiness phrase
+         * <b>REPLACES</b> the user count rather than being appended - "6 users" and "Missing:
+         * Coordinator, Reviewer" are the same fact at two precisions, and the count is the weaker
+         * one. Beside a broken organisation it actively misleads: it invites "it is populated, it
+         * is fine". Three segments either way, so nothing here has to decide how to truncate.
+         *
+         * <p>Composed here rather than in the template because this line already was - and because
+         * the readiness must arrive as a value on the node. A repository call from a method the
+         * template invokes per row is the N+1 this class's javadoc exists to prevent, on the one
+         * screen that renders every organisation on the platform.
+         */
         public String meta() {
-            String users = userCount == 1 ? "1 user" : userCount + " users";
-            return "Supplier · " + users + (brandingSet ? " · branding set" : " · no branding set");
+            String middle = readiness.isOperational()
+                    ? (userCount == 1 ? "1 user" : userCount + " users")
+                    : readiness.missingSummary();
+            return "Supplier · " + middle + (brandingSet ? " · branding set" : " · no branding set");
         }
 
         /** A supplier serving nobody is tagged "Empty" on the canvas rather than hidden. */
@@ -70,6 +85,23 @@ public record OrganisationTree(List<SupplierNode> suppliers, List<ProviderNode> 
                 return "No homes yet";
             }
             return String.join(" · ", homes.stream().map(Home::getName).toList());
+        }
+
+        /**
+         * The provider's line, with readiness FIRST (T267, Creed's ruling).
+         *
+         * <p>A care provider has no user count to replace, so here the phrase is added - and it
+         * leads. {@link #homeNames()} is UNBOUNDED, so a finding placed after it is the part that
+         * gets clipped on a provider with a dozen homes. <b>The general rule, worth more than this
+         * one line: where a line mixes a bounded phrase with an unbounded list, the bounded phrase
+         * goes first.</b>
+         *
+         * <p>"Missing: Home Staff" and "No homes yet" will usually appear together on a brand new
+         * provider, and that is correct rather than redundant - home staff belong to a provider
+         * THROUGH their homes, so one says what is missing and the other says which to add first.
+         */
+        public String meta() {
+            return readiness.isOperational() ? homeNames() : readiness.missingSummary() + " · " + homeNames();
         }
     }
 

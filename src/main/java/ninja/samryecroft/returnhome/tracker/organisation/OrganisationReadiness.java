@@ -98,6 +98,27 @@ public record OrganisationReadiness(OrgType type, Set<Role> rolesPresent) {
         return missingRoles().stream().map(Role::getDisplayName).toList();
     }
 
+    /**
+     * The phrase the screens carry: {@code "Missing: Coordinator, Reviewer"} (Creed's ruling).
+     *
+     * <p><b>The roles are NAMED rather than the state being labelled, and that is the anti-conflation
+     * half of this card arriving through the WORDS.</b> "Not yet operational" and the status chip's
+     * "Awaiting activation" are two phrasings of "cannot work yet" with nothing in either to tell a
+     * reader them apart - so the copy would merge the key gate and the staffing gap even where the
+     * layout kept them separate. Nobody reads "Missing: Coordinator" and thinks encryption key.
+     *
+     * <p><b>Zero branches</b>, after T251, where a copy table broke on the one branch nobody
+     * exercised. One join over a list that is empty when there is nothing to say, and callers ask
+     * {@link #isOperational()} rather than this method deciding whether to speak.
+     *
+     * <p>The order is {@link #rolesNeededBy}'s, which is also enum-ordinal order - so rows on the
+     * tree compare straight down the column. That the two coincide is a fact about today's list
+     * rather than a thing to rely on; the rule's order is the one that is promised.
+     */
+    public String missingSummary() {
+        return "Missing: " + String.join(", ", missingRoleNames());
+    }
+
     /** Whether it has the people. Says nothing about whether it has a key - see the class note. */
     public boolean isOperational() {
         return missingRoles().isEmpty();
