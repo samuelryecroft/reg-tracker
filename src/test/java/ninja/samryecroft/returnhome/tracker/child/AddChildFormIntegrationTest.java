@@ -43,6 +43,8 @@ class AddChildFormIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private MockMvc mockMvc;
     @Autowired
+    private ChildRepository childRepository;
+    @Autowired
     private HomeRepository homeRepository;
     @Autowired
     private UserRepository userRepository;
@@ -93,6 +95,8 @@ class AddChildFormIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     void aFutureBirthDateIsRejected() throws Exception {
+        long childrenBefore = childRepository.count();
+
         String html = mockMvc.perform(post("/children").with(asStaff()).with(csrf())
                         .param("firstName", "Future")
                         .param("lastName", "Child")
@@ -101,5 +105,13 @@ class AddChildFormIntegrationTest extends AbstractIntegrationTest {
                 .andReturn().getResponse().getContentAsString();
 
         assertThat(html).contains("#dateOfBirth");
+        // T305: the name says REJECTED, so the test has to show the write did not happen. Showing
+        // the error and saving anyway would have passed every assertion above it - the page looks
+        // identical either way, which is exactly why nobody had checked. Measured before writing
+        // this: a valid child does move the count, so a count that does NOT move is a refusal
+        // rather than a repository this test cannot see.
+        assertThat(childRepository.count())
+                .as("a birth date that cannot be true must not reach a child's record")
+                .isEqualTo(childrenBefore);
     }
 }
