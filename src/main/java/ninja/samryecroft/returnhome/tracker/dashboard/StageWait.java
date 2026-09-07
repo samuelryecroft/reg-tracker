@@ -43,7 +43,48 @@ import java.util.function.Function;
  * @param oldest  how long the oldest TIMED item has been there, empty when none of them is timed
  * @param untimed how many have no recorded moment of entering the stage
  */
-public record StageWait(int waiting, Optional<Duration> oldest, int untimed) {
+public record StageWait(int waiting, Optional<Duration> oldest, int untimed, Duration speaksInDaysAfter) {
+
+    /**
+     * The switch point for the two stages that run on a CONTINUOUS clock - waiting to be allocated,
+     * and waiting for a visit time.
+     *
+     * <p>The statutory window itself, so it introduces no new concept: a tile that has flipped to
+     * days has said it left the 72 hours before anyone has read the number. A young person's return
+     * does not observe weekends and homes are staffed continuously, so elapsed time and elapsed
+     * WORKING time are the same thing here.
+     */
+    public static final Duration CONTINUOUS_CLOCK = Duration.ofHours(72);
+
+    /**
+     * The switch point for AWAITING REVIEW, which is the one stage that is not a continuous-clock
+     * activity (Oscar, correcting his own ruling by attempting a counter-case against it).
+     *
+     * <p><b>Review is a quality check on a completed record, done in office hours.</b> The other two
+     * stages are the young person's clock; this one is a colleague's working week. Applying a
+     * continuous-time threshold to an office-hours activity <b>manufactures alarm out of the
+     * calendar</b>: a report submitted on Friday evening passes 72 hours on Monday evening with
+     * nobody having been negligent, so the tile would change every Monday for reasons that are not
+     * about anybody's work.
+     *
+     * <p><b>That is the always-alarming failure arriving by the back door, and worse than the version
+     * the two-unit rule was designed to avoid, because it is PREDICTABLE.</b> A reviewer who learns
+     * that Monday is normally loud has learned to discount the signal - which is the exact harm the
+     * whole scheme exists to prevent.
+     *
+     * <p><b>FIVE DAYS RATHER THAN A WORKING-DAY RULE, and the rejected option is recorded so nobody
+     * restores the tidier one.</b> This product holds no concept of a working day - no calendar, no
+     * holidays, no per-organisation hours - and inventing one for a dashboard threshold would put a
+     * whole new domain concept behind a single number. Five days clears a Friday submission to the
+     * following Wednesday, so a weekend never trips it and a genuinely neglected report still
+     * surfaces inside a week.
+     *
+     * <p><b>This does not break "one rule, two units" into two formats.</b> The rule is unchanged -
+     * below the threshold say hours, at or above it say days. What differs is the threshold, because
+     * the stages measure different kinds of time. A single number applied to both would be the
+     * false consistency, not the fix.
+     */
+    public static final Duration OFFICE_HOURS_CLOCK = Duration.ofDays(5);
 
     /**
      * Measures one stage.
@@ -53,11 +94,12 @@ public record StageWait(int waiting, Optional<Duration> oldest, int untimed) {
      *                   an hour ago is not stuck, and a tile that says it is trains people to
      *                   ignore the tile.
      */
-    public static <T> StageWait of(List<T> items, Function<T, LocalDateTime> stageEntry, LocalDateTime now) {
+    public static <T> StageWait of(List<T> items, Function<T, LocalDateTime> stageEntry, LocalDateTime now,
+            Duration speaksInDaysAfter) {
         List<LocalDateTime> timed = items.stream().map(stageEntry).filter(java.util.Objects::nonNull).toList();
         Optional<Duration> oldest = timed.stream().min(Comparator.naturalOrder())
                 .map(entered -> Duration.between(entered, now));
-        return new StageWait(items.size(), oldest, items.size() - timed.size());
+        return new StageWait(items.size(), oldest, items.size() - timed.size(), speaksInDaysAfter);
     }
 
     /**
@@ -101,16 +143,21 @@ public record StageWait(int waiting, Optional<Duration> oldest, int untimed) {
      * has told you it left the statutory window before you have read the number. What would be two
      * formats is one tile in days beside another in hours with no rule connecting them.
      *
+     * <p><b>The switch point is per-stage since T319's follow-up</b> - see {@link #CONTINUOUS_CLOCK}
+     * and {@link #OFFICE_HOURS_CLOCK}. Two of the three stages measure a young person's clock and
+     * one measures a colleague's working week, and one number across both manufactures alarm out of
+     * the calendar.
+     *
      * <p>Rounded DOWN, which understates by less than the unit shown and never invents time that has
      * not passed. The singulars are deliberate rather than polish: T251 is the live "1 children"
      * defect, and this is not shipping "1 days" next to it.
      */
-    private static String humanise(Duration waited) {
+    private String humanise(Duration waited) {
         long hours = waited.toHours();
         if (hours < 1) {
             return "under an hour";
         }
-        if (hours < 72) {
+        if (waited.compareTo(speaksInDaysAfter) < 0) {
             return hours == 1 ? "1 hour" : hours + " hours";
         }
         long days = waited.toDays();

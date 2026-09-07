@@ -25,7 +25,7 @@ class StageWaitTest {
 
     @Test
     void nothingWaitingSaysSoRatherThanReadingZero() {
-        StageWait empty = StageWait.of(List.<Item>of(), ENTRY, NOW);
+        StageWait empty = StageWait.of(List.<Item>of(), ENTRY, NOW, StageWait.CONTINUOUS_CLOCK);
 
         assertThat(empty.waiting()).isZero();
         // "oldest 0 days" beside a count of 0 reads as a measurement of nothing.
@@ -41,7 +41,7 @@ class StageWaitTest {
     @Test
     void pastTheStatutoryWindowItSpeaksInDays() {
         StageWait stuck = StageWait.of(
-                List.of(new Item(NOW.minusDays(6)), new Item(NOW.minusHours(2))), ENTRY, NOW);
+                List.of(new Item(NOW.minusDays(6)), new Item(NOW.minusHours(2))), ENTRY, NOW, StageWait.CONTINUOUS_CLOCK);
 
         assertThat(stuck.waiting()).isEqualTo(2);
         assertThat(stuck.detail()).isEqualTo("oldest waiting 6 days");
@@ -57,9 +57,9 @@ class StageWaitTest {
      */
     @Test
     void insideTheWindowItSpeaksInHoursBecauseZeroDaysWouldReassureFalsely() {
-        assertThat(StageWait.of(List.of(new Item(NOW.minusHours(20))), ENTRY, NOW).detail())
+        assertThat(StageWait.of(List.of(new Item(NOW.minusHours(20))), ENTRY, NOW, StageWait.CONTINUOUS_CLOCK).detail())
                 .isEqualTo("oldest waiting 20 hours");
-        assertThat(StageWait.of(List.of(new Item(NOW.minusMinutes(9))), ENTRY, NOW).detail())
+        assertThat(StageWait.of(List.of(new Item(NOW.minusMinutes(9))), ENTRY, NOW, StageWait.CONTINUOUS_CLOCK).detail())
                 .isEqualTo("oldest waiting under an hour");
     }
 
@@ -73,9 +73,9 @@ class StageWaitTest {
      */
     @Test
     void theUnitChangesExactlyAtSeventyTwoHours() {
-        assertThat(StageWait.of(List.of(new Item(NOW.minusHours(71))), ENTRY, NOW).detail())
+        assertThat(StageWait.of(List.of(new Item(NOW.minusHours(71))), ENTRY, NOW, StageWait.CONTINUOUS_CLOCK).detail())
                 .isEqualTo("oldest waiting 71 hours");
-        assertThat(StageWait.of(List.of(new Item(NOW.minusHours(72))), ENTRY, NOW).detail())
+        assertThat(StageWait.of(List.of(new Item(NOW.minusHours(72))), ENTRY, NOW, StageWait.CONTINUOUS_CLOCK).detail())
                 .isEqualTo("oldest waiting 3 days");
     }
 
@@ -85,13 +85,50 @@ class StageWaitTest {
      */
     @Test
     void oneHourAndOneDayAreSingular() {
-        assertThat(StageWait.of(List.of(new Item(NOW.minusHours(1))), ENTRY, NOW).detail())
+        assertThat(StageWait.of(List.of(new Item(NOW.minusHours(1))), ENTRY, NOW, StageWait.CONTINUOUS_CLOCK).detail())
                 .isEqualTo("oldest waiting 1 hour");
         // A day is inside the window, so "1 day" can only be reached past 72 hours - which means
         // the plural rule for days has to be checked where days actually occur, not at 24.
-        assertThat(StageWait.of(List.of(new Item(NOW.minusHours(24))), ENTRY, NOW).detail())
+        assertThat(StageWait.of(List.of(new Item(NOW.minusHours(24))), ENTRY, NOW, StageWait.CONTINUOUS_CLOCK).detail())
                 .as("24 hours is still inside the window, so it is still hours")
                 .isEqualTo("oldest waiting 24 hours");
+    }
+
+    /**
+     * AWAITING REVIEW SWITCHES AT FIVE DAYS, NOT SEVENTY-TWO HOURS - the one stage that is not a
+     * continuous-clock activity (Oscar, correcting his own ruling).
+     *
+     * <p><b>Friday evening is the case, and it is why the number moved.</b> A report submitted then
+     * passes 72 hours on Monday evening with nobody having been negligent, so a shared threshold
+     * would change that tile every Monday for reasons that are not about anybody's work. That is the
+     * always-alarming failure arriving by the back door, and worse than the one the two-unit rule
+     * was designed to avoid, <b>because it is predictable</b>: a reviewer who learns Monday is
+     * normally loud has learned to discount the signal.
+     */
+    @Test
+    void theReviewStageStillSpeaksInHoursWhereTheOthersWouldHaveFlipped() {
+        // 80 hours - past the statutory window, and a Friday-evening submission read on Monday.
+        StageWait review = StageWait.of(List.of(new Item(NOW.minusHours(80))), ENTRY, NOW,
+                StageWait.OFFICE_HOURS_CLOCK);
+        StageWait continuous = StageWait.of(List.of(new Item(NOW.minusHours(80))), ENTRY, NOW,
+                StageWait.CONTINUOUS_CLOCK);
+
+        assertThat(review.detail()).isEqualTo("oldest waiting 80 hours");
+        assertThat(continuous.detail())
+                .as("the same elapsed time on a continuous-clock stage HAS left the window, and says so")
+                .isEqualTo("oldest waiting 3 days");
+    }
+
+    /** And it does flip once a report has genuinely been sitting - five days, not never. */
+    @Test
+    void theReviewStageFlipsAtFiveDaysSoANeglectedReportStillSurfacesInsideAWeek() {
+        assertThat(StageWait.of(List.of(new Item(NOW.minusHours(119))), ENTRY, NOW,
+                StageWait.OFFICE_HOURS_CLOCK).detail())
+                .as("one hour short of five days")
+                .isEqualTo("oldest waiting 119 hours");
+        assertThat(StageWait.of(List.of(new Item(NOW.minusDays(5))), ENTRY, NOW,
+                StageWait.OFFICE_HOURS_CLOCK).detail())
+                .isEqualTo("oldest waiting 5 days");
     }
 
     /**
@@ -111,7 +148,7 @@ class StageWaitTest {
     @Test
     void rowsWithNoRecordedStageEntryAreNamedRatherThanDroppedOrGuessed() {
         StageWait partlyTimed = StageWait.of(
-                List.of(new Item(NOW.minusDays(4)), new Item(null), new Item(null)), ENTRY, NOW);
+                List.of(new Item(NOW.minusDays(4)), new Item(null), new Item(null)), ENTRY, NOW, StageWait.CONTINUOUS_CLOCK);
 
         assertThat(partlyTimed.waiting()).isEqualTo(3);
         assertThat(partlyTimed.untimed()).isEqualTo(2);
@@ -127,7 +164,7 @@ class StageWaitTest {
      */
     @Test
     void whenNothingCanBeDatedItSaysThatRatherThanNothing() {
-        StageWait untimed = StageWait.of(List.of(new Item(null), new Item(null)), ENTRY, NOW);
+        StageWait untimed = StageWait.of(List.of(new Item(null), new Item(null)), ENTRY, NOW, StageWait.CONTINUOUS_CLOCK);
 
         assertThat(untimed.waiting()).isEqualTo(2);
         assertThat(untimed.oldest()).isEmpty();
