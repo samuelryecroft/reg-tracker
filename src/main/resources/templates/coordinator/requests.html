@@ -36,22 +36,21 @@
     </nav>
 
     <!--/*
-      S-3: the banner stays. The chip row shows the filter state visually and to assistive tech via
-      aria-current; this is what states it in ordinary running text, and it carries the one control
-      that gets you back out.
+      T303 (spec §5h.6): the home dimension gets its OWN control, in audit/feed.html's already-built
+      idiom - the same single-choice-chip pattern as the stage row above, not joined to it, because
+      homeId is a SCOPE filter and the stage row above is a menu of one different dimension. Deletes
+      the .banner.info filter notice this replaces: the stage row already stated `filter` via
+      aria-current (a duplicate), and "Clear filters" was only load-bearing because homeId had no
+      control of its own - which is the actual defect T284 reported as a size problem. This chip
+      names the HOME, never the id the banner used to print (T265's defect in a second costume).
     */-->
-    <div class="banner info" th:if="${homeId != null or filter != null}">
-        <span class="ic" aria-hidden="true">◆</span>
-        <div>
-            <strong>Showing a filtered view</strong>
-            <p>
-                <span th:if="${homeId != null}" th:text="${'One home only (id ' + homeId + ')'}">One home</span>
-                <span th:if="${homeId != null and filter != null}"> · </span>
-                <span th:if="${filter != null}" th:text="${filter.label()}">Filter</span>
-                · <a href="/coordinator/requests">Clear filters</a>
-            </p>
-        </div>
-    </div>
+    <nav class="seg" aria-label="Filter by home">
+        <a class="seg-opt" th:href="@{/coordinator/requests(filter=${filter != null ? filter.key() : null})}"
+           th:attr="aria-current=${homeId == null} ? 'true'">All homes</a>
+        <a class="seg-opt" th:each="h : ${homesInScope}"
+           th:href="@{/coordinator/requests(homeId=${h.id}, filter=${filter != null ? filter.key() : null})}"
+           th:attr="aria-current=${homeId != null and homeId == h.id} ? 'true'" th:text="${h.name}">Home</a>
+    </nav>
 
     <!--/*
       The queue, as cards grouped by urgency tier (S-1/S-2, R-Q12). This replaces a <table> AND a
