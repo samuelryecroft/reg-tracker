@@ -47,9 +47,10 @@ public class EditUserForm {
      * COLLEAGUE only while both of: no colleague may EDIT an address (here), and there is NO
      * SELF-SERVICE RESET (otherwise one mailbox holds both factors). Removing either reopens it.
      *
-     * A third condition, VERIFIED ON FIRST USE, was specified in T322 and is NOT BUILT - and would
-     * not have done the job attributed to it, because the confirmation is delivered TO the address
-     * being verified, so it proves deliverability rather than ownership.
+     * A third condition, VERIFIED ON FIRST USE, was specified in T322 and HAS SINCE BEEN BUILT - and
+     * it is still NOT a third leg of this argument. The confirmation is delivered TO the address
+     * being verified, so it proves DELIVERABILITY, not OWNERSHIP: it bounds a mistyped address, and
+     * constrains nobody who chose the address. Two conditions hold, not three.
      *
      * WHAT THIS RESTRICTION ACTUALLY BUYS, and it is more than "no redirection": setPassword has no
      * platform-admin guard, so a manager may set an EXISTING colleague's password - but not their

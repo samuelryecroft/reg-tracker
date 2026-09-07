@@ -55,8 +55,9 @@
 
                  (Emailed codes rest on this plus one other thing - no self-service password reset,
                  or one mailbox would hold both factors. A third condition, "verified on first use",
-                 was specified in T322, is NOT BUILT, and would not have done the job anyway.
-                 UserService.changeEmail carries the whole argument.) */-->
+                 was specified in T322 and has since been built - but it proves an address is
+                 DELIVERABLE, not who owns it, so it bounds a mistyped address and is not a third
+                 leg. Two things, not three. UserService.changeEmail carries the whole argument.) */-->
             <p class="field">
                 <span class="lbl">Email address</span>
                 <span th:text="${user.email} ?: 'Not recorded'">someone@example.org</span>
