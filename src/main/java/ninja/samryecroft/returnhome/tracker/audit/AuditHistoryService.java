@@ -95,7 +95,10 @@ public class AuditHistoryService {
      * delivered per-user sign-in monitoring to the user page through a new door, and the policy call
      * that deliberately parked it would have been answered by omission.
      */
-    private static final Set<AuditEventType> EXCLUDED_FROM_USER_HISTORY =
+    // Package-private, not private, so EveryAuditEventTypeIsClassifiedTest can read the REAL set
+    // rather than a copy of it. A guard that restated this list would be a second answer to the same
+    // question - the defect this class already carries a warning about - and it would drift.
+    static final Set<AuditEventType> EXCLUDED_FROM_USER_HISTORY =
             Set.of(AuditEventType.LOGIN_SUCCESS, AuditEventType.LOGIN_FAILURE,
                     AuditEventType.MFA_CHALLENGE_ISSUED, AuditEventType.MFA_SUCCESS,
                     AuditEventType.MFA_FAILURE, AuditEventType.MFA_LOCKED);
