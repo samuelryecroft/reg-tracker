@@ -19,6 +19,9 @@ import ninja.samryecroft.returnhome.tracker.interview.InterviewRequestRepository
 import ninja.samryecroft.returnhome.tracker.interview.InterviewRequestTestFixtures;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewStatus;
 import ninja.samryecroft.returnhome.tracker.interview.QueueFilter;
+import ninja.samryecroft.returnhome.tracker.report.InterviewReport;
+import ninja.samryecroft.returnhome.tracker.report.InterviewReportRepository;
+import ninja.samryecroft.returnhome.tracker.report.ReportStatus;
 import ninja.samryecroft.returnhome.tracker.organisation.OrgType;
 import ninja.samryecroft.returnhome.tracker.organisation.Organisation;
 import ninja.samryecroft.returnhome.tracker.organisation.OrganisationRepository;
@@ -63,6 +66,7 @@ class TheSupplierDashboardKnowsWhatIsStuckTest extends AbstractIntegrationTest {
     @Autowired private InterviewRequestRepository interviewRequestRepository;
     @Autowired private AppUserDetailsService appUserDetailsService;
     @Autowired private org.springframework.jdbc.core.JdbcTemplate jdbc;
+    @Autowired private InterviewReportRepository interviewReportRepository;
 
     private String suffix;
     private Organisation supplierOrg;
@@ -175,6 +179,53 @@ class TheSupplierDashboardKnowsWhatIsStuckTest extends AbstractIntegrationTest {
         assertThat(html).contains("oldest waiting 20 hours");
         assertThat(html).as("nothing on this screen may report a real wait as zero of anything")
                 .doesNotContain("0 days");
+    }
+
+    /**
+     * THE REVIEW STAGE USES A DIFFERENT SWITCH POINT, ASSERTED AT THE SCREEN RATHER THAN THE UNIT.
+     *
+     * <p><b>The unit test could not have caught this and I found that out by arming it.</b> It calls
+     * {@code StageWait} with a threshold chosen in the test, so it proves the mechanism and says
+     * nothing about which threshold the dashboard actually passes. Swapping the review tile back to
+     * the continuous-clock constant left every test green. <b>A guard on the mechanism does not
+     * guard the choice - the caller has to be tested.</b>
+     *
+     * <p>Eighty hours: past the statutory window, and what a Friday-evening submission looks like on
+     * Monday. On a continuous-clock stage that reads "3 days"; review must still read hours, because
+     * nobody has been negligent and a tile that changes every Monday teaches a reviewer to discount
+     * it.
+     */
+    @Test
+    void aReportAwaitingReviewForEightyHoursStillReadsInHours() throws Exception {
+        awaitingReviewSince(LocalDateTime.now().minusHours(80));
+
+        String html = dashboardHtml();
+
+        assertThat(html).contains("oldest waiting 80 hours");
+        assertThat(html).as("the calendar must not be what changes this tile")
+                .doesNotContain("oldest waiting 3 days");
+    }
+
+    /** And a genuinely neglected report still surfaces inside a week. */
+    @Test
+    void aReportAwaitingReviewForFiveDaysReadsInDays() throws Exception {
+        awaitingReviewSince(LocalDateTime.now().minusDays(5));
+
+        assertThat(dashboardHtml()).contains("oldest waiting 5 days");
+    }
+
+    private void awaitingReviewSince(LocalDateTime submittedAt) {
+        InterviewRequest request = seedRequest(InterviewStatus.REPORT_SUBMITTED);
+        request.setAllocatedVisitor(visitor);
+        request.setAllocatedAt(submittedAt.minusDays(1));
+        interviewRequestRepository.saveAndFlush(request);
+
+        InterviewReport report = new InterviewReport();
+        report.setInterviewRequest(request);
+        report.setVisitor(visitor);
+        report.setStatus(ReportStatus.SUBMITTED);
+        report.setSubmittedAt(submittedAt);
+        interviewReportRepository.saveAndFlush(report);
     }
 
     /**

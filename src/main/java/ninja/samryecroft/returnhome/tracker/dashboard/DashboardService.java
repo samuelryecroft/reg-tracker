@@ -211,11 +211,13 @@ public class DashboardService {
         // it is trains people to ignore the tile. Unallocated is the one stage where the two
         // coincide, because being raised IS entering it.
         List<InterviewRequest> unallocated = requests.stream().filter(r -> r.getStatus() == InterviewStatus.REQUESTED).toList();
-        StageWait waitingToAllocate = StageWait.of(unallocated, InterviewRequest::getCreatedAt, now);
+        StageWait waitingToAllocate = StageWait.of(unallocated, InterviewRequest::getCreatedAt, now,
+                StageWait.CONTINUOUS_CLOCK);
 
         List<InterviewRequest> awaitingSchedule = requests.stream()
                 .filter(InterviewRequestService::isAwaitingSchedule).toList();
-        StageWait waitingForADate = StageWait.of(awaitingSchedule, InterviewRequest::getAllocatedAt, now);
+        StageWait waitingForADate = StageWait.of(awaitingSchedule, InterviewRequest::getAllocatedAt, now,
+                StageWait.CONTINUOUS_CLOCK);
 
         List<InterviewRequest> awaitingReview = requests.stream().filter(r -> r.getStatus() == InterviewStatus.REPORT_SUBMITTED).toList();
         // The stage began when the report was SUBMITTED, which is on the report and not the request.
@@ -226,8 +228,12 @@ public class DashboardService {
                 .filter(report -> report.getStatus() == ReportStatus.SUBMITTED && report.getSubmittedAt() != null)
                 .collect(Collectors.toMap(report -> report.getInterviewRequest().getId(),
                         InterviewReport::getSubmittedAt, (a, b) -> a.isAfter(b) ? a : b));
+        // OFFICE_HOURS_CLOCK, and this is the only stage that gets it. Review is a quality check on
+        // a completed record done in working hours; the two stages above are the young person's own
+        // clock, which does not observe weekends. See StageWait.OFFICE_HOURS_CLOCK for why five days
+        // and why not a working-day rule.
         StageWait waitingToReview = StageWait.of(awaitingReview,
-                request -> submittedAt.get(request.getId()), now);
+                request -> submittedAt.get(request.getId()), now, StageWait.OFFICE_HOURS_CLOCK);
 
         List<User> visitors = userRepository.findByRoleAndOrganisationId(Role.VISITOR, supplierOrgId);
         Set<InterviewStatus> openStatuses = Set.of(InterviewStatus.ALLOCATED, InterviewStatus.SCHEDULED,
