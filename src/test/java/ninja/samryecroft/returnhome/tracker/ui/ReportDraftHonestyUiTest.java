@@ -111,6 +111,22 @@ class ReportDraftHonestyUiTest extends AbstractUiTest {
      * happens, before any network round trip - because the fact that decides whether the visitor
      * should trust it is "does the server have this edit yet", which is true from the moment of
      * typing, not from the moment a request last succeeded.
+     *
+     * <p>T333: this raced, and the cause was not the 600ms debounce this test means to catch - it
+     * was a STALE IN-FLIGHT REQUEST. Clicking Back itself fires its own {@code autosave()} call
+     * (posting the original, uncorrected text) immediately, asynchronously. The old test corrected
+     * the field with no wait in between, so that in-flight response could resolve AFTER the
+     * corrective edit had already set "Unsaved changes", overwriting it back to "Saved …" - a race
+     * against the PRIOR save completing late, not the new one completing early. Confirmed by
+     * reproducing the failure with a deliberate artificial delay before the assertion and finding it
+     * persisted regardless of any timer-freezing attempt, which a genuine debounce race would not
+     * have survived.
+     *
+     * <p>Fixed by waiting for Back's own save to settle before making the corrective edit - the
+     * ordinary Playwright idiom for "do not act while a prior async effect is still in flight",
+     * not a timer trick. With no stale response left to land late, the only remaining margin is the
+     * new edit's own 600ms debounce, which this assertion (evaluated immediately, no wait) has never
+     * been at real risk of losing to.
      */
     @Test
     void editingAfterAlreadyBeingSavedMarksTheStampUnsavedImmediately() {
@@ -125,6 +141,9 @@ class ReportDraftHonestyUiTest extends AbstractUiTest {
 
         // Back to the step that was just saved, then correct it.
         page.click("button:has-text('Back')");
+        // Back's own autosave() call is already in flight - let it settle before editing, or its
+        // late response can overwrite the corrective edit's "Unsaved changes" state below.
+        page.waitForSelector("#stepper-saved:not(.pending):not(.stopped)");
         page.fill("#interviewLocation", "The home's quiet room - corrected");
 
         // Asserted immediately, not after a wait: the whole point is that this is true before the
