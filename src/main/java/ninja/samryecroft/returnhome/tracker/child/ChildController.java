@@ -4,6 +4,7 @@ import jakarta.validation.Valid;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Locale;
 import java.util.stream.Collectors;
@@ -191,6 +192,66 @@ public class ChildController {
         }
     }
 
+    /**
+     * T290 (spec §D-4c-4/D-4c-5): the summary block between the export card and the episode table.
+     * Both components derive entirely from {@code returnedAt} (mandatory since V15) across the
+     * child's own request history, already loaded for the table below - never from the two
+     * human-recorded {@code Boolean} fields on each request, which can disagree with what the
+     * request history itself shows and are not reconciled by anything (D-4c-4, ruled by the human
+     * 9 Sep: the derived figure wins; the recorded tickboxes stay on the request page as what was
+     * recorded then). Because everything here comes from {@code returnedAt}, which is never null,
+     * there is exactly one empty state ({@code requests} is empty) and no "not recorded" case -
+     * that hazard lives entirely in the per-row "Missing from" column, not here.
+     *
+     * <p>Exact copy is tabled in the spec and reproduced here verbatim, not composed from parts at
+     * render time - a count-derived sentence assembled from fragments is exactly the kind of thing
+     * that reads correctly for the case it was written against and wrong for the next one (T233's
+     * shape, applied to prose instead of a number).
+     */
+    private record MissingEpisodesSummary(String lead, String hint) {
+
+        private static final DateTimeFormatter RETURNED_FMT = DateTimeFormatter.ofPattern("dd MMM yyyy", Locale.UK);
+
+        /** @param requestsByReturnedAtDesc must already be ordered most-recent-{@code returnedAt}-first -
+         *     the same list the table renders, so the two can never disagree about which episode is
+         *     "most recent". */
+        static MissingEpisodesSummary of(List<InterviewRequest> requestsByReturnedAtDesc, LocalDateTime now) {
+            int n = requestsByReturnedAtDesc.size();
+            if (n == 0) {
+                return new MissingEpisodesSummary("No missing episodes recorded", null);
+            }
+
+            LocalDateTime sixMonthsAgo = now.minusMonths(6);
+            long r = requestsByReturnedAtDesc.stream()
+                    .filter(request -> !request.getReturnedAt().isBefore(sixMonthsAgo))
+                    .count();
+            // n == 1 singularises in every branch, not just r == n - the spec's own copy table
+            // (D-4c-5) only shows the singular carve-out for r == n, n == 1, but this codebase
+            // never leaves a count of 1 next to a plural noun elsewhere on this page (the export
+            // card above singularises "interview"/"report" the same way) - flagged to Creed as a
+            // likely gap in the table rather than deviated from silently.
+            String episodeWord = n == 1 ? "episode" : "episodes";
+            String lead;
+            if (r == n) {
+                lead = n == 1 ? "1 episode, in the last 6 months" : n + " episodes, all in the last 6 months";
+            } else if (r == 0) {
+                lead = n + " " + episodeWord + " · none in the last 6 months";
+            } else {
+                lead = n + " " + episodeWord + " · " + r + " in the last 6 months";
+            }
+
+            // The most recent episode's RETURN DATE, and nothing else - not its status, which is
+            // one row below in the table (D-4c-5: a summary and a table that both state one row's
+            // status are two places that can disagree, and the row is the one that owns it).
+            LocalDateTime mostRecentReturn = requestsByReturnedAtDesc.get(0).getReturnedAt();
+            long daysAgo = ChronoUnit.DAYS.between(mostRecentReturn.toLocalDate(), now.toLocalDate());
+            String elapsed = daysAgo == 0 ? "today" : daysAgo == 1 ? "yesterday" : daysAgo + " days ago";
+            String hint = "Last returned " + mostRecentReturn.format(RETURNED_FMT) + " · " + elapsed;
+
+            return new MissingEpisodesSummary(lead, hint);
+        }
+    }
+
     @GetMapping("/{id}")
     public String detail(@PathVariable Long id, @AuthenticationPrincipal AppUserPrincipal principal, Model model) {
         Child child = childRepository.findDetailedById(id)
@@ -199,7 +260,10 @@ public class ChildController {
             throw new AccessDeniedException("Not authorized to view this child");
         }
 
-        List<InterviewRequest> requests = interviewRequestRepository.findByChildIdOrderByCreatedAtDesc(id);
+        // T290 (D-4c-3): ordered by returnedAt, not createdAt - a SEPARATE query from the one the
+        // case-file export uses (see the repository method's own javadoc for why reusing it would
+        // have been a silent scope leak into the export's row order).
+        List<InterviewRequest> requests = interviewRequestRepository.findByChildIdOrderByReturnedAtDesc(id);
         long approvedReportCount = requests.stream()
                 .filter(r -> r.getStatus().name().equals("REPORT_APPROVED"))
                 .count();
@@ -209,6 +273,7 @@ public class ChildController {
         model.addAttribute("childIdentity", nameRevealService.identityFor(child));
         model.addAttribute("identityDetail", ChildIdentityDetail.of(child, revealed));
         model.addAttribute("requests", requests);
+        model.addAttribute("missingEpisodesSummary", MissingEpisodesSummary.of(requests, now));
         // D-4b-7 (spec §7e): a due badge only where DeadlineTracker.badgeFor actually returns one -
         // a completed or cancelled request has no live clock and must show no urgency (D-4a-4's
         // NO_CLOCK rule), so its absence here is meaningful rather than a gap. Same shape as
