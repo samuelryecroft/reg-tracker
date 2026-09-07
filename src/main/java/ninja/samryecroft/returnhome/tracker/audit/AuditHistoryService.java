@@ -519,6 +519,9 @@ public class AuditHistoryService {
             // Detail stays null: actor, timestamp and target already say who, when and which record,
             // and a sentence here would restate the columns either side of it.
             case AUDIT_VIEW_OPENED -> entry("Record viewed", event, when, role, null, "");
+            // T277. Its own row because it is its own action - and "Password set" rather than
+            // "Password changed", because the person whose account it is did not change anything.
+            case USER_PASSWORD_RESET -> entry("Password set by an administrator", event, when, role, null, "info");
             // ACCESS_DENIED has no meaningful target linkage for a per-record view, and its metadata
             // is free text throughout; LOGIN_SUCCESS/FAILURE are excluded upstream for the user page
             // and never match a request/report/child target in the first place.

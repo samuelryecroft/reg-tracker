@@ -351,8 +351,10 @@ class AuditTrailIntegrationTest extends AbstractIntegrationTest {
                 .contains("rolesBefore=COORDINATOR")
                 .contains("rolesAfter=REVIEWER")
                 .contains("enabledBefore=true")
-                .contains("enabledAfter=false")
-                .contains("passwordChanged=false");
+                .contains("enabledAfter=false");
+        // passwordChanged is gone from this row (T277): setting a password is its own action and
+        // its own event now, so USER_UPDATED no longer carries a flag about a thing it did not do.
+        // PasswordIsItsOwnActionTest asserts the new event positively.
     }
 
     @Test

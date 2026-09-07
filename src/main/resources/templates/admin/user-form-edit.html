@@ -21,7 +21,6 @@
                         <li th:if="${#fields.hasErrors('lastName')}"><a href="#lastName" th:text="${#fields.errors('lastName')[0]}">Error</a></li>
                         <li th:if="${#fields.hasErrors('email')}"><a href="#email" th:text="${#fields.errors('email')[0]}">Error</a></li>
                         <li th:if="${#fields.hasErrors('contactPhone')}"><a href="#contactPhone" th:text="${#fields.errors('contactPhone')[0]}">Error</a></li>
-                        <li th:if="${#fields.hasErrors('newPassword')}"><a href="#newPassword" th:text="${#fields.errors('newPassword')[0]}">Error</a></li>
                     </ul>
                 </div>
             </div>
@@ -101,17 +100,23 @@
                 <option value="false">No</option>
             </select>
 
-            <label for="newPassword">Reset password (leave blank to keep current password)</label>
-            <p class="hint">At least 8 characters if you set one.</p>
-            <input type="password" id="newPassword" th:field="*{newPassword}" autocomplete="new-password"
-                   th:errorclass="is-invalid" th:aria-invalid="${#fields.hasErrors('newPassword')}" aria-describedby="newPassword-error"/>
-            <div th:replace="~{fragments/layout :: fieldError('newPassword')}"></div>
-
             <div class="btn-row">
                 <button type="submit" class="btn">Save changes</button>
                 <a class="btn ghost" href="/admin/users">Cancel</a>
             </div>
         </form>
+
+        <!--/* T277: setting a password is its own ACTION on its own screen rather than a field in
+             this bundle. A permission to reach a form is a permission to everything in it, so while
+             the credential lived here, any widening of "who may edit this user" silently widened
+             "who may set their password" - which happened twice. The link is offered to the same
+             audience and behind the same authorisation check; it is simply no longer carried along
+             by a different one. The old hint here also still said "at least 8 characters", which
+             T272 replaced months ago and nobody re-read - a field's copy rots where the field is
+             not the point of the screen. */-->
+        <p class="field">
+            <a class="rowlink" th:href="@{/admin/users/{id}/password(id=${user.id})}">Set this user's password</a>
+        </p>
     </div>
 
     <div class="card">

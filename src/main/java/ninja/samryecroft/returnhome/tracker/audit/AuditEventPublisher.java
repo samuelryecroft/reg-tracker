@@ -121,8 +121,11 @@ public class AuditEventPublisher {
      * and both are recorded before-and-after rather than as a flag: during an incident the question
      * is "what changed, and from what", which a boolean answers only half of.
      *
-     * <p>{@code passwordChanged} stays a bare flag for the opposite reason - the value is a secret,
-     * so recording it would be the disclosure.
+     * <p><strong>{@code passwordChanged} is gone (T277).</strong> Setting a password is now its own
+     * action and its own event, {@link AuditEventType#USER_PASSWORD_RESET}, so this row no longer
+     * carries a flag about a thing it did not do. A credential change recorded as a field inside
+     * "user updated" cannot answer <em>when was this password last set, and by whom</em> without
+     * reading metadata off an event about something else.
      *
      * <p>A third field used to sit here: the Entra directory link, which decided <em>which human
      * being could sign in as this account</em> and was the sharpest of the three. It went with the
@@ -131,7 +134,7 @@ public class AuditEventPublisher {
      * writer leaves the trail intact rather than orphaning it.
      */
     public void userUpdated(User updated, Set<Role> rolesBefore, boolean enabledBefore,
-            boolean passwordChanged, AppUserPrincipal principal) {
+            AppUserPrincipal principal) {
         publish(actor(AuditEventRecord.of(AuditEventType.USER_UPDATED), principal)
                 .target("User", updated.getId())
                 .scope(organisationIdOf(updated), homeIdOf(updated))
@@ -139,7 +142,23 @@ public class AuditEventPublisher {
                 .meta("rolesAfter", roleNames(updated.getRoles()))
                 .meta("enabledBefore", enabledBefore)
                 .meta("enabledAfter", updated.isEnabled())
-                .meta("passwordChanged", passwordChanged)
+                .build());
+    }
+
+    /**
+     * An administrator set another account's password (T277).
+     *
+     * <p>Its own event rather than a flag on {@code userUpdated}, because it is the one user-admin
+     * action whose consequence is that <em>somebody else can sign in as this person</em>.
+     *
+     * <p><strong>The value is not recorded and must never be</strong> - recording it would be the
+     * disclosure. What is recorded is that it happened, to whom, and by whom, which is the whole of
+     * what a reviewer can act on.
+     */
+    public void userPasswordReset(User target, AppUserPrincipal principal) {
+        publish(actor(AuditEventRecord.of(AuditEventType.USER_PASSWORD_RESET), principal)
+                .target("User", target.getId())
+                .scope(organisationIdOf(target), homeIdOf(target))
                 .build());
     }
 

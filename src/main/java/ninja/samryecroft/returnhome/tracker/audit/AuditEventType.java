@@ -28,6 +28,15 @@ public enum AuditEventType {
     USER_CREATED,
     USER_UPDATED,
 
+    /**
+     * An administrator set another account's password (T277). Its OWN type rather than a flag on
+     * USER_UPDATED, because a credential change is not a profile edit: it is the one user-admin
+     * action whose consequence is that somebody else can sign in as this person, and a trail that
+     * records it as a field inside "user updated" cannot answer "when was this password last set,
+     * and by whom" without reading metadata off an event about something else.
+     */
+    USER_PASSWORD_RESET,
+
     INTERVIEW_REQUEST_CREATED,
     INTERVIEW_REQUEST_ALLOCATED,
     INTERVIEW_REQUEST_SCHEDULED,
