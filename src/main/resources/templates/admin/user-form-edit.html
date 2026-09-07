@@ -48,10 +48,15 @@
                  at creation cannot be corrected from here - and the answer to it is the link below,
                  not this input.
 
-                 AND THIS IS ONE OF THREE. Emailed codes are safe only while all of: no colleague may
-                 edit an address (this), no self-service password reset exists (T322), and an address
-                 is verified on first use (T322). Removing any one reopens the hole - so "we removed
-                 edit, the problem is solved" is not a reason to put this back. */-->
+                 WHAT IT BUYS, measured: setPassword has no platform-admin guard, so a manager may
+                 set an existing colleague's PASSWORD - but not their address. Under a second factor
+                 the code therefore still goes to the real person's mailbox and the manager is
+                 stopped. Putting this input back hands that impersonation capability straight back.
+
+                 (Emailed codes rest on this plus one other thing - no self-service password reset,
+                 or one mailbox would hold both factors. A third condition, "verified on first use",
+                 was specified in T322, is NOT BUILT, and would not have done the job anyway.
+                 UserService.changeEmail carries the whole argument.) */-->
             <p class="field">
                 <span class="lbl">Email address</span>
                 <span th:text="${user.email} ?: 'Not recorded'">someone@example.org</span>
