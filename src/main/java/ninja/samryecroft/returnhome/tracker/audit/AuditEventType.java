@@ -89,6 +89,11 @@ public enum AuditEventType {
     // second state would have been two values behaving identically, and every future query would
     // have had to remember to check them together.
     /** A young person taken off the active lists (T170). Never a deletion - see Child.archived. */
+    /**
+     * A young person's own details were corrected (T170). The metadata names WHICH FIELDS changed
+     * and NEVER their values - see AuditEventPublisher.childUpdated.
+     */
+    CHILD_UPDATED,
     CHILD_ARCHIVED,
     /** A young person put back on them. Restore is a first-class action, not an undo (T170). */
     CHILD_RESTORED,

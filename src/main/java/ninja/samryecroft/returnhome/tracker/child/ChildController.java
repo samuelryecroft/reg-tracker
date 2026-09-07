@@ -13,6 +13,7 @@ import ninja.samryecroft.returnhome.tracker.audit.AuditFeedScope;
 import ninja.samryecroft.returnhome.tracker.audit.AuditHistoryService;
 import ninja.samryecroft.returnhome.tracker.audit.DraftSaveRuns;
 import ninja.samryecroft.returnhome.tracker.child.dto.CreateChildForm;
+import ninja.samryecroft.returnhome.tracker.child.dto.EditChildForm;
 import ninja.samryecroft.returnhome.tracker.export.ExportCapability;
 import ninja.samryecroft.returnhome.tracker.home.Home;
 import ninja.samryecroft.returnhome.tracker.home.HomeRepository;
@@ -266,10 +267,41 @@ public class ChildController {
      * statement about an organisation's OWN PEOPLE, so the same scope rule as everything else here
      * rather than a second one invented for removal.
      */
+    @GetMapping("/{id}/edit")
+    public String editForm(@PathVariable Long id, @AuthenticationPrincipal AppUserPrincipal principal,
+            Model model) {
+        Child child = mineToManage(id, principal);
+        EditChildForm form = new EditChildForm();
+        form.setFirstName(child.getFirstName());
+        form.setLastName(child.getLastName());
+        form.setDateOfBirth(child.getDateOfBirth());
+        form.setLocalCaseReference(child.getLocalCaseReference());
+        model.addAttribute("child", child);
+        model.addAttribute("form", form);
+        model.addAttribute("dobMax", LocalDate.now());
+        return "children/edit-form";
+    }
+
+    /** Correcting a young person's details is ORDINARY AND NECESSARY - typos, legal name changes, a
+     * case reference issued late - which is why it is a plain edit form and not a ceremony. */
+    @PostMapping("/{id}/edit")
+    public String edit(@PathVariable Long id, @AuthenticationPrincipal AppUserPrincipal principal,
+            @Valid @ModelAttribute("form") EditChildForm form, BindingResult bindingResult, Model model) {
+        Child child = mineToManage(id, principal);
+        if (bindingResult.hasErrors()) {
+            model.addAttribute("child", child);
+            model.addAttribute("dobMax", LocalDate.now());
+            return "children/edit-form";
+        }
+        childLifecycleService.update(child.getId(), form.getFirstName(), form.getLastName(),
+                form.getDateOfBirth(), form.getLocalCaseReference(), principal);
+        return "redirect:/children/" + id;
+    }
+
     @PostMapping("/{id}/archive")
     public String archive(@PathVariable Long id, @AuthenticationPrincipal AppUserPrincipal principal,
             RedirectAttributes redirectAttributes) {
-        Child child = mineToArchive(id, principal);
+        Child child = mineToManage(id, principal);
         try {
             childLifecycleService.archive(child, principal);
         } catch (ChildNotArchivableException refused) {
@@ -285,18 +317,44 @@ public class ChildController {
     /** Restore, deliberately the same shape as archive - an asymmetric pair teaches people not to use the cheap half. */
     @PostMapping("/{id}/restore")
     public String restore(@PathVariable Long id, @AuthenticationPrincipal AppUserPrincipal principal) {
-        childLifecycleService.restore(mineToArchive(id, principal), principal);
+        childLifecycleService.restore(mineToManage(id, principal), principal);
         return "redirect:/children/" + id;
     }
 
-    private Child mineToArchive(Long id, AppUserPrincipal principal) {
+    /**
+     * The WHO rule for acting on a young person's record (T170), shared by edit, archive and
+     * restore because Oscar ruled one scope for all three: <strong>a care provider's own
+     * organisation</strong>. A SUPPLIER MAY NOT - they hold no homes and no population, they work on
+     * episodes, and archiving or correcting a record is a statement about an organisation's OWN
+     * PEOPLE. One method rather than three copies, so the three actions cannot drift apart.
+     *
+     * <h2>REMOVAL MUST NOT USE THIS METHOD (Kevin, T176)</h2>
+     *
+     * <p><strong>Archive and remove are different acts with different privileges and must not share a
+     * button - or a predicate. Someone tidying a list must not be able to destroy evidence.</strong>
+     * This method answers "may you act on this record", and every action behind it is REVERSIBLE:
+     * an edit can be edited again, an archive can be restored. Destroying a young person is none of
+     * those things - it is a GRAPH deletion whose export bundle becomes the only copy in existence,
+     * and it needs export, VERIFY, confirm custody, then destroy.
+     *
+     * <p><strong>So a later remove that reuses this predicate would inherit the archiving privilege,
+     * which is exactly the failure the ruling names.</strong> It must have its own check, and this
+     * is written here rather than in a document because here is where somebody adding it would be
+     * one line away from getting it wrong.
+     *
+     * <p><strong>Note this is the opposite call from the one made everywhere else this week.</strong>
+     * Sharing a predicate is right when two rules must AGREE - it is what stops visibility and
+     * grant drifting apart in T273. It is wrong when two acts must carry DIFFERENT privileges,
+     * because then a shared predicate is not consistency, it is a widening nobody decided.
+     */
+    private Child mineToManage(Long id, AppUserPrincipal principal) {
         Child child = childRepository.findDetailedById(id)
                 .orElseThrow(() -> new IllegalArgumentException("No such child: " + id));
         boolean mine = principal.hasRole(Role.ADMIN)
                 || (roleMatrix.isCareProviderOrgAdmin(principal)
                         && organisationAccessService.canViewHome(principal, child.getHome()));
         if (!mine) {
-            throw new AccessDeniedException("Not authorized to archive this child");
+            throw new AccessDeniedException("Not authorized to manage this child");
         }
         return child;
     }
