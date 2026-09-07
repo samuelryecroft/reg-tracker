@@ -65,12 +65,21 @@
 
     var current = 0;
     var savedAt = form.getAttribute('data-saved-at');
+    // T318 (CREED-RULING-step-label-affordance.md): the step label needed a non-colour, non-hover
+    // rest-state affordance - :hover alone is invisible on the touch devices this panel is built
+    // for, and the aria-expanded background/colour swap is a colour-only state signal (WCAG 1.4.1).
+    // The sprite has no ph-caret-up, so ph-caret-down is rotated 180deg on [aria-expanded="true"]
+    // instead (CSS, above .step-label). The URL comes from the form's own data-icons attribute,
+    // never hardcoded - a literal '/icons/phosphor.svg' would break under a context path.
+    var iconsUrl = form.getAttribute('data-icons');
     var chrome = document.createElement('div');
     chrome.className = 'steps';
     chrome.innerHTML =
         '<span class="dots"></span>' +
         '<button type="button" class="step-label" aria-expanded="false" aria-controls="stepper-panel">' +
-        '<span class="step-label-text"></span></button>' +
+        '<span class="step-label-text"></span>' +
+        '<svg class="icon" aria-hidden="true"><use href="' + iconsUrl + '#ph-caret-down"></use></svg>' +
+        '</button>' +
         // aria-live, because this is the only thing on the screen that says whether a visitor's
         // work is safe, and it changes without anything moving focus. A save state that reaches
         // only sighted users is the same defect as a state-bearing icon marked aria-hidden.
