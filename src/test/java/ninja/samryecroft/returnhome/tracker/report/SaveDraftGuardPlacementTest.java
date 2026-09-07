@@ -26,6 +26,10 @@ import ninja.samryecroft.returnhome.tracker.user.Role;
 import ninja.samryecroft.returnhome.tracker.user.User;
 import ninja.samryecroft.returnhome.tracker.user.UserRepository;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
  * The {@code saveDraft} half of {@link SubmitForReviewGuardPlacementTest}, and it exists for exactly
@@ -47,17 +51,38 @@ import org.junit.jupiter.api.Test;
  * not the {@code DRAFT} the method has just written. Reading it after {@code applyFormValues} would
  * record every save as DRAFT &rarr; DRAFT and lose the one transition worth finding.
  */
+@ExtendWith(MockitoExtension.class)
 class SaveDraftGuardPlacementTest {
 
-    private final InterviewReportRepository interviewReportRepository = mock(InterviewReportRepository.class);
-    private final InterviewRequestService interviewRequestService = mock(InterviewRequestService.class);
-    private final UserRepository userRepository = mock(UserRepository.class);
-    private final AuditEventPublisher auditEventPublisher = mock(AuditEventPublisher.class);
+    @Mock
 
-    private final ReportService reportService = new ReportService(
-            interviewReportRepository, interviewRequestService, userRepository,
-            mock(DocxReportGenerator.class), mock(AppProperties.class), mock(ThemeService.class),
-            auditEventPublisher, mock(ReportDocumentService.class));
+    private InterviewReportRepository interviewReportRepository;
+    @Mock
+    private InterviewRequestService interviewRequestService;
+    @Mock
+    private UserRepository userRepository;
+    @Mock
+    private AuditEventPublisher auditEventPublisher;
+
+    @Mock
+
+    private DocxReportGenerator docxReportGenerator;
+
+    @Mock
+
+    private AppProperties appProperties;
+
+    @Mock
+
+    private ThemeService themeService;
+
+    @Mock
+
+    private ReportDocumentService reportDocumentService;
+
+    @InjectMocks
+
+    private ReportService reportService;
 
     @Test
     void anApprovedReportIsRefusedBeforeAnyOfItIsOverwritten() {

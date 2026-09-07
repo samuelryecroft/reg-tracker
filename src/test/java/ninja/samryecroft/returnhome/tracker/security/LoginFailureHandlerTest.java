@@ -6,6 +6,10 @@ import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -30,10 +34,14 @@ import org.springframework.security.core.AuthenticationException;
  * <p>A plain unit test on purpose: this machine has no Docker, so an integration test could only
  * ever run in CI. The property under test is a branch, and a branch does not need a database.
  */
+@ExtendWith(MockitoExtension.class)
 class LoginFailureHandlerTest {
 
-    private final LoginAttemptService loginAttemptService = mock(LoginAttemptService.class);
-    private final LoginFailureHandler handler = new LoginFailureHandler(loginAttemptService);
+    @Mock
+
+    private LoginAttemptService loginAttemptService;
+    @InjectMocks
+    private LoginFailureHandler handler;
 
     private String redirectFor(String username, boolean locked, AuthenticationException exception)
             throws IOException {

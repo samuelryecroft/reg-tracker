@@ -13,6 +13,10 @@ import ninja.samryecroft.returnhome.tracker.document.KeyUnavailableException;
 import ninja.samryecroft.returnhome.tracker.theme.ThemeService;
 import ninja.samryecroft.returnhome.tracker.user.AppUserPrincipal;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
@@ -34,14 +38,26 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
  * wrong-noun defect T168 exists to fix, reappearing on the screen built to fix it, which is why the
  * assertion is on the NOUN and not merely on something being shown.
  */
+@ExtendWith(MockitoExtension.class)
 class OrganisationActivationMessageTest {
 
-    private final OrganisationRepository repository = mock(OrganisationRepository.class);
-    private final OrganisationLifecycleService lifecycle = mock(OrganisationLifecycleService.class);
-    private final OrganisationAdminController controller =
-            new OrganisationAdminController(repository, mock(ThemeService.class), mock(KeyProvider.class),
-                    lifecycle, mock(HomeRepository.class), mock(UserRepository.class));
-    private final AppUserPrincipal principal = mock(AppUserPrincipal.class);
+    @Mock
+
+    private OrganisationRepository repository;
+    @Mock
+    private OrganisationLifecycleService lifecycle;
+    @Mock
+    private ThemeService themeService;
+    @Mock
+    private KeyProvider keyProvider;
+    @Mock
+    private HomeRepository homeRepository;
+    @Mock
+    private UserRepository userRepository;
+    @InjectMocks
+    private OrganisationAdminController controller;
+    @Mock
+    private AppUserPrincipal principal;
 
     private Organisation pendingCareProvider() {
         Organisation organisation = new Organisation();
