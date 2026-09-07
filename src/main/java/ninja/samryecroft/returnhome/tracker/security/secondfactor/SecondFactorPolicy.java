@@ -47,9 +47,19 @@ public class SecondFactorPolicy {
     /**
      * The emergency exemption, and it is deliberately NARROW.
      *
-     * <p>D2/D5 kept a local credential because a tenant-wide sign-in outage would otherwise lock out
-     * the one person who could fix it. Email is now in that dependency chain: a mail-provider outage
-     * with no exemption locks out everybody, including whoever would restore mail.
+     * <p><b>Why it must exist at all, which is stronger than "it is convenient".</b> This second
+     * factor is delivered <em>by email</em>, so mail is now a single point of failure for every
+     * sign-in in the product - and the outage most likely to take mail down is exactly the kind of
+     * incident break-glass exists for. <b>This exemption is the only way back in when the factor's
+     * own delivery channel is the thing that is broken.</b> D2/D5 kept a local credential on the same
+     * argument for a tenant-wide sign-in outage; email inherits that argument rather than replacing
+     * it.
+     *
+     * <p>That is written here rather than in a ticket because the obvious later tidy-up - "why is
+     * this one account exempt? make it consistent" - closes the last door in the building, and it
+     * looks like an improvement while doing it. {@code BreakGlassSecondFactorExemptionTest} walks
+     * this path with mail unavailable, so the exemption is exercised rather than merely present: an
+     * emergency route nobody has ever walked is a measurement that cannot fail.
      *
      * <p><b>But the exemption is one named account, not "break-glass is on".</b> Break-glass is not a
      * distinct account - {@code BreakGlassAuditListener} treats any local sign-in during the
