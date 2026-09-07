@@ -240,7 +240,14 @@ class AColleagueCannotRedirectYourSignInCodesTest extends AbstractIntegrationTes
         user.setUsername(username);
         user.setFirstName("Real");
         user.setLastName("Person");
-        user.setEmail(THEIR_REAL_ADDRESS);
+        // T264: only the COLLEAGUE holds THEIR_REAL_ADDRESS - that address is the subject of this
+        // test, being the one a manager must not redirect. Every fixture user used to share it, which
+        // was incidental convenience and is now forbidden: V24 makes an address belong to one account,
+        // because two accounts on one address receive each other's sign-in codes. The assertions are
+        // unchanged; only the manager's and platform admin's incidental addresses differ.
+        user.setEmail(username.startsWith("t323-colleague")
+                ? THEIR_REAL_ADDRESS
+                : username + "@example.test");
         user.setRoles(new HashSet<>(roles));
         user.setOrganisation(organisation);
         user.setHomes(theirHome == null ? new HashSet<>() : new HashSet<>(Set.of(theirHome)));

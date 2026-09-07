@@ -268,7 +268,11 @@ public class UserService {
         // The escalation that DOES exist is the one changeEmail refuses: a manager may set an
         // EXISTING colleague's password but may not move their address, so a second factor still
         // reaches the real person. See UserService.changeEmail for the whole argument.
-        user.setEmail(trimToNull(form.getEmail()));
+        String address = trimToNull(form.getEmail());
+        // T264/T322: guarded at creation as well as at edit. Creation is the commoner way a duplicate
+        // arrives - an administrator setting up a colleague reaches for an address they know.
+        refuseIfAddressAlreadyUsed(address, null);
+        user.setEmail(address);
         user.setRoles(form.getRoles());
         user.setOrganisation(needsOrganisation(form.getRoles()) ? resolveOrganisation(form.getOrganisationId(), principal) : null);
         user.setHomes(resolveHomes(form.getRoles(), form.getHomeIds(), principal));
@@ -438,6 +442,33 @@ public class UserService {
                 .orElseThrow(() -> new IllegalArgumentException("No such user: " + id));
     }
 
+    /**
+     * T264/T322: an address may belong to only one account, because it is where sign-in codes go.
+     *
+     * <p>Checked here as well as by V24's unique index, and the two are not redundant. The index is
+     * the guarantee - it holds against anything that reaches the database. This check exists so the
+     * refusal is a sentence an administrator can act on rather than a constraint violation surfacing
+     * as a 500, and so the message names the real reason: <b>the address, not the person</b>. It
+     * deliberately does NOT say which account already holds it, which would let an administrator
+     * enumerate colleagues' addresses one guess at a time.
+     *
+     * <p>Null is allowed through: an account may have no address (the break-glass admin has none),
+     * and V24's index is partial for the same reason.
+     */
+    private void refuseIfAddressAlreadyUsed(String address, Long excludingUserId) {
+        if (address == null) {
+            return;
+        }
+        boolean taken = excludingUserId == null
+                ? userRepository.existsByEmailIgnoreCase(address)
+                : userRepository.existsByEmailIgnoreCaseAndIdNot(address, excludingUserId);
+        if (taken) {
+            throw new IllegalArgumentException(
+                    "That email address is already used by another account. An address can belong to "
+                            + "only one person, because it is where their sign-in codes are sent.");
+        }
+    }
+
     private void refuseUnlessPlatformAdmin(AppUserPrincipal principal) {
         if (principal == null || !principal.hasRole(Role.ADMIN)) {
             throw new AccessDeniedException(
@@ -450,7 +481,9 @@ public class UserService {
         refuseUnlessPlatformAdmin(principal);
         User user = userRepository.findDetailedById(id)
                 .orElseThrow(() -> new IllegalArgumentException("No such user: " + id));
-        user.setEmail(trimToNull(newEmail));
+        String address = trimToNull(newEmail);
+        refuseIfAddressAlreadyUsed(address, id);
+        user.setEmail(address);
         // T322: a new address is unproven, and its predecessor's proof does not transfer. This also
         // restores the allowance, so correcting a typo actually unblocks the account - without it the
         // fix would appear not to have worked, because the old address's exhausted count would still
