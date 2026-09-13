@@ -127,6 +127,18 @@ class ReportDraftHonestyUiTest extends AbstractUiTest {
      * not a timer trick. With no stale response left to land late, the only remaining margin is the
      * new edit's own 600ms debounce, which this assertion (evaluated immediately, no wait) has never
      * been at real risk of losing to.
+     *
+     * <p><b>What this deliberately no longer covers:</b> waiting for the prior save to settle
+     * before editing means this test can no longer observe what happens when an edit lands WHILE a
+     * save is still in flight. That case is not hypothetical - it is the same race, just entered
+     * from the product's side instead of the test's: if a visitor edits a field while a previous
+     * autosave request is still outstanding, that stale request's "Saved HH:MM" response can resolve
+     * after the edit and overwrite the "Unsaved changes" state the new edit had already set,
+     * reporting the new edit as saved when it is not. That is T317's exact harm - believing your
+     * work is saved when it is not - still reachable on a statutory record, just no longer through
+     * Back specifically. Fixing it is a change to save-state semantics (the stamp would need to
+     * track "a save covering the CURRENT content has completed", not just "a save completed"), and
+     * is carded separately as T338. This green test does not mean the in-flight case is fine.
      */
     @Test
     void editingAfterAlreadyBeingSavedMarksTheStampUnsavedImmediately() {
