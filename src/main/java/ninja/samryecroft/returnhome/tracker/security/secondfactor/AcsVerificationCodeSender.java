@@ -43,11 +43,19 @@ public class AcsVerificationCodeSender implements VerificationCodeSender {
             TokenCredential credential,
             @Value("${app.security.second-factor.acs-endpoint}") String endpoint) {
         this.fromAddress = appProperties.getSecurity().getSecondFactor().getFromAddress();
-        if (fromAddress == null || fromAddress.isBlank()) {
-            // Fails at startup rather than at the first sign-in. A deployment missing its sender
-            // address would otherwise look healthy until somebody tried to log in.
+        // Fails at startup rather than at the first sign-in. A deployment missing its sender address
+        // would otherwise look healthy until somebody tried to log in.
+        //
+        // "Still a placeholder" is checked as well as blank, and it is the case that actually
+        // happens: an unset ${SECOND_FACTOR_FROM_ADDRESS} does NOT fail configuration-properties
+        // binding - it binds the literal placeholder text, which is not blank. So the blank check
+        // alone passed cleanly on exactly the deployment it exists to catch, and the sender was
+        // built pointing at a sender address of "${SECOND_FACTOR_FROM_ADDRESS}".
+        if (fromAddress == null || fromAddress.isBlank() || fromAddress.contains("${")) {
             throw new IllegalStateException(
-                    "app.security.second-factor.from-address is required when transport=acs");
+                    "app.security.second-factor.from-address is required when transport=acs, and "
+                            + "must be a real address - it is currently unset or unresolved. Set "
+                            + "SECOND_FACTOR_FROM_ADDRESS alongside SECOND_FACTOR_TRANSPORT=acs.");
         }
         this.client = new EmailClientBuilder()
                 .endpoint(endpoint)
