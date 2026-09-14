@@ -1,5 +1,7 @@
 package ninja.samryecroft.returnhome.tracker.user;
 
+import ninja.samryecroft.returnhome.tracker.TestLogins;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -206,7 +208,7 @@ class ManagerSeesEveryoneButEditsOnlyTheirOwnTest extends AbstractIntegrationTes
     }
 
     private RequestPostProcessor asManager() {
-        UserDetails details = appUserDetailsService.loadUserByUsername(managerUsername);
+        UserDetails details = appUserDetailsService.loadUserByUsername(TestLogins.loginIdentifier(managerUsername));
         return securityContext(new SecurityContextImpl(
                 new UsernamePasswordAuthenticationToken(details, null, details.getAuthorities())));
     }

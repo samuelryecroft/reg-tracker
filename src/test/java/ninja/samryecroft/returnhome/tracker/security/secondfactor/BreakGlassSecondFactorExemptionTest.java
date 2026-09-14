@@ -106,7 +106,6 @@ class BreakGlassSecondFactorExemptionTest extends AbstractIntegrationTest {
         user.setEmail("ordinary-" + System.nanoTime() + "@example.test");
         user.setFirstName("Ord");
         user.setLastName("Inary");
-        user.setEmail("ordinary@example.test");
         user.setPassword(passwordEncoder.encode(ORDINARY_PASSWORD));
         user.setRoles(new HashSet<>(Set.of(Role.ADMIN)));
         user.setEnabled(true);

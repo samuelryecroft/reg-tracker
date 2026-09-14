@@ -1,5 +1,7 @@
 package ninja.samryecroft.returnhome.tracker.ui;
 
+import ninja.samryecroft.returnhome.tracker.TestLogins;
+
 import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.BrowserType;
@@ -44,7 +46,7 @@ public abstract class AbstractUiTest extends AbstractIntegrationTest {
 
     /** There is no default seed password any more, so tests that sign in as the platform admin
      * have to supply one - the same way a real deployment injects it from the environment. */
-    protected static final String ADMIN_USERNAME = "admin";
+    protected static final String ADMIN_USERNAME = TestLogins.BREAK_GLASS_USERNAME;
     protected static final String ADMIN_PASSWORD = "ui-test-seed-password";
 
     @DynamicPropertySource
@@ -123,7 +125,7 @@ public abstract class AbstractUiTest extends AbstractIntegrationTest {
      * {@link #newPageWithJavaScript} is useful for signing in on. */
     protected void login(Page targetPage, String user, String password) {
         targetPage.navigate(url("/login"));
-        targetPage.fill("#username", user.contains("@") ? user : user + "@example.test");
+        targetPage.fill("#username", TestLogins.loginIdentifier(user));
         targetPage.fill("#password", password);
         targetPage.click("button[type=submit]");
         targetPage.waitForLoadState();

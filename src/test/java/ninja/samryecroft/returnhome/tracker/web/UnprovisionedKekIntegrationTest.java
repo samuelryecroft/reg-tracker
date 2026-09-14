@@ -1,5 +1,7 @@
 package ninja.samryecroft.returnhome.tracker.web;
 
+import ninja.samryecroft.returnhome.tracker.TestLogins;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.securityContext;
@@ -251,7 +253,7 @@ class UnprovisionedKekIntegrationTest extends AbstractIntegrationTest {
     }
 
     private RequestPostProcessor asUser(String username) {
-        UserDetails details = appUserDetailsService.loadUserByUsername(username);
+        UserDetails details = appUserDetailsService.loadUserByUsername(TestLogins.loginIdentifier(username));
         SecurityContext context = new SecurityContextImpl(
                 UsernamePasswordAuthenticationToken.authenticated(details, null, details.getAuthorities()));
         return securityContext(context);

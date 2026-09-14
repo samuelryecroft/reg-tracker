@@ -1,5 +1,7 @@
 package ninja.samryecroft.returnhome.tracker.user;
 
+import ninja.samryecroft.returnhome.tracker.TestLogins;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.securityContext;
@@ -234,7 +236,7 @@ class RoleMatrixGatingIntegrationTest extends AbstractIntegrationTest {
     }
 
     private RequestPostProcessor asUser(String username) {
-        UserDetails userDetails = appUserDetailsService.loadUserByUsername(username);
+        UserDetails userDetails = appUserDetailsService.loadUserByUsername(TestLogins.loginIdentifier(username));
         SecurityContext context = new SecurityContextImpl(
                 new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities()));
         return securityContext(context);

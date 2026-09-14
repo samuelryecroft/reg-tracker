@@ -1,5 +1,7 @@
 package ninja.samryecroft.returnhome.tracker.user;
 
+import ninja.samryecroft.returnhome.tracker.TestLogins;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -262,7 +264,7 @@ class AColleagueCannotRedirectYourSignInCodesTest extends AbstractIntegrationTes
     }
 
     private RequestPostProcessor as(String username) {
-        UserDetails details = appUserDetailsService.loadUserByUsername(username);
+        UserDetails details = appUserDetailsService.loadUserByUsername(TestLogins.loginIdentifier(username));
         return securityContext(new SecurityContextImpl(
                 new UsernamePasswordAuthenticationToken(details, null, details.getAuthorities())));
     }

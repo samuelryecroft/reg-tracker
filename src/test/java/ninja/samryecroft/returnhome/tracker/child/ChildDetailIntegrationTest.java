@@ -1,5 +1,7 @@
 package ninja.samryecroft.returnhome.tracker.child;
 
+import ninja.samryecroft.returnhome.tracker.TestLogins;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.securityContext;
@@ -101,7 +103,7 @@ class ChildDetailIntegrationTest extends AbstractIntegrationTest {
     }
 
     private RequestPostProcessor asStaff() {
-        UserDetails userDetails = appUserDetailsService.loadUserByUsername(staffUsername);
+        UserDetails userDetails = appUserDetailsService.loadUserByUsername(TestLogins.loginIdentifier(staffUsername));
         SecurityContext context = new SecurityContextImpl(
                 new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities()));
         return securityContext(context);

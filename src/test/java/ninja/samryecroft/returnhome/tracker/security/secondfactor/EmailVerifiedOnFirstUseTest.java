@@ -88,7 +88,6 @@ class EmailVerifiedOnFirstUseTest extends AbstractIntegrationTest {
         user.setEmail("verify-" + System.nanoTime() + "@example.test");
         user.setFirstName("Ver");
         user.setLastName("Ify");
-        user.setEmail("staff@example.test");
         user.setPassword(passwordEncoder.encode(PASSWORD));
         user.setRoles(new HashSet<>(Set.of(Role.ADMIN)));
         user.setEnabled(true);

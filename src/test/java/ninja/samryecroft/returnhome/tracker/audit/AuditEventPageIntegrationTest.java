@@ -1,5 +1,7 @@
 package ninja.samryecroft.returnhome.tracker.audit;
 
+import ninja.samryecroft.returnhome.tracker.TestLogins;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.securityContext;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -76,7 +78,7 @@ class AuditEventPageIntegrationTest extends AbstractIntegrationTest {
     }
 
     private RequestPostProcessor asUser(String username) {
-        UserDetails details = appUserDetailsService.loadUserByUsername(username);
+        UserDetails details = appUserDetailsService.loadUserByUsername(TestLogins.loginIdentifier(username));
         SecurityContext context = new SecurityContextImpl(
                 new UsernamePasswordAuthenticationToken(details, null, details.getAuthorities()));
         return securityContext(context);

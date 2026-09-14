@@ -1,5 +1,7 @@
 package ninja.samryecroft.returnhome.tracker.auth;
 
+import ninja.samryecroft.returnhome.tracker.TestLogins;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 import ch.qos.logback.classic.Level;
@@ -118,7 +120,7 @@ class BreakGlassIntegrationTest extends AbstractBreakGlassEnabledTest {
     }
 
     private UsernamePasswordAuthenticationToken formAuthentication() {
-        UserDetails details = appUserDetailsService.loadUserByUsername(username);
+        UserDetails details = appUserDetailsService.loadUserByUsername(TestLogins.loginIdentifier(username));
         return new UsernamePasswordAuthenticationToken(details, null, details.getAuthorities());
     }
 }

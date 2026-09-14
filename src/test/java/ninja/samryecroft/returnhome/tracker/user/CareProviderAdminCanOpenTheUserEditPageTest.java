@@ -1,5 +1,7 @@
 package ninja.samryecroft.returnhome.tracker.user;
 
+import ninja.samryecroft.returnhome.tracker.TestLogins;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.securityContext;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -126,7 +128,7 @@ class CareProviderAdminCanOpenTheUserEditPageTest extends AbstractIntegrationTes
     }
 
     private RequestPostProcessor asOrgAdmin() {
-        UserDetails details = appUserDetailsService.loadUserByUsername(orgAdminUsername);
+        UserDetails details = appUserDetailsService.loadUserByUsername(TestLogins.loginIdentifier(orgAdminUsername));
         return securityContext(new SecurityContextImpl(
                 new UsernamePasswordAuthenticationToken(details, null, details.getAuthorities())));
     }

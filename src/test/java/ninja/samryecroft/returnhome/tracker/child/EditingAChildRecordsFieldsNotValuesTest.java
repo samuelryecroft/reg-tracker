@@ -1,5 +1,7 @@
 package ninja.samryecroft.returnhome.tracker.child;
 
+import ninja.samryecroft.returnhome.tracker.TestLogins;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.securityContext;
@@ -171,7 +173,7 @@ class EditingAChildRecordsFieldsNotValuesTest extends AbstractIntegrationTest {
      */
     @Test
     void aSupplierMayNotReachTheChildManagementRoutes() throws Exception {
-        UserDetails details = appUserDetailsService.loadUserByUsername(supplierUsername);
+        UserDetails details = appUserDetailsService.loadUserByUsername(TestLogins.loginIdentifier(supplierUsername));
         mockMvc.perform(post("/children/{id}/archive", child.getId()).with(csrf())
                         .with(securityContext(new SecurityContextImpl(
                                 new UsernamePasswordAuthenticationToken(details, null, details.getAuthorities())))))

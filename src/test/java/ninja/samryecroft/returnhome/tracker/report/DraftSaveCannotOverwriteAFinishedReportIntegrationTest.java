@@ -1,5 +1,7 @@
 package ninja.samryecroft.returnhome.tracker.report;
 
+import ninja.samryecroft.returnhome.tracker.TestLogins;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.securityContext;
@@ -340,7 +342,7 @@ class DraftSaveCannotOverwriteAFinishedReportIntegrationTest extends AbstractInt
     }
 
     private RequestPostProcessor asUser(String username) {
-        UserDetails details = appUserDetailsService.loadUserByUsername(username);
+        UserDetails details = appUserDetailsService.loadUserByUsername(TestLogins.loginIdentifier(username));
         SecurityContext context = new SecurityContextImpl(
                 new UsernamePasswordAuthenticationToken(details, null, details.getAuthorities()));
         return securityContext(context);

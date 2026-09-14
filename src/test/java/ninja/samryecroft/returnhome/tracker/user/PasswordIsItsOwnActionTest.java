@@ -1,5 +1,7 @@
 package ninja.samryecroft.returnhome.tracker.user;
 
+import ninja.samryecroft.returnhome.tracker.TestLogins;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -215,7 +217,7 @@ class PasswordIsItsOwnActionTest extends AbstractIntegrationTest {
      */
     @Test
     void theServiceRefusesOutOfScopeEvenWhenCalledDirectly() {
-        UserDetails details = appUserDetailsService.loadUserByUsername(orgAdminUsername);
+        UserDetails details = appUserDetailsService.loadUserByUsername(TestLogins.loginIdentifier(orgAdminUsername));
         AppUserPrincipal principal = (AppUserPrincipal) details;
 
         assertThatThrownBy(() -> userService.setPassword(otherProvidersUser.getId(), GOOD_PASSWORD, principal))
@@ -248,7 +250,7 @@ class PasswordIsItsOwnActionTest extends AbstractIntegrationTest {
     }
 
     private RequestPostProcessor asOrgAdmin() {
-        UserDetails details = appUserDetailsService.loadUserByUsername(orgAdminUsername);
+        UserDetails details = appUserDetailsService.loadUserByUsername(TestLogins.loginIdentifier(orgAdminUsername));
         return securityContext(new SecurityContextImpl(
                 new UsernamePasswordAuthenticationToken(details, null, details.getAuthorities())));
     }

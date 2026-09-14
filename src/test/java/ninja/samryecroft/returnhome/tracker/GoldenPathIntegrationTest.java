@@ -69,7 +69,7 @@ class GoldenPathIntegrationTest extends AbstractIntegrationTest {
      * {@link AppUserDetailsService} so requests are authenticated as a real {@code AppUserPrincipal}.
      */
     private RequestPostProcessor asUser(String username) {
-        UserDetails userDetails = appUserDetailsService.loadUserByUsername(username);
+        UserDetails userDetails = appUserDetailsService.loadUserByUsername(TestLogins.loginIdentifier(username));
         SecurityContext context = new SecurityContextImpl(
                 new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities()));
         return securityContext(context);

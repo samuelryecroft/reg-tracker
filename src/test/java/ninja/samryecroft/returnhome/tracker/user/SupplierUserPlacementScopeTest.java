@@ -1,5 +1,7 @@
 package ninja.samryecroft.returnhome.tracker.user;
 
+import ninja.samryecroft.returnhome.tracker.TestLogins;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -142,7 +144,7 @@ class SupplierUserPlacementScopeTest extends AbstractIntegrationTest {
 
     private AppUserPrincipal principal() {
         UserDetails details =
-                appUserDetailsService.loadUserByUsername("t249-supplier-admin" + suffix);
+                appUserDetailsService.loadUserByUsername(TestLogins.loginIdentifier("t249-supplier-admin" + suffix));
         return (AppUserPrincipal) details;
     }
 }

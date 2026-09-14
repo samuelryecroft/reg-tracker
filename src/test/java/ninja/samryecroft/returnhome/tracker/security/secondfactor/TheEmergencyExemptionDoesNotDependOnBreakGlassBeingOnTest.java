@@ -122,7 +122,6 @@ class TheEmergencyExemptionDoesNotDependOnBreakGlassBeingOnTest extends Abstract
         ordinary.setEmail("ordinary-" + System.nanoTime() + "@example.test");
         ordinary.setLastName("Ordinary");
         ordinary.setPassword(passwordEncoder.encode(ORDINARY_PASSWORD));
-        ordinary.setEmail("ordinary@example.test");
         ordinary.setEnabled(true);
         ordinary.setRoles(new HashSet<>(Set.of(Role.ADMIN)));
         userRepository.save(ordinary);
