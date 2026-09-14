@@ -35,11 +35,18 @@ import org.springframework.stereotype.Component;
  * and whose broken state are indistinguishable, which is the exact shape of the defect it was written
  * to prevent.
  *
- * <p>Asking instead whether such an account EXISTS is a question that can come out either way, and it
- * covers the three ways the exit actually closes: the exemption stops applying to this account (a
- * future re-gating, which is precisely what T339 was), {@code app.admin.username} names a row that is
- * not there - <b>a mismatch that otherwise fails silently and looks identical to health</b> - or the
- * account is disabled.
+ * <p>Asking instead whether the exemption still APPLIES to that account is a question that can come
+ * out either way, and it covers the two ways the exit actually closes once it exists: the exemption
+ * stops applying to it (a future re-gating, which is precisely what T339 was), or the account is
+ * disabled.
+ *
+ * <p><b>A third case was tried and withdrawn, on evidence.</b> An earlier draft also fired when
+ * {@code app.admin.username} named no row at all - meaning to catch a mismatch that otherwise fails
+ * silently. It failed every second-factor test context in CI, because a missing row is the ordinary
+ * state wherever no seed password is configured. A guard that refuses to boot is an outage of its own
+ * if it misfires, and that one misfired on the commonest configuration there is. The silent-mismatch
+ * risk is therefore NOT covered here; it is the same condition {@code AdminUserSeeder} already warns
+ * about, and it wants a different instrument than a fatal boot check.
  *
  * <p><b>Deliberately narrow, because a guard that refuses to boot is an outage of its own if it
  * misfires.</b> It stays silent when the factor is off (nothing to be locked out of) and when no
@@ -76,20 +83,27 @@ public class EmergencyAccessStartupCheck {
             return;
         }
         User admin = userRepository.findByUsername(username).orElse(null);
+        if (admin == null) {
+            // NOT a boot failure, and an earlier draft of this guard had it the other way round -
+            // which failed every second-factor test context in CI and would have failed a first boot
+            // of any environment without a seed password. A missing row is the ORDINARY state
+            // wherever ADMIN_SEED_PASSWORD is unset or was rejected as weak: AdminUserSeeder chose
+            // to let the application start with nobody able to sign in, and said so in the log.
+            // Turning that into a fatal error overturns a decision that is not this guard's to make,
+            // adds nothing the log does not already say, and converts a warned state into a crash
+            // loop. This guard is about the factor closing a door that was open, not about whether
+            // anyone was ever let in.
+            return;
+        }
         // isRequiredFor is asked of the real row rather than reasoned about, so that a future change
         // to how the exemption is decided is caught here instead of at somebody's sign-in.
-        if (admin != null && admin.isEnabled() && !policy.isRequiredFor(admin)) {
+        if (admin.isEnabled() && !policy.isRequiredFor(admin)) {
             return;
         }
 
-        String because;
-        if (admin == null) {
-            because = "no account named '" + username + "' exists";
-        } else if (!admin.isEnabled()) {
-            because = "the account '" + username + "' is disabled";
-        } else {
-            because = "the account '" + username + "' is not exempt from the second factor";
-        }
+        String because = admin.isEnabled()
+                ? "the account '" + username + "' is not exempt from the second factor"
+                : "the account '" + username + "' is disabled";
         throw new IllegalStateException(
                 "The second factor is enabled, but there is no emergency account that could sign in "
                         + "without it: " + because + ". A mail outage would then lock out everybody, "

@@ -81,16 +81,22 @@ class EmergencyAccessStartupCheckTest {
     }
 
     /**
-     * The mismatch that otherwise fails silently: {@code app.admin.username} names nobody. Without
-     * this guard the application starts, looks entirely healthy, and has no emergency account at all.
+     * A named account that does not exist is NOT a boot failure - and this assertion is here because
+     * an earlier draft of the guard had it the other way round.
+     *
+     * <p>That draft meant to catch a silent {@code app.admin.username} mismatch. It failed every
+     * second-factor test context in CI, because a missing row is the ordinary state wherever no seed
+     * password is configured: {@code AdminUserSeeder} deliberately lets the application start with
+     * nobody able to sign in and says so in the log. <b>A guard that refuses to boot is an outage of
+     * its own if it misfires, and that one misfired on the commonest configuration there is.</b> The
+     * evidence is kept as a test rather than a comment so the case cannot be quietly widened again.
      */
     @Test
-    void itRefusesWhenTheNamedEmergencyAccountDoesNotExist() {
+    void itStaysSilentWhenTheNamedEmergencyAccountDoesNotExist() {
         AppProperties properties = propertiesWith(true, "nobody-seeded-this");
 
-        assertThatThrownBy(() -> check(properties, null).refuseToStartWithNoWayBackIn(null))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("no account named 'nobody-seeded-this' exists");
+        assertThatCode(() -> check(properties, null).refuseToStartWithNoWayBackIn(null))
+                .doesNotThrowAnyException();
     }
 
     /** Somebody disabled the emergency account while the factor was on. */
