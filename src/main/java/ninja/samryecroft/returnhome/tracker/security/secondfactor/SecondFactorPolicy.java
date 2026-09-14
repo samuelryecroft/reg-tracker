@@ -2,7 +2,6 @@ package ninja.samryecroft.returnhome.tracker.security.secondfactor;
 
 import ninja.samryecroft.returnhome.tracker.config.AppProperties;
 import ninja.samryecroft.returnhome.tracker.user.User;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 /**
@@ -48,14 +47,6 @@ public class SecondFactorPolicy {
 
     private final AppProperties appProperties;
 
-    /**
-     * Read straight from configuration rather than through a service, because this is the same
-     * switch {@code BreakGlassAuditListener} reads and they must not be able to disagree about
-     * whether the emergency door is open.
-     */
-    @Value("${app.auth.break-glass.enabled:false}")
-    private boolean breakGlassEnabled;
-
     public SecondFactorPolicy(AppProperties appProperties) {
         this.appProperties = appProperties;
     }
@@ -96,11 +87,34 @@ public class SecondFactorPolicy {
      * {@code application.properties} already warns against: a credential path that comes on with
      * something else is one nobody decided to open. This narrows it to the bootstrap admin, which is
      * the account D2 was actually about, and both enabling and using that path are already audited.
+     *
+     * <p><b>T339: this no longer consults {@code app.auth.break-glass.enabled}, and that removal is
+     * the fix for a real lockout.</b> It used to open with {@code if (!breakGlassEnabled) return
+     * false;}. Production ships that flag false, so when the factor went live the exemption
+     * short-circuited, <b>the username below was never even compared</b>, the factor became required
+     * <em>of the emergency account</em>, and the admin was refused for having no address. The missing
+     * address was the symptom: with the flag off that account was locked out whether or not it had
+     * one - which is why giving it a mailbox was never the fix, since that would make the emergency
+     * path depend on the very channel it exists to survive.
+     *
+     * <p>The deeper reason the gate was wrong is that it made this exemption <b>redundant</b>: arming
+     * it took an App Service settings change, and anyone able to make that change could equally have
+     * set {@code SECOND_FACTOR_ENABLED=false}. It bought nothing the operator did not already have,
+     * while reading - here and in the deployment notes - like a guarantee that stood on its own.
+     * <b>A fire exit you must unlock before the fire is not a fire exit.</b>
+     *
+     * <p>The cost is stated rather than hidden: this one account now permanently holds a single
+     * factor. What bounds it is that it has no address to phish, {@code LoginAttemptService} throttles
+     * it, and it writes {@code LOGIN_SUCCESS} like any other sign-in. <b>Note what changed about
+     * monitoring:</b> a sign-in on this account while break-glass is OFF is no longer flagged
+     * {@code BREAK_GLASS_LOGIN}, because break-glass mode genuinely is not on - the ordinary sign-in
+     * trail still records it, but the high-attention marker does not fire.
+     *
+     * <p>Break-glass MODE is untouched by this change. {@code BreakGlassAuditListener} reads the
+     * property through its own {@code @Value} and keeps every behaviour it had; the two were never
+     * entangled, they only shared a property name.
      */
     private boolean isEmergencyExempt(User user) {
-        if (!breakGlassEnabled) {
-            return false;
-        }
         String bootstrapAdmin = appProperties.getAdmin().getUsername();
         return bootstrapAdmin != null
                 && !bootstrapAdmin.isBlank()
