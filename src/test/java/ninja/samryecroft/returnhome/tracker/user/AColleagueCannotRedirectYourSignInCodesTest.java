@@ -190,7 +190,7 @@ class AColleagueCannotRedirectYourSignInCodesTest extends AbstractIntegrationTes
                 .filteredOn(event -> event.getEventType() == AuditEventType.USER_EMAIL_CHANGED)
                 .singleElement()
                 .satisfies(event -> {
-                    assertThat(event.getActorUsernameAtTime()).isEqualTo(platformAdminUsername);
+                    assertThat(event.getActorIdentifierAtTime()).isEqualTo(platformAdminUsername + "@example.test");
                     assertThat(String.valueOf(event.getMetadata()))
                             .doesNotContain(THEIR_REAL_ADDRESS)
                             .doesNotContain("corrected.address@example.test");
@@ -238,6 +238,7 @@ class AColleagueCannotRedirectYourSignInCodesTest extends AbstractIntegrationTes
     private User saveUser(String username, Set<Role> roles, Organisation organisation, Home theirHome) {
         User user = new User();
         user.setUsername(username);
+        user.setEmail(username + "@example.test");
         user.setFirstName("Real");
         user.setLastName("Person");
         user.setEmail(THEIR_REAL_ADDRESS);

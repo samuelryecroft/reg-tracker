@@ -258,8 +258,8 @@ class ApprovalIsNotErasableByResubmissionIntegrationTest extends AbstractIntegra
 
         AuditEvent latest = auditEventRepository
                 .findByEventTypeOrderByOccurredAtDesc(AuditEventType.REPORT_SUBMITTED).stream()
-                .filter(e -> e.getActorUsernameAtTime() != null
-                        && e.getActorUsernameAtTime().equals("t145-visitor" + suffix))
+                .filter(e -> e.getActorIdentifierAtTime() != null
+                        && e.getActorIdentifierAtTime().equals("t145-visitor" + suffix))
                 .findFirst().orElseThrow();
 
         assertThat(latest.getMetadata()).contains("statusBefore=REJECTED");
@@ -290,6 +290,7 @@ class ApprovalIsNotErasableByResubmissionIntegrationTest extends AbstractIntegra
     private void saveUser(String username, Set<Role> roles, Organisation organisation, Home home) {
         User user = new User();
         user.setUsername(username);
+        user.setEmail(username + "@example.test");
         user.setLastName(username);
         user.setRoles(new HashSet<>(roles));
         user.setOrganisation(organisation);

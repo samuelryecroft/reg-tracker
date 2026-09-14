@@ -105,6 +105,7 @@ class GoldenPathIntegrationTest extends AbstractIntegrationTest {
     private User newUser(String username, Role role, Home home, Organisation organisation) {
         User user = new User();
         user.setUsername(username);
+        user.setEmail(username + "@example.test");
         user.setPassword("irrelevant-not-checked-by-with-userDetails");
         user.setLastName(username);
         user.setRoles(Set.of(role));

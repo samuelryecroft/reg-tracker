@@ -1,0 +1,30 @@
+-- T264/T322: no two accounts may share a sign-in factor destination.
+--
+-- WHY THIS IS NOT `UNIQUE` PLUS `NOT NULL`, WHICH IS WHAT THE CARD ASKED FOR.
+--
+-- The property we actually need is "no two accounts share a factor destination". "Every row has an
+-- address" is a DIFFERENT property, it is not required for safety, and enforcing it here would break
+-- the one account that legitimately has none. T264 measured 7 users: id 1 holds a NULL address, and
+-- it is the bootstrap admin - the break-glass account that SecondFactorPolicy deliberately EXEMPTS
+-- from the second factor, because the factor is delivered by email and a mail outage must not lock
+-- out the person who would restore mail. That account never needs an address, so a NOT NULL column
+-- would force us to invent one for the single identity we least want to give a mailbox.
+--
+-- And an account that has no address is already refused: SecondFactorService.canChallenge returns
+-- false and SecondFactorSuccessHandler redirects to /login?error=nofactor. THE ABSENCE ALREADY FAILS
+-- CLOSED, in the layer that knows whether this account needs a factor at all. A NOT NULL constraint
+-- would be a second, blunter answer to a question already answered correctly - and the blunter answer
+-- would be wrong about break-glass.
+--
+-- LOWER(), because the constraint has to bind the MAILBOX and not the string. Two rows differing only
+-- in case are two different strings and one destination, so a plain UNIQUE would let
+-- "J.Smith@example.org" and "j.smith@example.org" hold codes for two accounts in one inbox - the
+-- exact defect this index exists to prevent, waved through on a technicality.
+--
+-- IT FAILS THE DEPLOY IF DUPLICATES REMAIN, and that is the design rather than a side effect. Index
+-- creation refuses rather than choosing a winner: this migration must never decide which of three
+-- people sharing an address keeps it. Remediation is a deliberate act performed BEFORE this runs -
+-- see T264-REMEDIATION-shared-and-missing-addresses.md. T264 measured ids 4, 5 and 7 sharing one
+-- address, so this WILL fail until that is done, on purpose.
+
+CREATE UNIQUE INDEX idx_users_email_unique ON users (LOWER(email)) WHERE email IS NOT NULL;

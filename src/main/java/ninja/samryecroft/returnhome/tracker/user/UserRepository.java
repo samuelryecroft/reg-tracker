@@ -14,6 +14,20 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByUsername(String username);
 
     /**
+     * The login lookup (T344). {@code LOWER()} on both sides, matching V24's unique index - the
+     * constraint binds the MAILBOX, not the string, so sign-in has to resolve the same way or an
+     * address that is unique to the database would be un-typeable in the wrong case.
+     */
+    @Query("select u from User u where lower(u.email) = lower(:email)")
+    Optional<User> findByEmailIgnoreCase(@Param("email") String email);
+
+    /**
+     * The emergency account, asked for by its FLAG rather than by a name (T341/T344). At most one row
+     * can hold it - V25's partial unique index - so this cannot return an arbitrary choice of several.
+     */
+    Optional<User> findByBreakGlassTrue();
+
+    /**
      * One user with the collections its authorisation check reads.
      *
      * <p><strong>{@code getAuthorized} used a bare {@code findById} and then asked the result for its
@@ -71,7 +85,10 @@ public interface UserRepository extends JpaRepository<User, Long> {
     List<User> findByRoleOrderByFullName(@Param("role") Role role);
 
     @EntityGraph(attributePaths = {"homes", "organisation", "roles"})
-    @Query("select u from User u order by u.username")
+    // T344: ordered by NAME, not by username. Usernames are no longer issued to people, so ordering
+    // by one would sort the whole admin list by a column that is null for everybody except the
+    // emergency account - an ordering that looks deliberate and is actually arbitrary.
+    @Query("select u from User u order by u.lastName, u.firstName")
     List<User> findAllWithHome();
 
     @EntityGraph(attributePaths = {"homes", "organisation", "roles"})

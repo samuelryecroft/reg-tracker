@@ -166,6 +166,7 @@ class RoleMergeOnEditTest {
         User user = new User();
         ReflectionTestUtils.setField(user, "id", TARGET_ID);
         user.setUsername("target");
+        user.setEmail("target" + "@example.test");
         user.setRoles(new HashSet<>(roles));
         user.setOrganisation(organisation(SUPPLIER_ORG_ID, OrgType.SUPPLIER));
         return user;
@@ -193,6 +194,7 @@ class RoleMergeOnEditTest {
         User user = new User();
         ReflectionTestUtils.setField(user, "id", id);
         user.setUsername("actor");
+        user.setEmail("actor" + "@example.test");
         user.setRoles(new HashSet<>(roles));
         user.setOrganisation(organisation);
         return new AppUserPrincipal(user);

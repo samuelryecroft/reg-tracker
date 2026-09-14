@@ -145,6 +145,7 @@ class UnprovisionedKekIntegrationTest extends AbstractIntegrationTest {
 
         User admin = new User();
         admin.setUsername("kek-admin" + suffix);
+        admin.setEmail("kek-admin" + suffix + "@example.test");
         admin.setPassword(passwordEncoder.encode("password123"));
         admin.setFirstName("Kek");
         admin.setLastName("Admin");
@@ -156,6 +157,7 @@ class UnprovisionedKekIntegrationTest extends AbstractIntegrationTest {
 
         User platformAdmin = new User();
         platformAdmin.setUsername("kek-platform-admin" + suffix);
+        platformAdmin.setEmail("kek-platform-admin" + suffix + "@example.test");
         platformAdmin.setPassword(passwordEncoder.encode("password123"));
         platformAdmin.setFirstName("Platform");
         platformAdmin.setLastName("Admin");

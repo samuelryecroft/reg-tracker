@@ -80,6 +80,7 @@ class ChildDetailIntegrationTest extends AbstractIntegrationTest {
         staffUsername = "t4b-staff" + suffix;
         User staff = new User();
         staff.setUsername(staffUsername);
+        staff.setEmail(staffUsername + "@example.test");
         staff.setLastName("Staff");
         staff.setRoles(new HashSet<>(Set.of(Role.HOME_STAFF)));
         staff.setHomes(new HashSet<>(Set.of(home)));

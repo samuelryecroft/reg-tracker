@@ -30,7 +30,19 @@ public class User {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true)
+    /**
+     * Null for every account created after T344, and that is the ordinary case rather than an edge.
+     *
+     * <p>People sign in with their email address; a username is a second identifier to remember, to
+     * administer and to get wrong, and removing it is the whole point of T344. <b>The column stays
+     * for exactly one row: the break-glass account, which has no address and must never be given
+     * one</b>, so it needs a non-email identity to be typed at the login form.
+     *
+     * <p>Kept rather than dropped. Dropping it is irreversible, would break the previous jar during
+     * the deploy window (it still selects this column), and would leave the emergency account with no
+     * way to be named at all.
+     */
+    @Column(unique = true)
     private String username;
 
     /**
@@ -140,6 +152,21 @@ public class User {
     @Column(name = "appearance_preference", nullable = false)
     private AppearancePreference appearancePreference = AppearancePreference.AUTO;
 
+    /**
+     * The emergency account, and the reason this is a column rather than a name comparison.
+     *
+     * <p>Until T344 the exemption asked whether {@code app.admin.username} equalled this row's
+     * username. {@code ADMIN_SEED_USERNAME} was never set in production, so that property was its
+     * default - the literal {@code admin} - and <b>any account named {@code admin} was permanently
+     * exempt from the second factor</b>. Nobody decided that (T341). A flag cannot be collided with
+     * by naming, and it survives usernames ceasing to be login identifiers.
+     *
+     * <p>At most one row may hold it; V25 enforces that with a partial unique index, because a second
+     * emergency account is not redundancy - it is a second permanent exception nobody is watching.
+     */
+    @Column(name = "is_break_glass", nullable = false)
+    private boolean breakGlass = false;
+
     @Column(nullable = false)
     private boolean enabled = true;
 
@@ -159,6 +186,28 @@ public class User {
 
     public Long getId() {
         return id;
+    }
+
+    public boolean isBreakGlass() {
+        return breakGlass;
+    }
+
+    public void setBreakGlass(boolean breakGlass) {
+        this.breakGlass = breakGlass;
+    }
+
+    /**
+     * What this account types at the login form: the email address, or for the break-glass account
+     * its username.
+     *
+     * <p>One concept with two sources, deliberately resolved here rather than at each call site. It
+     * is what {@code AppUserPrincipal.getUsername()} returns, so failed-login throttling, the audit
+     * trail and the logs all name an account the same way without any of them knowing that the
+     * emergency row is different.
+     */
+    @Transient
+    public String getLoginIdentifier() {
+        return breakGlass ? username : email;
     }
 
     public String getUsername() {

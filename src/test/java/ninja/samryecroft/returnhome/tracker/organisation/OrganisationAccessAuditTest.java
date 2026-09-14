@@ -129,6 +129,7 @@ class OrganisationAccessAuditTest {
     private AppUserPrincipal principal(Set<Role> roles, Organisation organisation) {
         User user = new User();
         user.setUsername("t136");
+        user.setEmail("t136" + "@example.test");
         user.setRoles(new HashSet<>(roles));
         user.setOrganisation(organisation);
         return new AppUserPrincipal(user);

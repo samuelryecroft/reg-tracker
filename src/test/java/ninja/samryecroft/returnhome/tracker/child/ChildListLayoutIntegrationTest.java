@@ -65,6 +65,7 @@ class ChildListLayoutIntegrationTest extends AbstractIntegrationTest {
     private User savedHomeStaff(String username, Home home) {
         User staff = new User();
         staff.setUsername(username);
+        staff.setEmail(username + "@example.test");
         staff.setLastName("Staff");
         staff.setRoles(new HashSet<>(Set.of(Role.HOME_STAFF)));
         staff.setHomes(new HashSet<>(Set.of(home)));

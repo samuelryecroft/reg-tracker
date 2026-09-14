@@ -62,6 +62,7 @@ class BreakGlassClosedIntegrationTest extends AbstractIntegrationTest {
         username = "no-break-glass-" + System.nanoTime();
         User user = new User();
         user.setUsername(username);
+        user.setEmail(username + "@example.test");
         user.setLastName("Ordinary");
         user.setRoles(new HashSet<>(Set.of(Role.ADMIN)));
         user.setEnabled(true);
@@ -84,7 +85,7 @@ class BreakGlassClosedIntegrationTest extends AbstractIntegrationTest {
 
         assertThat(warnMessages()).noneMatch(m -> m.contains(BreakGlassAuditListener.ALERT_MARKER));
         assertThat(auditEventRepository.findByEventTypeOrderByOccurredAtDesc(AuditEventType.BREAK_GLASS_LOGIN)
-                .stream().map(AuditEvent::getActorUsernameAtTime).filter(username::equals).count())
+                .stream().map(AuditEvent::getActorIdentifierAtTime).filter((username + "@example.test")::equals).count())
                 .isZero();
     }
 

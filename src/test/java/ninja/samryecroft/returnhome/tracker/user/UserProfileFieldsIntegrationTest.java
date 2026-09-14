@@ -52,6 +52,7 @@ class UserProfileFieldsIntegrationTest extends AbstractIntegrationTest {
         supplier = seededSupplier();
         User admin = new User();
         admin.setUsername("profile-admin" + suffix);
+        admin.setEmail("profile-admin" + suffix + "@example.test");
         admin.setFirstName("Profile");
         admin.setLastName("Admin");
         admin.setRoles(new HashSet<>(Set.of(Role.ADMIN)));
@@ -62,7 +63,7 @@ class UserProfileFieldsIntegrationTest extends AbstractIntegrationTest {
     @Test
     void creatingAUserCapturesAllFourProfileFields() throws Exception {
         mockMvc.perform(post("/admin/users").with(admin()).with(csrf())
-                        .param("username", "new-staffer" + suffix)
+                        .param("username", "new-staffer" + suffix + "@example.test")
                         .param("password", "a-long-enough-password")
                         .param("firstName", "Ada")
                         .param("lastName", "Lovelace")
@@ -84,7 +85,7 @@ class UserProfileFieldsIntegrationTest extends AbstractIntegrationTest {
     @Test
     void aMalformedEmailIsRejectedAndNothingIsPersisted() throws Exception {
         mockMvc.perform(post("/admin/users").with(admin()).with(csrf())
-                        .param("username", "bad-email" + suffix)
+                        .param("username", "bad-email" + suffix + "@example.test")
                         .param("password", "a-long-enough-password")
                         .param("firstName", "Grace")
                         .param("lastName", "Hopper")
@@ -100,7 +101,7 @@ class UserProfileFieldsIntegrationTest extends AbstractIntegrationTest {
     @Test
     void aMissingLastNameIsRejected() throws Exception {
         mockMvc.perform(post("/admin/users").with(admin()).with(csrf())
-                        .param("username", "no-surname" + suffix)
+                        .param("username", "no-surname" + suffix + "@example.test")
                         .param("password", "a-long-enough-password")
                         .param("firstName", "Grace")
                         .param("lastName", "  ")
@@ -118,7 +119,7 @@ class UserProfileFieldsIntegrationTest extends AbstractIntegrationTest {
         // An untouched HTML input submits "", which would otherwise persist as an empty string that
         // reads as "we hold a number for this person" everywhere it is displayed.
         mockMvc.perform(post("/admin/users").with(admin()).with(csrf())
-                        .param("username", "no-phone" + suffix)
+                        .param("username", "no-phone" + suffix + "@example.test")
                         .param("password", "a-long-enough-password")
                         .param("firstName", "Alan")
                         .param("lastName", "Turing")
@@ -139,6 +140,7 @@ class UserProfileFieldsIntegrationTest extends AbstractIntegrationTest {
     void theEditFormIsPrefilledWithTheStoredProfileAndSavesChangesToItExceptTheEmail() throws Exception {
         User existing = new User();
         existing.setUsername("editable" + suffix);
+        existing.setEmail("editable" + suffix + "@example.test");
         existing.setFirstName("Edith");
         existing.setLastName("Clarke");
         existing.setEmail("edith.clarke@example.test");
@@ -184,6 +186,7 @@ class UserProfileFieldsIntegrationTest extends AbstractIntegrationTest {
     void theUserListShowsTheDerivedNameAndTheNewContactDetails() throws Exception {
         User listed = new User();
         listed.setUsername("listed" + suffix);
+        listed.setEmail("listed" + suffix + "@example.test");
         listed.setFirstName("Mary");
         listed.setLastName("Seacole");
         listed.setEmail("mary.seacole@example.test");

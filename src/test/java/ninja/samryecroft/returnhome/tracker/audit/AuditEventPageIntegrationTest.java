@@ -59,6 +59,7 @@ class AuditEventPageIntegrationTest extends AbstractIntegrationTest {
         if (userRepository.findByUsername(admin).isEmpty()) {
             User user = new User();
             user.setUsername(admin);
+            user.setEmail(admin + "@example.test");
             user.setFirstName("Aud");
             user.setLastName("Itor");
             user.setRoles(new HashSet<>(Set.of(Role.ADMIN)));

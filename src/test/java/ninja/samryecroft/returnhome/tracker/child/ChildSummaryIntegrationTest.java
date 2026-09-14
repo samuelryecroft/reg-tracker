@@ -88,6 +88,7 @@ class ChildSummaryIntegrationTest extends AbstractIntegrationTest {
         staffUsername = "t290-staff" + suffix;
         User staff = new User();
         staff.setUsername(staffUsername);
+        staff.setEmail(staffUsername + "@example.test");
         staff.setLastName("Staff");
         staff.setRoles(new HashSet<>(Set.of(Role.HOME_STAFF)));
         staff.setHomes(new HashSet<>(Set.of(home)));

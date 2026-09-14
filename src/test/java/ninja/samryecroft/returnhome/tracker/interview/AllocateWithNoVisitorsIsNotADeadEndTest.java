@@ -201,6 +201,7 @@ class AllocateWithNoVisitorsIsNotADeadEndTest extends AbstractIntegrationTest {
     private User saveUser(String username, Set<Role> roles) {
         User user = new User();
         user.setUsername(username);
+        user.setEmail(username + "@example.test");
         user.setLastName(username);
         user.setRoles(new HashSet<>(roles));
         user.setOrganisation(supplier);

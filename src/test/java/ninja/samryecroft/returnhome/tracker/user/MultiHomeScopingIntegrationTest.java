@@ -216,7 +216,7 @@ class MultiHomeScopingIntegrationTest extends AbstractIntegrationTest {
 
     private void signIn(String username) throws Exception {
         mockMvc.perform(post("/login").with(csrf())
-                        .param("username", username)
+                        .param("username", username + "@example.test")
                         .param("password", "multi-home-password"))
                 .andExpect(status().is3xxRedirection());
     }
@@ -247,6 +247,7 @@ class MultiHomeScopingIntegrationTest extends AbstractIntegrationTest {
 
         CreateUserForm form = new CreateUserForm();
         form.setUsername("mh-split" + suffix);
+        form.setEmail("mh-split" + suffix + "@example.test");
         form.setFirstName("Split");
         form.setLastName("Across Providers");
         form.setEmail("split.across.providers@example.test");
@@ -276,6 +277,7 @@ class MultiHomeScopingIntegrationTest extends AbstractIntegrationTest {
     private AppUserPrincipal adminPrincipal() {
         User admin = new User();
         admin.setUsername("mh-admin" + suffix);
+        admin.setEmail("mh-admin" + suffix + "@example.test");
         admin.setLastName("Platform Admin");
         admin.setRoles(Set.of(Role.ADMIN));
         admin.setEnabled(true);
@@ -321,6 +323,7 @@ class MultiHomeScopingIntegrationTest extends AbstractIntegrationTest {
     private void saveUser(String username, Role role, Set<Home> homes) {
         User user = new User();
         user.setUsername(username);
+        user.setEmail(username + "@example.test");
         user.setLastName(username);
         user.setPassword(passwordEncoder.encode("multi-home-password"));
         user.setRoles(Set.of(role));

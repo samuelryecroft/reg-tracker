@@ -130,6 +130,7 @@ class InterviewRequestServiceScopeTest {
     private AppUserPrincipal principal(Set<Role> roles, Organisation organisation) {
         User user = new User();
         user.setUsername("t139-wiring");
+        user.setEmail("t139-wiring" + "@example.test");
         user.setRoles(new HashSet<>(roles));
         user.setOrganisation(organisation);
         return new AppUserPrincipal(user);

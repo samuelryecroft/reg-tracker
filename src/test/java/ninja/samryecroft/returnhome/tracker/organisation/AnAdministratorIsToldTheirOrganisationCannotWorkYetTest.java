@@ -259,6 +259,7 @@ class AnAdministratorIsToldTheirOrganisationCannotWorkYetTest extends AbstractIn
     private void saveUser(String username, Set<Role> roles, Organisation organisation, Home theirHome) {
         User user = new User();
         user.setUsername(username);
+        user.setEmail(username + "@example.test");
         user.setLastName(username);
         user.setRoles(new HashSet<>(roles));
         user.setOrganisation(organisation);

@@ -302,6 +302,7 @@ class ConfirmVisitTimeIntegrationTest extends AbstractIntegrationTest {
     private User saveUser(String username, Role role, Organisation organisation) {
         User user = new User();
         user.setUsername(username);
+        user.setEmail(username + "@example.test");
         user.setLastName(username);
         user.setRoles(new HashSet<>(Set.of(role)));
         user.setOrganisation(organisation);

@@ -154,6 +154,7 @@ class EncryptedDataProbeFindsEachEntityTest extends AbstractIntegrationTest {
     private InterviewRequest request() {
         User visitor = new User();
         visitor.setUsername("probe-visitor" + suffix);
+        visitor.setEmail("probe-visitor" + suffix + "@example.test");
         visitor.setPassword(passwordEncoder.encode("password123"));
         visitor.setFirstName("Probe");
         visitor.setLastName("Visitor");

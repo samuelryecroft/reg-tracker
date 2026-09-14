@@ -249,6 +249,7 @@ class ChildAccessEventsReachTheFeedTest extends AbstractIntegrationTest {
     private User user(String username, Role role, Organisation organisation, Home home) {
         User user = new User();
         user.setUsername(username);
+        user.setEmail(username + "@example.test");
         user.setLastName(username);
         user.setRoles(new HashSet<>(Set.of(role)));
         user.setOrganisation(organisation);

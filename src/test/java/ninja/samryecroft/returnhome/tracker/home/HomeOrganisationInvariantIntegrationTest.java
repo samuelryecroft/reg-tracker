@@ -74,6 +74,7 @@ class HomeOrganisationInvariantIntegrationTest extends AbstractIntegrationTest {
         suffix = "-" + System.nanoTime();
         User admin = new User();
         admin.setUsername("t237-admin" + suffix);
+        admin.setEmail("t237-admin" + suffix + "@example.test");
         admin.setPassword(passwordEncoder.encode("password123"));
         admin.setFirstName("Invariant");
         admin.setLastName("Admin");

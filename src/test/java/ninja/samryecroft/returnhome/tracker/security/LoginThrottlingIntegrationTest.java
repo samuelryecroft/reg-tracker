@@ -53,6 +53,7 @@ class LoginThrottlingIntegrationTest extends AbstractIntegrationTest {
         username = "throttle-" + System.nanoTime();
         User user = new User();
         user.setUsername(username);
+        user.setEmail(username + "@example.test");
         user.setPassword(passwordEncoder.encode(PASSWORD));
         user.setLastName("Throttle Test User");
         user.setRoles(Set.of(Role.VISITOR));
@@ -62,7 +63,7 @@ class LoginThrottlingIntegrationTest extends AbstractIntegrationTest {
 
     private void attemptLogin(String user, String password) throws Exception {
         mockMvc.perform(post("/login").with(csrf())
-                        .param("username", user)
+                        .param("username", user + "@example.test")
                         .param("password", password))
                 .andExpect(status().is3xxRedirection());
     }
@@ -85,7 +86,7 @@ class LoginThrottlingIntegrationTest extends AbstractIntegrationTest {
         // defect being that a locked user got the generic "check your password" advice, i.e. was
         // told to do the one thing that cannot work. The assertion's intent, refusal, is unchanged.
         mockMvc.perform(post("/login").with(csrf())
-                        .param("username", username)
+                        .param("username", username + "@example.test")
                         .param("password", PASSWORD))
                 .andExpect(redirectedUrl("/login?error=locked"));
     }
@@ -98,7 +99,7 @@ class LoginThrottlingIntegrationTest extends AbstractIntegrationTest {
 
         // A correct password still works, and wipes the slate...
         mockMvc.perform(post("/login").with(csrf())
-                        .param("username", username)
+                        .param("username", username + "@example.test")
                         .param("password", PASSWORD))
                 .andExpect(redirectedUrl("/"));
         assertThat(loginAttemptService.isLocked(username)).isFalse();

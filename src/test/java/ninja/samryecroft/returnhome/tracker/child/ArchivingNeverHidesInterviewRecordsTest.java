@@ -78,6 +78,7 @@ class ArchivingNeverHidesInterviewRecordsTest extends AbstractIntegrationTest {
 
         staff = new User();
         staff.setUsername("t170-staff" + suffix);
+        staff.setEmail("t170-staff" + suffix + "@example.test");
         staff.setLastName("Staff");
         staff.setRoles(new HashSet<>(Set.of(Role.HOME_STAFF)));
         staff.setHomes(new HashSet<>(Set.of(home)));
@@ -86,6 +87,7 @@ class ArchivingNeverHidesInterviewRecordsTest extends AbstractIntegrationTest {
 
         User admin = new User();
         admin.setUsername("t170-manager" + suffix);
+        admin.setEmail("t170-manager" + suffix + "@example.test");
         admin.setLastName("Manager");
         admin.setRoles(new HashSet<>(Set.of(Role.ORG_ADMIN)));
         admin.setOrganisation(org);

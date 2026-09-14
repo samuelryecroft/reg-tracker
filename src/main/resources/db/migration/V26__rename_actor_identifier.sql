@@ -1,0 +1,21 @@
+-- T344: audit_events.actor_username_at_time holds "how this actor was identified at the time", and
+-- after this release that is no longer a username.
+--
+-- THE NAME WOULD OTHERWISE BECOME A LIE, and on an append-only table a lie is permanent. Once login
+-- moves to email addresses this column receives the email for every person - so leaving it called
+-- actor_username_at_time would mean a reader filtering it for a username finds only rows written
+-- before the cutover and concludes that person has done nothing since. The query succeeds, the data
+-- is accurate, and the answer is wrong.
+--
+-- NOT RENAMED TO actor_email_at_time, WHICH WAS THE OBVIOUS FIX AND IS ALSO WRONG. It will not hold
+-- emails either: the break-glass account is identified by its username, because it has no address
+-- and must never have one. Naming it after either source names it after half of itself. What it
+-- actually records is the identifier, whichever kind it was.
+--
+-- THIS RENAME IS FREE ONLY BECAUSE THE TABLE IS EMPTY. The production database is being purged in
+-- the same operation that ships this (T344b), so there are no pre-cutover rows whose values mean
+-- something the new name does not describe. On a populated audit table this would be a rename over
+-- rows that meant something else, and the honest move there would have been a SECOND column instead.
+-- If this migration is ever being applied to a database with existing audit rows, that is the
+-- decision to revisit.
+ALTER TABLE audit_events RENAME COLUMN actor_username_at_time TO actor_identifier_at_time;

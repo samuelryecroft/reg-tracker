@@ -54,6 +54,7 @@ class UserListLayoutIntegrationTest extends AbstractIntegrationTest {
     private User savedUser(String username, String first, String last, boolean enabled, Role... roles) {
         User user = new User();
         user.setUsername(username);
+        user.setEmail(username + "@example.test");
         user.setFirstName(first);
         user.setLastName(last);
         user.setRoles(new HashSet<>(Set.of(roles)));

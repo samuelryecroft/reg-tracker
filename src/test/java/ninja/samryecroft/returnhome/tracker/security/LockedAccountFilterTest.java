@@ -130,7 +130,7 @@ class LockedAccountFilterTest {
                 ? MockMvcRequestBuilders.get("/login")
                 : MockMvcRequestBuilders.post("/login");
         if (username != null) {
-            builder = builder.param("username", username);
+            builder = builder.param("username", username + "@example.test");
         }
         return builder.param("password", "whatever").buildRequest(new MockServletContext());
     }
@@ -222,7 +222,7 @@ class LockedAccountFilterTest {
 
         // Negative control: right method, different path.
         assertThat(matchedAsLocked(MockMvcRequestBuilders.post("/logout")
-                .param("username", "locked-user").buildRequest(new MockServletContext())))
+                .param("username", "locked-user" + "@example.test").buildRequest(new MockServletContext())))
                 .as("a POST to another path must NOT be intercepted - without this the matcher could "
                         + "be passing by matching everything")
                 .isFalse();

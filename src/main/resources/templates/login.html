@@ -43,7 +43,7 @@
                  and param.error[0] != 'codeburned' and param.error[0] != 'codeexpired'
                  and param.error[0] != 'unverified'}">
         <svg class="icon" aria-hidden="true"><use th:href="@{/icons/phosphor.svg} + '#ph-warning-circle'"></use></svg>
-        <div><strong>We couldn't sign you in</strong><p>Check your username and password and try again.</p></div>
+        <div><strong>We couldn't sign you in</strong><p>Check your email address and password and try again.</p></div>
     </div>
     <!--/* Names the state and what to do, never the account. "No address" is an administrator's job
          to fix, so the copy points there rather than inviting the person to retry something that
@@ -86,7 +86,14 @@
              outcome - the floor pattern earns its keep on a form with groups to distinguish, not
              a two-field card. */-->
         <form method="post" th:action="@{/login}">
-            <label for="username">Username</label>
+            <!-- T344: people sign in with their email address; usernames are no longer issued. The
+                 FIELD NAME stays "username" because that is the parameter Spring Security's form
+                 login reads - renaming it would change the contract with the filter, not the label
+                 the person reads. type="text" rather than "email" on purpose: the break-glass
+                 account signs in here too and its identifier is not an address, so type="email"
+                 would have the browser refuse to submit the one credential that exists for
+                 emergencies. -->
+            <label for="username">Email address</label>
             <input type="text" id="username" name="username" autocomplete="username" autofocus="autofocus" required/>
             <label for="password">Password</label>
             <input type="password" id="password" name="password" autocomplete="current-password" required/>

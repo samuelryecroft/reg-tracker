@@ -55,6 +55,7 @@ class NameRevealUiTest extends AbstractUiTest {
 
         User staff = new User();
         staff.setUsername("ui-reveal-staff");
+        staff.setEmail("ui-reveal-staff" + "@example.test");
         staff.setPassword(passwordEncoder.encode(PASSWORD));
         staff.setLastName("UI Reveal Staff");
         staff.setRoles(Set.of(Role.HOME_STAFF));

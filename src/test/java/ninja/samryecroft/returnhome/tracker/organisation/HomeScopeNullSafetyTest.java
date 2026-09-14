@@ -58,6 +58,7 @@ class HomeScopeNullSafetyTest {
     private AppUserPrincipal principal() {
         User user = new User();
         user.setUsername("scope-null-safety");
+        user.setEmail("scope-null-safety" + "@example.test");
         user.setRoles(new HashSet<>(Set.of(Role.HOME_STAFF)));
         return new AppUserPrincipal(user);
     }

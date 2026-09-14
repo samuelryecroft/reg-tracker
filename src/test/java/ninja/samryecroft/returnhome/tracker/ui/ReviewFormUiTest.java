@@ -73,6 +73,7 @@ class ReviewFormUiTest extends AbstractUiTest {
 
         User visitor = new User();
         visitor.setUsername("review-ui-visitor");
+        visitor.setEmail("review-ui-visitor" + "@example.test");
         visitor.setPassword(passwordEncoder.encode(PASSWORD));
         visitor.setLastName("Visitor");
         visitor.setRoles(Set.of(Role.VISITOR));
@@ -81,6 +82,7 @@ class ReviewFormUiTest extends AbstractUiTest {
 
         User reviewer = new User();
         reviewer.setUsername("review-ui-reviewer");
+        reviewer.setEmail("review-ui-reviewer" + "@example.test");
         reviewer.setPassword(passwordEncoder.encode(PASSWORD));
         reviewer.setLastName("Reviewer");
         reviewer.setRoles(Set.of(Role.REVIEWER));

@@ -75,6 +75,7 @@ class RevealControlVisibilityIntegrationTest extends AbstractIntegrationTest {
         String username = "t236-staff" + suffix;
         User staff = new User();
         staff.setUsername(username);
+        staff.setEmail(username + "@example.test");
         staff.setLastName("Staff");
         staff.setRoles(new HashSet<>(Set.of(Role.HOME_STAFF)));
         staff.setHomes(new HashSet<>(Set.of(home)));

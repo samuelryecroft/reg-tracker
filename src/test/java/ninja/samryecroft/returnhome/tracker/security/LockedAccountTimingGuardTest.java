@@ -142,6 +142,7 @@ class LockedAccountTimingGuardTest extends AbstractIntegrationTest {
         String username = "t221-real" + suffix;
         User user = new User();
         user.setUsername(username);
+        user.setEmail(username + "@example.test");
         user.setFirstName("Rea");
         user.setLastName("List");
         user.setPassword(passwordEncoder.encode("correct-horse-battery"));
@@ -153,7 +154,7 @@ class LockedAccountTimingGuardTest extends AbstractIntegrationTest {
 
     private MockHttpServletResponse attempt(String username) throws Exception {
         return mockMvc.perform(post("/login").with(csrf())
-                        .param("username", username)
+                        .param("username", username + "@example.test")
                         .param("password", "definitely-not-the-password"))
                 .andReturn().getResponse();
     }

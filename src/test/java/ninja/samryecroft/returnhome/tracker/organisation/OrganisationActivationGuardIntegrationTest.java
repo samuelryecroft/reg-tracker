@@ -98,6 +98,7 @@ class OrganisationActivationGuardIntegrationTest extends AbstractIntegrationTest
 
         User staff = new User();
         staff.setUsername("guard-staff" + suffix);
+        staff.setEmail("guard-staff" + suffix + "@example.test");
         staff.setPassword(passwordEncoder.encode("password123"));
         staff.setFirstName("Guard");
         staff.setLastName("Staff");
@@ -108,6 +109,7 @@ class OrganisationActivationGuardIntegrationTest extends AbstractIntegrationTest
 
         User admin = new User();
         admin.setUsername("guard-admin" + suffix);
+        admin.setEmail("guard-admin" + suffix + "@example.test");
         admin.setPassword(passwordEncoder.encode("password123"));
         admin.setFirstName("Guard");
         admin.setLastName("Admin");
@@ -152,6 +154,7 @@ class OrganisationActivationGuardIntegrationTest extends AbstractIntegrationTest
         String singleHomeStaffUsername = "guard-single-staff" + suffix;
         User singleHomeStaff = new User();
         singleHomeStaff.setUsername(singleHomeStaffUsername);
+        singleHomeStaff.setEmail(singleHomeStaffUsername + "@example.test");
         singleHomeStaff.setPassword(passwordEncoder.encode("password123"));
         singleHomeStaff.setFirstName("Guard");
         singleHomeStaff.setLastName("Single");

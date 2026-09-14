@@ -83,6 +83,7 @@ class PasswordIsItsOwnActionTest extends AbstractIntegrationTest {
         orgAdminUsername = "t277-orgadmin" + suffix;
         User admin = new User();
         admin.setUsername(orgAdminUsername);
+        admin.setEmail(orgAdminUsername + "@example.test");
         admin.setLastName("Org Admin");
         admin.setRoles(new HashSet<>(Set.of(Role.ORG_ADMIN)));
         admin.setOrganisation(ours);
@@ -224,6 +225,7 @@ class PasswordIsItsOwnActionTest extends AbstractIntegrationTest {
     private User saveStaff(String username, Home home) {
         User user = new User();
         user.setUsername(username);
+        user.setEmail(username + "@example.test");
         user.setLastName("Target");
         user.setRoles(new HashSet<>(Set.of(Role.HOME_STAFF)));
         user.setHomes(new HashSet<>(Set.of(home)));

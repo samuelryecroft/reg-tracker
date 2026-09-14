@@ -49,6 +49,7 @@ class HomeStaffRequestUiTest extends AbstractUiTest {
 
         User staff = new User();
         staff.setUsername("ui-home-staff");
+        staff.setEmail("ui-home-staff" + "@example.test");
         staff.setPassword(passwordEncoder.encode(PASSWORD));
         staff.setLastName("UI Test Staff");
         staff.setRoles(Set.of(Role.HOME_STAFF));

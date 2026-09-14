@@ -229,6 +229,7 @@ class CaseCardIntegrationTest extends AbstractIntegrationTest {
     private User newUser(String username, Role role, Home userHome, Organisation organisation) {
         User user = new User();
         user.setUsername(username);
+        user.setEmail(username + "@example.test");
         user.setPassword(passwordEncoder.encode(PASSWORD));
         user.setLastName(username);
         user.setRoles(Set.of(role));

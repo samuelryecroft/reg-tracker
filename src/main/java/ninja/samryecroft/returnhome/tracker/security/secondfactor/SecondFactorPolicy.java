@@ -88,6 +88,13 @@ public class SecondFactorPolicy {
      * something else is one nobody decided to open. This narrows it to the bootstrap admin, which is
      * the account D2 was actually about, and both enabling and using that path are already audited.
      *
+     * <p><b>T344: this asks a COLUMN, not a name.</b> It used to compare {@code app.admin.username} to
+     * this row's username. {@code ADMIN_SEED_USERNAME} was never set in production, so that property
+     * resolved to its default - the literal {@code admin} - and <b>any account named {@code admin}
+     * was permanently exempt from the second factor</b>. Nobody decided that; it was the default
+     * value of an environment variable nobody set (T341). A flag cannot be collided with by naming,
+     * and it survives usernames ceasing to be login identifiers at all.
+     *
      * <p><b>T339: this no longer consults {@code app.auth.break-glass.enabled}, and that removal is
      * the fix for a real lockout.</b> It used to open with {@code if (!breakGlassEnabled) return
      * false;}. Production ships that flag false, so when the factor went live the exemption
@@ -115,9 +122,6 @@ public class SecondFactorPolicy {
      * entangled, they only shared a property name.
      */
     private boolean isEmergencyExempt(User user) {
-        String bootstrapAdmin = appProperties.getAdmin().getUsername();
-        return bootstrapAdmin != null
-                && !bootstrapAdmin.isBlank()
-                && bootstrapAdmin.equalsIgnoreCase(user.getUsername());
+        return user.isBreakGlass();
     }
 }

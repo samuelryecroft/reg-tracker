@@ -176,6 +176,7 @@ class UserServiceVisibilityTest {
     private AppUserPrincipal principal(Set<Role> roles, Organisation organisation) {
         User user = new User();
         user.setUsername("t130");
+        user.setEmail("t130" + "@example.test");
         user.setRoles(new java.util.HashSet<>(roles));
         user.setOrganisation(organisation);
         return new AppUserPrincipal(user);

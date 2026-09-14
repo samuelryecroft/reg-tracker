@@ -55,6 +55,7 @@ class DashboardCssRenderingUiTest extends AbstractUiTest {
 
         User orgAdmin = new User();
         orgAdmin.setUsername("css-render-orgadmin");
+        orgAdmin.setEmail("css-render-orgadmin" + "@example.test");
         orgAdmin.setPassword(passwordEncoder.encode(PASSWORD));
         orgAdmin.setLastName("CSS Render Test Admin");
         orgAdmin.setRoles(Set.of(Role.ORG_ADMIN));

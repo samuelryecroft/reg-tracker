@@ -113,6 +113,7 @@ class SecondFactorGateIntegrationTest extends AbstractIntegrationTest {
     private User account(String email) {
         User user = new User();
         user.setUsername("t322" + suffix);
+        user.setEmail("t322" + suffix + "@example.test");
         user.setFirstName("Two");
         user.setLastName("Factor");
         user.setEmail(email);
@@ -125,7 +126,7 @@ class SecondFactorGateIntegrationTest extends AbstractIntegrationTest {
     /** Signs in with the correct password and returns the resulting half-finished session. */
     private MockHttpSession passwordStage(User user) throws Exception {
         MvcResult result = mockMvc.perform(post("/login").with(csrf())
-                        .param("username", user.getUsername())
+                        .param("username", user.getEmail())
                         .param("password", PASSWORD))
                 .andReturn();
         return (MockHttpSession) result.getRequest().getSession(false);

@@ -98,6 +98,7 @@ class ChildPageHidesRecordAccessTest extends AbstractIntegrationTest {
         staffUsername = "a5-staff" + suffix;
         staff = new User();
         staff.setUsername(staffUsername);
+        staff.setEmail(staffUsername + "@example.test");
         staff.setLastName("Staff");
         staff.setRoles(new HashSet<>(Set.of(Role.HOME_STAFF)));
         staff.setHomes(new HashSet<>(Set.of(home)));

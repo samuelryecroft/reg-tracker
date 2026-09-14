@@ -59,6 +59,7 @@ class CareProviderAdminCanFindTheViewerTheyCreatedTest extends AbstractIntegrati
 
         User admin = new User();
         admin.setUsername("t281-orgadmin" + suffix);
+        admin.setEmail("t281-orgadmin" + suffix + "@example.test");
         admin.setLastName("Org Admin");
         admin.setRoles(new HashSet<>(Set.of(Role.ORG_ADMIN)));
         admin.setOrganisation(ours);
@@ -116,6 +117,7 @@ class CareProviderAdminCanFindTheViewerTheyCreatedTest extends AbstractIntegrati
     void aRoleTheyCannotAssignIsStillNotTheirsToAdminister() {
         User coordinator = new User();
         coordinator.setUsername("t281-coordinator" + suffix);
+        coordinator.setEmail("t281-coordinator" + suffix + "@example.test");
         coordinator.setLastName("Coordinator");
         coordinator.setRoles(new HashSet<>(Set.of(Role.COORDINATOR)));
         coordinator.setOrganisation(ourHome.getOrganisation());
@@ -140,6 +142,7 @@ class CareProviderAdminCanFindTheViewerTheyCreatedTest extends AbstractIntegrati
     private User viewerIn(Home home, String username) {
         User viewer = new User();
         viewer.setUsername(username);
+        viewer.setEmail(username + "@example.test");
         viewer.setLastName("Viewer");
         viewer.setRoles(new HashSet<>(Set.of(Role.VIEWER)));
         viewer.setOrganisation(home.getOrganisation());
@@ -159,6 +162,7 @@ class CareProviderAdminCanFindTheViewerTheyCreatedTest extends AbstractIntegrati
     private CreateUserForm form(String username, Role role, Home home) {
         CreateUserForm form = new CreateUserForm();
         form.setUsername(username);
+        form.setEmail(username + "@example.test");
         form.setLastName("Created");
         form.setRoles(new HashSet<>(Set.of(role)));
         form.setHomeIds(new HashSet<>(Set.of(home.getId())));

@@ -119,6 +119,7 @@ class TheEmergencyExemptionDoesNotDependOnBreakGlassBeingOnTest extends Abstract
     void everyoneElseIsStillRefusedInTheSameContext() throws Exception {
         User ordinary = new User();
         ordinary.setUsername("ordinary-" + System.nanoTime());
+        ordinary.setEmail("ordinary-" + System.nanoTime() + "@example.test");
         ordinary.setLastName("Ordinary");
         ordinary.setPassword(passwordEncoder.encode(ORDINARY_PASSWORD));
         ordinary.setEmail("ordinary@example.test");
@@ -126,7 +127,7 @@ class TheEmergencyExemptionDoesNotDependOnBreakGlassBeingOnTest extends Abstract
         ordinary.setRoles(new HashSet<>(Set.of(Role.ADMIN)));
         userRepository.save(ordinary);
 
-        MvcResult landed = signIn(ordinary.getUsername(), ORDINARY_PASSWORD);
+        MvcResult landed = signIn(ordinary.getEmail(), ORDINARY_PASSWORD);
 
         assertThat(landed.getResponse().getRedirectedUrl())
                 .as("the factor must genuinely be ON in this context - otherwise the admin's "

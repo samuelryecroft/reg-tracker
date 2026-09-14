@@ -64,6 +64,7 @@ class ThemeConsequenceIntegrationTest extends AbstractIntegrationTest {
         String username = "t3a-orgadmin" + suffix;
         User user = new User();
         user.setUsername(username);
+        user.setEmail(username + "@example.test");
         user.setLastName("Admin");
         user.setRoles(new HashSet<>(Set.of(Role.ORG_ADMIN)));
         user.setOrganisation(supplier);
@@ -129,6 +130,7 @@ class ThemeConsequenceIntegrationTest extends AbstractIntegrationTest {
         String username = "t3a-platform-admin" + suffix;
         User admin = new User();
         admin.setUsername(username);
+        admin.setEmail(username + "@example.test");
         admin.setLastName("Admin");
         admin.setRoles(new HashSet<>(Set.of(Role.ADMIN)));
         admin.setHomes(new HashSet<>());

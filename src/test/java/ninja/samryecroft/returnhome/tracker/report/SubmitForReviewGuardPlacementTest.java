@@ -162,6 +162,7 @@ class SubmitForReviewGuardPlacementTest {
     private User plainUser(String username) {
         User user = new User();
         user.setUsername(username);
+        user.setEmail(username + "@example.test");
         user.setLastName(username);
         user.setRoles(Set.of(Role.VISITOR));
         user.setEnabled(true);

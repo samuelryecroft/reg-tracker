@@ -92,6 +92,7 @@ class NameRevealFlowIntegrationTest extends AbstractIntegrationTest {
         username = "reveal-test" + suffix;
         User staff = new User();
         staff.setUsername(username);
+        staff.setEmail(username + "@example.test");
         staff.setPassword(passwordEncoder.encode(PASSWORD));
         staff.setLastName("Reveal Tester");
         staff.setRoles(Set.of(Role.HOME_STAFF));
@@ -147,7 +148,7 @@ class NameRevealFlowIntegrationTest extends AbstractIntegrationTest {
 
         List<AuditEvent> events = auditEventRepository.findByEventTypeOrderByOccurredAtDesc(AuditEventType.NAMES_REVEALED);
         AuditEvent event = events.stream()
-                .filter(e -> username.equals(e.getActorUsernameAtTime()))
+                .filter(e -> (username + "@example.test").equals(e.getActorIdentifierAtTime()))
                 .findFirst()
                 .orElseThrow(() -> new AssertionError("No NAMES_REVEALED event for " + username));
 

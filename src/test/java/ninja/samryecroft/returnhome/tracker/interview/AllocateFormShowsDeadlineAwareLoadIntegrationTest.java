@@ -229,6 +229,7 @@ class AllocateFormShowsDeadlineAwareLoadIntegrationTest extends AbstractIntegrat
     private User saveUser(String username, Set<Role> roles, Organisation organisation, Home userHome) {
         User user = new User();
         user.setUsername(username);
+        user.setEmail(username + "@example.test");
         user.setLastName(username);
         user.setRoles(new HashSet<>(roles));
         user.setOrganisation(organisation == null ? seededSupplier() : organisation);

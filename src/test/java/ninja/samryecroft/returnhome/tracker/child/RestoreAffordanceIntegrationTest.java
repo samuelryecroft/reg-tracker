@@ -89,6 +89,7 @@ class RestoreAffordanceIntegrationTest extends AbstractIntegrationTest {
         staffUsername = "t328-staff" + suffix;
         User staff = new User();
         staff.setUsername(staffUsername);
+        staff.setEmail(staffUsername + "@example.test");
         staff.setLastName("Staff");
         staff.setRoles(new HashSet<>(Set.of(Role.HOME_STAFF)));
         staff.setHomes(new HashSet<>(Set.of(home)));
@@ -100,6 +101,7 @@ class RestoreAffordanceIntegrationTest extends AbstractIntegrationTest {
         orgAdminUsername = "t328-org-admin" + suffix;
         User orgAdmin = new User();
         orgAdmin.setUsername(orgAdminUsername);
+        orgAdmin.setEmail(orgAdminUsername + "@example.test");
         orgAdmin.setLastName("Manager");
         orgAdmin.setRoles(new HashSet<>(Set.of(Role.ORG_ADMIN)));
         orgAdmin.setOrganisation(careProvider);

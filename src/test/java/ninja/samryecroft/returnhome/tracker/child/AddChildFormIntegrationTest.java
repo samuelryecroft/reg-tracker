@@ -65,6 +65,7 @@ class AddChildFormIntegrationTest extends AbstractIntegrationTest {
         singleHomeUsername = "t5d-staff" + suffix;
         User staff = new User();
         staff.setUsername(singleHomeUsername);
+        staff.setEmail(singleHomeUsername + "@example.test");
         staff.setLastName("Staff");
         staff.setRoles(new HashSet<>(Set.of(Role.HOME_STAFF)));
         staff.setHomes(new HashSet<>(Set.of(home)));

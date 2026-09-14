@@ -106,6 +106,7 @@ class AuditHistoryIntegrationTest extends AbstractIntegrationTest {
     private User newUser(String username, Role role, Home userHome, Organisation organisation) {
         User user = new User();
         user.setUsername(username);
+        user.setEmail(username + "@example.test");
         user.setPassword(passwordEncoder.encode(PASSWORD));
         // Deliberately shares no substring with the username: interview/detail.html legitimately
         // shows the requester's full name in its own "Requested by" field (unrelated to History),
@@ -214,7 +215,7 @@ class AuditHistoryIntegrationTest extends AbstractIntegrationTest {
                 .doesNotContain("hist-visitor" + suffix)
                 .doesNotContain("hist-reviewer" + suffix);
         String generatedFilename = auditEventRepository.findByEventTypeOrderByOccurredAtDesc(AuditEventType.DOCX_GENERATED)
-                .stream().filter(e -> e.getActorUsernameAtTime().endsWith(suffix)).findFirst()
+                .stream().filter(e -> e.getActorIdentifierAtTime().contains(suffix)).findFirst()
                 .orElseThrow().getMetadata();
         assertThat(generatedFilename).contains("filename=");
         assertThat(historySection).doesNotContain(generatedFilename.replaceAll(".*filename=", "").split(";")[0]);
@@ -261,7 +262,7 @@ class AuditHistoryIntegrationTest extends AbstractIntegrationTest {
         // Seeded users in @BeforeEach are saved directly via the repository, which never publishes
         // USER_CREATED - go through the real endpoint so this account actually has creation history.
         mockMvc.perform(post("/admin/users").with(asUser("hist-admin" + suffix)).with(csrf())
-                        .param("username", "hist-newvisitor" + suffix)
+                        .param("username", "hist-newvisitor" + suffix + "@example.test")
                         .param("password", "CorrectHorse123!")
                         .param("firstName", "History")
                         .param("lastName", "New Visitor")
@@ -273,7 +274,7 @@ class AuditHistoryIntegrationTest extends AbstractIntegrationTest {
 
         // Prove exclusion isn't just "there happens to be no login event": actually sign in first.
         mockMvc.perform(post("/login").with(csrf())
-                        .param("username", "hist-newvisitor" + suffix)
+                        .param("username", "hist-newvisitor" + suffix + "@example.test")
                         .param("password", "CorrectHorse123!"))
                 .andExpect(status().is3xxRedirection());
 
