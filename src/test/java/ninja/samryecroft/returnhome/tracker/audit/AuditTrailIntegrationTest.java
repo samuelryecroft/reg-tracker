@@ -321,7 +321,7 @@ class AuditTrailIntegrationTest extends AbstractIntegrationTest {
         String newUsername = "audit-created" + suffix;
 
         mockMvc.perform(post("/admin/users").with(asUser("audit-orgadmin" + suffix)).with(csrf())
-                        .param("username", newUsername + "@example.test")
+                        .param("username", newUsername)
                         .param("password", PASSWORD)
                         .param("firstName", "Created")
                         .param("lastName", "By Audit Test")

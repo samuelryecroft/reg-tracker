@@ -100,18 +100,16 @@ class OrganisationActivationGuardIntegrationTest extends AbstractIntegrationTest
 
         User staff = new User();
         staff.setUsername("guard-staff" + suffix);
-        staff.setEmail("guard-staff" + suffix + "@example.test");
         staff.setPassword(passwordEncoder.encode("password123"));
         staff.setFirstName("Guard");
         staff.setLastName("Staff");
-        staff.setEmail("guard" + suffix + "@example.test");
+        staff.setEmail("guard-staff" + suffix + "@example.test");
         staff.setRoles(new HashSet<>(Set.of(Role.HOME_STAFF)));
         staff.setHomes(new HashSet<>(Set.of(pendingHome, activeHome)));
         userRepository.save(staff);
 
         User admin = new User();
         admin.setUsername("guard-admin" + suffix);
-        admin.setEmail("guard-admin" + suffix + "@example.test");
         admin.setPassword(passwordEncoder.encode("password123"));
         admin.setFirstName("Guard");
         admin.setLastName("Admin");
@@ -156,7 +154,6 @@ class OrganisationActivationGuardIntegrationTest extends AbstractIntegrationTest
         String singleHomeStaffUsername = "guard-single-staff" + suffix;
         User singleHomeStaff = new User();
         singleHomeStaff.setUsername(singleHomeStaffUsername);
-        singleHomeStaff.setEmail(singleHomeStaffUsername + "@example.test");
         singleHomeStaff.setPassword(passwordEncoder.encode("password123"));
         singleHomeStaff.setFirstName("Guard");
         singleHomeStaff.setLastName("Single");

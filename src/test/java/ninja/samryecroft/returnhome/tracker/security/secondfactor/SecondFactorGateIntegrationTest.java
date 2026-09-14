@@ -116,7 +116,6 @@ class SecondFactorGateIntegrationTest extends AbstractIntegrationTest {
     private User account(String email) {
         User user = new User();
         user.setUsername("t322" + suffix);
-        user.setEmail("t322" + suffix + "@example.test");
         user.setFirstName("Two");
         user.setLastName("Factor");
         user.setEmail(email);

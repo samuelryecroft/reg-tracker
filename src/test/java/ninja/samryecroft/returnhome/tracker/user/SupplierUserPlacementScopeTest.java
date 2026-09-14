@@ -65,11 +65,10 @@ class SupplierUserPlacementScopeTest extends AbstractIntegrationTest {
 
         User supplierAdmin = new User();
         supplierAdmin.setUsername("t249-supplier-admin" + suffix);
-        supplierAdmin.setEmail("t249-supplier-admin" + suffix + "@example.test");
         supplierAdmin.setPassword(passwordEncoder.encode("password123"));
         supplierAdmin.setFirstName("Supplier");
         supplierAdmin.setLastName("Admin");
-        supplierAdmin.setEmail("t249" + suffix + "@example.test");
+        supplierAdmin.setEmail("t249-supplier-admin" + suffix + "@example.test");
         supplierAdmin.setRoles(new HashSet<>(Set.of(Role.ORG_ADMIN)));
         supplierAdmin.setOrganisation(seededSupplier());
         userRepository.save(supplierAdmin);
@@ -132,7 +131,6 @@ class SupplierUserPlacementScopeTest extends AbstractIntegrationTest {
     private CreateUserForm formFor(String username, Long organisationId) {
         CreateUserForm form = new CreateUserForm();
         form.setUsername(username);
-        form.setEmail(username + "@example.test");
         form.setPassword("password123");
         form.setFirstName("New");
         form.setLastName("User");

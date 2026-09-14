@@ -264,7 +264,7 @@ class AuditHistoryIntegrationTest extends AbstractIntegrationTest {
         // Seeded users in @BeforeEach are saved directly via the repository, which never publishes
         // USER_CREATED - go through the real endpoint so this account actually has creation history.
         mockMvc.perform(post("/admin/users").with(asUser("hist-admin" + suffix)).with(csrf())
-                        .param("username", "hist-newvisitor" + suffix + "@example.test")
+                        .param("username", "hist-newvisitor" + suffix)
                         .param("password", "CorrectHorse123!")
                         .param("firstName", "History")
                         .param("lastName", "New Visitor")
@@ -276,7 +276,10 @@ class AuditHistoryIntegrationTest extends AbstractIntegrationTest {
 
         // Prove exclusion isn't just "there happens to be no login event": actually sign in first.
         mockMvc.perform(post("/login").with(csrf())
-                        .param("username", "hist-newvisitor" + suffix + "@example.test")
+                        // The address the account was CREATED with, not one derived from its
+                        // username - a failed sign-in also redirects, so getting this wrong would
+                        // leave the test asserting an absence it never actually created.
+                        .param("username", "history.new.visitor@example.test")
                         .param("password", "CorrectHorse123!"))
                 .andExpect(status().is3xxRedirection());
 

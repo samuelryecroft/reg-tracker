@@ -249,7 +249,6 @@ class MultiHomeScopingIntegrationTest extends AbstractIntegrationTest {
 
         CreateUserForm form = new CreateUserForm();
         form.setUsername("mh-split" + suffix);
-        form.setEmail("mh-split" + suffix + "@example.test");
         form.setFirstName("Split");
         form.setLastName("Across Providers");
         form.setEmail("split.across.providers@example.test");

@@ -39,7 +39,6 @@ class PasswordPolicyIsWiredToTheFormsTest extends AbstractIntegrationTest {
     void anOverLongPasswordOnCreateIsAFieldErrorRatherThanAnEncoderCrash() {
         CreateUserForm form = new CreateUserForm();
         form.setUsername("newstarter");
-        form.setEmail("newstarter" + "@example.test");
         form.setEmail("new.starter@example.org");
         form.setPassword(OVER_THE_ENCODER_CEILING);
 
@@ -61,7 +60,6 @@ class PasswordPolicyIsWiredToTheFormsTest extends AbstractIntegrationTest {
     void anAcceptablePasswordRaisesNoPasswordViolation() {
         CreateUserForm form = new CreateUserForm();
         form.setUsername("newstarter");
-        form.setEmail("newstarter" + "@example.test");
         form.setEmail("new.starter@example.org");
         form.setPassword("winter kettle marble lamp");
 
