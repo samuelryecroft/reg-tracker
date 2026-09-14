@@ -1,6 +1,7 @@
 package ninja.samryecroft.returnhome.tracker.security.secondfactor;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -107,6 +108,8 @@ class SecondFactorGateIntegrationTest extends AbstractIntegrationTest {
     private CapturingSender sender;
     @Autowired
     private JdbcTemplate jdbcTemplate;
+    @Autowired
+    private SecondFactorService secondFactorService;
 
     private final String suffix = "-" + System.nanoTime();
 
@@ -233,23 +236,39 @@ class SecondFactorGateIntegrationTest extends AbstractIntegrationTest {
     }
 
     /**
-     * An account with no address must be REFUSED, never admitted.
+     * An account with no address must be REFUSED, never admitted - and as of T344 it cannot exist at
+     * all.
      *
      * <p>This is the bypass the feature would otherwise contain: a missing address is the one
      * condition under which "send a code" cannot happen, and the natural implementation skips the
      * step it cannot perform. That turns the absence of an email address into a way of switching the
      * second factor off for a single account.
+     *
+     * <p><b>The guarantee moved down a layer rather than going away.</b> This test used to create
+     * such an account and prove it was refused at sign-in. V25's
+     * {@code CHECK (is_break_glass OR email IS NOT NULL)} now makes the row itself impossible, so the
+     * case can no longer be constructed - which is a stronger guarantee than refusing it afterwards,
+     * and is asserted as such below.
+     *
+     * <p>The refusal in {@code SecondFactorSuccessHandler} STAYS, and the second assertion is why: a
+     * constraint is a different layer that a later migration could drop, and the handler is what
+     * keeps the property true if it ever is. Asserted against an unsaved user, because the database
+     * will no longer let one be stored.
      */
     @Test
-    void anAccountWithNoAddressIsRefusedRatherThanAdmitted() throws Exception {
-        User user = account(null);
-        MockHttpSession session = passwordStage(user);
+    void anAccountWithNoAddressCannotExist_andWouldStillBeRefusedIfItDid() {
+        assertThatThrownBy(() -> account(null))
+                .as("the database must refuse to hold an ordinary account with no address - a row "
+                        + "that cannot exist cannot be a way to switch the factor off")
+                .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
 
-        MvcResult after = mockMvc.perform(get("/").session(session)).andReturn();
-        assertThat(after.getResponse().getStatus())
-                .as("no address must mean no sign-in, not a skipped factor")
-                .isEqualTo(302);
-        assertThat(after.getResponse().getRedirectedUrl()).contains("/login");
+        User addressless = new User();
+        addressless.setUsername("t322-unsaved" + suffix);
+        addressless.setLastName("Factor");
+        assertThat(secondFactorService.canChallenge(addressless))
+                .as("and the sign-in path would still refuse it, which is what keeps this true if "
+                        + "the constraint is ever dropped")
+                .isFalse();
     }
 
     /**

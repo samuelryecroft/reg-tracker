@@ -54,7 +54,15 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 @AutoConfigureMockMvc
 class AColleagueCannotRedirectYourSignInCodesTest extends AbstractIntegrationTest {
 
-    private static final String THEIR_REAL_ADDRESS = "real.person@example.test";
+    /**
+     * The colleague's real address, and it is per-test on purpose.
+     *
+     * <p>It used to be a shared constant applied by {@code saveUser} to EVERY user it created, which
+     * meant three accounts in one test held one address. That was invisible until V24 made email
+     * unique - the constraint caught, in the fixtures, exactly the defect it exists to prevent in
+     * production.
+     */
+    private String theirRealAddress;
     private static final String THE_ATTACKERS_INBOX = "redirected@attacker.test";
 
     @Autowired
@@ -82,6 +90,7 @@ class AColleagueCannotRedirectYourSignInCodesTest extends AbstractIntegrationTes
     @BeforeEach
     void seedAManagerAndAColleagueTheyAdminister() {
         suffix = "-" + System.nanoTime();
+        theirRealAddress = "real.person" + suffix + "@example.test";
         careProvider = new Organisation();
         careProvider.setName("T323 Provider" + suffix);
         careProvider.setType(OrgType.CARE_PROVIDER);
@@ -98,6 +107,10 @@ class AColleagueCannotRedirectYourSignInCodesTest extends AbstractIntegrationTes
         saveUser(platformAdminUsername, Set.of(Role.ADMIN), null, null);
 
         colleague = saveUser("t323-colleague" + suffix, Set.of(Role.HOME_STAFF), null, home);
+        // Only the colleague holds the address under test - they are the one whose sign-in codes a
+        // manager must not be able to redirect.
+        colleague.setEmail(theirRealAddress);
+        colleague = userRepository.saveAndFlush(colleague);
     }
 
     /**
@@ -123,7 +136,7 @@ class AColleagueCannotRedirectYourSignInCodesTest extends AbstractIntegrationTes
         editAs(managerUsername, "Corrected", THE_ATTACKERS_INBOX)
                 .andExpect(status().is3xxRedirection());
 
-        assertThat(reload().getEmail()).isEqualTo(THEIR_REAL_ADDRESS);
+        assertThat(reload().getEmail()).isEqualTo(theirRealAddress);
     }
 
     /**
@@ -141,7 +154,7 @@ class AColleagueCannotRedirectYourSignInCodesTest extends AbstractIntegrationTes
                         .param("email", THE_ATTACKERS_INBOX))
                 .andExpect(status().isForbidden());
 
-        assertThat(reload().getEmail()).isEqualTo(THEIR_REAL_ADDRESS);
+        assertThat(reload().getEmail()).isEqualTo(theirRealAddress);
     }
 
     /** The service says the same thing on its own, so the rule is not a property of the routing. */
@@ -192,7 +205,7 @@ class AColleagueCannotRedirectYourSignInCodesTest extends AbstractIntegrationTes
                 .satisfies(event -> {
                     assertThat(event.getActorIdentifierAtTime()).isEqualTo(platformAdminUsername + "@example.test");
                     assertThat(String.valueOf(event.getMetadata()))
-                            .doesNotContain(THEIR_REAL_ADDRESS)
+                            .doesNotContain(theirRealAddress)
                             .doesNotContain("corrected.address@example.test");
                 });
     }
@@ -206,7 +219,7 @@ class AColleagueCannotRedirectYourSignInCodesTest extends AbstractIntegrationTes
         assertThat(editPageAs(managerUsername))
                 .as("and the manager still sees the address itself - visible, not editable")
                 .doesNotContain(href)
-                .contains(THEIR_REAL_ADDRESS);
+                .contains(theirRealAddress);
     }
 
     private String editPageAs(String username) throws Exception {
@@ -241,7 +254,6 @@ class AColleagueCannotRedirectYourSignInCodesTest extends AbstractIntegrationTes
         user.setEmail(username + "@example.test");
         user.setFirstName("Real");
         user.setLastName("Person");
-        user.setEmail(THEIR_REAL_ADDRESS);
         user.setRoles(new HashSet<>(roles));
         user.setOrganisation(organisation);
         user.setHomes(theirHome == null ? new HashSet<>() : new HashSet<>(Set.of(theirHome)));
