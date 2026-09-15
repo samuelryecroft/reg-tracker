@@ -77,6 +77,22 @@ public enum AuditEventType {
      */
     PASSWORD_RESET_REQUESTED,
 
+    /**
+     * A self-service reset was APPLIED (T353e), in the same transaction that wrote the password.
+     * Actor is the account holder, not an administrator - which is why this is its own type and must
+     * read differently from {@link #USER_PASSWORD_RESET} ("Password set by an administrator"): "who
+     * changed this password" is exactly the question an investigator asks.
+     */
+    PASSWORD_RESET_COMPLETED,
+
+    /**
+     * A self-service reset attempt FAILED (T353e): an expired or already-consumed (replayed) token,
+     * or a wrong/burned reset code. Only written when a user is resolvable (an expired/consumed token
+     * still carries its user id; a token that never existed writes nothing, for the same
+     * append-only/enumeration reason as {@link #PASSWORD_RESET_REQUESTED}).
+     */
+    PASSWORD_RESET_FAILED,
+
     INTERVIEW_REQUEST_CREATED,
     INTERVIEW_REQUEST_ALLOCATED,
     INTERVIEW_REQUEST_SCHEDULED,

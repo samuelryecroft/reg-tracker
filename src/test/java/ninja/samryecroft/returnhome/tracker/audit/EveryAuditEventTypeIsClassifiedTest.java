@@ -62,6 +62,10 @@ class EveryAuditEventTypeIsClassifiedTest {
             // ever recorded on a real match, and "a reset was requested for your account" is exactly
             // what the account owner and an investigator want to see. It is not a working-hours signal.
             AuditEventType.PASSWORD_RESET_REQUESTED,
+            // T353e. Both SHOWN: a completed reset and a failed reset attempt are account-security
+            // events on the account, exactly what its owner and an investigator want to see.
+            AuditEventType.PASSWORD_RESET_COMPLETED,
+            AuditEventType.PASSWORD_RESET_FAILED,
 
             // Interview request lifecycle.
             AuditEventType.INTERVIEW_REQUEST_CREATED,
