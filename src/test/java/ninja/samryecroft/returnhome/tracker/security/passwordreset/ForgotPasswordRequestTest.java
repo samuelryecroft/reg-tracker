@@ -28,12 +28,21 @@ import org.springframework.core.task.SyncTaskExecutor;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 
 /**
  * T353d: {@code /forgot-password} mints and mails only on a real match, and is indistinguishable
  * either way. These are the enumeration-defence invariants stated as behaviour, not prose.
  */
-@SpringBootTest(properties = "app.security.password-reset.max-requests-per-address=3")
+@SpringBootTest(properties = {
+        "app.security.password-reset.max-requests-per-address=3",
+        // The throttle is an in-memory singleton shared across this class's methods, all posting
+        // from 127.0.0.1 - a low per-IP cap would make later methods fail on accumulated count.
+        // Neutralised here so per-address (which each method exercises with its own unique email)
+        // is the only cap in play. The per-IP cap runs the same record() path as per-address, so a
+        // separate assertion of it here would only re-test that path.
+        "app.security.password-reset.max-requests-per-ip=100000"
+})
 @AutoConfigureMockMvc
 class ForgotPasswordRequestTest extends AbstractIntegrationTest {
 
@@ -176,5 +185,45 @@ class ForgotPasswordRequestTest extends AbstractIntegrationTest {
 
         assertThat(afterCap).isEqualTo(3);
         assertThat(afterFourth).as("a request over the cap mints no token").isEqualTo(3);
+    }
+
+    @Test
+    void everyOutcomeRendersTheByteIdenticalNeutralResponse() throws Exception {
+        // god's ask (and what Oscar verifies MEASURED on T353i): the neutral response must be
+        // IDENTICAL across every branch, asserted by comparing the actual bodies and statuses - not
+        // five tests that each happen to expect the same literal, which agree only by coincidence.
+        User enabled = account("identical-match", true, false);
+        User disabled = account("identical-disabled", false, false);
+        User breakGlass = account("identical-bg", true, true);
+        String throttledEmail = "identical-throttled" + suffix + "@example.test";
+
+        List<int[]> statuses = new ArrayList<>();
+        List<String> bodies = new ArrayList<>();
+
+        // Trip the address cap (3) so the fifth capture is a THROTTLED response.
+        for (int i = 0; i < 3; i++) {
+            mockMvc.perform(post("/forgot-password").with(csrf()).param("email", throttledEmail));
+        }
+
+        String[] emails = {
+                enabled.getEmail(),                                   // match
+                "nobody" + suffix + "@example.test",                  // no-match
+                disabled.getEmail(),                                  // disabled
+                breakGlass.getEmail(),                                // break-glass
+                throttledEmail                                        // throttled (over the cap)
+        };
+        for (String email : emails) {
+            MvcResult result = mockMvc.perform(post("/forgot-password").with(csrf()).param("email", email))
+                    .andReturn();
+            statuses.add(new int[]{result.getResponse().getStatus()});
+            bodies.add(result.getResponse().getContentAsString());
+        }
+
+        String firstBody = bodies.get(0);
+        int firstStatus = statuses.get(0)[0];
+        assertThat(bodies)
+                .as("the neutral page must be byte-identical across match/no-match/disabled/break-glass/throttled")
+                .allSatisfy(b -> assertThat(b).isEqualTo(firstBody));
+        assertThat(statuses).allSatisfy(st -> assertThat(st[0]).isEqualTo(firstStatus));
     }
 }
