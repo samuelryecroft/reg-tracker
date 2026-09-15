@@ -67,6 +67,16 @@ public enum AuditEventType {
      */
     USER_EMAIL_CHANGED,
 
+    /**
+     * A self-service password reset was REQUESTED (T353d), and written ONLY when a real, enabled,
+     * non-break-glass account matched the submitted address. A no-match writes nothing: {@code
+     * /forgot-password} is unauthenticated and this table is append-only and cannot be pruned, so a
+     * row keyed on an unmatched address would be both the enumeration oracle the response refuses to
+     * be and an unbounded write an unauthenticated stranger could make into a table nothing deletes
+     * from. Distinct from {@link #PASSWORD_RESET_COMPLETED}: a request is not a change.
+     */
+    PASSWORD_RESET_REQUESTED,
+
     INTERVIEW_REQUEST_CREATED,
     INTERVIEW_REQUEST_ALLOCATED,
     INTERVIEW_REQUEST_SCHEDULED,

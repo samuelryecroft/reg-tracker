@@ -51,7 +51,7 @@ public class SecurityConfig {
                         // the second-factor step is that it happens while the session is NOT
                         // authenticated. It protects itself: the page is inert without the pending
                         // attribute that only a correct password can put in the session.
-                        .requestMatchers("/login", "/login/verify", "/css/**", "/js/**", "/fonts/**", "/icons/**", "/webjars/**", "/error").permitAll()
+                        .requestMatchers("/login", "/login/verify", "/forgot-password", "/css/**", "/js/**", "/fonts/**", "/icons/**", "/webjars/**", "/error").permitAll()
                         // WS-C: the health endpoint (and its liveness/readiness groups) is public so
                         // App Service probes can reach it unauthenticated. show-details=when-authorized
                         // means anonymous callers still only see {"status":"UP"}. Every OTHER actuator

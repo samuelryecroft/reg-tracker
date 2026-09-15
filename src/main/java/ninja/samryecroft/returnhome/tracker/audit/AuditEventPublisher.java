@@ -124,6 +124,21 @@ public class AuditEventPublisher {
                 .build());
     }
 
+    /**
+     * A self-service reset was requested for a REAL account (T353d). The actor is the target user,
+     * not an authenticated principal - {@code /forgot-password} is unauthenticated, and the account
+     * has been resolved by address by the time this is called. Called ONLY on a match: a no-match
+     * writes no row, because this table is append-only and unauthenticated writes keyed on a
+     * submitted address are the enumeration oracle the neutral response exists to deny.
+     */
+    public void passwordResetRequested(User target) {
+        publish(AuditEventRecord.of(AuditEventType.PASSWORD_RESET_REQUESTED)
+                .actor(target.getId(), target.getUsername(), roleNames(target.getRoles()))
+                .target("User", target.getId())
+                .scope(detachedOrganisationId(target), homeIdByQuery(target.getId()))
+                .build());
+    }
+
     public void mfaSuccess(User user) {
         publish(AuditEventRecord.of(AuditEventType.MFA_SUCCESS)
                 .actor(user.getId(), user.getUsername(), roleNames(user.getRoles()))
