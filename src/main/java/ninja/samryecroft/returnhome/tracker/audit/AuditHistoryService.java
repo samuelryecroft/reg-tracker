@@ -541,9 +541,28 @@ public class AuditHistoryService {
             // from the completed reset, because "who asked" and "who changed it" are different
             // questions an investigator asks. Ruled copy is Creed's (T353h); this is the safety net.
             case PASSWORD_RESET_REQUESTED -> entry("Password reset requested", event, when, role, null, "info");
-            // T353e. "by the account holder" - deliberately NOT "by an administrator" (that is
-            // USER_PASSWORD_RESET): who changed the password is the question. Ruled copy is Creed's.
-            case PASSWORD_RESET_COMPLETED -> entry("Password reset by the account holder", event, when, role, null, "ok");
+            // T353h, RULED. T353e's placeholder read "Password reset by the account holder", and the
+            // instinct behind it was right - this must not read like USER_PASSWORD_RESET, because
+            // "who changed this password" is exactly the question an investigator asks. But the
+            // answer it gave is ONE THE FLOW CANNOT ESTABLISH.
+            //
+            // /reset-password is UNAUTHENTICATED. What the flow proves is control of the mailbox at
+            // two moments; it never proves identity. T353 design §1 says so in terms: both hops are
+            // email, "this does nothing against someone who is in the mailbox". So "by the account
+            // holder" asserts the one fact in dispute whenever this row matters - and the reader of
+            // this trail may be an IRO or a court, for whom a named actor is a finding.
+            //
+            // T295's rule, in a new place: WHERE A SENTENCE WOULD HAVE TO CHANGE FOR ONE OF TWO
+            // READERS, IT IS USUALLY ASSERTING SOMETHING BEYOND THE FACT. The fact is the mechanism,
+            // and the mechanism is what distinguishes this from an admin reset just as cleanly:
+            // "using an emailed link" cannot be confused with "set by an administrator", and it
+            // stays true whoever was holding the mailbox.
+            //
+            // NOT FIXED HERE AND FLAGGED, because it is not copy: AuditEventPublisher records the
+            // TARGET USER AS THE ACTOR on this event, so the actor column names the account holder
+            // even though nobody authenticated. The headline no longer repeats that claim; the
+            // column still makes it. That is a data decision (Oscar/Kevin), not a wording one.
+            case PASSWORD_RESET_COMPLETED -> entry("Password reset using an emailed link", event, when, role, null, "ok");
             case PASSWORD_RESET_FAILED -> entry("Password reset attempt failed", event, when, role, null, "info");
             // T322. Ruled copy even though all four are excluded from the user page above, because
             // titleCase is a safety net and not a substitute for ruled copy (T295 §5): the exclusion

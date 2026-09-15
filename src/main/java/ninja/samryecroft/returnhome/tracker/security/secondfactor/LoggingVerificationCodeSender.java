@@ -70,7 +70,18 @@ public class LoggingVerificationCodeSender implements VerificationCodeSender {
 
     @Override
     public void send(String emailAddress, String code) {
-        log.warn("DEVELOPMENT SECOND FACTOR - code for {} is {}. This sender is never used in a "
-                + "deployed environment; see refuseToRunInADeployedEnvironment().", emailAddress, code);
+        send(emailAddress, code, ChallengePurpose.SIGN_IN);
+    }
+
+    /**
+     * T353h: the flow is logged because sign-in and reset codes can be live at the same moment for
+     * the same person (they are scoped separately by design), and a developer reading two
+     * indistinguishable lines has to guess which code belongs to which form.
+     */
+    @Override
+    public void send(String emailAddress, String code, ChallengePurpose purpose) {
+        log.warn("DEVELOPMENT SECOND FACTOR - {} code for {} is {}. This sender is never used in a "
+                + "deployed environment; see refuseToRunInADeployedEnvironment().",
+                purpose, emailAddress, code);
     }
 }

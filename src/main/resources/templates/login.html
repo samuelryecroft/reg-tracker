@@ -75,6 +75,17 @@
         <svg class="icon" aria-hidden="true"><use th:href="@{/icons/phosphor.svg} + '#ph-warning-circle'"></use></svg>
         <div><strong>Too many sign-in attempts</strong><p>For security, sign-in is paused for a short time.</p></div>
     </div>
+    <!--/* T353h. PasswordResetController's success path is `redirect:/login?reset`, and NOTHING
+         rendered for that parameter - a person finished a four-step reset and landed on a bare
+         sign-in form with no statement that it had worked. The one moment the flow must confirm is
+         the one where the password actually moved, and it was the only moment saying nothing.
+         role="status", matching the logout notice: this is a fact, not an interruption. It says
+         "sign in with your new password" because the reset deliberately does NOT sign anyone in -
+         that would hand a session to whoever holds the mailbox and skip the sign-in code. */-->
+    <div class="banner ok" role="status" th:if="${param.reset != null}">
+        <svg class="icon" aria-hidden="true"><use th:href="@{/icons/phosphor.svg} + '#ph-check-circle'"></use></svg>
+        <div><strong>Your password has been changed</strong><p>Sign in with your new password.</p></div>
+    </div>
     <div class="banner ok" role="status" th:if="${param.logout}">
         <svg class="icon" aria-hidden="true"><use th:href="@{/icons/phosphor.svg} + '#ph-check-circle'"></use></svg>
         <div><strong>You've been signed out</strong></div>
@@ -100,7 +111,21 @@
             <div class="btn-row"><button type="submit" class="btn block">Log in</button></div>
         </form>
     </div>
-    <p class="sub" style="margin-top:16px">Trouble signing in? Contact your organisation's administrator.</p>
+    <!--/* T353h. TWO CHANGES HERE AND THE FIRST IS THE FEATURE'S ONLY ENTRY POINT.
+         Nothing in the application linked to /forgot-password - measured on 539b964: the only two
+         references were the form's own action and the invalid-link page. The whole reset flow was
+         reachable only by typing the URL. A feature the locked-out cannot find is not shipped.
+
+         The second: "Trouble signing in? Contact your organisation's administrator" was the ONLY
+         advice here and it becomes actively wrong the moment this ships - it sends someone who can
+         now help themselves, at 2am, to a colleague who is asleep. It is NOT deleted, because it is
+         still the only route for the cases self-service cannot reach: an account with no email
+         address (`?error=nofactor` above says so itself), an address that is wrong, a locked
+         account. So it is demoted to the second line and given the case it actually covers, rather
+         than standing as the answer to every difficulty. */-->
+    <p class="sub" style="margin-top:16px"><a th:href="@{/forgot-password}">Forgotten your password?</a></p>
+    <p class="hint">If you can't sign in for another reason - or the email address on your account is
+        wrong - your organisation's administrator can help.</p>
 </main>
 </body>
 </html>
