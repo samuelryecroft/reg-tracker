@@ -58,6 +58,10 @@ class EveryAuditEventTypeIsClassifiedTest {
             // question an investigation asks directly, and hiding it on the grounds that it is
             // adjacent to sign-in would remove the answer.
             AuditEventType.USER_EMAIL_CHANGED,
+            // T353d. SHOWN: a reset REQUEST against this account is an account-security action, only
+            // ever recorded on a real match, and "a reset was requested for your account" is exactly
+            // what the account owner and an investigator want to see. It is not a working-hours signal.
+            AuditEventType.PASSWORD_RESET_REQUESTED,
 
             // Interview request lifecycle.
             AuditEventType.INTERVIEW_REQUEST_CREATED,

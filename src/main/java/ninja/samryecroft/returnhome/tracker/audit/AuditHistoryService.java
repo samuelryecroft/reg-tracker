@@ -536,6 +536,11 @@ public class AuditHistoryService {
             // T277. Its own row because it is its own action - and "Password set" rather than
             // "Password changed", because the person whose account it is did not change anything.
             case USER_PASSWORD_RESET -> entry("Password set by an administrator", event, when, role, null, "info");
+            // T353d. "Requested", not "set": a request is not a change (the password does not move
+            // until the code verifies at step D). Distinct copy from USER_PASSWORD_RESET above and
+            // from the completed reset, because "who asked" and "who changed it" are different
+            // questions an investigator asks. Ruled copy is Creed's (T353h); this is the safety net.
+            case PASSWORD_RESET_REQUESTED -> entry("Password reset requested", event, when, role, null, "info");
             // T322. Ruled copy even though all four are excluded from the user page above, because
             // titleCase is a safety net and not a substitute for ruled copy (T295 §5): the exclusion
             // is a POLICY decision that could be reversed by a later ruling, and the day it is

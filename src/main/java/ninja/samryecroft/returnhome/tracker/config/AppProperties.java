@@ -38,6 +38,7 @@ public class AppProperties {
     public static class Security {
         private final LoginThrottle loginThrottle = new LoginThrottle();
         private final SecondFactor secondFactor = new SecondFactor();
+        private final PasswordReset passwordReset = new PasswordReset();
 
         public LoginThrottle getLoginThrottle() {
             return loginThrottle;
@@ -45,6 +46,66 @@ public class AppProperties {
 
         public SecondFactor getSecondFactor() {
             return secondFactor;
+        }
+
+        public PasswordReset getPasswordReset() {
+            return passwordReset;
+        }
+    }
+
+    /**
+     * T353: self-service password reset. The reset CODE (step C/D) reuses the second-factor's own
+     * validity/attempt/resend settings; what lives here is the request side - how long the emailed
+     * LINK is good for, and the request throttle that stops {@code /forgot-password} being a mail
+     * cannon aimed at arbitrary addresses.
+     */
+    public static class PasswordReset {
+        /** The emailed link's life. Distinct from the code's 10-minute validity on the challenge. */
+        private Duration linkValidity = Duration.ofMinutes(30);
+
+        /**
+         * How many reset requests one ADDRESS may trigger within {@link #window}. The per-address cap
+         * bounds mail to a real user; the per-IP cap below is the one that stops an attacker walking
+         * an address list at one request each.
+         */
+        private int maxRequestsPerAddress = 3;
+
+        /** How many reset requests one SOURCE IP may make within {@link #window}. */
+        private int maxRequestsPerIp = 10;
+
+        /** The rolling window both caps are measured over. */
+        private Duration window = Duration.ofMinutes(15);
+
+        public Duration getLinkValidity() {
+            return linkValidity;
+        }
+
+        public void setLinkValidity(Duration linkValidity) {
+            this.linkValidity = linkValidity;
+        }
+
+        public int getMaxRequestsPerAddress() {
+            return maxRequestsPerAddress;
+        }
+
+        public void setMaxRequestsPerAddress(int maxRequestsPerAddress) {
+            this.maxRequestsPerAddress = maxRequestsPerAddress;
+        }
+
+        public int getMaxRequestsPerIp() {
+            return maxRequestsPerIp;
+        }
+
+        public void setMaxRequestsPerIp(int maxRequestsPerIp) {
+            this.maxRequestsPerIp = maxRequestsPerIp;
+        }
+
+        public Duration getWindow() {
+            return window;
+        }
+
+        public void setWindow(Duration window) {
+            this.window = window;
         }
     }
 

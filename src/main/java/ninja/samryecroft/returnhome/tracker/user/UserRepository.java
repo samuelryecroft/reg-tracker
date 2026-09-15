@@ -32,6 +32,22 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByEmailIgnoreCase(@Param("email") String email);
 
     /**
+     * The account a self-service reset may act on (T353d): matched by address, case-insensitively
+     * (the same normalisation as {@link #findByEmailIgnoreCase} and the unique index V24), AND
+     * enabled AND not the break-glass account.
+     *
+     * <p>{@code and not u.breakGlass} is a belt to the braces: V25's {@code CHECK (is_break_glass OR
+     * email IS NOT NULL)} means the break-glass row has no address and so is already unreachable
+     * through an email lookup. The clause is redundant TODAY and exists so that a future account
+     * carrying both an address and the flag can never be reset through this unauthenticated door.
+     * Disabled accounts are excluded so a reset cannot discover, or quietly re-animate, a suspended
+     * account.
+     */
+    @Query("select u from User u where lower(u.email) = lower(:email) "
+            + "and u.enabled = true and u.breakGlass = false")
+    Optional<User> findResettableByEmail(@Param("email") String email);
+
+    /**
      * The emergency account, asked for by its FLAG rather than by a name (T341/T344). At most one row
      * can hold it - V25's partial unique index - so this cannot return an arbitrary choice of several.
      *
