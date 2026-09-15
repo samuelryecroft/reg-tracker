@@ -14,7 +14,11 @@ output "app_service_name" {
 }
 
 output "container_app_job_name" {
-  description = "DB-plane Container Apps job name (null on the public/pre-prod path) - `az containerapp job start` target."
+  # null whenever the standing job is not provisioned: the public/pre-prod path (enable_vnet=false) OR,
+  # since T355, the default prod path where the obsolete standing job is toggled off
+  # (enable_migrator_job=false). `one()` returns null for the empty (count=0) case. The live migration
+  # path uses the per-run ephemeral env, which names its own job, so nothing consumes this on prod today.
+  description = "DB-plane Container Apps job name; null unless the standing migrator_job is provisioned (enable_vnet && enable_migrator_job). `az containerapp job start` target when set."
   value       = one(module.migrator_job[*].job_name)
 }
 

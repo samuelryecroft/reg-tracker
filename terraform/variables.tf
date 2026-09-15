@@ -82,6 +82,21 @@ variable "enable_vnet" {
   default     = true
 }
 
+variable "enable_migrator_job" {
+  # T355: default FALSE. The STANDING DB-plane Container Apps env+job (module.migrator_job) is obsolete:
+  # the live migration path is the PER-RUN EPHEMERAL env created and torn down by
+  # deploy/db-plane/ephemeral-migrate.sh (its own cae-*-migrate / caj-*-migrate, not these). The standing
+  # env carried an idle internal load balancer (~£6.5/mo) for infrastructure nothing uses, so it was
+  # retired (the env+job were deleted out of band and confirmed absent in Azure before this toggle landed).
+  # This is a dedicated switch rather than leaving the module gated on enable_vnet, so the standing job can
+  # be brought back deliberately (set true) if the pipeline is ever wired to it (T122/T110) without
+  # coupling that decision to the whole VNet posture. Requires enable_vnet (the job needs the private
+  # route to Postgres); the count below ANDs the two.
+  description = "Provision the STANDING DB-plane Container Apps env+job (module.migrator_job). Default false: obsolete, superseded by the per-run ephemeral migrate env; recreating it re-incurs the ~£6.5/mo idle internal load balancer. Requires enable_vnet."
+  type        = bool
+  default     = false
+}
+
 variable "monthly_budget_amount" {
   description = "T114 monthly Cost Management budget, in the subscription's BILLING CURRENCY (GBP for this sub). Default 50 = £50/mo (raised from £30 on the human's decision, once an itemised run-cost breakdown was confirmed; steady-state estimate is ~£30-35, so £50 leaves headroom without masking real bill-shock)."
   type        = number
