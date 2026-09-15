@@ -6,7 +6,9 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.time.Instant;
 import ninja.samryecroft.returnhome.tracker.audit.AuditEventPublisher;
+import ninja.samryecroft.returnhome.tracker.security.passwordreset.PasswordResetTokenRepository;
 import ninja.samryecroft.returnhome.tracker.home.Home;
 import ninja.samryecroft.returnhome.tracker.home.HomeRepository;
 import ninja.samryecroft.returnhome.tracker.organisation.Organisation;
@@ -34,10 +36,12 @@ public class UserService {
     private final PasswordEncoder passwordEncoder;
     private final AuditEventPublisher auditEventPublisher;
     private final RoleMatrix roleMatrix;
+    private final PasswordResetTokenRepository passwordResetTokens;
 
     public UserService(UserRepository userRepository, HomeRepository homeRepository,
             OrganisationRepository organisationRepository, OrganisationAccessService organisationAccessService,
-            PasswordEncoder passwordEncoder, AuditEventPublisher auditEventPublisher, RoleMatrix roleMatrix) {
+            PasswordEncoder passwordEncoder, AuditEventPublisher auditEventPublisher, RoleMatrix roleMatrix,
+            PasswordResetTokenRepository passwordResetTokens) {
         this.userRepository = userRepository;
         this.homeRepository = homeRepository;
         this.organisationRepository = organisationRepository;
@@ -45,6 +49,7 @@ public class UserService {
         this.passwordEncoder = passwordEncoder;
         this.auditEventPublisher = auditEventPublisher;
         this.roleMatrix = roleMatrix;
+        this.passwordResetTokens = passwordResetTokens;
     }
 
     /**
@@ -329,6 +334,10 @@ public class UserService {
         User user = getAuthorized(id, principal);
         user.setPassword(passwordEncoder.encode(newPassword));
         User saved = userRepository.save(user);
+        // T353g: an administrator setting a password must retire any self-service reset in flight -
+        // otherwise the remedy and the hole coexist, and an attacker's live reset link survives the
+        // very action taken to shut them out. Nulls the pending hash on those tokens too.
+        passwordResetTokens.consumeAllOutstandingForUser(saved.getId(), Instant.now());
         auditEventPublisher.userPasswordReset(saved, principal);
         return saved;
     }
@@ -457,6 +466,10 @@ public class UserService {
         // be barring sign-in.
         user.resetEmailVerification();
         User saved = userRepository.save(user);
+        // T353g: the reset code is delivered to the email address, so a change of address must
+        // retire outstanding reset tokens for the same reason a password change does - a link minted
+        // against the old address must not still complete after the address (and its proof) has moved.
+        passwordResetTokens.consumeAllOutstandingForUser(saved.getId(), Instant.now());
         auditEventPublisher.userEmailChanged(saved, principal);
         return saved;
     }
