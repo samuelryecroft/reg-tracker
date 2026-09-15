@@ -17,4 +17,17 @@
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES   IN SCHEMA public TO rht_app;
 GRANT USAGE, SELECT                 ON ALL SEQUENCES IN SCHEMA public TO rht_app;
 
+-- Read-only backstop (T352): after Flyway, SELECT on every table for rht_readonly, matching the app
+-- backstop above. 01's ALTER DEFAULT PRIVILEGES already covers tables the migrator creates; this
+-- catches any that slipped past it, so the jump-box read role survives a rebuild by construction.
+-- SELECT only -- it does not touch audit_events' append-only model (readonly may read it, never mutate).
+-- Guarded so a server where the role does not yet exist re-runs cleanly instead of erroring.
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'rht_readonly') THEN
+    EXECUTE 'GRANT SELECT ON ALL TABLES IN SCHEMA public TO rht_readonly';
+  END IF;
+END
+$$;
+
 REVOKE UPDATE, DELETE ON audit_events FROM rht_app;
