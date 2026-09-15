@@ -1,5 +1,6 @@
 package ninja.samryecroft.returnhome.tracker.user;
 
+import ninja.samryecroft.returnhome.tracker.security.session.SessionTerminationService;
 import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -37,11 +38,13 @@ public class UserService {
     private final AuditEventPublisher auditEventPublisher;
     private final RoleMatrix roleMatrix;
     private final PasswordResetTokenRepository passwordResetTokens;
+    private final SessionTerminationService sessionTerminationService;
 
     public UserService(UserRepository userRepository, HomeRepository homeRepository,
             OrganisationRepository organisationRepository, OrganisationAccessService organisationAccessService,
             PasswordEncoder passwordEncoder, AuditEventPublisher auditEventPublisher, RoleMatrix roleMatrix,
-            PasswordResetTokenRepository passwordResetTokens) {
+            PasswordResetTokenRepository passwordResetTokens,
+            SessionTerminationService sessionTerminationService) {
         this.userRepository = userRepository;
         this.homeRepository = homeRepository;
         this.organisationRepository = organisationRepository;
@@ -50,6 +53,7 @@ public class UserService {
         this.auditEventPublisher = auditEventPublisher;
         this.roleMatrix = roleMatrix;
         this.passwordResetTokens = passwordResetTokens;
+        this.sessionTerminationService = sessionTerminationService;
     }
 
     /**
@@ -339,6 +343,14 @@ public class UserService {
         // very action taken to shut them out. Nulls the pending hash on those tokens too.
         passwordResetTokens.consumeAllOutstandingForUser(saved.getId(), Instant.now());
         auditEventPublisher.userPasswordReset(saved, principal);
+        // T357: and whoever is ALREADY signed in as this account stops being signed in.
+        //
+        // This is the half that makes the action a remedy rather than a gesture. An administrator
+        // resetting the password of an account they believe is compromised has done the one thing
+        // they can do about it, and would reasonably conclude the intruder is out. Without this the
+        // intruder's existing session keeps working - through a password they no longer know -
+        // until it happens to time out, and nothing on any screen says so.
+        sessionTerminationService.terminateAllSessionsFor(saved.getId());
         return saved;
     }
 

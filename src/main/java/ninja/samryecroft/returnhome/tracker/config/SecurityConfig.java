@@ -18,6 +18,12 @@ import ninja.samryecroft.returnhome.tracker.security.secondfactor.SecondFactorPo
 import ninja.samryecroft.returnhome.tracker.security.secondfactor.SecondFactorService;
 import ninja.samryecroft.returnhome.tracker.security.secondfactor.SecondFactorSuccessHandler;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.security.core.session.SessionRegistry;
+import org.springframework.security.core.session.SessionRegistryImpl;
+import org.springframework.security.web.authentication.logout.LogoutFilter;
+import org.springframework.security.web.session.HttpSessionEventPublisher;
+import org.springframework.security.web.session.SimpleRedirectSessionInformationExpiredStrategy;
+import ninja.samryecroft.returnhome.tracker.security.session.AuthenticatedSessionRegistrar;
 
 @Configuration
 @EnableMethodSecurity
@@ -28,12 +34,37 @@ public class SecurityConfig {
         return new BCryptPasswordEncoder();
     }
 
+    /**
+     * The register of who is signed in, so that a password change can end their sessions (T357).
+     *
+     * <p>In-memory and per-instance. Complete on the single instance we run; see
+     * {@code SessionTerminationService} for what changes if we scale out.
+     */
+    @Bean
+    public SessionRegistry sessionRegistry() {
+        return new SessionRegistryImpl();
+    }
+
+    /**
+     * <b>Not optional, and its absence is invisible.</b> {@code SessionRegistryImpl} learns that a
+     * session has ended only from a {@code SessionDestroyedEvent}, and the servlet container
+     * publishes one only if this listener is registered. Without it the registry never forgets
+     * anybody: it accumulates dead sessions for the life of the process, and "expire this user's
+     * sessions" starts walking entries for sessions that stopped existing days ago. Nothing fails -
+     * it just grows, and the expiry it reports is partly fiction.
+     */
+    @Bean
+    public HttpSessionEventPublisher httpSessionEventPublisher() {
+        return new HttpSessionEventPublisher();
+    }
+
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http,
             LoginFailureHandler loginFailureHandler,
             LoginAttemptService loginAttemptService,
             SecondFactorService secondFactorService,
             SecondFactorPolicy secondFactorPolicy,
+            SessionRegistry sessionRegistry,
             ApplicationEventPublisher eventPublisher) throws Exception {
         // Constructed here rather than injected as a bean: Boot auto-registers Filter BEANS into the
         // servlet chain as well, which would place this ahead of Spring Security's chain entirely and
@@ -92,7 +123,7 @@ public class SecurityConfig {
                         // T322: replaces .defaultSuccessUrl("/", false), whose behaviour the handler
                         // reproduces exactly for accounts that do not need a second factor. A
                         // password being correct is no longer the same thing as being signed in.
-                        .successHandler(new SecondFactorSuccessHandler(secondFactorService, secondFactorPolicy))
+                        .successHandler(new SecondFactorSuccessHandler(secondFactorService, secondFactorPolicy, sessionRegistry))
                         // T215: without this, EVERY AuthenticationException lands on /login?error
                         // and a locked-out user is told to check their password - the one thing
                         // that cannot work - on every attempt for the whole window.
@@ -116,7 +147,30 @@ public class SecurityConfig {
                 // It cannot live in LoginFailureHandler: by the time a failure handler runs, the
                 // hash has already happened or already been skipped.
                 // Full disassembly and the two rejected alternatives: see LockedAccountFilter.
-                .addFilterBefore(lockedAccountFilter, UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(lockedAccountFilter, UsernamePasswordAuthenticationFilter.class)
+                // T357: a password reset has to end the sessions of whoever is already signed in.
+                //
+                // maximumSessions(-1) is UNLIMITED - this is deliberately NOT a concurrent-session
+                // limit, and nobody is being logged out for signing in twice. The only reason it is
+                // configured at all is that it is what puts ConcurrentSessionFilter in the chain,
+                // and that filter is the thing that notices SessionInformation.isExpired() and ends
+                // the request. Set a registry without it and expireNow() marks a flag that nothing
+                // ever reads: every session stays usable and the code looks right.
+                .sessionManagement(session -> session
+                        .maximumSessions(-1)
+                        .sessionRegistry(sessionRegistry)
+                        // Spring's DEFAULT here writes a plain-text body with status 200. In an
+                        // HTML application that is a blank-looking page in place of the one asked
+                        // for, and - measured, not assumed - it made my own first version of the
+                        // guard below pass while reading the 200 as "still signed in". Redirecting
+                        // to the login page states what happened and gives the person the one
+                        // action that helps.
+                        .expiredSessionStrategy(
+                                new SimpleRedirectSessionInformationExpiredStrategy("/login?expired")))
+                // Registration itself cannot rely on the authentication filter's strategy, because
+                // the second-factor route does not go through it - see AuthenticatedSessionRegistrar.
+                // Placed before LogoutFilter so it runs on every authenticated request in the chain.
+                .addFilterBefore(new AuthenticatedSessionRegistrar(sessionRegistry), LogoutFilter.class);
 
         return http.build();
     }
