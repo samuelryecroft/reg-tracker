@@ -53,10 +53,12 @@ class UserServiceVisibilityTest {
     private PasswordEncoder passwordEncoder;
     @Mock
     private AuditEventPublisher auditEventPublisher;
+    @Mock
+    private ninja.samryecroft.returnhome.tracker.security.passwordreset.PasswordResetTokenRepository passwordResetTokens;
 
     private UserService service() {
         return new UserService(userRepository, homeRepository, organisationRepository,
-                organisationAccessService, passwordEncoder, auditEventPublisher, new RoleMatrix());
+                organisationAccessService, passwordEncoder, auditEventPublisher, new RoleMatrix(), passwordResetTokens);
     }
 
     @Test
