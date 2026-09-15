@@ -28,6 +28,14 @@
     </scm>
     <properties>
         <java.version>21</java.version>
+        <!--
+            T356: a PER-EXECUTION skip for the Playwright browser install, so nobody dodging that
+            slow step ever reaches for the plugin-wide -Dexec.skip again. -Dexec.skip skipped the
+            subset-icon-sprite step too, and R17 shipped the full sprite with a clean git stamp as a
+            result (correct commit, wrong content). Use -Dplaywright.install.skip=true to skip ONLY
+            the browser install; it does not touch the subset step or the jar guard below.
+        -->
+        <playwright.install.skip>false</playwright.install.skip>
     </properties>
     <dependencyManagement>
         <dependencies>
@@ -301,6 +309,10 @@
                             <goal>exec</goal>
                         </goals>
                         <configuration>
+                            <!-- T356: skippable ON ITS OWN via -Dplaywright.install.skip=true, so the
+                                 slow browser install can be dodged without the plugin-wide -Dexec.skip
+                                 that also drops the subset step. -->
+                            <skip>${playwright.install.skip}</skip>
                             <!--
                                 Must fork a real subprocess (exec:exec), not exec:java: Playwright's
                                 CLI calls System.exit() internally, which would kill Maven's own JVM
@@ -350,6 +362,45 @@
                                 <argument>ninja.samryecroft.returnhome.tracker.build.IconSpriteSubsetter</argument>
                                 <argument>${project.basedir}/src/main/resources/static/icons/phosphor.svg</argument>
                                 <argument>${project.build.outputDirectory}/static/icons/phosphor.svg</argument>
+                                <argument>${project.basedir}/src/main/resources/templates</argument>
+                                <argument>${project.basedir}/src/main/resources/static</argument>
+                            </arguments>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <!--
+                            T356: the backstop. After spring-boot repackage has built the jar, assert
+                            the PACKAGED sprite carries the subset symbol count, not the source count.
+                            This is what makes "correct commit, wrong content" impossible to ship: a
+                            jar built any way that skipped the subset (a stray -Dexec.skip, which skips
+                            subset-icon-sprite above but NOT this - note <skip>false</skip>) fails here
+                            instead of deploying green. -Dmaven.test.skip=true fails it a different way,
+                            loudly: the check lives in test-classes, so skipping test compilation makes
+                            this exec's class absent and the build error rather than silently pass.
+
+                            Bound to package, not verify, because the deploy builds `package` - a
+                            verify-phase guard would never run on the artifact that actually ships.
+                            exec-maven-plugin is declared after spring-boot-maven-plugin, so a
+                            package-phase exec here runs AFTER repackage and the jar exists.
+                        -->
+                        <id>verify-jar-carries-subset</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
+                        <configuration>
+                            <!-- Deliberately NOT ${exec.skip}: this guard must run even when someone
+                                 has passed -Dexec.skip=true, because that is exactly the build that
+                                 drops the subset and needs catching. -->
+                            <skip>false</skip>
+                            <executable>java</executable>
+                            <classpathScope>test</classpathScope>
+                            <arguments>
+                                <argument>-classpath</argument>
+                                <classpath/>
+                                <argument>ninja.samryecroft.returnhome.tracker.build.IconSpriteSubsetJarCheck</argument>
+                                <argument>${project.build.directory}/${project.build.finalName}.jar</argument>
+                                <argument>${project.basedir}/src/main/resources/static/icons/phosphor.svg</argument>
                                 <argument>${project.basedir}/src/main/resources/templates</argument>
                                 <argument>${project.basedir}/src/main/resources/static</argument>
                             </arguments>
