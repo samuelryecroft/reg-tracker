@@ -37,6 +37,17 @@ import org.springframework.stereotype.Component;
 public class AuditEventPublisher {
 
     /**
+     * How a self-service reset was authorised, recorded on every reset row (T359).
+     *
+     * <p>A FIXED value, never anything submitted, for the same reason the failure reasons are fixed.
+     * It exists so the trail states the MECHANISM rather than leaving a reader to infer the person:
+     * what the flow proves is control of the mailbox at two moments, and control of a mailbox is not
+     * identity. Being able to read this off the row is what lets somebody investigating a disputed
+     * change tell a self-service reset from an administrator's one without knowing our code.
+     */
+    static final String RESET_VIA_EMAILED_LINK = "emailed-link";
+
+    /**
      * How long one access episode may last regardless of inactivity (T283 R2).
      *
      * <p>A judgement, not a measurement (Kevin's own flag): comfortably shorter than a working
@@ -118,53 +129,77 @@ public class AuditEventPublisher {
      */
     public void mfaChallengeIssued(User user) {
         publish(AuditEventRecord.of(AuditEventType.MFA_CHALLENGE_ISSUED)
-                .actor(user.getId(), user.getUsername(), roleNames(user.getRoles()))
+                .actor(user.getId(), user.getLoginIdentifier(), roleNames(user.getRoles()))
                 .target("User", user.getId())
                 .scope(detachedOrganisationId(user), homeIdByQuery(user.getId()))
                 .build());
     }
 
     /**
-     * A self-service reset was requested for a REAL account (T353d). The actor is the target user,
-     * not an authenticated principal - {@code /forgot-password} is unauthenticated, and the account
-     * has been resolved by address by the time this is called. Called ONLY on a match: a no-match
-     * writes no row, because this table is append-only and unauthenticated writes keyed on a
+     * A self-service reset was requested for a REAL account (T353d).
+     *
+     * <p><b>T359 - what the actor columns mean here, because the flow never identified anybody.</b>
+     * {@code /forgot-password} is unauthenticated. It proves control of a mailbox and nothing else,
+     * so a row that read as "the account holder did this" would assert more than the system can
+     * know - and this table is append-only, so an overstatement made today is permanent.
+     *
+     * <p>So the row records <b>what was actually proven</b>: {@code actor_id} is the account,
+     * because the account is the only identity in play and the row has to attach to it, and
+     * {@code actor_identifier_at_time} is the ADDRESS that control was demonstrated over.
+     * {@link #RESET_VIA_EMAILED_LINK} in the metadata names the mechanism, so a reader years from
+     * now - an IRO, or a court - is told how the act was authorised rather than left to assume it
+     * was the person. Creed made the same correction to the visible wording on T353h; this is the
+     * column catching up with the headline.
+     *
+     * <p>Called ONLY on a match: a no-match writes no row, because unauthenticated writes keyed on a
      * submitted address are the enumeration oracle the neutral response exists to deny.
      */
     public void passwordResetRequested(User target) {
         publish(AuditEventRecord.of(AuditEventType.PASSWORD_RESET_REQUESTED)
-                .actor(target.getId(), target.getUsername(), roleNames(target.getRoles()))
+                .actor(target.getId(), target.getLoginIdentifier(), roleNames(target.getRoles()))
                 .target("User", target.getId())
                 .scope(detachedOrganisationId(target), homeIdByQuery(target.getId()))
-                .build());
-    }
-
-    /** A self-service reset was applied (T353e), same transaction as the password write. */
-    public void passwordResetCompleted(User target) {
-        publish(AuditEventRecord.of(AuditEventType.PASSWORD_RESET_COMPLETED)
-                .actor(target.getId(), target.getUsername(), roleNames(target.getRoles()))
-                .target("User", target.getId())
-                .scope(detachedOrganisationId(target), homeIdByQuery(target.getId()))
+                .meta("authorisedBy", RESET_VIA_EMAILED_LINK)
                 .build());
     }
 
     /**
-     * A self-service reset attempt failed (T353e). {@code reason} is a FIXED vocabulary - never a
+     * A self-service reset was applied (T353e), same transaction as the password write. Actor
+     * semantics as in {@link #passwordResetRequested} - the mailbox is what was proven, not the
+     * person.
+     */
+    public void passwordResetCompleted(User target) {
+        publish(AuditEventRecord.of(AuditEventType.PASSWORD_RESET_COMPLETED)
+                .actor(target.getId(), target.getLoginIdentifier(), roleNames(target.getRoles()))
+                .target("User", target.getId())
+                .scope(detachedOrganisationId(target), homeIdByQuery(target.getId()))
+                .meta("authorisedBy", RESET_VIA_EMAILED_LINK)
+                .build());
+    }
+
+    /**
+     * A self-service reset attempt FAILED (T353e). {@code reason} is a FIXED vocabulary - never a
      * submitted value - the same discipline as {@link #mfaFailure}. Called only when a user is
      * resolvable; a token that never existed writes no row.
+     *
+     * <p>Actor semantics as in {@link #passwordResetRequested}, and they matter most here: a failure
+     * row is the one an investigator reads when they suspect somebody was trying. Naming the account
+     * holder as the actor on a FAILED attempt would put that person's name against somebody else's
+     * attempt to break into their account.
      */
     public void passwordResetFailed(User target, String reason) {
         publish(AuditEventRecord.of(AuditEventType.PASSWORD_RESET_FAILED)
-                .actor(target.getId(), target.getUsername(), roleNames(target.getRoles()))
+                .actor(target.getId(), target.getLoginIdentifier(), roleNames(target.getRoles()))
                 .target("User", target.getId())
                 .scope(detachedOrganisationId(target), homeIdByQuery(target.getId()))
+                .meta("authorisedBy", RESET_VIA_EMAILED_LINK)
                 .meta("reason", reason)
                 .build());
     }
 
     public void mfaSuccess(User user) {
         publish(AuditEventRecord.of(AuditEventType.MFA_SUCCESS)
-                .actor(user.getId(), user.getUsername(), roleNames(user.getRoles()))
+                .actor(user.getId(), user.getLoginIdentifier(), roleNames(user.getRoles()))
                 .target("User", user.getId())
                 .scope(detachedOrganisationId(user), homeIdByQuery(user.getId()))
                 .build());
@@ -173,7 +208,7 @@ public class AuditEventPublisher {
     /** {@code reason} is a fixed vocabulary - never the submitted value, which is a live guess. */
     public void mfaFailure(User user, String reason) {
         publish(AuditEventRecord.of(AuditEventType.MFA_FAILURE)
-                .actor(user.getId(), user.getUsername(), roleNames(user.getRoles()))
+                .actor(user.getId(), user.getLoginIdentifier(), roleNames(user.getRoles()))
                 .target("User", user.getId())
                 .scope(detachedOrganisationId(user), homeIdByQuery(user.getId()))
                 .meta("reason", reason)
@@ -182,7 +217,7 @@ public class AuditEventPublisher {
 
     public void mfaLocked(User user) {
         publish(AuditEventRecord.of(AuditEventType.MFA_LOCKED)
-                .actor(user.getId(), user.getUsername(), roleNames(user.getRoles()))
+                .actor(user.getId(), user.getLoginIdentifier(), roleNames(user.getRoles()))
                 .target("User", user.getId())
                 .scope(detachedOrganisationId(user), homeIdByQuery(user.getId()))
                 .build());

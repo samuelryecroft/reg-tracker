@@ -38,7 +38,7 @@ public class AuditEventListener {
             // only surface a spurious error for work that actually succeeded. Losing an audit row
             // is bad, so this is loud - but it must not break a safeguarding workflow.
             log.error("Failed to persist audit event {} for actor {} on {} {}", record.eventType(),
-                    record.actorUsername(), record.targetType(), record.targetId(), ex);
+                    record.actorIdentifier(), record.targetType(), record.targetId(), ex);
         }
     }
 }

@@ -82,7 +82,7 @@ public class AuditEvent {
         this.eventType = record.eventType();
         this.occurredAt = record.occurredAt();
         this.actorId = record.actorId();
-        this.actorIdentifierAtTime = record.actorUsername();
+        this.actorIdentifierAtTime = record.actorIdentifier();
         this.actorRolesAtTime = record.actorRoles();
         this.targetType = record.targetType();
         this.targetId = record.targetId();
