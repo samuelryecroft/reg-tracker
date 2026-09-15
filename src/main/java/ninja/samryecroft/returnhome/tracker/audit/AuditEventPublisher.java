@@ -139,6 +139,29 @@ public class AuditEventPublisher {
                 .build());
     }
 
+    /** A self-service reset was applied (T353e), same transaction as the password write. */
+    public void passwordResetCompleted(User target) {
+        publish(AuditEventRecord.of(AuditEventType.PASSWORD_RESET_COMPLETED)
+                .actor(target.getId(), target.getUsername(), roleNames(target.getRoles()))
+                .target("User", target.getId())
+                .scope(detachedOrganisationId(target), homeIdByQuery(target.getId()))
+                .build());
+    }
+
+    /**
+     * A self-service reset attempt failed (T353e). {@code reason} is a FIXED vocabulary - never a
+     * submitted value - the same discipline as {@link #mfaFailure}. Called only when a user is
+     * resolvable; a token that never existed writes no row.
+     */
+    public void passwordResetFailed(User target, String reason) {
+        publish(AuditEventRecord.of(AuditEventType.PASSWORD_RESET_FAILED)
+                .actor(target.getId(), target.getUsername(), roleNames(target.getRoles()))
+                .target("User", target.getId())
+                .scope(detachedOrganisationId(target), homeIdByQuery(target.getId()))
+                .meta("reason", reason)
+                .build());
+    }
+
     public void mfaSuccess(User user) {
         publish(AuditEventRecord.of(AuditEventType.MFA_SUCCESS)
                 .actor(user.getId(), user.getUsername(), roleNames(user.getRoles()))

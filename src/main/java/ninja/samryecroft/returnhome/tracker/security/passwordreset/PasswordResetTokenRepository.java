@@ -30,4 +30,15 @@ public interface PasswordResetTokenRepository extends JpaRepository<PasswordRese
     @Modifying
     @Query("delete from PasswordResetToken t where t.expiresAt < :before")
     int deleteExpiredBefore(@Param("before") Instant before);
+
+    /**
+     * Consume every outstanding token for a user, nulling the pending password hash as it goes
+     * (T353e/g). Used on a completed reset (retire the sibling tokens of the one just spent) and
+     * on an admin password-set or email change (T353g). Nulling in the same statement matters: a
+     * bulk UPDATE bypasses the entity consume(), so the pending password would otherwise linger.
+     */
+    @Modifying
+    @Query("update PasswordResetToken t set t.consumedAt = :now, t.pendingPasswordHash = null "
+            + "where t.userId = :userId and t.consumedAt is null")
+    int consumeAllOutstandingForUser(@Param("userId") Long userId, @Param("now") Instant now);
 }
