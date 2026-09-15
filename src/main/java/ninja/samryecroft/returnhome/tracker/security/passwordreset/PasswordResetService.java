@@ -1,5 +1,6 @@
 package ninja.samryecroft.returnhome.tracker.security.passwordreset;
 
+import ninja.samryecroft.returnhome.tracker.security.session.SessionTerminationService;
 import java.time.Instant;
 import java.util.Optional;
 import ninja.samryecroft.returnhome.tracker.audit.AuditEventPublisher;
@@ -47,10 +48,12 @@ public class PasswordResetService {
     private final PasswordEncoder passwordEncoder;
     private final PasswordPolicy passwordPolicy;
     private final AuditEventPublisher audit;
+    private final SessionTerminationService sessionTermination;
 
     public PasswordResetService(PasswordResetTokenRepository tokens, UserRepository users,
             SecondFactorService secondFactor, LoginChallengeRepository challenges,
-            PasswordEncoder passwordEncoder, PasswordPolicy passwordPolicy, AuditEventPublisher audit) {
+            PasswordEncoder passwordEncoder, PasswordPolicy passwordPolicy, AuditEventPublisher audit,
+            SessionTerminationService sessionTermination) {
         this.tokens = tokens;
         this.users = users;
         this.secondFactor = secondFactor;
@@ -58,6 +61,7 @@ public class PasswordResetService {
         this.passwordEncoder = passwordEncoder;
         this.passwordPolicy = passwordPolicy;
         this.audit = audit;
+        this.sessionTermination = sessionTermination;
     }
 
     /** Step B: is this token good enough to show the new-password form? Invalid/expired/consumed all look the same. */
@@ -152,10 +156,10 @@ public class PasswordResetService {
      * alone can mint. Applies the pending hash, consumes this token AND every other outstanding token
      * for the user, and audits the completion in the same transaction as the write.
      *
-     * <p>DEFERRED, and flagged rather than silently omitted: existing authenticated SESSIONS for this
-     * user are not expired here, because the application has no SessionRegistry to expire them
-     * through. Adding one is its own security-infra change; raised to god as a follow-up rather than
-     * bolted on. There is NO auto-sign-in either way - a completed reset lands on the login page.
+     * <p>T357 closes the gap this comment used to record. Existing authenticated SESSIONS for this
+     * user are now expired here: without it the reset changed the credential and left whoever was
+     * already inside exactly where they were, which is the half of the remedy nobody can see is
+     * missing. There is still NO auto-sign-in - a completed reset lands on the login page.
      */
     private void applyVerifiedReset(PasswordResetGrant grant) {
         Instant now = Instant.now();
@@ -166,6 +170,10 @@ public class PasswordResetService {
         tokens.save(grant.token());
         tokens.consumeAllOutstandingForUser(user.getId(), now);
         audit.passwordResetCompleted(user);
+        // T357: and anyone already signed in as this account stops being signed in. The person
+        // resetting is doing it BECAUSE they think somebody else is in there; leaving that session
+        // alive makes the reset a gesture.
+        sessionTermination.terminateAllSessionsFor(user.getId());
     }
 
     private Optional<PasswordResetToken> usable(String rawToken) {

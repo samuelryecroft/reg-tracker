@@ -13,6 +13,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.security.web.authentication.SavedRequestAwareAuthenticationSuccessHandler;
+import org.springframework.security.core.session.SessionRegistry;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 
 /**
@@ -42,12 +43,14 @@ public class SecondFactorSuccessHandler implements AuthenticationSuccessHandler 
 
     private final SecondFactorService secondFactorService;
     private final SecondFactorPolicy policy;
+    private final SessionRegistry sessionRegistry;
     private final AuthenticationSuccessHandler completedLoginHandler;
 
     public SecondFactorSuccessHandler(SecondFactorService secondFactorService,
-            SecondFactorPolicy policy) {
+            SecondFactorPolicy policy, SessionRegistry sessionRegistry) {
         this.secondFactorService = secondFactorService;
         this.policy = policy;
+        this.sessionRegistry = sessionRegistry;
         SavedRequestAwareAuthenticationSuccessHandler delegate =
                 new SavedRequestAwareAuthenticationSuccessHandler();
         // Matches the previous .defaultSuccessUrl("/", false) exactly: land on "/" unless the user
@@ -128,5 +131,18 @@ public class SecondFactorSuccessHandler implements AuthenticationSuccessHandler 
     private void clearAuthentication(HttpSession session) {
         SecurityContextHolder.clearContext();
         session.removeAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY);
+        // T357: and out of the register of signed-in sessions, because this one is not one.
+        //
+        // Spring's own RegisterSessionAuthenticationStrategy files the session the moment the
+        // PASSWORD matches - which here is precisely the moment we take the authentication away
+        // again. Leaving it filed is wrong twice over: the entry describes a session nobody is
+        // signed in on, and its id is about to be replaced by request.changeSessionId() when the
+        // code passes, so it would linger for the life of the process naming nothing. An expiry
+        // would then count it and report shutting down a session that never existed.
+        //
+        // This removes a REGISTRY ENTRY and nothing else. The gate itself is unchanged and still
+        // rests on the same thing it always did: no authentication exists until the code is
+        // verified.
+        sessionRegistry.removeSessionInformation(session.getId());
     }
 }

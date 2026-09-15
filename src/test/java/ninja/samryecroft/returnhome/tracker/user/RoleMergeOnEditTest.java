@@ -1,5 +1,8 @@
 package ninja.samryecroft.returnhome.tracker.user;
 
+import ninja.samryecroft.returnhome.tracker.security.session.SessionTerminationService;
+import org.springframework.security.core.session.SessionRegistryImpl;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -63,7 +66,10 @@ class RoleMergeOnEditTest {
 
     private UserService service() {
         return new UserService(userRepository, homeRepository, organisationRepository,
-                organisationAccessService, passwordEncoder, auditEventPublisher, new RoleMatrix(), passwordResetTokens);
+                organisationAccessService, passwordEncoder, auditEventPublisher, new RoleMatrix(),
+                passwordResetTokens,
+                // T357: unit tests of visibility and role merging - no session exists to end.
+                new SessionTerminationService(new SessionRegistryImpl()));
     }
 
     /**

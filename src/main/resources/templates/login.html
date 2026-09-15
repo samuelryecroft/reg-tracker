@@ -45,6 +45,42 @@
         <svg class="icon" aria-hidden="true"><use th:href="@{/icons/phosphor.svg} + '#ph-warning-circle'"></use></svg>
         <div><strong>We couldn't sign you in</strong><p>Check your email address and password and try again.</p></div>
     </div>
+    <!--/* T357 / T353h, RULED COPY (Creed). A separate parameter from ?error, per Kevin's reasoning -
+         the generic banner's exclusion list must not grow a sixth exception.
+
+         TONE IS `info`, NOT `err`, AND THAT IS A CATEGORY DECISION. For most readers this is the
+         expected consequence of a reset they performed a moment ago, arriving on their other device -
+         nothing went wrong, and a red banner would be counted as a fault by anyone scanning the screen
+         (T295). Not `ok` either: for one reader in some number this is the worst news the product will
+         ever give them. `info` is the only tone honest for every author of the event.
+         role="status", not "alert" - the sent-back banner's ruling, verbatim: that role is for
+         interruption, and this is a fact, not one.
+
+         IT NAMES THE EVENT AND REFUSES TO NAME THE AUTHOR, because it cannot know it. Measured on
+         ebe2163, terminateAllSessionsFor has TWO callers: PasswordResetService (the account holder, or
+         whoever held their mailbox) and UserService.setPassword (an administrator). One cause, three
+         possible authors - you, your administrator, or somebody who is not you - and they call for
+         opposite responses.
+
+         THE SECOND SENTENCE IS WHY THIS BANNER EXISTS. It is the only place a victim of a mailbox
+         takeover finds out, and what they need is a test they can apply in three seconds, not a
+         description. "Contact your administrator" ALONE WOULD BE WRONG HERE and must not be tidied to
+         it later: the administrator is one of the three authors, so sending a victim there is sound
+         advice most of the time and precisely wrong in the case that matters most. Naming the admin
+         route as one possibility costs a clause and makes the sentence true in all three cases.
+
+         Do NOT merge this with the ?reset banner as a duplicate. ?reset is the device that COMPLETED
+         the reset; this is a session that was already open somewhere else. Different readers, opposite
+         messages. */-->
+    <div class="banner info" role="status" th:if="${param.expired != null}">
+        <svg class="icon" aria-hidden="true"><use th:href="@{/icons/phosphor.svg} + '#ph-info'"></use></svg>
+        <div>
+            <strong>You've been signed out because this password was changed</strong>
+            <p>Any sessions that were open have been ended. If you changed it, or asked an administrator
+                to, sign in with the new password. <strong>If you did not, tell your manager now</strong> —
+                it means someone else was able to change it.</p>
+        </div>
+    </div>
     <!--/* Names the state and what to do, never the account. "No address" is an administrator's job
          to fix, so the copy points there rather than inviting the person to retry something that
          will fail identically every time. */-->
