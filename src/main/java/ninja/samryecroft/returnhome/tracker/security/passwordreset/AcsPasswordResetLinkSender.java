@@ -7,9 +7,6 @@ import com.azure.core.credential.TokenCredential;
 import ninja.samryecroft.returnhome.tracker.config.AppProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.stereotype.Component;
 
 /**
  * Delivers the password-reset link through Azure Communication Services Email (T353d), on the SAME
@@ -21,8 +18,6 @@ import org.springframework.stereotype.Component;
  * is a URL with a 30-minute life and a staff address, and an implementation that adds context to be
  * helpful is the change that makes the region matter.
  */
-@Component
-@ConditionalOnProperty(prefix = "app.security.second-factor", name = "transport", havingValue = "acs")
 public class AcsPasswordResetLinkSender implements PasswordResetLinkSender {
 
     private static final Logger log = LoggerFactory.getLogger(AcsPasswordResetLinkSender.class);
@@ -30,9 +25,8 @@ public class AcsPasswordResetLinkSender implements PasswordResetLinkSender {
     private final EmailAsyncClient client;
     private final String fromAddress;
 
-    public AcsPasswordResetLinkSender(AppProperties appProperties,
-            TokenCredential credential,
-            @Value("${app.security.second-factor.acs-endpoint}") String endpoint) {
+    public AcsPasswordResetLinkSender(AppProperties appProperties, TokenCredential credential,
+            String endpoint) {
         this.fromAddress = appProperties.getSecurity().getSecondFactor().getFromAddress();
         // Same fail-at-startup guard as the code sender: an unresolved ${SECOND_FACTOR_FROM_ADDRESS}
         // binds the literal placeholder, which is not blank, so the placeholder is checked too.
