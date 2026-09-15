@@ -3,6 +3,17 @@
 <head>
 <th:block th:fragment="styles">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<!--/* T348: preload the one web font so it downloads in parallel with app.css instead of only
+     being discovered after the stylesheet is fetched and parsed (it is referenced by @font-face,
+     the last thing the browser reads). font-display:swap already renders fallback text first, so
+     this removes the swap flash on a slow first load rather than blocking anything.
+     The href is the PLAIN, non-fingerprinted path ON PURPOSE, not a @{...} expression: the actual
+     font request comes from app.css's @font-face src url("/fonts/inter-latin-variable.woff2"),
+     which is a static file Thymeleaf never rewrites - so a fingerprinted preload URL would not
+     match it and would fetch the font twice. This must stay byte-identical to that @font-face url.
+     crossorigin is required even same-origin: fonts are always fetched in CORS mode, and a preload
+     without it is treated as a different request and does not prime the cache. */-->
+<link rel="preload" href="/fonts/inter-latin-variable.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" th:href="@{/css/app.css}">
 <!--/* T186: a per-org inline <style> used to sit here overriding four bridge tokens - --accent,
      --accent-dark, --accent-ink and --tint - with values computed from a theme's brand hex.
