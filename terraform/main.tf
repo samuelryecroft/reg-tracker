@@ -195,9 +195,15 @@ resource "azurerm_container_registry" "acr" {
 # the private path (enable_vnet) - the public/pre-prod path has no private DB, so its migrations run
 # from the hosted runner directly. Pulls the custom, digest-pinned DB-plane image from ACR and reads
 # the DB passwords from Key Vault, both via the CD managed identity (no DB credential through GitHub).
+#
+# T355: gated OFF by default (var.enable_migrator_job = false). This STANDING env+job is obsolete - the
+# live migration path is the per-run EPHEMERAL env in deploy/db-plane/ephemeral-migrate.sh - and the
+# standing env's idle internal load balancer cost ~£6.5/mo for infrastructure nothing uses. The two
+# resources are already absent in Azure; this toggle + a state removal bring terraform in line without
+# destroying anything live. ANDed with enable_vnet because the job needs the private route to Postgres.
 module "migrator_job" {
   source = "./modules/migrator_job"
-  count  = var.enable_vnet ? 1 : 0
+  count  = var.enable_vnet && var.enable_migrator_job ? 1 : 0
 
   name_prefix         = var.name_prefix
   location            = var.location
