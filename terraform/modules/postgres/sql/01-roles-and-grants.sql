@@ -65,6 +65,34 @@ ALTER DEFAULT PRIVILEGES FOR ROLE rht_migrator IN SCHEMA public
 ALTER DEFAULT PRIVILEGES FOR ROLE rht_migrator IN SCHEMA public
   GRANT USAGE, SELECT                 ON SEQUENCES TO rht_app;
 
+-- ---- READ-ONLY role: direct human/jump-box reads of the DB (T343). SELECT only -- never DML, never
+-- ---- DDL. This lives here (T352) because a purge+rebuild DROPs SCHEMA public, which takes every grant
+-- ---- to rht_readonly with it, while 01 previously re-granted only rht_migrator and rht_app -- so the
+-- ---- jump box was read-dead after each rebuild until a hand fix. Provisioning it here restores it by
+-- ---- construction on every rebuild.
+--
+-- Its PASSWORD is intentionally NOT set/reset here: it is managed out-of-band by the jump-box tooling
+-- (Key Vault JUMPBOX-READONLY-DB-PASSWORD), and a purge+rebuild does not drop the ROLE (roles are
+-- cluster-level), only the schema -- so the surviving role keeps its password and this file only needs
+-- to restore its ACCESS, with no readonly secret in the deploy path. The guarded CREATE keeps a
+-- brand-new server (where the role does not yet exist) from failing the whole rebuild on the grants
+-- below; on such a server the jump-box setup sets the password, exactly as it did the first time.
+--
+-- SELECT-ONLY is what keeps this safe against the three-layer audit model: rht_readonly may READ
+-- audit_events (reading an audit trail is expected) but is never granted INSERT/UPDATE/DELETE on
+-- anything, so it cannot weaken L1 (trigger), L2 (REVOKE from rht_app) or L3 (ownership).
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'rht_readonly') THEN
+    CREATE ROLE rht_readonly LOGIN;
+  END IF;
+END
+$$;
+GRANT USAGE  ON SCHEMA public TO rht_readonly;
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO rht_readonly;
+ALTER DEFAULT PRIVILEGES FOR ROLE rht_migrator IN SCHEMA public
+  GRANT SELECT ON TABLES TO rht_readonly;
+
 -- Re-assert audit_events immutability HERE too, so this file independently leaves the DB safe. The
 -- blanket "GRANT ... ON ALL TABLES" above re-grants UPDATE/DELETE on audit_events on every run; from
 -- deploy #2 on, that would silently undo 02's REVOKE until 02 re-runs. Guarded by to_regclass so it
