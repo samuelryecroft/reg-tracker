@@ -322,6 +322,39 @@
                             </arguments>
                         </configuration>
                     </execution>
+                    <execution>
+                        <!--
+                            T349 (Lane B perf item 3): ship a subset of the Phosphor sprite. The
+                            source tree keeps the full 112-symbol library; this rewrites the copy
+                            already in target/classes down to the glyphs actually referenced by
+                            templates and scripts, so the packaged jar carries only those. Bound to
+                            prepare-package: after process-resources has copied the full sprite and
+                            after test-compile (the subsetter is build tooling in test-classes),
+                            before spring-boot repackage puts it in the jar.
+
+                            classpathScope=test and the exec:exec fork mirror the Playwright step
+                            above - the subsetter lives in src/test/java so it ships no code in the
+                            app jar and stays unit-testable (IconSpriteSubsetTest).
+                        -->
+                        <id>subset-icon-sprite</id>
+                        <phase>prepare-package</phase>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
+                        <configuration>
+                            <executable>java</executable>
+                            <classpathScope>test</classpathScope>
+                            <arguments>
+                                <argument>-classpath</argument>
+                                <classpath/>
+                                <argument>ninja.samryecroft.returnhome.tracker.build.IconSpriteSubsetter</argument>
+                                <argument>${project.basedir}/src/main/resources/static/icons/phosphor.svg</argument>
+                                <argument>${project.build.outputDirectory}/static/icons/phosphor.svg</argument>
+                                <argument>${project.basedir}/src/main/resources/templates</argument>
+                                <argument>${project.basedir}/src/main/resources/static</argument>
+                            </arguments>
+                        </configuration>
+                    </execution>
                 </executions>
             </plugin>
         </plugins>
