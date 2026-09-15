@@ -23,6 +23,7 @@ import ninja.samryecroft.returnhome.tracker.interview.QueueFilter;
 import ninja.samryecroft.returnhome.tracker.organisation.OrgStatus;
 import ninja.samryecroft.returnhome.tracker.organisation.OrgType;
 import ninja.samryecroft.returnhome.tracker.report.ReportStatus;
+import ninja.samryecroft.returnhome.tracker.security.secondfactor.ChallengePurpose;
 import ninja.samryecroft.returnhome.tracker.user.AppearancePreference;
 import ninja.samryecroft.returnhome.tracker.user.Role;
 import org.junit.jupiter.api.Test;
@@ -198,6 +199,19 @@ class PersistedConstantsGuardTest {
     }
 
     /**
+     * The flow a {@code login_challenges} row was issued for (T353b). Persisted STRING and stored in
+     * a column with no CHECK constraint, so a rename here does not fail loudly at write time - it
+     * makes existing rows unreadable to the enum, which is exactly the silent split this guard pins
+     * against. PASSWORD_RESET in particular is load-bearing: the reset verifier only accepts a code
+     * of that purpose, so renaming it would quietly stop every reset code from ever verifying.
+     */
+    @Test
+    void challengePurposeNames() {
+        assertThat(names(ChallengePurpose.values()))
+                .containsExactlyInAnyOrder("SIGN_IN", "PASSWORD_RESET");
+    }
+
+    /**
      * <b>The set of persisted enums is DERIVED, not read.</b> This exists because the first version
      * of this class missed two of seven: I found the entities carrying
      * {@code @Enumerated(EnumType.STRING)} and then listed, by reading them, which enum types they
@@ -223,7 +237,7 @@ class PersistedConstantsGuardTest {
 
         assertThat(scanned).containsExactlyInAnyOrder(AuditEventType.class, InterviewStatus.class,
                 ReportStatus.class, Role.class, OrgType.class, OrgStatus.class,
-                AppearancePreference.class);
+                AppearancePreference.class, ChallengePurpose.class);
     }
 
     /** Every enum type reachable as an {@code @Enumerated(STRING)} field of an {@code @Entity}. */
