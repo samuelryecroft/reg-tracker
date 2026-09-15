@@ -1,5 +1,7 @@
 package ninja.samryecroft.returnhome.tracker.interview;
 
+import ninja.samryecroft.returnhome.tracker.TestLogins;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.securityContext;
@@ -70,7 +72,7 @@ class DeadlineTrackingIntegrationTest extends AbstractIntegrationTest {
     private String suffix;
 
     private RequestPostProcessor asUser(String username) {
-        UserDetails userDetails = appUserDetailsService.loadUserByUsername(username);
+        UserDetails userDetails = appUserDetailsService.loadUserByUsername(TestLogins.loginIdentifier(username));
         SecurityContext context = new SecurityContextImpl(
                 new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities()));
         return securityContext(context);
@@ -114,6 +116,7 @@ class DeadlineTrackingIntegrationTest extends AbstractIntegrationTest {
     private User newUser(String username, Role role, Home userHome, Organisation organisation) {
         User user = new User();
         user.setUsername(username);
+        user.setEmail(username + "@example.test");
         user.setPassword(passwordEncoder.encode(PASSWORD));
         user.setLastName(username);
         user.setRoles(Set.of(role));

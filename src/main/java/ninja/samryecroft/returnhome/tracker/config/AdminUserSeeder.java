@@ -77,6 +77,11 @@ public class AdminUserSeeder implements ApplicationRunner {
         admin.setLastName("Administrator");
         // No email: this account is seeded from an environment secret, not provisioned by a person,
         // so there is no address to record. An admin supplies one on the first edit.
+        // THE EMERGENCY ACCOUNT, and this line is load-bearing. Without it the seeded admin is an
+        // ordinary row: the second factor would be required of it, it has no address to receive a
+        // code at, and it would be refused at sign-in - which is exactly the lockout T339 fixed,
+        // reached by a different route. V25's partial unique index keeps it to one row.
+        admin.setBreakGlass(true);
         admin.setRoles(Set.of(Role.ADMIN));
         admin.setEnabled(true);
         userRepository.save(admin);

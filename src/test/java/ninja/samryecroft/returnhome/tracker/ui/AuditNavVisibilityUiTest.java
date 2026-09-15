@@ -56,6 +56,7 @@ class AuditNavVisibilityUiTest extends AbstractUiTest {
     private void createViewer(String username, boolean canExport) {
         User user = new User();
         user.setUsername(username);
+        user.setEmail(username + "@example.test");
         user.setPassword(passwordEncoder.encode(PASSWORD));
         user.setLastName("Audit Nav Tester");
         user.setRoles(Set.of(Role.VIEWER));

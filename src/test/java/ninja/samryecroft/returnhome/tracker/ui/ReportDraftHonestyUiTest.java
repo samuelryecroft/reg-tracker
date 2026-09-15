@@ -81,6 +81,7 @@ class ReportDraftHonestyUiTest extends AbstractUiTest {
 
         User requestedBy = new User();
         requestedBy.setUsername("draft-honesty-home-staff");
+        requestedBy.setEmail("draft-honesty-home-staff" + "@example.test");
         requestedBy.setPassword(passwordEncoder.encode(PASSWORD));
         requestedBy.setLastName("Home Staff");
         requestedBy.setRoles(Set.of(Role.HOME_STAFF));
@@ -90,6 +91,7 @@ class ReportDraftHonestyUiTest extends AbstractUiTest {
 
         User visitor = new User();
         visitor.setUsername("draft-honesty-visitor");
+        visitor.setEmail("draft-honesty-visitor" + "@example.test");
         visitor.setPassword(passwordEncoder.encode(PASSWORD));
         visitor.setLastName("Visitor");
         visitor.setRoles(Set.of(Role.VISITOR));

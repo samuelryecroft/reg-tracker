@@ -38,8 +38,23 @@ public class AuditEvent {
     @Column(name = "actor_id", updatable = false)
     private Long actorId;
 
-    @Column(name = "actor_username_at_time", updatable = false)
-    private String actorUsernameAtTime;
+    /**
+     * How this actor was identified when the event happened - the email address for a person, and for
+     * the break-glass account its username, because that account has no address and must never have
+     * one (T344).
+     *
+     * <p>Renamed from {@code actor_username_at_time}, and the rename is the point rather than tidying.
+     * Once login moved to email addresses, a column called "username" holding emails would mean a
+     * reader filtering it for a username found only rows written before the cutover and concluded that
+     * person had done nothing since - a query that succeeds, on data that is accurate, returning the
+     * wrong answer. On an append-only table that could never be corrected afterwards.
+     *
+     * <p>Not {@code actor_email_at_time} either, which was the obvious fix and is also wrong: it does
+     * not hold emails for the one account that has none. Naming it after either source names it after
+     * half of itself.
+     */
+    @Column(name = "actor_identifier_at_time", updatable = false)
+    private String actorIdentifierAtTime;
 
     @Column(name = "actor_roles_at_time", updatable = false)
     private String actorRolesAtTime;
@@ -67,7 +82,7 @@ public class AuditEvent {
         this.eventType = record.eventType();
         this.occurredAt = record.occurredAt();
         this.actorId = record.actorId();
-        this.actorUsernameAtTime = record.actorUsername();
+        this.actorIdentifierAtTime = record.actorUsername();
         this.actorRolesAtTime = record.actorRoles();
         this.targetType = record.targetType();
         this.targetId = record.targetId();
@@ -92,8 +107,8 @@ public class AuditEvent {
         return actorId;
     }
 
-    public String getActorUsernameAtTime() {
-        return actorUsernameAtTime;
+    public String getActorIdentifierAtTime() {
+        return actorIdentifierAtTime;
     }
 
     public String getActorRolesAtTime() {

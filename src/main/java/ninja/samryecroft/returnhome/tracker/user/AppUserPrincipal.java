@@ -73,7 +73,12 @@ public class AppUserPrincipal implements UserDetails {
 
     @Override
     public String getUsername() {
-        return user.getUsername();
+        // The LOGIN IDENTIFIER, not the username column: the email for a person, and for the
+        // break-glass account its username, because that account has no address (T344). Spring
+        // Security's "username" is whatever names the principal, and everything downstream -
+        // failed-login throttling, the audit trail, the break-glass alert - reads this one method,
+        // so none of them has to know the emergency row is different.
+        return user.getLoginIdentifier();
     }
 
     @Override

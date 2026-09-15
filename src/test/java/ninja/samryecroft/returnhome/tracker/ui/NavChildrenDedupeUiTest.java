@@ -49,6 +49,7 @@ class NavChildrenDedupeUiTest extends AbstractUiTest {
     private void createStackedUser(String username, Role... roles) {
         User user = new User();
         user.setUsername(username);
+        user.setEmail(username + "@example.test");
         user.setPassword(passwordEncoder.encode(PASSWORD));
         user.setLastName("Nav Dedupe Tester");
         user.setRoles(Set.of(roles));

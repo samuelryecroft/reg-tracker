@@ -21,6 +21,7 @@ class RoleMatrixTest {
     private AppUserPrincipal principal(OrgType orgType, Role... roles) {
         User user = new User();
         user.setUsername("matrix-subject");
+        user.setEmail("matrix-subject" + "@example.test");
         user.setLastName("Matrix Subject");
         user.setRoles(Set.of(roles));
         if (orgType != null) {

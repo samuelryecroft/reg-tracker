@@ -142,18 +142,23 @@ class LockedAccountTimingGuardTest extends AbstractIntegrationTest {
         String username = "t221-real" + suffix;
         User user = new User();
         user.setUsername(username);
+        user.setEmail(username + "@example.test");
         user.setFirstName("Rea");
         user.setLastName("List");
         user.setPassword(passwordEncoder.encode("correct-horse-battery"));
         user.setRoles(new HashSet<>(Set.of(Role.ADMIN)));
         user.setEnabled(true);
         userRepository.save(user);
-        return username;
+        // The ADDRESS, not the name: everything below keys on what is submitted at /login, and the
+        // lockout counter keys on the same string. Returning the name made the precondition ask
+        // whether a DIFFERENT identifier was locked - which fails in the direction that looks like
+        // this class's own finding.
+        return user.getEmail();
     }
 
-    private MockHttpServletResponse attempt(String username) throws Exception {
+    private MockHttpServletResponse attempt(String identifier) throws Exception {
         return mockMvc.perform(post("/login").with(csrf())
-                        .param("username", username)
+                        .param("username", identifier)
                         .param("password", "definitely-not-the-password"))
                 .andReturn().getResponse();
     }
@@ -167,22 +172,22 @@ class LockedAccountTimingGuardTest extends AbstractIntegrationTest {
      * and the guard reports a symmetric non-zero count. <b>Without this line that state is
      * indistinguishable from the defect the class exists to detect.</b>
      */
-    private void lock(String username) throws Exception {
+    private void lock(String identifier) throws Exception {
         for (int i = 0; i < MAX_ATTEMPTS; i++) {
-            attempt(username);
+            attempt(identifier);
         }
-        assertThat(loginAttemptService.isLocked(username))
+        assertThat(loginAttemptService.isLocked(identifier))
                 .as("PRECONDITION: '%s' must be locked after %d failed attempts before anything below "
                         + "is measured. If this fails the throttle did not engage, and the counts that "
                         + "follow would be measurements of an UNLOCKED account - which looks identical "
-                        + "to the timing defect this class detects", username, MAX_ATTEMPTS)
+                        + "to the timing defect this class detects", identifier, MAX_ATTEMPTS)
                 .isTrue();
     }
 
     @Test
     void neitherLockedCaseComputesAPasswordHash() throws Exception {
         String real = realUser();
-        String unknown = "t221-ghost" + suffix;
+        String unknown = "t221-ghost" + suffix + "@example.test";
         lock(real);
         lock(unknown);
 

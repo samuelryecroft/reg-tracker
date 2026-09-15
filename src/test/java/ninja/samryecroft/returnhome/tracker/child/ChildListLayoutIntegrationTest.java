@@ -1,5 +1,7 @@
 package ninja.samryecroft.returnhome.tracker.child;
 
+import ninja.samryecroft.returnhome.tracker.TestLogins;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.securityContext;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -49,7 +51,7 @@ class ChildListLayoutIntegrationTest extends AbstractIntegrationTest {
     private AppUserDetailsService appUserDetailsService;
 
     private RequestPostProcessor asUser(String username) {
-        UserDetails userDetails = appUserDetailsService.loadUserByUsername(username);
+        UserDetails userDetails = appUserDetailsService.loadUserByUsername(TestLogins.loginIdentifier(username));
         SecurityContext context = new SecurityContextImpl(
                 new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities()));
         return securityContext(context);
@@ -65,6 +67,7 @@ class ChildListLayoutIntegrationTest extends AbstractIntegrationTest {
     private User savedHomeStaff(String username, Home home) {
         User staff = new User();
         staff.setUsername(username);
+        staff.setEmail(username + "@example.test");
         staff.setLastName("Staff");
         staff.setRoles(new HashSet<>(Set.of(Role.HOME_STAFF)));
         staff.setHomes(new HashSet<>(Set.of(home)));

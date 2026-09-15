@@ -67,6 +67,7 @@ class ReportSectionPanelUiTest extends AbstractUiTest {
 
         User requestedBy = new User();
         requestedBy.setUsername("panel-ui-home-staff");
+        requestedBy.setEmail("panel-ui-home-staff" + "@example.test");
         requestedBy.setPassword(passwordEncoder.encode(PASSWORD));
         requestedBy.setLastName("Home Staff");
         requestedBy.setRoles(Set.of(Role.HOME_STAFF));
@@ -76,6 +77,7 @@ class ReportSectionPanelUiTest extends AbstractUiTest {
 
         User visitor = new User();
         visitor.setUsername("panel-ui-visitor");
+        visitor.setEmail("panel-ui-visitor" + "@example.test");
         visitor.setPassword(passwordEncoder.encode(PASSWORD));
         visitor.setLastName("Visitor");
         visitor.setRoles(Set.of(Role.VISITOR));

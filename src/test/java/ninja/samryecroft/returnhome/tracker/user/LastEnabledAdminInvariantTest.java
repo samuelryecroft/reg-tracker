@@ -58,6 +58,7 @@ class LastEnabledAdminInvariantTest extends AbstractIntegrationTest {
 
         User platform = new User();
         platform.setUsername("t278-platform" + suffix);
+        platform.setEmail("t278-platform" + suffix + "@example.test");
         platform.setLastName("Platform");
         platform.setRoles(new HashSet<>(Set.of(Role.ADMIN)));
         platform.setEnabled(true);
@@ -123,6 +124,7 @@ class LastEnabledAdminInvariantTest extends AbstractIntegrationTest {
         other = organisationRepository.save(other);
         User theirs = new User();
         theirs.setUsername("t278-other-admin" + suffix);
+        theirs.setEmail("t278-other-admin" + suffix + "@example.test");
         theirs.setLastName("Other Admin");
         theirs.setRoles(new HashSet<>(Set.of(Role.ORG_ADMIN)));
         theirs.setOrganisation(other);
@@ -147,6 +149,7 @@ class LastEnabledAdminInvariantTest extends AbstractIntegrationTest {
     private User saveOrgAdmin(String username, boolean enabled) {
         User user = new User();
         user.setUsername(username);
+        user.setEmail(username + "@example.test");
         user.setLastName("Admin");
         user.setRoles(new HashSet<>(Set.of(Role.ORG_ADMIN)));
         user.setOrganisation(org);

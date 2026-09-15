@@ -184,6 +184,7 @@ class AccessEpisodeTest {
             ReflectionTestUtils.setField(user, "id", id);
         }
         user.setUsername("viewer");
+        user.setEmail("viewer" + "@example.test");
         user.setRoles(Set.of(Role.VIEWER));
         return new AppUserPrincipal(user);
     }

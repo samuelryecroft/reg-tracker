@@ -103,15 +103,15 @@ class BreakGlassSecondFactorExemptionTest extends AbstractIntegrationTest {
     void anOrdinaryAccountIsStillRefusedDuringTheSameEmergency() throws Exception {
         User user = new User();
         user.setUsername("ordinary-" + System.nanoTime());
+        user.setEmail("ordinary-" + System.nanoTime() + "@example.test");
         user.setFirstName("Ord");
         user.setLastName("Inary");
-        user.setEmail("ordinary@example.test");
         user.setPassword(passwordEncoder.encode(ORDINARY_PASSWORD));
         user.setRoles(new HashSet<>(Set.of(Role.ADMIN)));
         user.setEnabled(true);
         userRepository.save(user);
 
-        MvcResult landed = signIn(user.getUsername(), ORDINARY_PASSWORD);
+        MvcResult landed = signIn(user.getEmail(), ORDINARY_PASSWORD);
 
         assertThat(landed.getResponse().getRedirectedUrl())
                 .as("break-glass being open must not drop the second factor for everyone else")

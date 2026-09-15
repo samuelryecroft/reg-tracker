@@ -246,6 +246,7 @@ class FieldEncryptionIntegrationTest extends AbstractIntegrationTest {
     private User newUser(String username) {
         User user = new User();
         user.setUsername(username);
+        user.setEmail(username + "@example.test");
         user.setPassword("irrelevant-to-this-test");
         user.setLastName("Test Staff");
         user.setRoles(java.util.Set.of(Role.HOME_STAFF));

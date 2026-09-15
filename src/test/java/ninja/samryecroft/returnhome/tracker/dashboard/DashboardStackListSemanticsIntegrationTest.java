@@ -1,5 +1,7 @@
 package ninja.samryecroft.returnhome.tracker.dashboard;
 
+import ninja.samryecroft.returnhome.tracker.TestLogins;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.securityContext;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -203,7 +205,7 @@ class DashboardStackListSemanticsIntegrationTest extends AbstractIntegrationTest
     }
 
     private RequestPostProcessor asUser(String username) {
-        UserDetails userDetails = appUserDetailsService.loadUserByUsername(username);
+        UserDetails userDetails = appUserDetailsService.loadUserByUsername(TestLogins.loginIdentifier(username));
         SecurityContext context = new SecurityContextImpl(
                 new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities()));
         return securityContext(context);
@@ -227,6 +229,7 @@ class DashboardStackListSemanticsIntegrationTest extends AbstractIntegrationTest
     private User newUser(String username, Role role, Home home, Organisation organisation) {
         User user = new User();
         user.setUsername(username);
+        user.setEmail(username + "@example.test");
         user.setPassword(passwordEncoder.encode(PASSWORD));
         user.setLastName(username);
         user.setRoles(Set.of(role));

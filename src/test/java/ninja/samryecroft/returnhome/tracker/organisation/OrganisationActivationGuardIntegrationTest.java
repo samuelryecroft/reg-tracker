@@ -1,5 +1,7 @@
 package ninja.samryecroft.returnhome.tracker.organisation;
 
+import ninja.samryecroft.returnhome.tracker.TestLogins;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.securityContext;
@@ -101,7 +103,7 @@ class OrganisationActivationGuardIntegrationTest extends AbstractIntegrationTest
         staff.setPassword(passwordEncoder.encode("password123"));
         staff.setFirstName("Guard");
         staff.setLastName("Staff");
-        staff.setEmail("guard" + suffix + "@example.test");
+        staff.setEmail("guard-staff" + suffix + "@example.test");
         staff.setRoles(new HashSet<>(Set.of(Role.HOME_STAFF)));
         staff.setHomes(new HashSet<>(Set.of(pendingHome, activeHome)));
         userRepository.save(staff);
@@ -302,7 +304,7 @@ class OrganisationActivationGuardIntegrationTest extends AbstractIntegrationTest
     }
 
     private RequestPostProcessor asUser(String username) {
-        UserDetails details = appUserDetailsService.loadUserByUsername(username);
+        UserDetails details = appUserDetailsService.loadUserByUsername(TestLogins.loginIdentifier(username));
         SecurityContext context = new SecurityContextImpl(
                 UsernamePasswordAuthenticationToken.authenticated(details, null, details.getAuthorities()));
         return securityContext(context);

@@ -45,7 +45,7 @@ import org.springframework.boot.test.context.SpringBootTest;
  * <p><strong>{@code detail} is the only way an identity could reach the pack, and that is
  * structural rather than a judgement.</strong> {@link AuditHistoryEntry} has no username component
  * at all, so {@code CaseFileNarrativeWriter} cannot render one however it is written; the event's
- * {@code actorUsernameAtTime} stops at the projection. What remains reachable is free text in
+ * {@code actorIdentifierAtTime} stops at the projection. What remains reachable is free text in
  * {@code detail} - {@code null} for access rows, which T295 made a deliberate choice rather than an
  * accident of the default branch: {@code AUDIT_VIEW_OPENED} now has its own case, and that case
  * passes {@code null}. <strong>Give it a detail that names somebody and the property is defeated by
@@ -89,6 +89,7 @@ class AccessRowsInThePackCarryNoIdentityTest extends AbstractIntegrationTest {
         username = "pack-reviewer" + suffix;
         actor = new User();
         actor.setUsername(username);
+        actor.setEmail(username + "@example.test");
         // Distinctive enough that a substring assertion cannot pass by luck against boilerplate.
         actor.setLastName(IDENTIFYING_SURNAME);
         actor.setRoles(new HashSet<>(Set.of(Role.HOME_STAFF)));
@@ -127,8 +128,11 @@ class AccessRowsInThePackCarryNoIdentityTest extends AbstractIntegrationTest {
         assertThat(auditEventRepository.findByTargetTypeAndTargetIdOrderByOccurredAtDesc(
                         "InterviewRequest", request.getId()))
                 .singleElement()
-                .extracting(AuditEvent::getActorUsernameAtTime)
-                .isEqualTo(username);
+                .extracting(AuditEvent::getActorIdentifierAtTime)
+                // T344: the trail records the identifier the person SIGNED IN with, which is now
+                // their address. The column was renamed from actor_username_at_time for exactly
+                // this reason - it holds whatever identified the actor, not a username.
+                .isEqualTo(username + "@example.test");
     }
 
     /** Kevin's condition on the A5 ruling, measured rather than reasoned about. */

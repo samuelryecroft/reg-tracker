@@ -27,13 +27,17 @@ import org.springframework.stereotype.Component;
  * first written with.
  *
  * <p><b>The first attempt could never fire, and that is worth recording rather than quietly
- * replacing.</b> It asked whether the bootstrap admin was "neither exempt nor challengeable". But it
- * finds that account BY {@code app.admin.username}, and {@link SecondFactorPolicy} decides the
- * exemption by comparing {@code app.admin.username} to the very same row - <b>the lookup and the
- * exemption share a key, so they cannot disagree</b>. The account it found was therefore always
- * exempt, the condition was always false, and the guard was unfirable: a check whose passing state
- * and whose broken state are indistinguishable, which is the exact shape of the defect it was written
- * to prevent.
+ * replacing.</b> It asked whether the bootstrap admin was "neither exempt nor challengeable" - but it
+ * found that account by {@code app.admin.username} while the policy decided the exemption by
+ * comparing {@code app.admin.username} to the very same row. <b>The lookup and the exemption shared a
+ * key, so they could not disagree</b>: the account it found was always exempt, the condition was
+ * always false, and the guard was unfirable - a check whose passing state and whose broken state are
+ * indistinguishable, which is the exact shape of the defect it was written to prevent.
+ *
+ * <p><b>T344 removes that coupling at the root.</b> The row is now found by its
+ * {@code is_break_glass} flag while the exemption is decided by the same flag on the loaded row, so
+ * the guard asks a question of the TABLE ("is there an enabled emergency account that is still
+ * exempt?") rather than re-deriving the answer it is testing.
  *
  * <p>Asking instead whether the exemption still APPLIES to that account is a question that can come
  * out either way, and it covers the two ways the exit actually closes once it exists: the exemption
@@ -78,38 +82,30 @@ public class EmergencyAccessStartupCheck {
         if (!appProperties.getSecurity().getSecondFactor().isEnabled()) {
             return;
         }
-        String username = appProperties.getAdmin().getUsername();
-        if (username == null || username.isBlank()) {
-            return;
-        }
-        User admin = userRepository.findByUsername(username).orElse(null);
-        if (admin == null) {
+        User emergency = userRepository.findByBreakGlassTrue().orElse(null);
+        if (emergency == null) {
             // NOT a boot failure, and an earlier draft of this guard had it the other way round -
             // which failed every second-factor test context in CI and would have failed a first boot
-            // of any environment without a seed password. A missing row is the ORDINARY state
-            // wherever ADMIN_SEED_PASSWORD is unset or was rejected as weak: AdminUserSeeder chose
-            // to let the application start with nobody able to sign in, and said so in the log.
-            // Turning that into a fatal error overturns a decision that is not this guard's to make,
-            // adds nothing the log does not already say, and converts a warned state into a crash
-            // loop. This guard is about the factor closing a door that was open, not about whether
-            // anyone was ever let in.
+            // of any environment without a seed password. No emergency row is the ORDINARY state
+            // wherever ADMIN_SEED_PASSWORD is unset or was rejected as weak: AdminUserSeeder chose to
+            // let the application start with nobody able to sign in, and said so in the log. Turning
+            // that into a fatal error overturns a decision that is not this guard's to make, adds
+            // nothing the log does not already say, and converts a warned state into a crash loop.
             return;
         }
-        // isRequiredFor is asked of the real row rather than reasoned about, so that a future change
-        // to how the exemption is decided is caught here instead of at somebody's sign-in.
-        if (admin.isEnabled() && !policy.isRequiredFor(admin)) {
+        // Asked of the real row rather than reasoned about, so that a future change to how the
+        // exemption is decided is caught here instead of at somebody's sign-in.
+        if (emergency.isEnabled() && !policy.isRequiredFor(emergency)) {
             return;
         }
-
-        String because = admin.isEnabled()
-                ? "the account '" + username + "' is not exempt from the second factor"
-                : "the account '" + username + "' is disabled";
         throw new IllegalStateException(
-                "The second factor is enabled, but there is no emergency account that could sign in "
-                        + "without it: " + because + ". A mail outage would then lock out everybody, "
-                        + "including whoever would restore mail. Refusing to start rather than going "
-                        + "live with no way back in. Either make app.admin.username name an enabled "
-                        + "account the exemption applies to, or turn "
-                        + "app.security.second-factor.enabled off until it does.");
+                "The second factor is enabled, but the emergency account cannot sign in without it: "
+                        + (emergency.isEnabled()
+                                ? "it is no longer exempt from the second factor"
+                                : "it is disabled")
+                        + ". A mail outage would then lock out everybody, including whoever would "
+                        + "restore mail. Refusing to start rather than going live with no way back "
+                        + "in. Either restore the exemption for the account flagged is_break_glass, "
+                        + "or turn app.security.second-factor.enabled off until it is restored.");
     }
 }

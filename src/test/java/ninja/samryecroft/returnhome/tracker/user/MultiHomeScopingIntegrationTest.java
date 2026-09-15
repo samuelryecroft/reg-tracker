@@ -1,5 +1,7 @@
 package ninja.samryecroft.returnhome.tracker.user;
 
+import ninja.samryecroft.returnhome.tracker.TestLogins;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -216,7 +218,7 @@ class MultiHomeScopingIntegrationTest extends AbstractIntegrationTest {
 
     private void signIn(String username) throws Exception {
         mockMvc.perform(post("/login").with(csrf())
-                        .param("username", username)
+                        .param("username", username + "@example.test")
                         .param("password", "multi-home-password"))
                 .andExpect(status().is3xxRedirection());
     }
@@ -276,6 +278,7 @@ class MultiHomeScopingIntegrationTest extends AbstractIntegrationTest {
     private AppUserPrincipal adminPrincipal() {
         User admin = new User();
         admin.setUsername("mh-admin" + suffix);
+        admin.setEmail("mh-admin" + suffix + "@example.test");
         admin.setLastName("Platform Admin");
         admin.setRoles(Set.of(Role.ADMIN));
         admin.setEnabled(true);
@@ -283,7 +286,7 @@ class MultiHomeScopingIntegrationTest extends AbstractIntegrationTest {
     }
 
     private RequestPostProcessor asUser(String username) {
-        UserDetails userDetails = appUserDetailsService.loadUserByUsername(username);
+        UserDetails userDetails = appUserDetailsService.loadUserByUsername(TestLogins.loginIdentifier(username));
         SecurityContext context = new SecurityContextImpl(
                 new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities()));
         return securityContext(context);
@@ -321,6 +324,7 @@ class MultiHomeScopingIntegrationTest extends AbstractIntegrationTest {
     private void saveUser(String username, Role role, Set<Home> homes) {
         User user = new User();
         user.setUsername(username);
+        user.setEmail(username + "@example.test");
         user.setLastName(username);
         user.setPassword(passwordEncoder.encode("multi-home-password"));
         user.setRoles(Set.of(role));

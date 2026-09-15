@@ -1,5 +1,7 @@
 package ninja.samryecroft.returnhome.tracker.web;
 
+import ninja.samryecroft.returnhome.tracker.TestLogins;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.securityContext;
@@ -148,7 +150,7 @@ class UnprovisionedKekIntegrationTest extends AbstractIntegrationTest {
         admin.setPassword(passwordEncoder.encode("password123"));
         admin.setFirstName("Kek");
         admin.setLastName("Admin");
-        admin.setEmail("kek" + suffix + "@example.test");
+        admin.setEmail("kek-admin" + suffix + "@example.test");
         admin.setOrganisation(careProvider);
         admin.setRoles(new HashSet<>(Set.of(Role.ORG_ADMIN)));
         admin.setHomes(new HashSet<>(Set.of(home)));
@@ -159,7 +161,7 @@ class UnprovisionedKekIntegrationTest extends AbstractIntegrationTest {
         platformAdmin.setPassword(passwordEncoder.encode("password123"));
         platformAdmin.setFirstName("Platform");
         platformAdmin.setLastName("Admin");
-        platformAdmin.setEmail("kek-pa" + suffix + "@example.test");
+        platformAdmin.setEmail("kek-platform-admin" + suffix + "@example.test");
         platformAdmin.setRoles(new HashSet<>(Set.of(Role.ADMIN)));
         platformAdmin.setHomes(new HashSet<>());
         userRepository.save(platformAdmin);
@@ -249,7 +251,7 @@ class UnprovisionedKekIntegrationTest extends AbstractIntegrationTest {
     }
 
     private RequestPostProcessor asUser(String username) {
-        UserDetails details = appUserDetailsService.loadUserByUsername(username);
+        UserDetails details = appUserDetailsService.loadUserByUsername(TestLogins.loginIdentifier(username));
         SecurityContext context = new SecurityContextImpl(
                 UsernamePasswordAuthenticationToken.authenticated(details, null, details.getAuthorities()));
         return securityContext(context);

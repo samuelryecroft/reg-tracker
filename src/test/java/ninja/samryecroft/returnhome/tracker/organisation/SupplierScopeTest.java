@@ -104,6 +104,7 @@ class SupplierScopeTest {
     private AppUserPrincipal principal(Set<Role> roles, Organisation organisation) {
         User user = new User();
         user.setUsername("t139");
+        user.setEmail("t139" + "@example.test");
         user.setRoles(new HashSet<>(roles));
         user.setOrganisation(organisation);
         return new AppUserPrincipal(user);

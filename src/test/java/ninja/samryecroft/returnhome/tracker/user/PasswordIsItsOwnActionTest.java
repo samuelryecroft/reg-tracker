@@ -1,5 +1,7 @@
 package ninja.samryecroft.returnhome.tracker.user;
 
+import ninja.samryecroft.returnhome.tracker.TestLogins;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -83,6 +85,7 @@ class PasswordIsItsOwnActionTest extends AbstractIntegrationTest {
         orgAdminUsername = "t277-orgadmin" + suffix;
         User admin = new User();
         admin.setUsername(orgAdminUsername);
+        admin.setEmail(orgAdminUsername + "@example.test");
         admin.setLastName("Org Admin");
         admin.setRoles(new HashSet<>(Set.of(Role.ORG_ADMIN)));
         admin.setOrganisation(ours);
@@ -214,7 +217,7 @@ class PasswordIsItsOwnActionTest extends AbstractIntegrationTest {
      */
     @Test
     void theServiceRefusesOutOfScopeEvenWhenCalledDirectly() {
-        UserDetails details = appUserDetailsService.loadUserByUsername(orgAdminUsername);
+        UserDetails details = appUserDetailsService.loadUserByUsername(TestLogins.loginIdentifier(orgAdminUsername));
         AppUserPrincipal principal = (AppUserPrincipal) details;
 
         assertThatThrownBy(() -> userService.setPassword(otherProvidersUser.getId(), GOOD_PASSWORD, principal))
@@ -224,6 +227,7 @@ class PasswordIsItsOwnActionTest extends AbstractIntegrationTest {
     private User saveStaff(String username, Home home) {
         User user = new User();
         user.setUsername(username);
+        user.setEmail(username + "@example.test");
         user.setLastName("Target");
         user.setRoles(new HashSet<>(Set.of(Role.HOME_STAFF)));
         user.setHomes(new HashSet<>(Set.of(home)));
@@ -246,7 +250,7 @@ class PasswordIsItsOwnActionTest extends AbstractIntegrationTest {
     }
 
     private RequestPostProcessor asOrgAdmin() {
-        UserDetails details = appUserDetailsService.loadUserByUsername(orgAdminUsername);
+        UserDetails details = appUserDetailsService.loadUserByUsername(TestLogins.loginIdentifier(orgAdminUsername));
         return securityContext(new SecurityContextImpl(
                 new UsernamePasswordAuthenticationToken(details, null, details.getAuthorities())));
     }

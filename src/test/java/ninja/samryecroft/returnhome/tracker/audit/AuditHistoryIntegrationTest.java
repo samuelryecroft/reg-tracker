@@ -1,5 +1,7 @@
 package ninja.samryecroft.returnhome.tracker.audit;
 
+import ninja.samryecroft.returnhome.tracker.TestLogins;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.securityContext;
@@ -72,7 +74,7 @@ class AuditHistoryIntegrationTest extends AbstractIntegrationTest {
     private String suffix;
 
     private RequestPostProcessor asUser(String username) {
-        UserDetails userDetails = appUserDetailsService.loadUserByUsername(username);
+        UserDetails userDetails = appUserDetailsService.loadUserByUsername(TestLogins.loginIdentifier(username));
         SecurityContext context = new SecurityContextImpl(
                 new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities()));
         return securityContext(context);
@@ -106,6 +108,7 @@ class AuditHistoryIntegrationTest extends AbstractIntegrationTest {
     private User newUser(String username, Role role, Home userHome, Organisation organisation) {
         User user = new User();
         user.setUsername(username);
+        user.setEmail(username + "@example.test");
         user.setPassword(passwordEncoder.encode(PASSWORD));
         // Deliberately shares no substring with the username: interview/detail.html legitimately
         // shows the requester's full name in its own "Requested by" field (unrelated to History),
@@ -214,7 +217,7 @@ class AuditHistoryIntegrationTest extends AbstractIntegrationTest {
                 .doesNotContain("hist-visitor" + suffix)
                 .doesNotContain("hist-reviewer" + suffix);
         String generatedFilename = auditEventRepository.findByEventTypeOrderByOccurredAtDesc(AuditEventType.DOCX_GENERATED)
-                .stream().filter(e -> e.getActorUsernameAtTime().endsWith(suffix)).findFirst()
+                .stream().filter(e -> e.getActorIdentifierAtTime().contains(suffix)).findFirst()
                 .orElseThrow().getMetadata();
         assertThat(generatedFilename).contains("filename=");
         assertThat(historySection).doesNotContain(generatedFilename.replaceAll(".*filename=", "").split(";")[0]);
@@ -273,7 +276,10 @@ class AuditHistoryIntegrationTest extends AbstractIntegrationTest {
 
         // Prove exclusion isn't just "there happens to be no login event": actually sign in first.
         mockMvc.perform(post("/login").with(csrf())
-                        .param("username", "hist-newvisitor" + suffix)
+                        // The address the account was CREATED with, not one derived from its
+                        // username - a failed sign-in also redirects, so getting this wrong would
+                        // leave the test asserting an absence it never actually created.
+                        .param("username", "history.new.visitor@example.test")
                         .param("password", "CorrectHorse123!"))
                 .andExpect(status().is3xxRedirection());
 

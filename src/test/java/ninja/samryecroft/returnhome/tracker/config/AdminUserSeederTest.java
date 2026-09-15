@@ -171,6 +171,7 @@ class AdminUserSeederTest {
     private User existingAdmin(String username) {
         User admin = new User();
         admin.setUsername(username);
+        admin.setEmail(username + "@example.test");
         admin.setRoles(Set.of(Role.ADMIN));
         return admin;
     }

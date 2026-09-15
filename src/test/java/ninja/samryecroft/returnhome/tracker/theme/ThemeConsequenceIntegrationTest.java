@@ -1,5 +1,7 @@
 package ninja.samryecroft.returnhome.tracker.theme;
 
+import ninja.samryecroft.returnhome.tracker.TestLogins;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.securityContext;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -64,6 +66,7 @@ class ThemeConsequenceIntegrationTest extends AbstractIntegrationTest {
         String username = "t3a-orgadmin" + suffix;
         User user = new User();
         user.setUsername(username);
+        user.setEmail(username + "@example.test");
         user.setLastName("Admin");
         user.setRoles(new HashSet<>(Set.of(Role.ORG_ADMIN)));
         user.setOrganisation(supplier);
@@ -74,7 +77,7 @@ class ThemeConsequenceIntegrationTest extends AbstractIntegrationTest {
     }
 
     private RequestPostProcessor asUser(String username) {
-        UserDetails userDetails = appUserDetailsService.loadUserByUsername(username);
+        UserDetails userDetails = appUserDetailsService.loadUserByUsername(TestLogins.loginIdentifier(username));
         SecurityContext context = new SecurityContextImpl(
                 new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities()));
         return securityContext(context);
@@ -129,6 +132,7 @@ class ThemeConsequenceIntegrationTest extends AbstractIntegrationTest {
         String username = "t3a-platform-admin" + suffix;
         User admin = new User();
         admin.setUsername(username);
+        admin.setEmail(username + "@example.test");
         admin.setLastName("Admin");
         admin.setRoles(new HashSet<>(Set.of(Role.ADMIN)));
         admin.setHomes(new HashSet<>());

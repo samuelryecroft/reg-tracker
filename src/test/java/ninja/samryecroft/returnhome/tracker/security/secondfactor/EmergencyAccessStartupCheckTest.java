@@ -19,25 +19,21 @@ import org.junit.jupiter.api.Test;
  * a guard that throws for the wrong reason passes a test that only asks whether it threw - and the
  * first version of this guard could not fire at all, which a one-directional test would have called
  * success.
- *
- * <p>Plain unit tests with hand-built collaborators: the condition is about configuration and one
- * row, and driving it through a Spring context would hide the thing being asserted behind a fixture.
  */
 class EmergencyAccessStartupCheckTest {
 
-    private static final String ADMIN = "bootstrap-admin";
-
-    private AppProperties propertiesWith(boolean factorEnabled, String adminUsername) {
+    private AppProperties propertiesWith(boolean factorEnabled) {
         AppProperties properties = new AppProperties();
         properties.getSecurity().getSecondFactor().setEnabled(factorEnabled);
-        properties.getAdmin().setUsername(adminUsername);
         return properties;
     }
 
-    private User account(String username, boolean enabled) {
+    /** The emergency account as the database now marks it: by a flag, not by its name (T344). */
+    private User emergencyAccount(boolean enabled, boolean breakGlass) {
         User user = new User();
-        user.setUsername(username);
+        user.setUsername("bootstrap-admin");
         user.setEnabled(enabled);
+        user.setBreakGlass(breakGlass);
         return user;
     }
 
@@ -53,7 +49,7 @@ class EmergencyAccessStartupCheckTest {
                 UserRepository.class.getClassLoader(),
                 new Class<?>[] {UserRepository.class},
                 (proxy, method, args) -> {
-                    if ("findByUsername".equals(method.getName())) {
+                    if ("findByBreakGlassTrue".equals(method.getName())) {
                         return Optional.ofNullable(user);
                     }
                     throw new UnsupportedOperationException(
@@ -61,71 +57,59 @@ class EmergencyAccessStartupCheckTest {
                 });
     }
 
-    private EmergencyAccessStartupCheck check(AppProperties properties, User adminRow) {
+    private EmergencyAccessStartupCheck check(AppProperties properties, User emergencyRow) {
         SecondFactorPolicy policy = new SecondFactorPolicy(properties);
-        return new EmergencyAccessStartupCheck(properties, repositoryReturning(adminRow), policy);
+        return new EmergencyAccessStartupCheck(properties, repositoryReturning(emergencyRow), policy);
     }
 
     /**
-     * The healthy configuration: factor on, the exemption applying to a real enabled account. This is
-     * the direction that matters most, because a false positive here is a production outage caused by
-     * the safety check itself.
+     * The healthy configuration. This is the direction that matters most, because a false positive
+     * here is a production outage caused by the safety check itself.
      */
     @Test
     void itStaysSilentWhenAnExemptEmergencyAccountExists() {
-        AppProperties properties = propertiesWith(true, ADMIN);
-
-        assertThatCode(() -> check(properties, account(ADMIN, true))
+        assertThatCode(() -> check(propertiesWith(true), emergencyAccount(true, true))
                 .refuseToStartWithNoWayBackIn(null))
                 .doesNotThrowAnyException();
     }
 
     /**
-     * A named account that does not exist is NOT a boot failure - and this assertion is here because
-     * an earlier draft of the guard had it the other way round.
+     * No emergency account at all is NOT a boot failure - and this assertion is here because an
+     * earlier draft of the guard had it the other way round.
      *
-     * <p>That draft meant to catch a silent {@code app.admin.username} mismatch. It failed every
-     * second-factor test context in CI, because a missing row is the ordinary state wherever no seed
-     * password is configured: {@code AdminUserSeeder} deliberately lets the application start with
-     * nobody able to sign in and says so in the log. <b>A guard that refuses to boot is an outage of
-     * its own if it misfires, and that one misfired on the commonest configuration there is.</b> The
-     * evidence is kept as a test rather than a comment so the case cannot be quietly widened again.
+     * <p>That draft failed every second-factor test context in CI, because a missing emergency row is
+     * the ordinary state wherever no seed password is configured: {@code AdminUserSeeder} deliberately
+     * lets the application start with nobody able to sign in and says so in the log. <b>A guard that
+     * refuses to boot is an outage of its own if it misfires, and that one misfired on the commonest
+     * configuration there is.</b> Kept as a test rather than a comment so it cannot be quietly widened
+     * again.
      */
     @Test
-    void itStaysSilentWhenTheNamedEmergencyAccountDoesNotExist() {
-        AppProperties properties = propertiesWith(true, "nobody-seeded-this");
-
-        assertThatCode(() -> check(properties, null).refuseToStartWithNoWayBackIn(null))
+    void itStaysSilentWhenNoEmergencyAccountExists() {
+        assertThatCode(() -> check(propertiesWith(true), null).refuseToStartWithNoWayBackIn(null))
                 .doesNotThrowAnyException();
     }
 
     /** Somebody disabled the emergency account while the factor was on. */
     @Test
     void itRefusesWhenTheEmergencyAccountIsDisabled() {
-        AppProperties properties = propertiesWith(true, ADMIN);
-
-        assertThatThrownBy(() -> check(properties, account(ADMIN, false))
+        assertThatThrownBy(() -> check(propertiesWith(true), emergencyAccount(false, true))
                 .refuseToStartWithNoWayBackIn(null))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("is disabled");
+                .hasMessageContaining("it is disabled");
     }
 
     /**
-     * The regression this whole card is about: the exemption stops applying to the account.
-     *
-     * <p>Reproduced the only way it can now happen - the policy's idea of the bootstrap admin and the
-     * account on the system are different names - which is the same end state T339 reached by a
-     * different route, and is what a future re-gating of the exemption would look like from here.
+     * The regression this whole line of work is about: the exemption stops applying to the emergency
+     * account. That is the state T339 reached by a gate, and the state a future re-gating would reach
+     * again.
      */
     @Test
     void itRefusesWhenTheExemptionDoesNotApplyToThatAccount() {
-        AppProperties properties = propertiesWith(true, ADMIN);
-        // The row the lookup returns is NOT the account the policy exempts.
-        User someoneElse = account("not-the-bootstrap-admin", true);
-
-        assertThatThrownBy(() -> check(properties, someoneElse).refuseToStartWithNoWayBackIn(null))
+        assertThatThrownBy(() -> check(propertiesWith(true), emergencyAccount(true, false))
+                .refuseToStartWithNoWayBackIn(null))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("is not exempt from the second factor");
+                .hasMessageContaining("no longer exempt from the second factor");
     }
 
     /**
@@ -134,38 +118,28 @@ class EmergencyAccessStartupCheckTest {
      */
     @Test
     void itStaysSilentWhileTheFactorIsOff() {
-        AppProperties properties = propertiesWith(false, "nobody-seeded-this");
-
-        assertThatCode(() -> check(properties, null).refuseToStartWithNoWayBackIn(null))
+        assertThatCode(() -> check(propertiesWith(false), null).refuseToStartWithNoWayBackIn(null))
                 .doesNotThrowAnyException();
     }
 
     /**
-     * Silent when no bootstrap admin is configured at all - an ordinary local-development state that
-     * {@code AdminUserSeeder} already warns about, and which turning fatal would make a first run
-     * crash-loop on.
+     * The exemption depends on the FLAG and on nothing else - not on a name, and not on
+     * {@code app.auth.break-glass.enabled}.
+     *
+     * <p>Both of those have locked the emergency account out of production once already: the flag gate
+     * in T339, and the name default in T341, where {@code ADMIN_SEED_USERNAME} was unset so any
+     * account called {@code admin} was permanently exempt.
      */
     @Test
-    void itStaysSilentWhenNoBootstrapAdminIsConfigured() {
-        AppProperties properties = propertiesWith(true, "  ");
+    void theExemptionDependsOnTheFlagAndOnNothingElse() {
+        SecondFactorPolicy policy = new SecondFactorPolicy(propertiesWith(true));
 
-        assertThatCode(() -> check(properties, null).refuseToStartWithNoWayBackIn(null))
-                .doesNotThrowAnyException();
-    }
-
-    /**
-     * The guard must not be satisfiable by the old, unfirable condition. If someone reinstates the
-     * break-glass gate on the exemption, {@code isRequiredFor} becomes true for the emergency account
-     * and the first test above starts failing - this records why that failure is correct.
-     */
-    @Test
-    void theExemptionItReliesOnDoesNotDependOnBreakGlassBeingArmed() {
-        AppProperties properties = propertiesWith(true, ADMIN);
-        SecondFactorPolicy policy = new SecondFactorPolicy(properties);
-
-        assertThat(policy.isRequiredFor(account(ADMIN, true)))
-                .as("the bootstrap admin must be exempt with no break-glass flag set anywhere - "
-                        + "that gate is what locked the emergency account out of production (T339)")
+        assertThat(policy.isRequiredFor(emergencyAccount(true, true)))
+                .as("a flagged account is exempt with no break-glass property set anywhere")
                 .isFalse();
+        assertThat(policy.isRequiredFor(emergencyAccount(true, false)))
+                .as("an unflagged account is NOT exempt, whatever it happens to be named - that "
+                        + "naming coincidence was T341")
+                .isTrue();
     }
 }

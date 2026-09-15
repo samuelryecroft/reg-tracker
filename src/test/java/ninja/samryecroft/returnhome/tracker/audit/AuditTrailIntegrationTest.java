@@ -1,5 +1,7 @@
 package ninja.samryecroft.returnhome.tracker.audit;
 
+import ninja.samryecroft.returnhome.tracker.TestLogins;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -82,7 +84,7 @@ class AuditTrailIntegrationTest extends AbstractIntegrationTest {
     private String suffix;
 
     private RequestPostProcessor asUser(String username) {
-        UserDetails userDetails = appUserDetailsService.loadUserByUsername(username);
+        UserDetails userDetails = appUserDetailsService.loadUserByUsername(TestLogins.loginIdentifier(username));
         SecurityContext context = new SecurityContextImpl(
                 new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities()));
         return securityContext(context);
@@ -130,6 +132,7 @@ class AuditTrailIntegrationTest extends AbstractIntegrationTest {
     private User newUser(String username, Role role, Home userHome, Organisation organisation) {
         User user = new User();
         user.setUsername(username);
+        user.setEmail(username + "@example.test");
         user.setPassword(passwordEncoder.encode(PASSWORD));
         user.setLastName(username);
         user.setRoles(Set.of(role));
@@ -143,8 +146,8 @@ class AuditTrailIntegrationTest extends AbstractIntegrationTest {
     private AuditEvent latestOwn(AuditEventType type) {
         List<AuditEvent> events = auditEventRepository.findByEventTypeOrderByOccurredAtDesc(type);
         return events.stream()
-                .filter(event -> event.getActorUsernameAtTime() != null
-                        && event.getActorUsernameAtTime().endsWith(suffix))
+                .filter(event -> event.getActorIdentifierAtTime() != null
+                        && event.getActorIdentifierAtTime().contains(suffix))
                 .findFirst()
                 .orElseThrow(() -> new AssertionError("No " + type + " audit event for this run"));
     }
@@ -165,7 +168,7 @@ class AuditTrailIntegrationTest extends AbstractIntegrationTest {
         AuditEvent created = latestOwn(AuditEventType.INTERVIEW_REQUEST_CREATED);
         assertThat(created.getTargetType()).isEqualTo("InterviewRequest");
         assertThat(created.getTargetId()).isEqualTo(requestId);
-        assertThat(created.getActorUsernameAtTime()).isEqualTo("audit-home" + suffix);
+        assertThat(created.getActorIdentifierAtTime()).isEqualTo("audit-home" + suffix + "@example.test");
         assertThat(created.getActorId())
                 .isEqualTo(userRepository.findByUsername("audit-home" + suffix).orElseThrow().getId());
         assertThat(created.getActorRolesAtTime()).isEqualTo("HOME_STAFF");
@@ -184,7 +187,7 @@ class AuditTrailIntegrationTest extends AbstractIntegrationTest {
 
         AuditEvent allocated = latestOwn(AuditEventType.INTERVIEW_REQUEST_ALLOCATED);
         assertThat(allocated.getTargetId()).isEqualTo(requestId);
-        assertThat(allocated.getActorUsernameAtTime()).isEqualTo("audit-coordinator" + suffix);
+        assertThat(allocated.getActorIdentifierAtTime()).isEqualTo("audit-coordinator" + suffix + "@example.test");
         assertThat(allocated.getActorRolesAtTime()).isEqualTo("COORDINATOR");
         // Scope follows the request's care-provider home, not the supplier-side actor's own org.
         assertThat(allocated.getOrganisationId()).isEqualTo(careProviderOrg.getId());
@@ -202,7 +205,7 @@ class AuditTrailIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().is3xxRedirection());
 
         AuditEvent draft = latestOwn(AuditEventType.REPORT_DRAFT_SAVED);
-        assertThat(draft.getActorUsernameAtTime()).isEqualTo("audit-visitor" + suffix);
+        assertThat(draft.getActorIdentifierAtTime()).isEqualTo("audit-visitor" + suffix + "@example.test");
         assertThat(draft.getTargetType()).isEqualTo("InterviewReport");
         assertThat(draft.getMetadata()).contains("requestId=" + requestId).contains("reportStatus=DRAFT");
 
@@ -212,7 +215,7 @@ class AuditTrailIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().is3xxRedirection());
 
         AuditEvent submitted = latestOwn(AuditEventType.REPORT_SUBMITTED);
-        assertThat(submitted.getActorUsernameAtTime()).isEqualTo("audit-visitor" + suffix);
+        assertThat(submitted.getActorIdentifierAtTime()).isEqualTo("audit-visitor" + suffix + "@example.test");
         assertThat(submitted.getOrganisationId()).isEqualTo(careProviderOrg.getId());
         assertThat(submitted.getMetadata()).contains("reportStatus=SUBMITTED");
 
@@ -223,14 +226,14 @@ class AuditTrailIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().is3xxRedirection());
 
         AuditEvent approved = latestOwn(AuditEventType.REPORT_APPROVED);
-        assertThat(approved.getActorUsernameAtTime()).isEqualTo("audit-reviewer" + suffix);
+        assertThat(approved.getActorIdentifierAtTime()).isEqualTo("audit-reviewer" + suffix + "@example.test");
         assertThat(approved.getActorRolesAtTime()).isEqualTo("REVIEWER");
         assertThat(approved.getMetadata()).contains("reportStatus=APPROVED");
 
         String generatedFilename = interviewReportRepository.findByInterviewRequestId(requestId)
                 .orElseThrow().getGeneratedDocumentPath();
         AuditEvent generated = latestOwn(AuditEventType.DOCX_GENERATED);
-        assertThat(generated.getActorUsernameAtTime()).isEqualTo("audit-reviewer" + suffix);
+        assertThat(generated.getActorIdentifierAtTime()).isEqualTo("audit-reviewer" + suffix + "@example.test");
         assertThat(generated.getMetadata()).contains("filename=" + generatedFilename);
 
         // 5. Home staff downloads it - who *reads* the document is audited too
@@ -238,7 +241,7 @@ class AuditTrailIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk());
 
         AuditEvent downloaded = latestOwn(AuditEventType.DOCX_DOWNLOADED);
-        assertThat(downloaded.getActorUsernameAtTime()).isEqualTo("audit-home" + suffix);
+        assertThat(downloaded.getActorIdentifierAtTime()).isEqualTo("audit-home" + suffix + "@example.test");
         assertThat(downloaded.getTargetType()).isEqualTo("InterviewReport");
         assertThat(downloaded.getOrganisationId()).isEqualTo(careProviderOrg.getId());
         assertThat(downloaded.getHomeId()).isEqualTo(home.getId());
@@ -262,7 +265,7 @@ class AuditTrailIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().is3xxRedirection());
 
         AuditEvent rejected = latestOwn(AuditEventType.REPORT_REJECTED);
-        assertThat(rejected.getActorUsernameAtTime()).isEqualTo("audit-reviewer" + suffix);
+        assertThat(rejected.getActorIdentifierAtTime()).isEqualTo("audit-reviewer" + suffix + "@example.test");
         assertThat(rejected.getMetadata()).contains("reportStatus=REJECTED").contains("commentsProvided=true");
         // AUDIT-PLAN.md §B.5: the trail records that a decision happened, never a second copy of
         // what was said about the child.
@@ -275,22 +278,22 @@ class AuditTrailIntegrationTest extends AbstractIntegrationTest {
         String username = "audit-visitor" + suffix;
 
         mockMvc.perform(post("/login").with(csrf())
-                        .param("username", username)
+                        .param("username", username + "@example.test")
                         .param("password", PASSWORD))
                 .andExpect(status().is3xxRedirection());
 
         AuditEvent success = latestOwn(AuditEventType.LOGIN_SUCCESS);
-        assertThat(success.getActorUsernameAtTime()).isEqualTo(username);
+        assertThat(success.getActorIdentifierAtTime()).isEqualTo(username + "@example.test");
         assertThat(success.getActorId()).isEqualTo(userRepository.findByUsername(username).orElseThrow().getId());
         assertThat(success.getOrganisationId()).isEqualTo(supplierOrg.getId());
 
         mockMvc.perform(post("/login").with(csrf())
-                        .param("username", username)
+                        .param("username", username + "@example.test")
                         .param("password", "wrong-password"))
                 .andExpect(status().is3xxRedirection());
 
         AuditEvent failure = latestOwn(AuditEventType.LOGIN_FAILURE);
-        assertThat(failure.getActorUsernameAtTime()).isEqualTo(username);
+        assertThat(failure.getActorIdentifierAtTime()).isEqualTo(username + "@example.test");
         // Nothing identifies the account beyond the attempted username - and no credential material.
         assertThat(failure.getActorId()).isNull();
         assertThat(failure.getMetadata()).contains("BadCredentialsException");
@@ -305,7 +308,7 @@ class AuditTrailIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isForbidden());
 
         AuditEvent denied = latestOwn(AuditEventType.ACCESS_DENIED);
-        assertThat(denied.getActorUsernameAtTime()).isEqualTo("audit-home" + suffix);
+        assertThat(denied.getActorIdentifierAtTime()).isEqualTo("audit-home" + suffix + "@example.test");
         assertThat(denied.getActorRolesAtTime()).isEqualTo("HOME_STAFF");
         assertThat(denied.getHomeId()).isEqualTo(home.getId());
         assertThat(denied.getMetadata())
@@ -328,7 +331,7 @@ class AuditTrailIntegrationTest extends AbstractIntegrationTest {
 
         User created = userRepository.findByUsername(newUsername).orElseThrow();
         AuditEvent createdEvent = latestOwn(AuditEventType.USER_CREATED);
-        assertThat(createdEvent.getActorUsernameAtTime()).isEqualTo("audit-orgadmin" + suffix);
+        assertThat(createdEvent.getActorIdentifierAtTime()).isEqualTo("audit-orgadmin" + suffix + "@example.test");
         assertThat(createdEvent.getTargetType()).isEqualTo("User");
         assertThat(createdEvent.getTargetId()).isEqualTo(created.getId());
         assertThat(createdEvent.getOrganisationId()).isEqualTo(supplierOrg.getId());

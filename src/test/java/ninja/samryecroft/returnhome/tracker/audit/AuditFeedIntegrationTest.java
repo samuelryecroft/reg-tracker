@@ -1,5 +1,7 @@
 package ninja.samryecroft.returnhome.tracker.audit;
 
+import ninja.samryecroft.returnhome.tracker.TestLogins;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.securityContext;
@@ -75,7 +77,7 @@ class AuditFeedIntegrationTest extends AbstractIntegrationTest {
     private Long childId;
 
     private RequestPostProcessor asUser(String username) {
-        UserDetails userDetails = appUserDetailsService.loadUserByUsername(username);
+        UserDetails userDetails = appUserDetailsService.loadUserByUsername(TestLogins.loginIdentifier(username));
         SecurityContext context = new SecurityContextImpl(
                 new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities()));
         return securityContext(context);
@@ -117,6 +119,7 @@ class AuditFeedIntegrationTest extends AbstractIntegrationTest {
     private User newUser(String username, Role role, Home userHome, Organisation organisation) {
         User user = new User();
         user.setUsername(username);
+        user.setEmail(username + "@example.test");
         user.setPassword(passwordEncoder.encode(PASSWORD));
         user.setLastName(username);
         user.setRoles(Set.of(role));
@@ -134,7 +137,7 @@ class AuditFeedIntegrationTest extends AbstractIntegrationTest {
     @Test
     void feedShowsCaseActivityButNeverSignInEvents() throws Exception {
         String homeUsername = "feed-home" + suffix;
-        mockMvc.perform(post("/login").with(csrf()).param("username", homeUsername).param("password", PASSWORD))
+        mockMvc.perform(post("/login").with(csrf()).param("username", homeUsername + "@example.test").param("password", PASSWORD))
                 .andExpect(status().is3xxRedirection());
 
         mockMvc.perform(post("/requests").with(asUser(homeUsername)).with(csrf())
@@ -246,7 +249,7 @@ class AuditFeedIntegrationTest extends AbstractIntegrationTest {
 
         AuditEvent exportEvent = auditEventRepository.findByEventTypeOrderByOccurredAtDesc(AuditEventType.AUDIT_QUERY_EXPORTED)
                 .stream()
-                .filter(e -> e.getActorUsernameAtTime() != null && e.getActorUsernameAtTime().endsWith(suffix))
+                .filter(e -> e.getActorIdentifierAtTime() != null && e.getActorIdentifierAtTime().contains(suffix))
                 .findFirst().orElseThrow();
         assertThat(exportEvent.getMetadata()).contains("rows=" + dataRows);
         assertThat(exportEvent.getMetadata()).doesNotContain("Free text that must never reach the CSV export");

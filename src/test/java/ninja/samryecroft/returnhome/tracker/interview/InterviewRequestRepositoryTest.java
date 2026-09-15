@@ -102,6 +102,7 @@ class InterviewRequestRepositoryTest extends AbstractIntegrationTest {
     private User newUser(String username, Role role, Home home) {
         User user = new User();
         user.setUsername(username);
+        user.setEmail(username + "@example.test");
         user.setPassword("irrelevant");
         user.setLastName(username);
         user.setRoles(Set.of(role));

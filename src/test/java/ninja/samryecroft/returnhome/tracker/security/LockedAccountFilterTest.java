@@ -130,6 +130,10 @@ class LockedAccountFilterTest {
                 ? MockMvcRequestBuilders.get("/login")
                 : MockMvcRequestBuilders.post("/login");
         if (username != null) {
+            // T344 note: no address is appended here on purpose. What this filter reads is the
+            // VALUE of the login parameter, whatever it happens to be - it never resolves an
+            // account - so the identifier is opaque to it, and both sides of every case below have
+            // to agree on the same string or the test is only measuring its own inconsistency.
             builder = builder.param("username", username);
         }
         return builder.param("password", "whatever").buildRequest(new MockServletContext());

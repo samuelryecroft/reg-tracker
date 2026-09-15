@@ -1,5 +1,7 @@
 package ninja.samryecroft.returnhome.tracker.report;
 
+import ninja.samryecroft.returnhome.tracker.TestLogins;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.securityContext;
@@ -258,8 +260,8 @@ class ApprovalIsNotErasableByResubmissionIntegrationTest extends AbstractIntegra
 
         AuditEvent latest = auditEventRepository
                 .findByEventTypeOrderByOccurredAtDesc(AuditEventType.REPORT_SUBMITTED).stream()
-                .filter(e -> e.getActorUsernameAtTime() != null
-                        && e.getActorUsernameAtTime().equals("t145-visitor" + suffix))
+                .filter(e -> e.getActorIdentifierAtTime() != null
+                        && e.getActorIdentifierAtTime().equals("t145-visitor" + suffix + "@example.test"))
                 .findFirst().orElseThrow();
 
         assertThat(latest.getMetadata()).contains("statusBefore=REJECTED");
@@ -290,6 +292,7 @@ class ApprovalIsNotErasableByResubmissionIntegrationTest extends AbstractIntegra
     private void saveUser(String username, Set<Role> roles, Organisation organisation, Home home) {
         User user = new User();
         user.setUsername(username);
+        user.setEmail(username + "@example.test");
         user.setLastName(username);
         user.setRoles(new HashSet<>(roles));
         user.setOrganisation(organisation);
@@ -299,7 +302,7 @@ class ApprovalIsNotErasableByResubmissionIntegrationTest extends AbstractIntegra
     }
 
     private RequestPostProcessor asUser(String username) {
-        UserDetails details = appUserDetailsService.loadUserByUsername(username);
+        UserDetails details = appUserDetailsService.loadUserByUsername(TestLogins.loginIdentifier(username));
         SecurityContext context = new SecurityContextImpl(
                 new UsernamePasswordAuthenticationToken(details, null, details.getAuthorities()));
         return securityContext(context);

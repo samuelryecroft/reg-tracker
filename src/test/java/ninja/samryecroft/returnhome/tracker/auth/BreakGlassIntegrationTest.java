@@ -1,5 +1,7 @@
 package ninja.samryecroft.returnhome.tracker.auth;
 
+import ninja.samryecroft.returnhome.tracker.TestLogins;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 import ch.qos.logback.classic.Level;
@@ -61,6 +63,7 @@ class BreakGlassIntegrationTest extends AbstractBreakGlassEnabledTest {
         username = "break-glass-" + System.nanoTime();
         User user = new User();
         user.setUsername(username);
+        user.setEmail(username + "@example.test");
         user.setLastName("Emergency");
         user.setRoles(new HashSet<>(Set.of(Role.ADMIN)));
         user.setEnabled(true);
@@ -111,13 +114,13 @@ class BreakGlassIntegrationTest extends AbstractBreakGlassEnabledTest {
 
     private long rowsFor(AuditEventType type) {
         return auditEventRepository.findByEventTypeOrderByOccurredAtDesc(type).stream()
-                .map(AuditEvent::getActorUsernameAtTime)
-                .filter(username::equals)
+                .map(AuditEvent::getActorIdentifierAtTime)
+                .filter((username + "@example.test")::equals)
                 .count();
     }
 
     private UsernamePasswordAuthenticationToken formAuthentication() {
-        UserDetails details = appUserDetailsService.loadUserByUsername(username);
+        UserDetails details = appUserDetailsService.loadUserByUsername(TestLogins.loginIdentifier(username));
         return new UsernamePasswordAuthenticationToken(details, null, details.getAuthorities());
     }
 }

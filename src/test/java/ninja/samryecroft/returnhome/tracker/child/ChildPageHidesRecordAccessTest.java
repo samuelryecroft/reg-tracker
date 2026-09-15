@@ -1,5 +1,7 @@
 package ninja.samryecroft.returnhome.tracker.child;
 
+import ninja.samryecroft.returnhome.tracker.TestLogins;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.securityContext;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -98,6 +100,7 @@ class ChildPageHidesRecordAccessTest extends AbstractIntegrationTest {
         staffUsername = "a5-staff" + suffix;
         staff = new User();
         staff.setUsername(staffUsername);
+        staff.setEmail(staffUsername + "@example.test");
         staff.setLastName("Staff");
         staff.setRoles(new HashSet<>(Set.of(Role.HOME_STAFF)));
         staff.setHomes(new HashSet<>(Set.of(home)));
@@ -180,7 +183,7 @@ class ChildPageHidesRecordAccessTest extends AbstractIntegrationTest {
     }
 
     private RequestPostProcessor asStaff() {
-        UserDetails userDetails = appUserDetailsService.loadUserByUsername(staffUsername);
+        UserDetails userDetails = appUserDetailsService.loadUserByUsername(TestLogins.loginIdentifier(staffUsername));
         return securityContext(new SecurityContextImpl(
                 new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities())));
     }

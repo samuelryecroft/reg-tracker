@@ -157,7 +157,7 @@ class EncryptedDataProbeFindsEachEntityTest extends AbstractIntegrationTest {
         visitor.setPassword(passwordEncoder.encode("password123"));
         visitor.setFirstName("Probe");
         visitor.setLastName("Visitor");
-        visitor.setEmail("probe" + suffix + "@example.test");
+        visitor.setEmail("probe-visitor" + suffix + "@example.test");
         visitor.setRoles(new HashSet<>(Set.of(Role.VISITOR)));
         visitor.setHomes(new HashSet<>(Set.of(home)));
         visitor = userRepository.save(visitor);

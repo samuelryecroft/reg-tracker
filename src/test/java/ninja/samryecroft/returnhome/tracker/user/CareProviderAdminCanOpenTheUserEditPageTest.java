@@ -1,5 +1,7 @@
 package ninja.samryecroft.returnhome.tracker.user;
 
+import ninja.samryecroft.returnhome.tracker.TestLogins;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.securityContext;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -78,6 +80,7 @@ class CareProviderAdminCanOpenTheUserEditPageTest extends AbstractIntegrationTes
         orgAdminUsername = "t281-edit-orgadmin" + suffix;
         User admin = new User();
         admin.setUsername(orgAdminUsername);
+        admin.setEmail(orgAdminUsername + "@example.test");
         admin.setLastName("Org Admin");
         admin.setRoles(new HashSet<>(Set.of(Role.ORG_ADMIN)));
         admin.setOrganisation(org);
@@ -113,6 +116,7 @@ class CareProviderAdminCanOpenTheUserEditPageTest extends AbstractIntegrationTes
     private User saveUserWithHome(String username, Role role) {
         User user = new User();
         user.setUsername(username);
+        user.setEmail(username + "@example.test");
         user.setLastName("Target");
         user.setRoles(new HashSet<>(Set.of(role)));
         user.setHomes(new HashSet<>(Set.of(home)));
@@ -124,7 +128,7 @@ class CareProviderAdminCanOpenTheUserEditPageTest extends AbstractIntegrationTes
     }
 
     private RequestPostProcessor asOrgAdmin() {
-        UserDetails details = appUserDetailsService.loadUserByUsername(orgAdminUsername);
+        UserDetails details = appUserDetailsService.loadUserByUsername(TestLogins.loginIdentifier(orgAdminUsername));
         return securityContext(new SecurityContextImpl(
                 new UsernamePasswordAuthenticationToken(details, null, details.getAuthorities())));
     }

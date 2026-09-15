@@ -73,6 +73,7 @@ class StepLabelAffordanceUiTest extends AbstractUiTest {
 
         User requestedBy = new User();
         requestedBy.setUsername("caret-ui-home-staff");
+        requestedBy.setEmail("caret-ui-home-staff" + "@example.test");
         requestedBy.setPassword(passwordEncoder.encode(PASSWORD));
         requestedBy.setLastName("Home Staff");
         requestedBy.setRoles(Set.of(Role.HOME_STAFF));
@@ -82,6 +83,7 @@ class StepLabelAffordanceUiTest extends AbstractUiTest {
 
         User visitor = new User();
         visitor.setUsername("caret-ui-visitor");
+        visitor.setEmail("caret-ui-visitor" + "@example.test");
         visitor.setPassword(passwordEncoder.encode(PASSWORD));
         visitor.setLastName("Visitor");
         visitor.setRoles(Set.of(Role.VISITOR));

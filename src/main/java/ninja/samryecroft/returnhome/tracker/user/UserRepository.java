@@ -14,6 +14,35 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByUsername(String username);
 
     /**
+     * The login lookup (T344). {@code LOWER()} on both sides, matching V24's unique index - the
+     * constraint binds the MAILBOX, not the string, so sign-in has to resolve the same way or an
+     * address that is unique to the database would be un-typeable in the wrong case.
+     *
+     * <p><strong>The entity graph is not an optimisation - it is the difference between a working
+     * sign-in and a 500.</strong> {@code homes}, {@code organisation} and {@code roles} are LAZY and
+     * {@code spring.jpa.open-in-view=false}, so the principal this builds is read long after the
+     * session that loaded it has closed. Written without the graph, this replaced
+     * {@link #findByUsername} - which has always carried one - and every authenticated request that
+     * reached a home threw {@code LazyInitializationException}. It is the same defect
+     * {@link #findDetailedById} exists to record, arriving by a different door: a lookup that is
+     * correct about WHICH row and wrong about how much of it.
+     */
+    @EntityGraph(attributePaths = {"homes", "organisation", "roles"})
+    @Query("select u from User u where lower(u.email) = lower(:email)")
+    Optional<User> findByEmailIgnoreCase(@Param("email") String email);
+
+    /**
+     * The emergency account, asked for by its FLAG rather than by a name (T341/T344). At most one row
+     * can hold it - V25's partial unique index - so this cannot return an arbitrary choice of several.
+     *
+     * <p>Carries the same entity graph as the email lookup above, and for the same reason: this is
+     * also a SIGN-IN path. The emergency account is the one used when everything else has failed,
+     * which is the worst possible moment to discover it loads a principal that throws on first use.
+     */
+    @EntityGraph(attributePaths = {"homes", "organisation", "roles"})
+    Optional<User> findByBreakGlassTrue();
+
+    /**
      * One user with the collections its authorisation check reads.
      *
      * <p><strong>{@code getAuthorized} used a bare {@code findById} and then asked the result for its
@@ -71,7 +100,10 @@ public interface UserRepository extends JpaRepository<User, Long> {
     List<User> findByRoleOrderByFullName(@Param("role") Role role);
 
     @EntityGraph(attributePaths = {"homes", "organisation", "roles"})
-    @Query("select u from User u order by u.username")
+    // T344: ordered by NAME, not by username. Usernames are no longer issued to people, so ordering
+    // by one would sort the whole admin list by a column that is null for everybody except the
+    // emergency account - an ordering that looks deliberate and is actually arbitrary.
+    @Query("select u from User u order by u.lastName, u.firstName")
     List<User> findAllWithHome();
 
     @EntityGraph(attributePaths = {"homes", "organisation", "roles"})

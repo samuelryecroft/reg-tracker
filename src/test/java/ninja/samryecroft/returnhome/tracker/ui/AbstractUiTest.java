@@ -1,5 +1,7 @@
 package ninja.samryecroft.returnhome.tracker.ui;
 
+import ninja.samryecroft.returnhome.tracker.TestLogins;
+
 import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.BrowserType;
@@ -44,7 +46,7 @@ public abstract class AbstractUiTest extends AbstractIntegrationTest {
 
     /** There is no default seed password any more, so tests that sign in as the platform admin
      * have to supply one - the same way a real deployment injects it from the environment. */
-    protected static final String ADMIN_USERNAME = "admin";
+    protected static final String ADMIN_USERNAME = TestLogins.BREAK_GLASS_USERNAME;
     protected static final String ADMIN_PASSWORD = "ui-test-seed-password";
 
     @DynamicPropertySource
@@ -106,15 +108,24 @@ public abstract class AbstractUiTest extends AbstractIntegrationTest {
         return "http://localhost:" + port + path;
     }
 
-    protected void login(String username, String password) {
-        login(page, username, password);
+    /**
+     * Signs in the fixture user with this name.
+     *
+     * <p>T344: people sign in with an EMAIL ADDRESS, not a username. Fixtures across this suite
+     * derive the address from the name they give a user - {@code name + "@example.test"} - and this
+     * helper applies the same convention, so a test still names the person it means rather than
+     * repeating a suffix 46 times. Pass a value already containing {@code @} to sign in with a
+     * literal address instead.
+     */
+    protected void login(String user, String password) {
+        login(page, user, password);
     }
 
     /** Same steps, on a page other than the default one - the only shape
      * {@link #newPageWithJavaScript} is useful for signing in on. */
-    protected void login(Page targetPage, String username, String password) {
+    protected void login(Page targetPage, String user, String password) {
         targetPage.navigate(url("/login"));
-        targetPage.fill("#username", username);
+        targetPage.fill("#username", TestLogins.loginIdentifier(user));
         targetPage.fill("#password", password);
         targetPage.click("button[type=submit]");
         targetPage.waitForLoadState();

@@ -1,5 +1,7 @@
 package ninja.samryecroft.returnhome.tracker.user;
 
+import ninja.samryecroft.returnhome.tracker.TestLogins;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.securityContext;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -45,7 +47,7 @@ class UserListLayoutIntegrationTest extends AbstractIntegrationTest {
     private AppUserDetailsService appUserDetailsService;
 
     private RequestPostProcessor asUser(String username) {
-        UserDetails userDetails = appUserDetailsService.loadUserByUsername(username);
+        UserDetails userDetails = appUserDetailsService.loadUserByUsername(TestLogins.loginIdentifier(username));
         SecurityContext context = new SecurityContextImpl(
                 new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities()));
         return securityContext(context);
@@ -54,6 +56,7 @@ class UserListLayoutIntegrationTest extends AbstractIntegrationTest {
     private User savedUser(String username, String first, String last, boolean enabled, Role... roles) {
         User user = new User();
         user.setUsername(username);
+        user.setEmail(username + "@example.test");
         user.setFirstName(first);
         user.setLastName(last);
         user.setRoles(new HashSet<>(Set.of(roles)));

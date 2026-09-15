@@ -1,5 +1,7 @@
 package ninja.samryecroft.returnhome.tracker.user;
 
+import ninja.samryecroft.returnhome.tracker.TestLogins;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -66,7 +68,7 @@ class SupplierUserPlacementScopeTest extends AbstractIntegrationTest {
         supplierAdmin.setPassword(passwordEncoder.encode("password123"));
         supplierAdmin.setFirstName("Supplier");
         supplierAdmin.setLastName("Admin");
-        supplierAdmin.setEmail("t249" + suffix + "@example.test");
+        supplierAdmin.setEmail("t249-supplier-admin" + suffix + "@example.test");
         supplierAdmin.setRoles(new HashSet<>(Set.of(Role.ORG_ADMIN)));
         supplierAdmin.setOrganisation(seededSupplier());
         userRepository.save(supplierAdmin);
@@ -140,7 +142,7 @@ class SupplierUserPlacementScopeTest extends AbstractIntegrationTest {
 
     private AppUserPrincipal principal() {
         UserDetails details =
-                appUserDetailsService.loadUserByUsername("t249-supplier-admin" + suffix);
+                appUserDetailsService.loadUserByUsername(TestLogins.loginIdentifier("t249-supplier-admin" + suffix));
         return (AppUserPrincipal) details;
     }
 }

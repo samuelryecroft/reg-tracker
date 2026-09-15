@@ -1,5 +1,7 @@
 package ninja.samryecroft.returnhome.tracker.web;
 
+import ninja.samryecroft.returnhome.tracker.TestLogins;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.securityContext;
@@ -92,6 +94,7 @@ class NameRevealFlowIntegrationTest extends AbstractIntegrationTest {
         username = "reveal-test" + suffix;
         User staff = new User();
         staff.setUsername(username);
+        staff.setEmail(username + "@example.test");
         staff.setPassword(passwordEncoder.encode(PASSWORD));
         staff.setLastName("Reveal Tester");
         staff.setRoles(Set.of(Role.HOME_STAFF));
@@ -103,7 +106,7 @@ class NameRevealFlowIntegrationTest extends AbstractIntegrationTest {
     }
 
     private RequestPostProcessor asUser() {
-        UserDetails userDetails = appUserDetailsService.loadUserByUsername(username);
+        UserDetails userDetails = appUserDetailsService.loadUserByUsername(TestLogins.loginIdentifier(username));
         SecurityContext context = new SecurityContextImpl(
                 new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities()));
         return securityContext(context);
@@ -147,7 +150,7 @@ class NameRevealFlowIntegrationTest extends AbstractIntegrationTest {
 
         List<AuditEvent> events = auditEventRepository.findByEventTypeOrderByOccurredAtDesc(AuditEventType.NAMES_REVEALED);
         AuditEvent event = events.stream()
-                .filter(e -> username.equals(e.getActorUsernameAtTime()))
+                .filter(e -> (username + "@example.test").equals(e.getActorIdentifierAtTime()))
                 .findFirst()
                 .orElseThrow(() -> new AssertionError("No NAMES_REVEALED event for " + username));
 

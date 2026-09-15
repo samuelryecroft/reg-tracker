@@ -92,6 +92,7 @@ class OrganisationReadinessIsComputedFromMembershipTest extends AbstractIntegrat
     void homeStaffCountForTheirProviderEvenThoughTheyHaveNoOrganisation() {
         User staff = new User();
         staff.setUsername("t267-staff" + suffix);
+        staff.setEmail("t267-staff" + suffix + "@example.test");
         staff.setLastName("Staff");
         staff.setRoles(new HashSet<>(Set.of(Role.HOME_STAFF)));
         staff.setOrganisation(null);
@@ -138,6 +139,7 @@ class OrganisationReadinessIsComputedFromMembershipTest extends AbstractIntegrat
         Organisation otherSupplier = saveOrg("T267 Other Supplier" + suffix, OrgType.SUPPLIER, null);
         User theirs = new User();
         theirs.setUsername("t267-theirs" + suffix);
+        theirs.setEmail("t267-theirs" + suffix + "@example.test");
         theirs.setLastName("Theirs");
         theirs.setRoles(new HashSet<>(Set.of(Role.COORDINATOR, Role.VISITOR, Role.REVIEWER)));
         theirs.setOrganisation(otherSupplier);
@@ -172,6 +174,7 @@ class OrganisationReadinessIsComputedFromMembershipTest extends AbstractIntegrat
         Organisation pending = saveOrg("T267 Pending Supplier" + suffix, OrgType.SUPPLIER, null);
         User everybody = new User();
         everybody.setUsername("t267-everybody" + suffix);
+        everybody.setEmail("t267-everybody" + suffix + "@example.test");
         everybody.setLastName("Everybody");
         everybody.setRoles(new HashSet<>(Set.of(Role.COORDINATOR, Role.VISITOR, Role.REVIEWER)));
         everybody.setOrganisation(pending);
@@ -202,6 +205,7 @@ class OrganisationReadinessIsComputedFromMembershipTest extends AbstractIntegrat
     private User orgScoped(String name, Role role) {
         User user = new User();
         user.setUsername("t267-" + name + suffix);
+        user.setEmail("t267-" + name + suffix + "@example.test");
         user.setLastName(name);
         user.setRoles(new HashSet<>(Set.of(role)));
         user.setOrganisation(supplier);

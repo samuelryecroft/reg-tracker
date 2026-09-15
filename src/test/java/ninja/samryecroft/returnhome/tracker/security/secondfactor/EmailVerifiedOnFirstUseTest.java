@@ -85,9 +85,9 @@ class EmailVerifiedOnFirstUseTest extends AbstractIntegrationTest {
     private User account() {
         User user = new User();
         user.setUsername("verify-" + System.nanoTime());
+        user.setEmail("verify-" + System.nanoTime() + "@example.test");
         user.setFirstName("Ver");
         user.setLastName("Ify");
-        user.setEmail("staff@example.test");
         user.setPassword(passwordEncoder.encode(PASSWORD));
         user.setRoles(new HashSet<>(Set.of(Role.ADMIN)));
         user.setEnabled(true);
@@ -96,7 +96,7 @@ class EmailVerifiedOnFirstUseTest extends AbstractIntegrationTest {
 
     private MockHttpSession passwordStage(User user) throws Exception {
         MvcResult result = mockMvc.perform(post("/login").with(csrf())
-                        .param("username", user.getUsername())
+                        .param("username", user.getEmail())
                         .param("password", PASSWORD))
                 .andReturn();
         return (MockHttpSession) result.getRequest().getSession(false);
@@ -151,7 +151,7 @@ class EmailVerifiedOnFirstUseTest extends AbstractIntegrationTest {
         passwordStage(user);
 
         MvcResult third = mockMvc.perform(post("/login").with(csrf())
-                        .param("username", user.getUsername())
+                        .param("username", user.getEmail())
                         .param("password", PASSWORD))
                 .andReturn();
 

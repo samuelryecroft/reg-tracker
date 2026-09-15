@@ -38,6 +38,7 @@ class UserListRoleChipsUiTest extends AbstractUiTest {
     private User createUser(String username, Organisation org, Role... roles) {
         User user = new User();
         user.setUsername(username);
+        user.setEmail(username + "@example.test");
         user.setPassword(passwordEncoder.encode(PASSWORD));
         user.setLastName("Role Chips Tester " + username);
         user.setRoles(Set.of(roles));

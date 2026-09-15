@@ -1,5 +1,7 @@
 package ninja.samryecroft.returnhome.tracker.organisation;
 
+import ninja.samryecroft.returnhome.tracker.TestLogins;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.securityContext;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -259,6 +261,7 @@ class AnAdministratorIsToldTheirOrganisationCannotWorkYetTest extends AbstractIn
     private void saveUser(String username, Set<Role> roles, Organisation organisation, Home theirHome) {
         User user = new User();
         user.setUsername(username);
+        user.setEmail(username + "@example.test");
         user.setLastName(username);
         user.setRoles(new HashSet<>(roles));
         user.setOrganisation(organisation);
@@ -276,7 +279,7 @@ class AnAdministratorIsToldTheirOrganisationCannotWorkYetTest extends AbstractIn
     }
 
     private RequestPostProcessor asUser(String username) {
-        UserDetails details = appUserDetailsService.loadUserByUsername(username);
+        UserDetails details = appUserDetailsService.loadUserByUsername(TestLogins.loginIdentifier(username));
         return securityContext(new SecurityContextImpl(
                 new UsernamePasswordAuthenticationToken(details, null, details.getAuthorities())));
     }
