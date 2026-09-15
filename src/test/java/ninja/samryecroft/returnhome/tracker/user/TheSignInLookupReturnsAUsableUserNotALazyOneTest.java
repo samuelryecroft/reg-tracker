@@ -37,7 +37,11 @@ import org.springframework.security.crypto.password.PasswordEncoder;
  * happily against a build where the whole problem is impossible. It proves the detector works by
  * showing the ungraphed read failing in the same conditions.
  */
-@SpringBootTest
+// A seed password, so the bootstrap admin actually EXISTS here: the seeder skips itself without
+// one, and the break-glass assertion below would then be passing on an empty Optional - a guard
+// that cannot fire is the T339 mistake, and it is not worth repeating in the test that was written
+// to stop a defect being invisible.
+@SpringBootTest(properties = "app.admin.password=lazy-probe-seed-password")
 class TheSignInLookupReturnsAUsableUserNotALazyOneTest extends AbstractIntegrationTest {
 
     @Autowired private AppUserDetailsService appUserDetailsService;

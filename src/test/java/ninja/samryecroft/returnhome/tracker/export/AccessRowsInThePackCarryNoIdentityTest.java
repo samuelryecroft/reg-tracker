@@ -129,7 +129,10 @@ class AccessRowsInThePackCarryNoIdentityTest extends AbstractIntegrationTest {
                         "InterviewRequest", request.getId()))
                 .singleElement()
                 .extracting(AuditEvent::getActorIdentifierAtTime)
-                .isEqualTo(username);
+                // T344: the trail records the identifier the person SIGNED IN with, which is now
+                // their address. The column was renamed from actor_username_at_time for exactly
+                // this reason - it holds whatever identified the actor, not a username.
+                .isEqualTo(username + "@example.test");
     }
 
     /** Kevin's condition on the A5 ruling, measured rather than reasoned about. */

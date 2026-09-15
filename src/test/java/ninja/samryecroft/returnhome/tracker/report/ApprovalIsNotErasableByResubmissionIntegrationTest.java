@@ -261,7 +261,7 @@ class ApprovalIsNotErasableByResubmissionIntegrationTest extends AbstractIntegra
         AuditEvent latest = auditEventRepository
                 .findByEventTypeOrderByOccurredAtDesc(AuditEventType.REPORT_SUBMITTED).stream()
                 .filter(e -> e.getActorIdentifierAtTime() != null
-                        && e.getActorIdentifierAtTime().equals("t145-visitor" + suffix))
+                        && e.getActorIdentifierAtTime().equals("t145-visitor" + suffix + "@example.test"))
                 .findFirst().orElseThrow();
 
         assertThat(latest.getMetadata()).contains("statusBefore=REJECTED");

@@ -86,13 +86,13 @@
              outcome - the floor pattern earns its keep on a form with groups to distinguish, not
              a two-field card. */-->
         <form method="post" th:action="@{/login}">
-            <!-- T344: people sign in with their email address; usernames are no longer issued. The
-                 FIELD NAME stays "username" because that is the parameter Spring Security's form
+            <!--/* T344: people sign in with their email address; usernames are no longer issued.
+                 The FIELD NAME stays "username" because that is the parameter Spring Security's form
                  login reads - renaming it would change the contract with the filter, not the label
                  the person reads. type="text" rather than "email" on purpose: the break-glass
                  account signs in here too and its identifier is not an address, so type="email"
                  would have the browser refuse to submit the one credential that exists for
-                 emergencies. -->
+                 emergencies. */-->
             <label for="username">Email address</label>
             <input type="text" id="username" name="username" autocomplete="username" autofocus="autofocus" required/>
             <label for="password">Password</label>

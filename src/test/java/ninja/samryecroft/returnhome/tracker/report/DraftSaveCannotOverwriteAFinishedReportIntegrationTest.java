@@ -265,7 +265,7 @@ class DraftSaveCannotOverwriteAFinishedReportIntegrationTest extends AbstractInt
         AuditEvent latest = auditEventRepository
                 .findByEventTypeOrderByOccurredAtDesc(AuditEventType.REPORT_DRAFT_SAVED).stream()
                 .filter(e -> e.getActorIdentifierAtTime() != null
-                        && e.getActorIdentifierAtTime().equals("t174-visitor" + suffix))
+                        && e.getActorIdentifierAtTime().equals("t174-visitor" + suffix + "@example.test"))
                 .findFirst().orElseThrow();
         return latest.getMetadata();
     }

@@ -47,10 +47,13 @@ class LoginThrottlingIntegrationTest extends AbstractIntegrationTest {
     private LoginAttemptService loginAttemptService;
 
     private String username;
+    /** What is actually submitted at /login, and so what the lockout counter keys on. */
+    private String identifier;
 
     @BeforeEach
     void seedUser() {
         username = "throttle-" + System.nanoTime();
+        identifier = username + "@example.test";
         User user = new User();
         user.setUsername(username);
         user.setEmail(username + "@example.test");
@@ -63,20 +66,20 @@ class LoginThrottlingIntegrationTest extends AbstractIntegrationTest {
 
     private void attemptLogin(String user, String password) throws Exception {
         mockMvc.perform(post("/login").with(csrf())
-                        .param("username", user + "@example.test")
+                        .param("username", user)
                         .param("password", password))
                 .andExpect(status().is3xxRedirection());
     }
 
     @Test
     void accountLocksOutAfterTooManyFailedAttemptsAndRefusesTheCorrectPassword() throws Exception {
-        assertThat(loginAttemptService.isLocked(username)).isFalse();
+        assertThat(loginAttemptService.isLocked(identifier)).isFalse();
 
         for (int attempt = 1; attempt <= 3; attempt++) {
-            attemptLogin(username, "wrong-password-" + attempt);
+            attemptLogin(identifier, "wrong-password-" + attempt);
         }
 
-        assertThat(loginAttemptService.isLocked(username)).isTrue();
+        assertThat(loginAttemptService.isLocked(identifier)).isTrue();
 
         // The point of a lockout: even the RIGHT password is refused while it holds, so guessing
         // cannot simply continue at speed.
@@ -86,39 +89,39 @@ class LoginThrottlingIntegrationTest extends AbstractIntegrationTest {
         // defect being that a locked user got the generic "check your password" advice, i.e. was
         // told to do the one thing that cannot work. The assertion's intent, refusal, is unchanged.
         mockMvc.perform(post("/login").with(csrf())
-                        .param("username", username + "@example.test")
+                        .param("username", identifier)
                         .param("password", PASSWORD))
                 .andExpect(redirectedUrl("/login?error=locked"));
     }
 
     @Test
     void attemptsBelowTheThresholdDoNotLockAndSuccessClearsTheCount() throws Exception {
-        attemptLogin(username, "wrong-password");
-        attemptLogin(username, "wrong-password");
-        assertThat(loginAttemptService.isLocked(username)).isFalse();
+        attemptLogin(identifier, "wrong-password");
+        attemptLogin(identifier, "wrong-password");
+        assertThat(loginAttemptService.isLocked(identifier)).isFalse();
 
         // A correct password still works, and wipes the slate...
         mockMvc.perform(post("/login").with(csrf())
-                        .param("username", username + "@example.test")
+                        .param("username", identifier)
                         .param("password", PASSWORD))
                 .andExpect(redirectedUrl("/"));
-        assertThat(loginAttemptService.isLocked(username)).isFalse();
+        assertThat(loginAttemptService.isLocked(identifier)).isFalse();
 
         // ...so the next two failures start from zero rather than tipping straight over.
-        attemptLogin(username, "wrong-password");
-        attemptLogin(username, "wrong-password");
-        assertThat(loginAttemptService.isLocked(username)).isFalse();
+        attemptLogin(identifier, "wrong-password");
+        attemptLogin(identifier, "wrong-password");
+        assertThat(loginAttemptService.isLocked(identifier)).isFalse();
     }
 
     @Test
     void lockoutIsPerUsernameAndCaseInsensitive() throws Exception {
-        String other = "other-" + System.nanoTime();
+        String other = "other-" + System.nanoTime() + "@example.test";
         for (int attempt = 1; attempt <= 3; attempt++) {
-            attemptLogin(username.toUpperCase(java.util.Locale.ROOT), "wrong-password");
+            attemptLogin(identifier.toUpperCase(java.util.Locale.ROOT), "wrong-password");
         }
 
         // Varying capitalisation must not buy an attacker a fresh set of attempts.
-        assertThat(loginAttemptService.isLocked(username)).isTrue();
+        assertThat(loginAttemptService.isLocked(identifier)).isTrue();
         // ...and one locked account must not affect anybody else's.
         assertThat(loginAttemptService.isLocked(other)).isFalse();
     }

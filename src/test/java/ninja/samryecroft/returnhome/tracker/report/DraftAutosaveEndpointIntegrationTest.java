@@ -263,7 +263,7 @@ class DraftAutosaveEndpointIntegrationTest extends AbstractIntegrationTest {
         assertThat(auditEventRepository.findByEventTypeOrderByOccurredAtDesc(AuditEventType.ACCESS_DENIED))
                 .as("a denial that stops appearing in the trail because a handler got more specific "
                         + "is a silent loss")
-                .anyMatch(e -> "t174e-visitor".concat(suffix).equals(e.getActorIdentifierAtTime()));
+                .anyMatch(e -> "t174e-visitor".concat(suffix).concat("@example.test").equals(e.getActorIdentifierAtTime()));
         assertThat(interviewReportRepository.findByInterviewRequestId(requestId)).isEmpty();
     }
 

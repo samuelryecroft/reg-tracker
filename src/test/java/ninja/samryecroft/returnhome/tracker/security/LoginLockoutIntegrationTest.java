@@ -162,7 +162,7 @@ class LoginLockoutIntegrationTest extends AbstractIntegrationTest {
                 .as("the generic banner must not also render - ?error=locked satisfies "
                         + "${param.error} too, so without an exclusive test the reader is told to "
                         + "try again directly beneath being told that trying again is paused")
-                .doesNotContain("Check your username and password and try again.");
+                .doesNotContain("Check your email address and password and try again.");
 
         // Creed: naming the remaining time lets an attacker schedule.
         assertThat(page).doesNotContain("15 min").doesNotContain("minutes");
@@ -173,7 +173,7 @@ class LoginLockoutIntegrationTest extends AbstractIntegrationTest {
         MockHttpServletResponse response = attempt(realUser());
         String page = pageAt(response.getRedirectedUrl());
 
-        assertThat(page).contains("Check your username and password and try again.");
+        assertThat(page).contains("Check your email address and password and try again.");
         assertThat(page).doesNotContain("Too many sign-in attempts");
     }
 }

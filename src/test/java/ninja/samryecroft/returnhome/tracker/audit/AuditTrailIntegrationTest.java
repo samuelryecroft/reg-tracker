@@ -283,7 +283,7 @@ class AuditTrailIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().is3xxRedirection());
 
         AuditEvent success = latestOwn(AuditEventType.LOGIN_SUCCESS);
-        assertThat(success.getActorIdentifierAtTime()).isEqualTo(username);
+        assertThat(success.getActorIdentifierAtTime()).isEqualTo(username + "@example.test");
         assertThat(success.getActorId()).isEqualTo(userRepository.findByUsername(username).orElseThrow().getId());
         assertThat(success.getOrganisationId()).isEqualTo(supplierOrg.getId());
 
@@ -293,7 +293,7 @@ class AuditTrailIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().is3xxRedirection());
 
         AuditEvent failure = latestOwn(AuditEventType.LOGIN_FAILURE);
-        assertThat(failure.getActorIdentifierAtTime()).isEqualTo(username);
+        assertThat(failure.getActorIdentifierAtTime()).isEqualTo(username + "@example.test");
         // Nothing identifies the account beyond the attempted username - and no credential material.
         assertThat(failure.getActorId()).isNull();
         assertThat(failure.getMetadata()).contains("BadCredentialsException");
