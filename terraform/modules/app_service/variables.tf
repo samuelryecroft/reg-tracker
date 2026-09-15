@@ -30,6 +30,31 @@ variable "ai_connection_string_secret_uri" { type = string }
 
 variable "action_group_id" { type = string }
 
+# T354: application settings that were set out of band on prod during the 2FA/ACS/document work and were
+# not in the module. Codified so a `terraform apply` no longer plans to remove them (removal would disable
+# 2FA + break ACS email). Config, not secrets. Defaults match the prod values; the env-specific ones can be
+# overridden from the root for a different environment.
+variable "second_factor_enabled" {
+  type    = string
+  default = "true"
+}
+variable "second_factor_transport" {
+  type    = string
+  default = "acs"
+}
+variable "second_factor_from_address" {
+  type    = string
+  default = "no-reply@activeloop.co.uk"
+}
+variable "acs_email_endpoint" {
+  type    = string
+  default = "https://acs-rht.uk.communication.azure.com"
+}
+variable "documents_keyvault_credential" {
+  type    = string
+  default = "managed-identity"
+}
+
 # Set on the VNet path: the delegated App Service subnet to integrate into (regional VNet
 # integration). null on the pre-prod path (no integration).
 variable "vnet_integration_subnet_id" {
