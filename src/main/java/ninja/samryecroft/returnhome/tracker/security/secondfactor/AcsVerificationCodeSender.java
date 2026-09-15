@@ -68,14 +68,39 @@ public class AcsVerificationCodeSender implements VerificationCodeSender {
 
     @Override
     public void send(String emailAddress, String code) {
+        send(emailAddress, code, ChallengePurpose.SIGN_IN);
+    }
+
+    /**
+     * T353h. Two flows, two messages - and the difference that matters is the last line, not the
+     * subject. See {@link VerificationCodeSender#send(String, String, ChallengePurpose)} for why an
+     * alarm attached to the wrong event is worse than no alarm.
+     *
+     * <p><b>Both messages still carry the code and nothing else.</b> No name, no case or interview
+     * reference, no mention of a young person. The reset message names an ACTION the reader just
+     * took; it never names a PERSON. That constraint is the residency argument and it is unchanged.
+     */
+    @Override
+    public void send(String emailAddress, String code, ChallengePurpose purpose) {
+        boolean reset = purpose == ChallengePurpose.PASSWORD_RESET;
         EmailMessage message = new EmailMessage()
                 .setSenderAddress(fromAddress)
                 .setToRecipients(emailAddress)
-                .setSubject("Your sign-in code")
+                // Distinct subjects because both messages can sit in one inbox at once, a minute
+                // apart, containing different six-digit numbers. "Your code" for both would make the
+                // two indistinguishable in a notification preview, which is where they are read.
+                .setSubject(reset ? "Your password reset code" : "Your sign-in code")
                 // Plain text only. An HTML body invites a template, a template invites a greeting by
                 // name, and the whole safety of this message is that it says nothing about anyone.
-                .setBodyPlainText(code + " is your code to sign in. It expires in 10 minutes.\n\n"
-                        + "If you were not signing in, tell your manager.");
+                .setBodyPlainText(reset
+                        ? code + " is your code to finish resetting your password. It expires in "
+                                + "10 minutes.\n\n"
+                                + "Your password has not changed yet. It only changes once this code "
+                                + "is entered.\n\n"
+                                + "If you did not ask to reset your password, do not enter this code "
+                                + "- someone else has your reset link. Tell your manager."
+                        : code + " is your code to sign in. It expires in 10 minutes.\n\n"
+                                + "If you were not signing in, tell your manager.");
 
         try {
             // Blocks on purpose: the caller is inside the sign-in transaction and must not report a

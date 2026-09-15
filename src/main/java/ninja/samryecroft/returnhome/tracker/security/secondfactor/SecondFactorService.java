@@ -121,7 +121,9 @@ public class SecondFactorService {
         // Sent BEFORE the audit event, and if the transport throws, the exception propagates and the
         // transaction rolls the challenge back. A stored challenge whose code never left the
         // building is a guaranteed lockout that looks like a mail problem.
-        sender.send(user.getEmail(), code);
+        // T353h: the purpose travels with the code. The service has always known which flow this
+        // is; until now the sender did not, so a reset code went out wearing the sign-in message.
+        sender.send(user.getEmail(), code, purpose);
 
         // Counted only AFTER the transport accepted it, so a mail outage does not burn a user's
         // allowance for an address that may be perfectly correct.

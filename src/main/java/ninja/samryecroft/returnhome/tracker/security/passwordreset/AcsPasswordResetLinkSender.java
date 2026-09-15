@@ -50,9 +50,26 @@ public class AcsPasswordResetLinkSender implements PasswordResetLinkSender {
                 // Plain text only, for the same reason the code email is: an HTML body invites a
                 // template, a template invites a greeting by name, and the safety of this message is
                 // that it names no one.
-                .setBodyPlainText("Use this link to reset your password. It expires in 30 minutes.\n\n"
+                // T353h, ruled copy. Three things this body does that the first version did not:
+                //
+                // 1. IT SAYS THE LINK IS SINGLE-USE. "Expires in 30 minutes" alone is the same
+                //    defect §7w fixed on the export countdown: naming ONE of two limits tells the
+                //    reader the other does not exist. A second click is the commoner failure.
+                // 2. IT WARNS THAT A CODE FOLLOWS. Otherwise the reader treats the link as the
+                //    whole reset, stops watching the mailbox, and abandons a reset that was working.
+                // 3. "IGNORE THIS EMAIL" IS REPLACED. That advice is fine for a mis-typed address
+                //    and wrong for the case that matters: a link the reader did not ask for means
+                //    somebody submitted their address, and silence is not the right response to it.
+                //    The password cannot move without the code, so the honest instruction is "you do
+                //    not need to do anything to stay safe" AND "say something" - not one or other.
+                .setBodyPlainText("Use this link to set a new password. It expires in 30 minutes "
+                        + "and can only be used once.\n\n"
                         + resetLink + "\n\n"
-                        + "If you did not ask to reset your password, you can ignore this email.");
+                        + "You will be asked to choose the password, then to enter a code we email "
+                        + "you. The password does not change until that code is entered.\n\n"
+                        + "If you did not ask to reset your password, no change has been made and "
+                        + "none can be made without the code. Tell your manager that you received "
+                        + "this.");
         try {
             client.beginSend(message).getSyncPoller().waitForCompletion();
         } catch (RuntimeException ex) {

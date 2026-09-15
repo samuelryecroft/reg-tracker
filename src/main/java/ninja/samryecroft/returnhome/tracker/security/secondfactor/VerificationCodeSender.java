@@ -25,4 +25,28 @@ public interface VerificationCodeSender {
      *                                           leave the user waiting for a code that is not coming
      */
     void send(String emailAddress, String code);
+
+    /**
+     * Sends the code for a NAMED FLOW (T353h). A sign-in code and a password-reset code are the same
+     * six digits from the same generator, but they are not the same message, and getting that wrong
+     * is not a tone problem.
+     *
+     * <p><b>The safety sentence is the reason this overload exists.</b> The sign-in message ends
+     * <em>"If you were not signing in, tell your manager"</em> - that line is the product's tripwire
+     * for a stolen password, and it works because it reaches someone who did NOT act. Sent
+     * unchanged during a password reset it is wrong twice over: the reader knows they were not
+     * signing in, so a true alarm reads as a glitch and gets ignored; and the genuinely alarming
+     * case - <em>a reset code arriving when you never asked for a reset</em> - is then the one event
+     * with no sentence telling anyone what it means. <b>The alarm has to describe the event it is
+     * actually attached to, or it trains people to disregard it.</b>
+     *
+     * <p>Default-delegates to the two-argument form so that a sender which does not care about the
+     * flow - the development logger, a test stub - needs no change. A real transport overrides this
+     * one and lets the two-argument form delegate to it, never the reverse.
+     *
+     * @param purpose which flow minted the code; never rendered verbatim into the message
+     */
+    default void send(String emailAddress, String code, ChallengePurpose purpose) {
+        send(emailAddress, code);
+    }
 }
