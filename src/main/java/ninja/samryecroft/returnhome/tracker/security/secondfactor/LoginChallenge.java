@@ -2,6 +2,8 @@ package ninja.samryecroft.returnhome.tracker.security.secondfactor;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -49,13 +51,24 @@ public class LoginChallenge {
     @Column(name = "attempts", nullable = false)
     private int attempts;
 
+    /**
+     * The flow this code was issued for (T353b). Load-bearing rather than descriptive: the lookup
+     * and the consume-outstanding query filter on it, so a code is only ever matched or retired
+     * within its own flow. NOT NULL and always set through the constructor - the migration's column
+     * default is only a deploy-window safety net, never a value this class relies on.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "purpose", nullable = false, length = 20)
+    private ChallengePurpose purpose;
+
     protected LoginChallenge() {
     }
 
-    public LoginChallenge(Long userId, String codeHash, Instant expiresAt) {
+    public LoginChallenge(Long userId, String codeHash, Instant expiresAt, ChallengePurpose purpose) {
         this.userId = userId;
         this.codeHash = codeHash;
         this.expiresAt = expiresAt;
+        this.purpose = purpose;
     }
 
     public Long getId() {
@@ -64,6 +77,10 @@ public class LoginChallenge {
 
     public Long getUserId() {
         return userId;
+    }
+
+    public ChallengePurpose getPurpose() {
+        return purpose;
     }
 
     public String getCodeHash() {

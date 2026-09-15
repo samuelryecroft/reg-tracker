@@ -87,22 +87,35 @@ public class SecondFactorService {
      */
     @Transactional
     public boolean issueChallenge(User user) {
+        return issueChallenge(user, ChallengePurpose.SIGN_IN);
+    }
+
+    /**
+     * Issues a code for a specific flow (T353b). The purpose scopes the resend cap and the retiring
+     * of the previous code, so issuing a reset code neither counts against a user's sign-in resend
+     * allowance nor kills a live sign-in code, and vice versa.
+     */
+    @Transactional
+    public boolean issueChallenge(User user, ChallengePurpose purpose) {
         Instant now = Instant.now();
-        long recent = challenges.countIssuedSince(user.getId(), now.minus(config().getResendWindow()));
+        long recent = challenges.countIssuedSince(user.getId(), purpose,
+                now.minus(config().getResendWindow()));
         if (recent >= config().getMaxResends()) {
             audit.mfaFailure(user, "resend-cap-reached");
             return false;
         }
 
         // A previously issued code must die when a new one is born; two live codes for one account
-        // means the older is a credential nobody is watching for.
-        challenges.consumeOutstanding(user.getId(), now);
+        // means the older is a credential nobody is watching for. Scoped to this flow: the other
+        // flow's live code is not ours to retire.
+        challenges.consumeOutstanding(user.getId(), purpose, now);
 
         String code = generateCode();
         LoginChallenge challenge = new LoginChallenge(
                 user.getId(),
                 passwordEncoder.encode(code),
-                now.plus(config().getCodeValidity()));
+                now.plus(config().getCodeValidity()),
+                purpose);
         challenges.save(challenge);
 
         // Sent BEFORE the audit event, and if the transport throws, the exception propagates and the
@@ -130,8 +143,20 @@ public class SecondFactorService {
      */
     @Transactional
     public Outcome verify(User user, String submittedCode) {
+        return verify(user, submittedCode, ChallengePurpose.SIGN_IN);
+    }
+
+    /**
+     * Checks a submitted code against this user's newest challenge IN THE GIVEN FLOW (T353b). A code
+     * issued for one purpose can never satisfy another's verifier, because the lookup itself is
+     * purpose-scoped - the two flows are kept apart by the query, not by a check a later caller could
+     * forget.
+     */
+    @Transactional
+    public Outcome verify(User user, String submittedCode, ChallengePurpose purpose) {
         Instant now = Instant.now();
-        Optional<LoginChallenge> found = challenges.findFirstByUserIdOrderByCreatedAtDesc(user.getId());
+        Optional<LoginChallenge> found =
+                challenges.findFirstByUserIdAndPurposeOrderByCreatedAtDesc(user.getId(), purpose);
         if (found.isEmpty()) {
             audit.mfaFailure(user, "no-challenge");
             return Outcome.NO_CHALLENGE;
