@@ -1,0 +1,70 @@
+# Release notes
+
+Operator-facing notes for production releases: what shipped, the configuration that governs it, and
+the operational facts that are cheaper to know up front than to discover during an incident. Newest
+first.
+
+---
+
+## Self-service password reset (T353)
+
+A signed-out user can reset their own password: `/forgot-password` takes an email address, and — only
+on a real match — mints a single-use token and emails a reset **link**. The link opens the new-password
+form, which is gated by a second-factor **code**; the password changes only after that code verifies.
+A completed reset lands on the login page with no auto-sign-in.
+
+### Configuration (`app.security.*`)
+
+The reset **code** TTL and attempt cap are pinned in `application.properties` (matching the code
+defaults, so nothing changes). The reset **link** TTL keeps its `AppProperties` default of 30 minutes
+and is intentionally not written into `application.properties`: the committed-config guard treats any
+property key containing "password" as a credential that must come from the environment, and
+`password-reset.link-validity` trips that substring even though it is a TTL. All three values:
+
+| Setting | Key | Value |
+| --- | --- | --- |
+| Reset **link** lifetime | `password-reset.link-validity` | **30 minutes** |
+| Reset **code** lifetime | `second-factor.code-validity` | **10 minutes** |
+| Code **attempt cap** | `second-factor.max-attempts` | **5** (challenge burned, not merely delayed) |
+| Request throttle | `password-reset.max-requests-per-address` / `max-requests-per-ip` over `window` | 3 per address, 10 per IP, over a 15-minute window |
+
+The reset **code** and its **attempt cap** are the *existing* second-factor / sign-in values — the reset
+code is a `login_challenges` row and reuses them. Changing `second-factor.code-validity` or
+`second-factor.max-attempts` therefore changes **both** the sign-in code and the reset code.
+
+### Operational facts — know these before an incident
+
+1. **Reset mail rides the SAME ACS transport as sign-in codes.** The reset link is sent through the
+   same Azure Communication Services endpoint, from-address and managed-identity credential as the
+   two-factor sign-in code (`app.security.second-factor.transport=acs`). There is **no second channel**:
+   an ACS outage takes out password reset **and** two-factor sign-in **together**. When ACS is down,
+   users who need a factor code or a reset link cannot get either.
+
+2. **Session expiry on reset is in-memory and per-instance.** Retiring a user's existing authenticated
+   sessions when their password is reset is held in an in-process registry — like the login throttle,
+   it lives in the instance's memory. On the single-instance App Service this is complete; **if the app
+   is ever scaled out it becomes silently partial** — a reset on one instance would not expire that
+   user's sessions held on the other instances. Scaling out requires a shared session store to keep this
+   whole.
+
+### Deployment dependency
+
+This feature requires migrations **V27** (`password_reset_tokens` table) and **V28** (the
+`login_challenges.purpose` column, read on the sign-in path). Both must be applied before the code that
+reads them goes live — a release carrying this code against a database without these is a sign-in-path
+failure, not merely a broken new feature.
+
+---
+
+## Audit trail — actor-identifier snapshot (T359)
+
+Audit rows now record the actor's login identifier (the email address for a person, the account name
+for break-glass) in `actor_identifier_at_time`. Since T344 no usernames are issued, so that snapshot
+column had been **NULL on every MFA and password-reset row ever written** — nothing failed because
+`actor_id` was still populated, but the snapshot that exists precisely for "who was that, now the
+account has changed hands or addresses" was empty. Fixed to write `getLoginIdentifier()`.
+
+**Operational fact — when the fix takes effect:** it changes what is *written*, so it takes effect when
+the new jar is **serving**, not at merge. Between the merge and the release, rows are still being written
+with a **null identifier**. The upper bound on that gap **is this release** — the release record is what
+a later reader will use to date when the identifier began being captured.
