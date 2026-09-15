@@ -34,6 +34,11 @@ resource "azurerm_linux_web_app" "this" {
   site_config {
     always_on                         = true
     minimum_tls_version               = "1.2"
+    # HTTP/2 (T347): prod otherwise negotiates HTTP/1.1 even when the client offers h2 (measured,
+    # T345-LANE-B item 2). Enabling it lets the front end negotiate h2 over the existing TLS for header
+    # compression + multiplexing on the high-RTT path. Enabled on prod 2026-09-15 via `az webapp config
+    # set --http20-enabled true` (measured h2 negotiated); codified here (T354) so terraform matches.
+    http2_enabled                     = true
     ftps_state                        = "Disabled"
     health_check_path                 = var.health_check_path
     health_check_eviction_time_in_min = 5 # azurerm v4 requires this alongside health_check_path
@@ -64,6 +69,18 @@ resource "azurerm_linux_web_app" "this" {
     "APPLICATIONINSIGHTS_CONNECTION_STRING"  = "@Microsoft.KeyVault(SecretUri=${var.ai_connection_string_secret_uri})"
     "APPLICATIONINSIGHTS_CONFIGURATION_FILE" = "/home/site/wwwroot/applicationinsights.json"
     "JAVA_OPTS"                              = "-javaagent:/home/site/wwwroot/applicationinsights-agent.jar"
+
+    # T354 reconciliation: these five were set out of band on prod (via `az`) during the 2FA/ACS/document
+    # work -- including by hand-flip requests during the incident response -- and were NEVER in this map.
+    # A `terraform apply` therefore planned to REMOVE them, which would have disabled 2FA and broken ACS
+    # email. Codified here so terraform stops trying to strip them. They are config, not secrets. Defaults
+    # live on the variables; env-specific values (the ACS endpoint, the from-address) can be overridden
+    # from the root per environment.
+    "SECOND_FACTOR_ENABLED"                  = var.second_factor_enabled
+    "SECOND_FACTOR_TRANSPORT"                = var.second_factor_transport
+    "SECOND_FACTOR_FROM_ADDRESS"             = var.second_factor_from_address
+    "ACS_EMAIL_ENDPOINT"                     = var.acs_email_endpoint
+    "APP_DOCUMENTS_KEYVAULT_CREDENTIAL"      = var.documents_keyvault_credential
   }
 }
 
