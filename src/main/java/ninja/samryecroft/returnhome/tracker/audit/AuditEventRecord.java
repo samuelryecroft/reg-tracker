@@ -18,7 +18,7 @@ public record AuditEventRecord(
         AuditEventType eventType,
         LocalDateTime occurredAt,
         Long actorId,
-        String actorUsername,
+        String actorIdentifier,
         String actorRoles,
         String targetType,
         Long targetId,
@@ -42,7 +42,7 @@ public record AuditEventRecord(
         private final AuditEventType eventType;
         private final Map<String, String> metadata = new LinkedHashMap<>();
         private Long actorId;
-        private String actorUsername;
+        private String actorIdentifier;
         private String actorRoles;
         private String targetType;
         private Long targetId;
@@ -53,9 +53,15 @@ public record AuditEventRecord(
             this.eventType = eventType;
         }
 
-        Builder actor(Long id, String username, String roles) {
+        /**
+         * @param identifier what identified the actor AT THIS MOMENT - an email address for
+         *        everyone since T344, and a name for the break-glass account, which has no address.
+         *        It is a SNAPSHOT: it must not be re-derived when the row is read, because the point
+         *        of the column is to survive the account's address changing afterwards.
+         */
+        Builder actor(Long id, String identifier, String roles) {
             this.actorId = id;
-            this.actorUsername = username;
+            this.actorIdentifier = identifier;
             this.actorRoles = roles;
             return this;
         }
@@ -81,7 +87,7 @@ public record AuditEventRecord(
             String rendered = metadata.isEmpty() ? null : metadata.entrySet().stream()
                     .map(entry -> entry.getKey() + "=" + entry.getValue())
                     .collect(Collectors.joining("; "));
-            return new AuditEventRecord(eventType, LocalDateTime.now(), actorId, actorUsername,
+            return new AuditEventRecord(eventType, LocalDateTime.now(), actorId, actorIdentifier,
                     actorRoles, targetType, targetId, organisationId, homeId, truncate(rendered));
         }
 
