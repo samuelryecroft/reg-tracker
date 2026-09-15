@@ -7,6 +7,65 @@
 - **Builds on:** T4 (observability/audit enhancement) and T6 (`AUTH-PROVIDER-OPTIONS.md`) —
   see the auth-event overlap note in §B.6.
 
+## A0. A KNOWN GAP IN THE RECORD, AND WHY IT IS NOT BEING REPAIRED (T359, 2026-09-15)
+
+**Read this before drawing any conclusion from an empty `actor_identifier_at_time`.**
+
+### What is missing
+
+For audit rows of type `MFA_CHALLENGE_ISSUED`, `MFA_SUCCESS`, `MFA_FAILURE`, `MFA_LOCKED`,
+`PASSWORD_RESET_REQUESTED`, `PASSWORD_RESET_COMPLETED` and `PASSWORD_RESET_FAILED`, written in the
+window below, **`actor_identifier_at_time` is NULL for every account except the break-glass one.**
+
+The cause: those seven publisher methods recorded `User.getUsername()`. T344 stopped issuing
+usernames — since then the column is null for everyone but the emergency account, which has no email
+address and so keeps a name. The rename of the column from `actor_username_at_time` to
+`actor_identifier_at_time` (V26) was made precisely so it would hold *whatever identified the actor*,
+and nobody checked what was still being passed into it.
+
+Rows written for **authenticated** actions are unaffected: those take the identifier from the
+signed-in principal and have always carried it.
+
+### The window, bounded at both ends
+
+- **Lower bound — exact.** The database was purged and rebuilt for T344, released as
+  `prod-2026-09-15-r16` and verified by Sam signing in. **Every row now in `audit_events` postdates
+  that rebuild**, so no affected row predates it.
+- **Upper bound — the T359 RELEASE, not the merge.** The fix changes what is written, so it takes
+  effect when the new jar is serving, not when the branch lands. The release record is where the
+  exact time lives.
+
+### What the null does NOT mean
+
+**It does not mean the actor was unidentified.** `actor_id` is populated on every one of these rows
+and identifies the account. What was lost is the human-readable point-in-time snapshot beside it —
+which matters only later, when someone asks who that was and the account has since changed address
+or changed hands. That is exactly the case the snapshot column exists for, which is what makes this
+worth writing down rather than absorbing.
+
+### Why it will NOT be backfilled
+
+Two reasons, and the second is the one that settles it.
+
+1. `audit_events` is append-only by three enforced layers (§B.4, T219). Rewriting rows is the thing
+   the design exists to prevent.
+2. **A backfill would be a forgery.** Deriving the identifier now, from the account's current
+   address, asserts that this address identified the actor *at that time* — which is the one thing a
+   snapshot column is there to preserve and the one thing we no longer know. An address may have
+   changed since; an account may have been reassigned. **Converting an admitted gap into a plausible
+   falsehood makes the trail worse, not better**, and it would be undetectable afterwards.
+
+An honest empty field with a documented reason is evidence. A confidently wrong one is not.
+
+### If you are reading a row from this window
+
+Use `actor_id` for attribution, and treat the empty identifier as *not recorded* rather than *not
+applicable*. If you need the address the account held at that time and it is not in this window's
+rows, **it cannot be recovered from this table** — say so, rather than inferring it from the
+account's current state.
+
+---
+
 ## A. Audit event catalog
 
 Grounded in every `*Controller`/`*Service` method, `Role.java`, `InterviewStatus`, and
