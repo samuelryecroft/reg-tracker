@@ -20,8 +20,19 @@ import org.springframework.web.servlet.LocaleResolver;
  * <p>This guard has two parts: (1) verify the bean exists and is configured, (2) verify it resolves
  * to the correct locale. A removed or changed config is caught at startup.
  */
+/*
+ * T360 correction (Creed): this needed `extends AbstractIntegrationTest`. A bare @SpringBootTest
+ * starts the whole context, which starts Flyway, which needs a database - and without the base
+ * class there is no Testcontainers Postgres, so it reached for a local one and failed with
+ * "password authentication failed for user tracker". All three tests errored on context load.
+ *
+ * Worth stating because the failure does not look like its cause: NOTHING ABOUT THE MESSAGE
+ * MENTIONS THE MISSING BASE CLASS, and the same three tests would pass on a developer machine that
+ * happens to have a matching local database running - which is precisely the class of defect
+ * T358 just closed, arriving from the other direction.
+ */
 @SpringBootTest
-class LocaleConfigGuardTest {
+class LocaleConfigGuardTest extends ninja.samryecroft.returnhome.tracker.AbstractIntegrationTest {
 
     @Autowired
     private LocaleResolver localeResolver;

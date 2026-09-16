@@ -81,6 +81,11 @@ class ApplicationLocaleFeatureTest extends AbstractIntegrationTest {
         staffUsername = "t360-staff" + suffix;
         User staff = new User();
         staff.setUsername(staffUsername);
+        // T360 correction (Creed): omitted in the original, and the row cannot be inserted without
+        // it - `users_email_or_break_glass` (T344, email-as-login) requires an address on every
+        // account that is not the break-glass one. The fixture this was adapted from
+        // (ChildDetailIntegrationTest) sets it; the copy dropped the line.
+        staff.setEmail(staffUsername + "@example.test");
         staff.setLastName("Staff");
         staff.setRoles(new HashSet<>(Set.of(Role.HOME_STAFF)));
         staff.setHomes(new HashSet<>(Set.of(home)));
@@ -91,7 +96,12 @@ class ApplicationLocaleFeatureTest extends AbstractIntegrationTest {
     }
 
     private RequestPostProcessor asStaff() {
-        UserDetails userDetails = appUserDetailsService.loadUserByUsername(staffUsername);
+        // T360 correction (Creed): must go through TestLogins. T344 made sign-in resolve accounts by
+        // EMAIL, and the suite's convention is <username>@example.test - so a bare username here
+        // resolves to nothing ("No account for: t360-staff-..."). The fixture this was adapted from
+        // uses the helper; the copy called loadUserByUsername directly.
+        UserDetails userDetails = appUserDetailsService.loadUserByUsername(
+                ninja.samryecroft.returnhome.tracker.TestLogins.loginIdentifier(staffUsername));
         SecurityContext context = new SecurityContextImpl(
                 new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities()));
         return securityContext(context);
@@ -103,6 +113,9 @@ class ApplicationLocaleFeatureTest extends AbstractIntegrationTest {
         child.setFirstName("Jordan");
         child.setLastName("T360" + suffix);
         child.setLocalCaseReference("CH-T360-" + suffix);
+        // T360 correction (Creed): also omitted. date_of_birth_enc is NOT NULL, so the child row
+        // cannot be inserted without it either.
+        child.setDateOfBirth(java.time.LocalDate.of(2013, 7, 22));
         child.setHome(home);
         child = childRepository.save(child);
 
