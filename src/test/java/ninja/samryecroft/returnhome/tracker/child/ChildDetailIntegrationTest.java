@@ -52,7 +52,7 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 class ChildDetailIntegrationTest extends AbstractIntegrationTest {
 
     private static final DateTimeFormatter DISPLAY_FMT =
-            DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm", Locale.ENGLISH);
+            DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm", Locale.UK);
 
     @Autowired
     private MockMvc mockMvc;
