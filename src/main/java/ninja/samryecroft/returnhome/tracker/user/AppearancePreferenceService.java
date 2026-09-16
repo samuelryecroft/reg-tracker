@@ -36,12 +36,14 @@ public class AppearancePreferenceService {
      * ninja.samryecroft.returnhome.tracker.web.GlobalControllerAdvice}'s own pattern - until the
      * user's next login.
      *
-     * <p>Re-fetches with {@link UserRepository#findByUsername}'s own entity graph (the exact query
-     * {@link AppUserDetailsService} runs at login) rather than a bare {@code getReferenceById},
-     * deliberately: a lazy reference is fine to mutate and save inside this transaction, but handing
-     * one to a new {@link AppUserPrincipal} that outlives the transaction is the lazy-initialization
-     * trap this codebase has hit before - {@code roles}/{@code organisation}/{@code homes} need to
-     * already be real, loaded objects before the persistence context that could load them closes.
+     * <p>Re-fetches with the detailed entity graph (same as {@link UserRepository#findByUsername})
+     * rather than a bare {@code getReferenceById}, deliberately: a lazy reference is fine to mutate
+     * and save inside this transaction, but handing one to a new {@link AppUserPrincipal} that
+     * outlives the transaction is the lazy-initialization trap this codebase has hit before -
+     * {@code roles}/{@code organisation}/{@code homes} need to already be real, loaded objects
+     * before the persistence context that could load them closes. Uses {@code getUserId()} to
+     * look up by primary key rather than login identifier, so it works regardless of whether
+     * username and email differ (T368).
      *
      * <p>The new token's authorities come from {@code refreshed}, the freshly-loaded principal, NOT
      * from the old token being replaced (Kevin's review, PR #29) - {@link
@@ -70,7 +72,7 @@ public class AppearancePreferenceService {
      */
     @Transactional
     public void updateOwnPreference(AppUserPrincipal principal, AppearancePreference preference) {
-        User user = userRepository.findByUsername(principal.getUsername())
+        User user = userRepository.findDetailedById(principal.getUserId())
                 .orElseThrow(() -> new IllegalStateException(
                         "Signed-in user '" + principal.getUsername() + "' no longer exists"));
         user.setAppearancePreference(preference);
