@@ -48,17 +48,12 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 class ChildSummaryIntegrationTest extends AbstractIntegrationTest {
 
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("dd MMM yyyy", Locale.UK);
-    // Deliberately Locale.ENGLISH, NOT Locale.UK like DATE_FMT above: this compares against the
-    // table/stack's own #temporals.format(x, 'dd MMM yyyy HH:mm') calls, which resolve their
-    // locale through Spring's AcceptHeaderLocaleResolver rather than a fixed one (the same
-    // already-documented, pre-existing gap ChildController.ChildListRow's own DOB_FMT comment
-    // names - "Creed's T193 follow-up") - MockMvc sends no Accept-Language header, which that
-    // resolver defaults to plain Locale.ENGLISH, not the JVM's own default locale (confirmed
-    // empirically: on this JVM, both Locale.UK and Locale.getDefault() render September as
-    // "Sept"; only Locale.ENGLISH renders "Sep", matching the template's actual output).
-    // RETURNED_FMT/DATE_FMT above are different because they compare against
-    // MissingEpisodesSummary's own Locale.UK-pinned formatter, not this template call.
-    private static final DateTimeFormatter DATETIME_FMT = DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm", Locale.ENGLISH);
+    // Now Locale.UK to match the app's FixedLocaleResolver (T360): the template's
+    // #temporals.format(x, 'dd MMM yyyy HH:mm') calls now resolve through the fixed resolver
+    // rather than the previous AcceptHeaderLocaleResolver default of Locale.ENGLISH.
+    // The app pins all viewers to Locale.UK so date output is consistent regardless of
+    // browser Accept-Language or system locale.
+    private static final DateTimeFormatter DATETIME_FMT = DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm", Locale.UK);
 
     @Autowired
     private MockMvc mockMvc;
