@@ -369,6 +369,36 @@
                     </execution>
                     <execution>
                         <!--
+                            T361 (Lane B perf item 5): minify static/css/app.css. The source tree keeps
+                            every comment; this rewrites the copy already in target/classes down to
+                            comments-and-whitespace-stripped CSS, so the packaged jar ships the minified
+                            file. app.css is ~45% comments (T350), which - being prose - gzip poorly, so
+                            this takes the served file from ~37 KB gzipped to ~9 KB. Same shape as
+                            subset-icon-sprite above: build tool in src/test/java (ships no app code,
+                            unit-tested by CssMinifierTest), run via exec:exec with classpathScope=test,
+                            bound to prepare-package (after process-resources copied app.css, before the
+                            spring-boot repackage puts it in the jar). Comments/whitespace ONLY - it never
+                            rewrites, merges or drops a rule; see CssMinifier's javadoc.
+                        -->
+                        <id>minify-css</id>
+                        <phase>prepare-package</phase>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
+                        <configuration>
+                            <executable>java</executable>
+                            <classpathScope>test</classpathScope>
+                            <arguments>
+                                <argument>-classpath</argument>
+                                <classpath/>
+                                <argument>ninja.samryecroft.returnhome.tracker.build.CssMinifier</argument>
+                                <argument>${project.basedir}/src/main/resources/static/css/app.css</argument>
+                                <argument>${project.build.outputDirectory}/static/css/app.css</argument>
+                            </arguments>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <!--
                             T356: the backstop. After spring-boot repackage has built the jar, assert
                             the PACKAGED sprite carries the subset symbol count, not the source count.
                             This is what makes "correct commit, wrong content" impossible to ship: a
@@ -403,6 +433,34 @@
                                 <argument>${project.basedir}/src/main/resources/static/icons/phosphor.svg</argument>
                                 <argument>${project.basedir}/src/main/resources/templates</argument>
                                 <argument>${project.basedir}/src/main/resources/static</argument>
+                            </arguments>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <!--
+                            T361 backstop, exactly like verify-jar-carries-subset: after repackage,
+                            assert the PACKAGED app.css is minified (no /* comment, and smaller than
+                            source). A step that produces the minified file cannot catch its own
+                            absence; this INSPECTS THE ARTIFACT, so a build that skipped minify-css
+                            (a stray -Dexec.skip - note <skip>false</skip> here) fails instead of
+                            shipping the 122 KB commented CSS green. -Dmaven.test.skip=true removes
+                            this class from test-classes, so it errors loudly rather than passing.
+                        -->
+                        <id>verify-jar-carries-minified-css</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
+                        <configuration>
+                            <skip>false</skip>
+                            <executable>java</executable>
+                            <classpathScope>test</classpathScope>
+                            <arguments>
+                                <argument>-classpath</argument>
+                                <classpath/>
+                                <argument>ninja.samryecroft.returnhome.tracker.build.CssMinifiedJarCheck</argument>
+                                <argument>${project.build.directory}/${project.build.finalName}.jar</argument>
+                                <argument>${project.basedir}/src/main/resources/static/css/app.css</argument>
                             </arguments>
                         </configuration>
                     </execution>
