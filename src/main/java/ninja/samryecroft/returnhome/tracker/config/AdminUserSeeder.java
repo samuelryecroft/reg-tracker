@@ -31,6 +31,17 @@ public class AdminUserSeeder implements ApplicationRunner {
 
     private static final Logger log = LoggerFactory.getLogger(AdminUserSeeder.class);
 
+    /**
+     * The break-glass account's address (T364 stage 2). A reserved-domain (RFC 6761 {@code .invalid})
+     * value that can never resolve or be registered, so it belongs to nobody forever - the account is
+     * exempt from the second factor and never receives a code, so it needs an address that is
+     * unique and unforgeable rather than one that is deliverable.
+     *
+     * <p><strong>Must match {@code V29__break_glass_email.sql} exactly.</strong> This seeder sets it
+     * on a FRESH install; that migration re-homes the EXISTING production row to the same value.
+     */
+    public static final String BREAK_GLASS_EMAIL = "break-glass@return-home.invalid";
+
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final AppProperties appProperties;
@@ -75,12 +86,20 @@ public class AdminUserSeeder implements ApplicationRunner {
         admin.setPassword(passwordEncoder.encode(password));
         admin.setFirstName("System");
         admin.setLastName("Administrator");
-        // No email: this account is seeded from an environment secret, not provisioned by a person,
-        // so there is no address to record. An admin supplies one on the first edit.
+        // T364 stage 2: a reserved-domain address, so the emergency account authenticates by email
+        // like everyone else rather than depending on the username column. .invalid (RFC 6761) can
+        // never resolve or be registered, so this address belongs to nobody forever - it keeps the
+        // "no address to phish" property the exemption relies on while removing the need for a
+        // non-email identity. The existing production row is re-homed to the SAME value by
+        // V29__break_glass_email.sql (this seeder only ever creates the first admin, never updates
+        // an existing one), so the two must stay identical. The username is still set as well: it
+        // stays a working fallback until the column is dropped (stage 3, Sam's own decision).
+        admin.setEmail(BREAK_GLASS_EMAIL);
         // THE EMERGENCY ACCOUNT, and this line is load-bearing. Without it the seeded admin is an
-        // ordinary row: the second factor would be required of it, it has no address to receive a
-        // code at, and it would be refused at sign-in - which is exactly the lockout T339 fixed,
-        // reached by a different route. V25's partial unique index keeps it to one row.
+        // ordinary row: the second factor would be required of it and it would be refused at sign-in
+        // (the code goes nowhere, since a .invalid address is undeliverable and the account is exempt
+        // precisely so it never needs one) - which is exactly the lockout T339 fixed, reached by a
+        // different route. V25's partial unique index keeps it to one row.
         admin.setBreakGlass(true);
         admin.setRoles(Set.of(Role.ADMIN));
         admin.setEnabled(true);

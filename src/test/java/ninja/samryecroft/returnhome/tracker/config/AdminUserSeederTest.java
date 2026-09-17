@@ -127,6 +127,12 @@ class AdminUserSeederTest {
         assertThat(saved.getValue().getUsername()).isEqualTo("boss");
         assertThat(saved.getValue().getRoles()).containsExactly(Role.ADMIN);
         assertThat(saved.getValue().isEnabled()).isTrue();
+        // T364 stage 2: the emergency account is the break-glass row and carries the reserved-domain
+        // address, so it authenticates by email like everyone else. The migration V29 puts the same
+        // value on the existing production row; the two must agree, so this asserts the constant.
+        assertThat(saved.getValue().isBreakGlass()).isTrue();
+        assertThat(saved.getValue().getEmail()).isEqualTo(AdminUserSeeder.BREAK_GLASS_EMAIL);
+        assertThat(saved.getValue().getEmail()).endsWith(".invalid");
         // Stored hashed, never in the clear.
         assertThat(saved.getValue().getPassword()).isNotEqualTo("from-the-env");
         assertThat(passwordEncoder.matches("from-the-env", saved.getValue().getPassword())).isTrue();
