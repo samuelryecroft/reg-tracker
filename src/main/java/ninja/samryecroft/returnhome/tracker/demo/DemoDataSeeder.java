@@ -141,7 +141,8 @@ public class DemoDataSeeder implements ApplicationRunner {
         log.info("Seeded demo tenancy: {} organisations, {} homes, {} children, {} users, "
                         + "{} interview requests covering every lifecycle state.",
                 seed.organisations, seed.homes, seed.children, seed.users, seed.requests);
-        log.info("Sign in with any of: {} (all use the demo password).", seed.usernames);
+        log.info("Sign in with any of these email addresses: {} (all use the demo password).",
+                seed.usernames);
     }
 
     /**
@@ -286,8 +287,10 @@ public class DemoDataSeeder implements ApplicationRunner {
                 user("coordinator.ng", "Owen Prescott", Set.of(Role.COORDINATOR), seed.northgate, null);
 
         seed.users = 9;
-        seed.usernames = "admin, orgadmin, coordinator, visitor, visitor2, reviewer, homestaff, "
-                + "homestaff2, viewer, coordinator.ng";
+        seed.usernames = "admin@example.test, orgadmin@example.test, coordinator@example.test, "
+                + "visitor@example.test, visitor2@example.test, reviewer@example.test, "
+                + "homestaff@example.test, homestaff2@example.test, viewer@example.test, "
+                + "coordinator.ng@example.test";
 
         // A handful of sign-ins so the audit trail is not empty on the first screen.
         audit.loginSuccess(new AppUserPrincipal(seed.coordinator));
@@ -297,7 +300,9 @@ public class DemoDataSeeder implements ApplicationRunner {
 
     private User user(String username, String fullName, Set<Role> roles, Organisation org, Home home) {
         User user = new User();
-        user.setUsername(username);
+        // T364 stage 1: no username set - demo accounts sign in by email like everyone else. The
+        // parameter is kept as the local-part of the derived address below (and as the readable name
+        // of the account in this seeder), not written to the username column.
         // The seeder keeps taking a single display name; splitting it here rather than at ~30 call
         // sites keeps the demo data readable, and exercises the same first-space rule as V17.
         int space = fullName.indexOf(' ');

@@ -14,8 +14,10 @@ import ninja.samryecroft.returnhome.tracker.user.password.StrongPassword;
 @StrongPassword
 public class CreateUserForm implements PasswordCandidate {
 
-    @NotBlank
-    private String username;
+    // T364 stage 1: there is no longer a username field here. Email is the login identifier
+    // (T344), so an ordinary account is created without a username and the column stays null for
+    // everyone but the break-glass row. usernameForPolicy() therefore returns null - the password
+    // policy still bans the email local-part, the organisation name and the application name.
 
     /**
      * Optional, and length-checked only when supplied - a short password is as invalid as it ever
@@ -67,14 +69,6 @@ public class CreateUserForm implements PasswordCandidate {
     private Long organisationId;
 
     private Set<Long> homeIds = new HashSet<>();
-
-    public String getUsername() {
-        return username;
-    }
-
-    public void setUsername(String username) {
-        this.username = username;
-    }
 
     public String getPassword() {
         return password;
@@ -147,8 +141,10 @@ public class CreateUserForm implements PasswordCandidate {
         this.homeIds = homeIds;
     }
 
-    // --- PasswordCandidate (T272). This form knows the username, the email and the organisation,
-    // so it can supply all three context values; nothing here returns a placeholder. ---
+    // --- PasswordCandidate (T272). This form knows the email and the organisation, and since T364
+    // stage 1 no longer knows a username; usernameForPolicy() returns null rather than a placeholder,
+    // which PasswordContext treats as "not supplied" (the email local-part and organisation still
+    // apply). ---
 
     @Override
     public String passwordBeingSet() {
@@ -162,7 +158,7 @@ public class CreateUserForm implements PasswordCandidate {
 
     @Override
     public String usernameForPolicy() {
-        return username;
+        return null;
     }
 
     @Override

@@ -272,7 +272,7 @@ class AuditHistoryIntegrationTest extends AbstractIntegrationTest {
                         .param("roles", "VISITOR")
                         .param("organisationId", supplierOrg.getId().toString()))
                 .andExpect(status().is3xxRedirection());
-        Long newUserId = userRepository.findByUsername("hist-newvisitor" + suffix).orElseThrow().getId();
+        Long newUserId = userRepository.findByEmailIgnoreCase("history.new.visitor@example.test").orElseThrow().getId();
 
         // Prove exclusion isn't just "there happens to be no login event": actually sign in first.
         mockMvc.perform(post("/login").with(csrf())

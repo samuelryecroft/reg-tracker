@@ -161,7 +161,6 @@ class CareProviderAdminCanFindTheViewerTheyCreatedTest extends AbstractIntegrati
 
     private CreateUserForm form(String username, Role role, Home home) {
         CreateUserForm form = new CreateUserForm();
-        form.setUsername(username);
         form.setEmail(username + "@example.test");
         form.setLastName("Created");
         form.setRoles(new HashSet<>(Set.of(role)));

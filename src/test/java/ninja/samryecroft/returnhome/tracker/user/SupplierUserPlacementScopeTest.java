@@ -130,7 +130,6 @@ class SupplierUserPlacementScopeTest extends AbstractIntegrationTest {
 
     private CreateUserForm formFor(String username, Long organisationId) {
         CreateUserForm form = new CreateUserForm();
-        form.setUsername(username);
         form.setPassword("password123");
         form.setFirstName("New");
         form.setLastName("User");

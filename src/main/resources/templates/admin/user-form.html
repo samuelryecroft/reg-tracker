@@ -17,7 +17,6 @@
                 <div>
                     <strong>Before this user can be created</strong>
                     <ul>
-                        <li th:if="${#fields.hasErrors('username')}"><a href="#username" th:text="${#fields.errors('username')[0]}">Error</a></li>
                         <li th:if="${#fields.hasErrors('password')}"><a href="#password" th:text="${#fields.errors('password')[0]}">Error</a></li>
                         <li th:if="${#fields.hasErrors('firstName')}"><a href="#firstName" th:text="${#fields.errors('firstName')[0]}">Error</a></li>
                         <li th:if="${#fields.hasErrors('lastName')}"><a href="#lastName" th:text="${#fields.errors('lastName')[0]}">Error</a></li>
@@ -26,11 +25,6 @@
                     </ul>
                 </div>
             </div>
-
-            <label for="username">Username <span class="req" aria-hidden="true">*</span></label>
-            <input type="text" id="username" th:field="*{username}" required
-                   th:errorclass="is-invalid" th:aria-invalid="${#fields.hasErrors('username')}" aria-describedby="username-error"/>
-            <div th:replace="~{fragments/layout :: fieldError('username')}"></div>
 
             <label for="password">Password <span class="req" aria-hidden="true">*</span></label>
             <p class="hint">At least 8 characters.</p>

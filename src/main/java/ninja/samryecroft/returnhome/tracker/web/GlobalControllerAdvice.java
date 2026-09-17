@@ -474,7 +474,7 @@ public class GlobalControllerAdvice {
     @ResponseStatus(HttpStatus.CONFLICT)
     public String handleDataIntegrityViolation(Model model) {
         model.addAttribute("status", 409);
-        model.addAttribute("message", "That value conflicts with an existing record (e.g. username already taken).");
+        model.addAttribute("message", "That value conflicts with an existing record (e.g. an email address already in use).");
         return "error";
     }
 }
