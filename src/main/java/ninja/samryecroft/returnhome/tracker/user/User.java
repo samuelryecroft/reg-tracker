@@ -197,17 +197,24 @@ public class User {
     }
 
     /**
-     * What this account types at the login form: the email address, or for the break-glass account
-     * its username.
+     * What this account is named by: its email address, falling back to the username only for a row
+     * that has no address.
+     *
+     * <p><b>T364 stage 2: email first, for every account.</b> Break-glass now carries a
+     * reserved-domain address ({@link ninja.samryecroft.returnhome.tracker.config.AdminUserSeeder#BREAK_GLASS_EMAIL},
+     * set on fresh installs by the seeder and on the existing row by {@code V29}), so it is named by
+     * that address like everyone else - which is what lets the username column eventually be dropped.
+     * The {@code username} fallback remains for the one case that still has no address: a break-glass
+     * row that has not yet been re-homed (an environment where V29 has not run). That fallback is the
+     * fire exit's fire exit, and it is why this does not simply return {@code email}.
      *
      * <p>One concept with two sources, deliberately resolved here rather than at each call site. It
      * is what {@code AppUserPrincipal.getUsername()} returns, so failed-login throttling, the audit
-     * trail and the logs all name an account the same way without any of them knowing that the
-     * emergency row is different.
+     * trail and the logs all name an account the same way.
      */
     @Transient
     public String getLoginIdentifier() {
-        return breakGlass ? username : email;
+        return email != null ? email : username;
     }
 
     public String getUsername() {
