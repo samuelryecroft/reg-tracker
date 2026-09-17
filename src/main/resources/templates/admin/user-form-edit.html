@@ -2,13 +2,13 @@
 <html xmlns:th="http://www.thymeleaf.org" lang="en" th:attr="data-appearance=${#strings.toLowerCase(appearancePreference)}">
 <head>
     <meta charset="UTF-8"/>
-    <title th:text="${'Edit User: ' + user.username}">Edit User</title>
+    <title th:text="${'Edit User: ' + user.fullName}">Edit User</title>
     <th:block th:replace="~{fragments/layout :: styles}"></th:block>
 </head>
 <body>
 <div th:replace="~{fragments/layout :: nav}"></div>
 <main id="main">
-    <h1 th:text="${'Edit User: ' + user.username}">Edit User</h1>
+    <h1 th:text="${'Edit User: ' + user.fullName}">Edit User</h1>
 
     <div class="card">
         <form method="post" th:action="@{/admin/users/{id}/edit(id=${user.id})}" th:object="${form}">

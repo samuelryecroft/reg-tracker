@@ -248,7 +248,6 @@ class MultiHomeScopingIntegrationTest extends AbstractIntegrationTest {
         foreignHome = homeRepository.save(foreignHome);
 
         CreateUserForm form = new CreateUserForm();
-        form.setUsername("mh-split" + suffix);
         form.setFirstName("Split");
         form.setLastName("Across Providers");
         form.setEmail("split.across.providers@example.test");

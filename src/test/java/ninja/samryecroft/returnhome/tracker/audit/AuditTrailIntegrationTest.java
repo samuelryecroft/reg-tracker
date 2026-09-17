@@ -329,7 +329,7 @@ class AuditTrailIntegrationTest extends AbstractIntegrationTest {
                         .param("roles", Role.COORDINATOR.name()))
                 .andExpect(status().is3xxRedirection());
 
-        User created = userRepository.findByUsername(newUsername).orElseThrow();
+        User created = userRepository.findByEmailIgnoreCase("created.by.audit.test@example.test").orElseThrow();
         AuditEvent createdEvent = latestOwn(AuditEventType.USER_CREATED);
         assertThat(createdEvent.getActorIdentifierAtTime()).isEqualTo("audit-orgadmin" + suffix + "@example.test");
         assertThat(createdEvent.getTargetType()).isEqualTo("User");

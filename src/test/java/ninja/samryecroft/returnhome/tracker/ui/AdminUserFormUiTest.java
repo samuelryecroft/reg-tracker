@@ -68,7 +68,6 @@ class AdminUserFormUiTest extends AbstractUiTest {
         // removed with Entra, substituting the email field looked equivalent and was not: type=email
         // is validated in the browser, so the form never posted and this test timed out waiting for
         // an error that could not appear.
-        page.fill("#username", "t165ui");
         page.fill("#password", "correct-horse-battery");
         page.fill("#firstName", "Val");
         page.fill("#lastName", "Idation");

@@ -93,13 +93,12 @@ public class UserAdminController {
         try {
             userService.create(form, principal);
         } catch (DataIntegrityViolationException clash) {
-            // Kept, and re-pointed, when the Entra object id was removed. The arm existed for
-            // uq_users_idp_subject, but it was ALSO the only thing catching uq_users_username -
-            // there is no pre-check or validator for a duplicate username anywhere - so deleting it
-            // outright would have turned a graceful form error into a 500 on an ordinary admin
-            // mistake. It also fixes a mislabel: a duplicate username used to be reported as a
-            // duplicate Directory object ID.
-            rejectDuplicateUsername(bindingResult);
+            // T364 stage 1: with the username field gone, the only unique constraint a create can
+            // now violate is the email address (idx_users_email_unique, V24) - there is no pre-check
+            // or validator for a duplicate address anywhere, so without this arm an ordinary admin
+            // mistake would become a 500. (It used to catch uq_users_username here; that field no
+            // longer exists on the form.)
+            rejectDuplicateEmail(bindingResult);
             addPickerAttributes(principal, model);
             return "admin/user-form";
         }
@@ -139,16 +138,13 @@ public class UserAdminController {
             addPickerAttributes(principal, model);
             return "admin/user-form-edit";
         }
-        try {
-            userService.update(id, form, principal);
-        } catch (DataIntegrityViolationException clash) {
-            User target = userService.getAuthorized(id, principal);
-            rejectDuplicateUsername(bindingResult);
-            model.addAttribute("user", target);
-            model.addAttribute("rolesYouCannotChange", userService.rolesNotAssignableBy(target, principal));
-            addPickerAttributes(principal, model);
-            return "admin/user-form-edit";
-        }
+        // T364 stage 1: no try/catch for a unique-constraint clash here. The edit form changes
+        // roles, homes, enabled state, name and phone - none of which is unique - and it cannot
+        // change the email or the (now removed) username, so no DataIntegrityViolation is reachable
+        // on this path. An unexpected one falls through to GlobalControllerAdvice rather than being
+        // reported as a field error that has no field to attach to. (It used to reject a duplicate
+        // username, which the edit form could never set.)
+        userService.update(id, form, principal);
         return "redirect:/admin/users";
     }
 
@@ -221,9 +217,9 @@ public class UserAdminController {
         return "redirect:/admin/users";
     }
 
-    private void rejectDuplicateUsername(BindingResult bindingResult) {
-        bindingResult.rejectValue("username", "duplicate",
-                "That username is already taken.");
+    private void rejectDuplicateEmail(BindingResult bindingResult) {
+        bindingResult.rejectValue("email", "duplicate",
+                "That email address is already in use.");
     }
 
     private void addPickerAttributes(AppUserPrincipal principal, Model model) {

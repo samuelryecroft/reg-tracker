@@ -75,7 +75,7 @@ class UserProfileFieldsIntegrationTest extends AbstractIntegrationTest {
                         .param("organisationId", supplier.getId().toString()))
                 .andExpect(status().is3xxRedirection());
 
-        User saved = userRepository.findByUsername("new-staffer" + suffix).orElseThrow();
+        User saved = userRepository.findByEmailIgnoreCase("ada.lovelace@example.test").orElseThrow();
         assertThat(saved.getFirstName()).isEqualTo("Ada");
         assertThat(saved.getLastName()).isEqualTo("Lovelace");
         assertThat(saved.getEmail()).isEqualTo("ada.lovelace@example.test");
@@ -97,7 +97,7 @@ class UserProfileFieldsIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(model().attributeHasFieldErrors("form", "email"));
 
-        assertThat(userRepository.findByUsername("bad-email" + suffix)).isEmpty();
+        assertThat(userRepository.findByEmailIgnoreCase("not-an-address")).isEmpty();
     }
 
     @Test
@@ -113,7 +113,7 @@ class UserProfileFieldsIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(model().attributeHasFieldErrors("form", "lastName"));
 
-        assertThat(userRepository.findByUsername("no-surname" + suffix)).isEmpty();
+        assertThat(userRepository.findByEmailIgnoreCase("grace@example.test")).isEmpty();
     }
 
     @Test
@@ -131,7 +131,7 @@ class UserProfileFieldsIntegrationTest extends AbstractIntegrationTest {
                         .param("organisationId", supplier.getId().toString()))
                 .andExpect(status().is3xxRedirection());
 
-        assertThat(userRepository.findByUsername("no-phone" + suffix).orElseThrow().getContactPhone()).isNull();
+        assertThat(userRepository.findByEmailIgnoreCase("alan.turing@example.test").orElseThrow().getContactPhone()).isNull();
     }
 
     /**

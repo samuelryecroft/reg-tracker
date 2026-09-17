@@ -251,7 +251,8 @@ public class UserService {
         validateCombination(form.getRoles());
 
         User user = new User();
-        user.setUsername(form.getUsername());
+        // T364 stage 1: no username is set for ordinary accounts - email is the login identifier
+        // (T344) and the column stays null for everyone but the break-glass row.
         // No password means no local credential, which must stay null rather than becoming the
         // encoding of an empty string - that would be a real, matchable credential, and anyone
         // submitting a blank password would authenticate as this account.
