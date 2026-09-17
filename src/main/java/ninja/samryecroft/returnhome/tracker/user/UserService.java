@@ -483,6 +483,26 @@ public class UserService {
         // against the old address must not still complete after the address (and its proof) has moved.
         passwordResetTokens.consumeAllOutstandingForUser(saved.getId(), Instant.now());
         auditEventPublisher.userEmailChanged(saved, principal);
+        // T366: and whoever is already signed in as this account stops being signed in - the same
+        // half setPassword gained in T357, arriving here for a reason of its own.
+        //
+        // WHY AN ADDRESS CHANGE IS A CREDENTIAL EVENT ON THIS PRODUCT, WHICH IS NOT OBVIOUS AND IS
+        // THE WHOLE ARGUMENT. Ordinarily it would not be: changing where post goes does not change
+        // the key to the door. But T322 made the mailbox the root of trust for sign-in - every
+        // second-factor code is delivered to it - and T344 made the address the login identifier
+        // itself. So after this line runs, a DIFFERENT MAILBOX CONTROLS THIS ACCOUNT than the one
+        // that controlled it a moment ago. A session opened under the old address is a session
+        // authorised by a factor that has since moved to someone else's inbox.
+        //
+        // The gap this closes: this method is platform-admin only (T323) and the realistic reason
+        // to reach for it is that the address on the account is WRONG - mistyped at creation, or a
+        // colleague's, or one that has been taken over. In every one of those cases the admin is
+        // acting to take the account away from whoever the old address reached, and until now the
+        // live session of exactly that person survived the correction untouched.
+        //
+        // Found while designing T365 (trusted devices) and deliberately NOT folded into that design:
+        // the gap is real today, with nothing trusted-device about it.
+        sessionTerminationService.terminateAllSessionsFor(saved.getId());
         return saved;
     }
 
