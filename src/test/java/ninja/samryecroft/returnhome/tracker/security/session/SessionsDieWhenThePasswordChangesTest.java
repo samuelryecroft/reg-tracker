@@ -178,6 +178,44 @@ class SessionsDieWhenThePasswordChangesTest extends AbstractIntegrationTest {
     }
 
     /**
+     * T366: THE SAME GUARANTEE, FOR A CHANGE OF EMAIL ADDRESS.
+     *
+     * <p><b>Added to this class rather than a new one, deliberately.</b> Everything that makes the
+     * measurement trustworthy already lives here and was expensive to get right: a sign-in that
+     * genuinely goes through the second factor (see the class javadoc - a sign-in with the factor
+     * off would pass against a build where this feature is entirely inert), and an
+     * {@link #isAuthorised} that checks where the response POINTS and not only what it numbered.
+     * A fresh test class would have had to rebuild both, and the second one is the trap that
+     * previously went green against a broken build.
+     *
+     * <p><b>Why an address change belongs beside a password change at all</b>, which is the part
+     * that is not obvious. Ordinarily it would not: changing where post goes is not changing the
+     * key. But T322 made the mailbox the root of trust for sign-in - the second-factor code is
+     * delivered to it - and T344 made the address the login identifier. So after this call a
+     * different mailbox controls the account, and a session opened under the old address is one
+     * authorised by a factor that has since moved.
+     *
+     * <p>The realistic case is the one that makes it urgent: this method is platform-admin only
+     * (T323), and the reason to reach for it is that the address is WRONG - mistyped, a colleague's,
+     * or taken over. The administrator is acting to take the account away from whoever the old
+     * address reached, and until T366 that person's live session survived the correction.
+     */
+    @Test
+    void aSessionOpenBeforeTheEmailChangedStopsWorkingAfterIt() throws Exception {
+        MockHttpSession sessionOpenedUnderTheOldAddress = signIn(subject);
+
+        userService.changeEmail(subject.getId(), "moved-" + System.nanoTime() + "@example.test",
+                administrator);
+
+        assertThat(isAuthorised(sessionOpenedUnderTheOldAddress))
+                .as("the session held from BEFORE the address changed must be refused - the second "
+                        + "factor that authorised it is delivered to a mailbox that is no longer "
+                        + "this account's, so leaving the session alive leaves the old address's "
+                        + "holder signed in after the correction meant to remove them")
+                .isFalse();
+    }
+
+    /**
      * THE ASSERTION THIS CARD EXISTS FOR.
      */
     @Test
