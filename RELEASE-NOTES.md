@@ -6,6 +6,47 @@ first.
 
 ---
 
+## Running-process provenance: `GET /version` (T375)
+
+A new **unauthenticated** endpoint, `GET /version`, returns exactly two fields and nothing else:
+
+```json
+{ "commit": "<40-char git commit id>", "buildTime": "<ISO-8601 build time>" }
+```
+
+It exists to answer, from the **running process**, "which commit is serving right now?" — a question the
+release operator must be able to ask at cutover without holding a credential.
+
+**Why this, and what it corrects.** T268 stamped the artefact and exposed the commit on `/actuator/info`,
+and our release discipline came to call that the strongest check because it interrogates the running
+process rather than the bytes on disk. But `/actuator/info` is **ADMIN-only** — an anonymous caller gets a
+302 to the login page — so the release operator, who runs anonymously during a deploy, could never
+actually perform it. A release that happened to carry a user-visible behavioural change could be verified
+by probing that change; a pure refactor or dependency bump would have had **no** running-process proof at
+all, while the on-disk `sha256` read back from Kudu proves only the bytes on disk, not the bytes the JVM
+loaded (which differ during the overlapped restart). `GET /version` closes that gap.
+
+### Operational facts — know these before an incident
+
+1. **This is the running-process provenance check; use it at cutover.** After a deploy,
+   `curl https://portal.activeloop.co.uk/version` and confirm `.commit` equals the released commit. It is
+   the *running* layer of provenance, deliberately distinct from the Kudu on-disk `sha256` (the *disk*
+   layer) and the build-time stamp (the *artefact* layer). **The release discipline no longer names
+   `/actuator/info` as the operator's check** — that endpoint stays an ADMIN convenience.
+
+2. **`/actuator/info` is unchanged — still ADMIN-only, still richer.** `/version` is a plain MVC route, not
+   an actuator endpoint, so the ADMIN gate on `/actuator/**` is exactly as it was. This adds a surface; it
+   does not widen one. A regression test asserts `/actuator/info` still refuses an anonymous caller.
+
+3. **What an anonymous caller learns is exactly the commit id and the build time.** Against this private
+   repository the commit id is an opaque fingerprint: it grants no access and names no person (committer
+   identity was already stripped from the stamp at T268). It *is* a precise version fingerprint — a real if
+   small disclosure — but it is strictly less than `git.properties` already commits into the artefact and
+   less than `/actuator/info` serves. The payload is held to those two fields by a build-time guard: adding
+   a third field fails the test rather than silently widening the anonymous disclosure.
+
+---
+
 ## Self-service password reset (T353)
 
 A signed-out user can reset their own password: `/forgot-password` takes an email address, and — only

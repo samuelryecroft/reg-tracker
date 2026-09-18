@@ -5,6 +5,9 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.Map;
 import ninja.samryecroft.returnhome.tracker.AbstractIntegrationTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -48,6 +51,10 @@ class BuildProvenanceIntegrationTest extends AbstractIntegrationTest {
 
     /** A full git object name. Anchored, so a truncated or placeholder value is not a pass. */
     private static final String FULL_SHA = "^[0-9a-f]{40}$";
+
+    /** Local, not a bean: this app wires no {@code ObjectMapper} bean (Spring MVC's Jackson message
+     *  converter makes its own), and all this needs is to read a two-field response back. */
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Autowired
     private MockMvc mockMvc;
@@ -120,5 +127,55 @@ class BuildProvenanceIntegrationTest extends AbstractIntegrationTest {
                 .doesNotContain("user.email")
                 .doesNotContain("user.name")
                 .doesNotContain("message");
+    }
+
+    /**
+     * T375: the check the operator can actually run. Unlike {@code /actuator/info} above, this is
+     * served to an ANONYMOUS caller - the release operator at cutover holds no credential - and it
+     * still names the running commit. This is the running-process layer of provenance, distinct
+     * from the Kudu on-disk {@code sha256} (which proves the bytes on disk, not the bytes the JVM
+     * loaded) and from the build-time stamp (which proves the artefact, not that it is the one
+     * serving).
+     */
+    @Test
+    void theVersionEndpointNamesTheRunningCommitToAnAnonymousCaller() throws Exception {
+        String body = mockMvc.perform(get("/version"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        Map<String, String> payload = objectMapper.readValue(body, new TypeReference<>() {});
+
+        assertThat(payload.get("commit"))
+                .as("the anonymous /version check must return the full running commit id, or it is "
+                        + "not the running-process provenance the operator needs")
+                .matches(FULL_SHA)
+                .isEqualTo(gitProperties.getCommitId());
+        assertThat(payload.get("buildTime"))
+                .as("the build time completes the provenance answer and must be a real value, not "
+                        + "the 'unknown' a stampless build would report")
+                .isNotBlank()
+                .isNotEqualTo("unknown");
+    }
+
+    /**
+     * <strong>Field-creep guard.</strong> The anonymous payload is exactly {@code commit} and
+     * {@code buildTime} and must stay that way. Every field added here is served to an
+     * unauthenticated caller, so the guard is a build-time gate on that disclosure rather than a
+     * comment asking people not to widen it: add a field to {@link ninja.samryecroft.returnhome.tracker.web.VersionController}
+     * and this fails, naming the field that leaked. {@code /actuator/info} is where a richer,
+     * ADMIN-only view already lives; the anonymous surface deliberately does not grow toward it.
+     */
+    @Test
+    void theVersionPayloadIsExactlyCommitAndBuildTime() throws Exception {
+        String body = mockMvc.perform(get("/version"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        Map<String, String> payload = objectMapper.readValue(body, new TypeReference<>() {});
+
+        assertThat(payload.keySet())
+                .as("the anonymous /version payload grew a field; every key here is served to an "
+                        + "unauthenticated caller, so a new one is a widened disclosure, not a feature")
+                .containsExactlyInAnyOrder("commit", "buildTime");
     }
 }
