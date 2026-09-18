@@ -32,8 +32,8 @@ resource "azurerm_linux_web_app" "this" {
   }
 
   site_config {
-    always_on                         = true
-    minimum_tls_version               = "1.2"
+    always_on           = true
+    minimum_tls_version = "1.2"
     # HTTP/2 (T347): prod otherwise negotiates HTTP/1.1 even when the client offers h2 (measured,
     # T345-LANE-B item 2). Enabling it lets the front end negotiate h2 over the existing TLS for header
     # compression + multiplexing on the high-RTT path. Enabled on prod 2026-09-15 via `az webapp config
@@ -70,17 +70,27 @@ resource "azurerm_linux_web_app" "this" {
     "APPLICATIONINSIGHTS_CONFIGURATION_FILE" = "/home/site/wwwroot/applicationinsights.json"
     "JAVA_OPTS"                              = "-javaagent:/home/site/wwwroot/applicationinsights-agent.jar"
 
+    # Pin the JVM's default zone. App Service Linux is UTC unless this is set, while every
+    # operator-entered time in this application (returnedAt, missingSince, heldAt, scheduledAt) is UK
+    # wall-clock, and the 72-hour statutory deadline compares the two. Unset, the comparison is an hour
+    # out for the ~7 months of BST: DeadlineTracker reports DUE_SOON where the case is actually OVERDUE,
+    # the dashboard's overdue tile undercounts, and SeventyTwoHourReading can print "Within 72 hours"
+    # into a statutory document bound for a court or IRO for an interview that was not. This setting is
+    # the fix; TimeZoneGuard asserts it at boot so a silent removal cannot ship (the two together are the
+    # point - the setting alone is exactly the kind of out-of-band-strippable config T354 above documents).
+    "WEBSITE_TIME_ZONE" = var.website_time_zone
+
     # T354 reconciliation: these five were set out of band on prod (via `az`) during the 2FA/ACS/document
     # work -- including by hand-flip requests during the incident response -- and were NEVER in this map.
     # A `terraform apply` therefore planned to REMOVE them, which would have disabled 2FA and broken ACS
     # email. Codified here so terraform stops trying to strip them. They are config, not secrets. Defaults
     # live on the variables; env-specific values (the ACS endpoint, the from-address) can be overridden
     # from the root per environment.
-    "SECOND_FACTOR_ENABLED"                  = var.second_factor_enabled
-    "SECOND_FACTOR_TRANSPORT"                = var.second_factor_transport
-    "SECOND_FACTOR_FROM_ADDRESS"             = var.second_factor_from_address
-    "ACS_EMAIL_ENDPOINT"                     = var.acs_email_endpoint
-    "APP_DOCUMENTS_KEYVAULT_CREDENTIAL"      = var.documents_keyvault_credential
+    "SECOND_FACTOR_ENABLED"             = var.second_factor_enabled
+    "SECOND_FACTOR_TRANSPORT"           = var.second_factor_transport
+    "SECOND_FACTOR_FROM_ADDRESS"        = var.second_factor_from_address
+    "ACS_EMAIL_ENDPOINT"                = var.acs_email_endpoint
+    "APP_DOCUMENTS_KEYVAULT_CREDENTIAL" = var.documents_keyvault_credential
   }
 }
 

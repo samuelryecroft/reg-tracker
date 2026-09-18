@@ -59,3 +59,54 @@ output "application_insights_connection_string" {
   value       = module.observability.app_insights_connection_string
   sensitive   = true
 }
+
+# ---------------------------------------------------------------------------------------------------
+# Inputs for the PER-RUN EPHEMERAL DB-migration env (deploy/db-plane/ephemeral-migrate.sh, T180).
+#
+# That script takes its whole configuration from the environment, and the deploy workflow sources it
+# from `terraform output`. The five it needs that already existed above (resource_group_name,
+# migrate_subnet_id, key_vault_uri, postgres_fqdn, container_registry_login_server) are reused as-is;
+# the ones below were only ever module outputs or bare variables, so the workflow had no way to read
+# them. They are plain names and identifiers, not secrets - the DB passwords are read from Key Vault
+# by the job itself, in-VNet, and never pass through the runner.
+#
+# NOT exposed here on purpose: the CD identity's resource id. That identity is created out of band by
+# bootstrap/bootstrap-deployer-identity.sh precisely because Terraform cannot manage the principal that
+# runs it, so making it a Terraform output would imply an ownership this config does not have. The
+# workflow resolves it with `az identity show` instead.
+# ---------------------------------------------------------------------------------------------------
+
+output "database_name" {
+  description = "Application database name (DB_NAME for the ephemeral migration job)."
+  value       = module.postgres.database_name
+}
+
+output "postgres_administrator_login" {
+  description = "Postgres admin login (ADMIN_LOGIN; the job reads its password from Key Vault, not from here)."
+  value       = var.postgres_administrator_login
+}
+
+output "migrator_db_login" {
+  description = "Flyway migrator role login (MIGRATOR_LOGIN; password comes from Key Vault, not from here)."
+  value       = var.migrator_db_login
+}
+
+output "name_prefix" {
+  description = "Resource name prefix - the ephemeral env/job names derive from it (cae-<prefix>-migrate)."
+  value       = var.name_prefix
+}
+
+output "location" {
+  description = "Azure region - the ephemeral migration env is created in the same region as the estate."
+  value       = var.location
+}
+
+output "log_analytics_workspace_customer_id" {
+  description = "Log Analytics workspace customerId GUID (LOG_WS_ID). NOT the ARM resource id - see the module output's note."
+  value       = module.observability.log_analytics_workspace_customer_id
+}
+
+output "cd_identity_name" {
+  description = "Name of the out-of-band CD user-assigned identity. The name is config (it is a Terraform variable, because migrator_job consumes it); the identity itself is not managed here, so the workflow resolves its resource id with `az identity show`."
+  value       = var.cd_identity_name
+}

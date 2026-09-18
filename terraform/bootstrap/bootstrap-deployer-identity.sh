@@ -15,13 +15,13 @@ set -euo pipefail
 # ---- EDIT THESE (CAF names; the *-suffixed ones are known after the first apply picks the random
 #      suffix - the KV/ACR grants below need those resources to exist, so run this AFTER the RG,
 #      Key Vault and ACR are created, then re-run is a no-op) ----
-GITHUB_REPO="OWNER/REPO"            # e.g. samuelryecroft/reg-tracker
+GITHUB_REPO="samuelryecroft/reg-tracker"
 APP_RG="rg-rht"                     # the app resource group (rg-<name_prefix>)
 LOCATION="uksouth"
-KEY_VAULT_NAME="kv-rht-CHANGEME"    # kv-<name_prefix>-<suffix> (from the deployed vault)
-ACR_NAME="crrhtCHANGEME"            # cr<name_prefix><suffix> (from the deployed registry)
+KEY_VAULT_NAME="kv-rht-fq58t"
+ACR_NAME="crrhtfq58t"
 STATE_RG="rg-rht-tfstate"           # from bootstrap-tfstate.sh
-STATE_SA="sarhttfstatechangeme"     # from bootstrap-tfstate.sh
+STATE_SA="sarhttfstatedcc9b3"
 PLAN_IDENTITY="rht-ci-plan"
 CD_IDENTITY="rht-cd-prod"
 # --------------------

@@ -100,8 +100,8 @@ resource "azurerm_monitor_scheduled_query_rules_alert_v2" "break_glass_login" {
   # `AppTraces` only resolves at workspace scope; a component-scoped rule fails to create with
   # "Failed to resolve table or column expression named 'AppTraces'" (400). (T355: the alert was
   # authored scoped to the component and had never been applied, so this defect was latent until now.)
-  scopes              = [azurerm_log_analytics_workspace.this.id]
-  description         = "The emergency local sign-in path was used. Expected to be rare and always deliberate."
+  scopes      = [azurerm_log_analytics_workspace.this.id]
+  description = "The emergency local sign-in path was used. Expected to be rare and always deliberate."
 
   # Severity 0, matching health_probe rather than inheriting a default. A health-probe failure is
   # self-announcing - users tell you the app is down - whereas a break-glass sign-in is silent, so
