@@ -8,7 +8,8 @@ renumber if anything in flight collides.
 > the pipeline is being exercised on demand (their work; nothing in these waves touches it).
 > **Wave 0:** #250 fixes the CI red that #246 introduced and awaits a human merge. **Wave 1, all
 > branched from #250:** T377 = #251, T376 = #252, T378 = #254, T387 = the PR carrying this file.
-> **Next:** Wave 2, starting with T380 and T379.
+> **Wave 2 in progress:** T380 = the second-factor PR; T379 next. T386 and the 5xx threshold review are
+> with the deployment agent, behind a clean Terraform baseline and Sam's go-ahead.
 
 Sizes: **S** ≤ half a day · **M** 1–3 days · **L** a week or more. Every item has a *Done when* so it
 can be closed without re-reading the review.
@@ -124,8 +125,10 @@ gap is written down.
    `ConflictException`; everything else stays as-is and now surfaces as a 500, which is the point.
 4. Guard: a test that no `@ExceptionHandler` in `src/main` names `IllegalArgumentException` or
    `IllegalStateException`.
-5. Alert: an App Insights alert on 5xx rate in the `observability` module, so a scoping bug pages
-   somebody instead of rendering "record not found".
+5. Alert: a 5xx alert already exists (`alert-<prefix>-http-5xx` in the `app_service` module: more
+   than 5 in 5 minutes, severity 1, on-call action group, live on prod). The follow-up is a
+   threshold review now that internal bugs are 500s, owned by the deployment agent once the estate
+   has a clean baseline; not a second alert.
 
 *Done when:* an unscoped repository call in a controller produces a 500 and an alert, not a 404.
 **Land this before Wave 2** — it is what makes T381/T388 observable.
