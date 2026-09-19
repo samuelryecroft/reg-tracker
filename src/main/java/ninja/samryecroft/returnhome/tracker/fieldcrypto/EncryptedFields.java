@@ -60,6 +60,52 @@ public class EncryptedFields {
         }
     }
 
+    /**
+     * Re-encrypts, onto the entity itself, every marked field whose plaintext no longer matches what
+     * the row was loaded with, and returns the names of the plaintext fields that had changed.
+     *
+     * <p>Called by the flush-entity listener BEFORE Hibernate's own dirty check runs, and that
+     * ordering is the entire point (T376). The plaintext holders are {@code @Transient}, so
+     * Hibernate cannot see them change; the ciphertext columns are what it compares, and until this
+     * runs they still hold exactly what was loaded. An edit that touches only a transient field
+     * therefore produced NO UPDATE at all - the child's corrected date of birth was discarded while
+     * the audit trail recorded the correction. Writing fresh ciphertext here makes the mapped column
+     * differ from its loaded value, so the standard dirty check schedules the update and the insert
+     * and update listeners take it from there, unchanged.
+     *
+     * <p>The comparison decrypts the LOADED ciphertext rather than comparing ciphertext to
+     * ciphertext: every encryption uses a fresh IV, so two encryptions of the same value never match,
+     * and comparing them would mark every loaded row dirty on every flush. Decrypting costs one
+     * AES-GCM operation per marked field per managed entity per flush, the same work the load itself
+     * did. Nothing is written for a field whose value is unchanged.
+     *
+     * @param propertyNames the persister's mapped property names, positionally matching {@code loadedState}
+     * @param loadedState   the entity's state as loaded from the database, ciphertext columns included
+     * @throws FieldCryptoException if a marked ciphertext field is not a mapped property, because the
+     *                              silent alternative is exactly the bug this exists to remove
+     */
+    public List<String> reencryptChangedPlaintext(EncryptedEntity entity, String[] propertyNames,
+            Object[] loadedState) {
+        long organisationId = requireOrganisation(entity);
+        List<String> changed = new java.util.ArrayList<>();
+        for (Pair pair : pairsFor(entity.getClass())) {
+            int index = java.util.Arrays.asList(propertyNames).indexOf(pair.ciphertext().getName());
+            if (index < 0) {
+                throw new FieldCryptoException(pair.context() + " names a ciphertext field '"
+                        + pair.ciphertext().getName() + "' that Hibernate does not map, so a change to "
+                        + "it could never reach the database");
+            }
+            String current = asString(read(pair.plaintext(), entity));
+            String loaded = cipher.decrypt(organisationId, pair.context(), (String) loadedState[index]);
+            if (java.util.Objects.equals(current, loaded)) {
+                continue;
+            }
+            write(pair.ciphertext(), entity, cipher.encrypt(organisationId, pair.context(), current));
+            changed.add(pair.plaintext().getName());
+        }
+        return changed;
+    }
+
     /** True if this type has anything to encrypt, so listeners can skip everything else cheaply. */
     public boolean isEncrypted(Class<?> type) {
         return !pairsFor(type).isEmpty();

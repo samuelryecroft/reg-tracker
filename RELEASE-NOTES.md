@@ -6,6 +6,52 @@ first.
 
 ---
 
+## Child record corrections that did not apply (T376)
+
+**Operator note. Read this before trusting any `CHILD_UPDATED` audit row written before this
+release.**
+
+Editing a young person's record and changing **only** their date of birth, **only** their local case
+reference, or a first or last name that kept its initial (Jon → Jonathan, Smith → Smyth) **saved
+nothing**. The screen showed the previous value on reload, and an audit row of type `CHILD_UPDATED`
+was written naming the field as changed. A correction that changed a name's initial applied
+normally, and so did any edit made in the same submission as one. The defect was in field
+encryption — the plaintext holders are transient, so Hibernate saw no changed column and issued no
+UPDATE — and the fix (`FieldEncryptionHibernateListener.onFlushEntity`) covers every encrypted
+record, present and future, not children alone.
+
+### What the audit trail contains
+
+For every `CHILD_UPDATED` row written between the child-edit feature going live (T170, early
+September 2026) and this release:
+
+- if `metadata` names **only** `dateOfBirth` and/or `localCaseReference`, the edit **did not
+  apply**;
+- if it names `firstName` or `lastName`, the edit applied **only if the initial changed**. The row
+  does not say which, so those must be checked against the record.
+
+The rows cannot be corrected: `audit_events` refuses UPDATE and DELETE by database trigger, by
+design. This note is the correction.
+
+### What to do
+
+1. List the rows in question:
+
+   ```sql
+   select id, occurred_at, actor_id, target_id, metadata
+   from audit_events
+   where event_type = 'CHILD_UPDATED'
+     and occurred_at < '<timestamp this release went live>'
+   order by occurred_at;
+   ```
+
+2. For each `target_id` (the young person), ask the home to check the date of birth, case
+   reference and name on screen against their own records and re-enter anything wrong. The
+   re-entry writes a true `CHILD_UPDATED` row.
+3. Record the count and the date checked here, the way `AUDIT-PLAN.md` §A0 does for its gap.
+
+---
+
 ## Self-service password reset (T353)
 
 A signed-out user can reset their own password: `/forgot-password` takes an email address, and — only

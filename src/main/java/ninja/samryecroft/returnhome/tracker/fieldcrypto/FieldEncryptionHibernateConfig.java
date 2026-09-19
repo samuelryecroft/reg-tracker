@@ -43,6 +43,11 @@ public class FieldEncryptionHibernateConfig implements HibernatePropertiesCustom
                     sessionFactory.getServiceRegistry().getService(EventListenerRegistry.class);
             registry.appendListeners(EventType.PRE_INSERT, listener);
             registry.appendListeners(EventType.PRE_UPDATE, listener);
+            // PREPENDED, not appended: Hibernate's default flush-entity listener is the one that
+            // performs the dirty check, and a transient plaintext change is only visible to it if
+            // the ciphertext has been rewritten first (T376). Appended, ours would run after the
+            // entity had already been judged clean.
+            registry.prependListeners(EventType.FLUSH_ENTITY, listener);
         }
     }
 }

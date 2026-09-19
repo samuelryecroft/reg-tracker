@@ -66,6 +66,17 @@ account's current state.
 
 ---
 
+## A0b. `CHILD_UPDATED` ROWS THAT DESCRIBE AN EDIT THAT DID NOT APPLY (T376, 2026-09-19)
+
+Between T170 going live and T376, a `CHILD_UPDATED` row whose `metadata` names only `dateOfBirth`
+and/or `localCaseReference` records an edit that **was not saved**: the plaintext fields are
+transient, Hibernate saw no changed column, and no UPDATE was issued while the row was written.
+Rows naming `firstName` or `lastName` applied only if the initial changed, and the row does not say
+which. The rows stand, because the table refuses correction by design; the operator procedure, the
+query and the reasoning are in `RELEASE-NOTES.md` under *Child record corrections that did not
+apply (T376)*. The fix is `FieldEncryptionHibernateListener.onFlushEntity`, and it holds for every
+encrypted entity, not only `Child`.
+
 ## A. Audit event catalog
 
 Grounded in every `*Controller`/`*Service` method, `Role.java`, `InterviewStatus`, and

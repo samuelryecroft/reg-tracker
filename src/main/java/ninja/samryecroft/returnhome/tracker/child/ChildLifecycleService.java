@@ -110,6 +110,12 @@ public class ChildLifecycleService {
         // transient fields do not survive the copy, and the ciphertext columns keep their old
         // values: the edit appears to succeed and silently changes nothing. Found by this method's
         // own test, not by reasoning.
+        //
+        // The MANAGED case had the same failure by a different route until T376: a change to only
+        // a transient field (date of birth, case reference, a name keeping its initial) left no
+        // mapped property dirty, so Hibernate issued no UPDATE while the audit row below said
+        // otherwise. FieldEncryptionHibernateListener.onFlushEntity now makes such a change dirty
+        // for every encrypted entity; ChildEditPersistsTransientOnlyChangeTest pins it here.
         Child child = childRepository.findDetailedById(childId)
                 .orElseThrow(() -> new IllegalArgumentException("No such young person: " + childId));
         List<String> changed = new ArrayList<>();
