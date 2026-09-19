@@ -274,6 +274,17 @@ Drop `users.idp_subject` (zero references). Make `users.password NOT NULL` **onl
 production count of null passwords — PR #215 is the precedent for a correct migration that fails
 closed on real rows.
 
+### T395 — Dependency health that a deploy can see · **S**
+
+Raised by the deployment agent while reviewing T384: the readiness probe reports only the
+application's own lifecycle state, by design (a slow or unprovisioned dependency must not pull the
+instance out of rotation), and nothing in it constructs a Key Vault, Blob or ACS client. So an Azure
+SDK regression ships green and surfaces on the first document or the first 2FA code. Add
+`HealthIndicator`s for Key Vault (a key-get on the platform key), Blob storage and ACS to the
+**full** `/actuator/health` (never the readiness group), so the smoke step can read a meaningful
+answer after each deploy. *Done when:* an SDK bump that breaks any of the three turns
+`/actuator/health` DOWN with the component named.
+
 ### T394 — Time as `Instant`/`TIMESTAMPTZ` · **L** · *Later*
 
 The proper end of P0.3: `OffsetDateTime`/`Instant` on `TIMESTAMPTZ` with one conversion boundary in
