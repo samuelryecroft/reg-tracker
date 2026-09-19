@@ -120,8 +120,17 @@ public class SecondFactorPolicy {
      * <p>Break-glass MODE is untouched by this change. {@code BreakGlassAuditListener} reads the
      * property through its own {@code @Value} and keeps every behaviour it had; the two were never
      * entangled, they only shared a property name.
+     *
+     * <p><b>T365: a second consumer, and it is deliberately the SAME predicate.</b>
+     * {@code TrustedDeviceService} asks this to refuse the break-glass account a trusted device at
+     * both ends - never mint one, never honour one. The design (§6) is explicit that the mint path
+     * "asks the existing predicate; it must not carry its own copy of 'is this the break-glass
+     * account'", on this class's own precedent that two copies of one question drift until one
+     * silently stops being checked. So it is public rather than duplicated: a trusted device is a
+     * second standing way in that skips a check, and break-glass - which exists for when email itself
+     * is down and is already factor-exempt here - must never hold one.
      */
-    private boolean isEmergencyExempt(User user) {
+    public boolean isEmergencyExempt(User user) {
         return user.isBreakGlass();
     }
 }
