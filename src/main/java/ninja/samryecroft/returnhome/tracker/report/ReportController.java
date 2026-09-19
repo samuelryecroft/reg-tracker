@@ -1,5 +1,7 @@
 package ninja.samryecroft.returnhome.tracker.report;
 
+import ninja.samryecroft.returnhome.tracker.core.NotFoundException;
+
 import ninja.samryecroft.returnhome.tracker.audit.AuditEventPublisher;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewRequest;
 import ninja.samryecroft.returnhome.tracker.interview.InterviewRequestService;
@@ -80,7 +82,7 @@ public class ReportController {
     private InterviewReport approvedReportFor(Long requestId) {
         InterviewReport report = reportService.getByRequestId(requestId);
         if (report.getStatus() != ReportStatus.APPROVED) {
-            throw new IllegalArgumentException("No approved report found for request " + requestId);
+            throw new NotFoundException("No approved report found for request " + requestId);
         }
         return report;
     }

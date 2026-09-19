@@ -1,5 +1,7 @@
 package ninja.samryecroft.returnhome.tracker.child;
 
+import ninja.samryecroft.returnhome.tracker.core.NotFoundException;
+
 import jakarta.validation.Valid;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -357,7 +359,7 @@ public class ChildController {
      */
     private Child mineToManage(Long id, AppUserPrincipal principal) {
         Child child = childRepository.findDetailedById(id)
-                .orElseThrow(() -> new IllegalArgumentException("No such young person: " + id));
+                .orElseThrow(() -> new NotFoundException("No such young person: " + id));
         if (!canManage(child, principal)) {
             throw new AccessDeniedException("Not authorized to manage this child");
         }
@@ -380,7 +382,7 @@ public class ChildController {
     @GetMapping("/{id}")
     public String detail(@PathVariable Long id, @AuthenticationPrincipal AppUserPrincipal principal, Model model) {
         Child child = childRepository.findDetailedById(id)
-                .orElseThrow(() -> new IllegalArgumentException("No such young person: " + id));
+                .orElseThrow(() -> new NotFoundException("No such young person: " + id));
         if (!principal.hasRole(Role.ADMIN) && !organisationAccessService.canViewHome(principal, child.getHome())) {
             throw new AccessDeniedException("Not authorized to view this child");
         }
@@ -473,7 +475,7 @@ public class ChildController {
                 // With the organisation loaded: the T168(b) guard below reads it, and
                 // Home.organisation is LAZY under open-in-view=false.
                 home = homeRepository.findByIdWithOrganisation(form.getHomeId())
-                        .orElseThrow(() -> new IllegalArgumentException("No such home: " + form.getHomeId()));
+                        .orElseThrow(() -> new NotFoundException("No such home: " + form.getHomeId()));
                 if (!organisationAccessService.canViewHome(principal, home)) {
                     throw new AccessDeniedException("Home does not belong to your organisation");
                 }

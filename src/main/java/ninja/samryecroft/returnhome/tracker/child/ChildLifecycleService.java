@@ -1,5 +1,7 @@
 package ninja.samryecroft.returnhome.tracker.child;
 
+import ninja.samryecroft.returnhome.tracker.core.NotFoundException;
+
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -111,7 +113,7 @@ public class ChildLifecycleService {
         // values: the edit appears to succeed and silently changes nothing. Found by this method's
         // own test, not by reasoning.
         Child child = childRepository.findDetailedById(childId)
-                .orElseThrow(() -> new IllegalArgumentException("No such young person: " + childId));
+                .orElseThrow(() -> new NotFoundException("No such young person: " + childId));
         List<String> changed = new ArrayList<>();
         if (!Objects.equals(child.getFirstName(), firstName)) {
             changed.add("firstName");

@@ -1,5 +1,7 @@
 package ninja.samryecroft.returnhome.tracker.interview;
 
+import ninja.samryecroft.returnhome.tracker.core.ConflictException;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -99,7 +101,7 @@ class InterviewStatusTransitionsTest {
     void requireNamesBothEndsOfTheRefusedTransition() {
         assertThatThrownBy(() -> InterviewStatusTransitions.require(
                 InterviewStatus.REPORT_APPROVED, InterviewStatus.SCHEDULED))
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(ConflictException.class)
                 .hasMessageContaining("REPORT_APPROVED")
                 .hasMessageContaining("SCHEDULED");
     }

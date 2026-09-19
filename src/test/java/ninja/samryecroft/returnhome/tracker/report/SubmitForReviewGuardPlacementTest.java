@@ -1,5 +1,7 @@
 package ninja.samryecroft.returnhome.tracker.report;
 
+import ninja.samryecroft.returnhome.tracker.core.ConflictException;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -107,7 +109,7 @@ class SubmitForReviewGuardPlacementTest {
         form.setInterviewerComments("Rewritten after approval");
 
         assertThatThrownBy(() -> reportService.submitForReview(1L, form, admin))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(ConflictException.class);
 
         // The branch assertions. These are what distinguish a guard at the top from a guard at the
         // bottom: with the guard at the bottom, both of these have already happened by the time the

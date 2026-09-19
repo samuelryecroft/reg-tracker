@@ -1,5 +1,7 @@
 package ninja.samryecroft.returnhome.tracker.audit;
 
+import ninja.samryecroft.returnhome.tracker.core.NotFoundException;
+
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.LocalDate;
@@ -124,7 +126,7 @@ public class AuditFeedController {
                 .findFirst()
                 // IllegalArgumentException is the codebase's 404 (GlobalControllerAdvice), and the
                 // message is rendered. It says only what the caller already supplied.
-                .orElseThrow(() -> new IllegalArgumentException("No such audit event: " + id));
+                .orElseThrow(() -> new NotFoundException("No such audit event: " + id));
 
         model.addAttribute("row", row);
         return "audit/event";

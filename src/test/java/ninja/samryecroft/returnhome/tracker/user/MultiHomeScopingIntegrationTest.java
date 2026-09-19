@@ -1,5 +1,7 @@
 package ninja.samryecroft.returnhome.tracker.user;
 
+import ninja.samryecroft.returnhome.tracker.core.InvalidRequestException;
+
 import ninja.samryecroft.returnhome.tracker.TestLogins;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -255,7 +257,7 @@ class MultiHomeScopingIntegrationTest extends AbstractIntegrationTest {
         form.setHomeIds(Set.of(firstHome.getId(), foreignHome.getId()));
 
         assertThatThrownBy(() -> userService.create(form, adminPrincipal()))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(InvalidRequestException.class)
                 .hasMessageContaining("same care provider organisation");
     }
 

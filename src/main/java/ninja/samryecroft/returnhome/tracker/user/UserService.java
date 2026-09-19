@@ -1,5 +1,9 @@
 package ninja.samryecroft.returnhome.tracker.user;
 
+import ninja.samryecroft.returnhome.tracker.core.InvalidRequestException;
+
+import ninja.samryecroft.returnhome.tracker.core.NotFoundException;
+
 import ninja.samryecroft.returnhome.tracker.security.session.SessionTerminationService;
 import java.util.EnumSet;
 import java.util.HashSet;
@@ -215,7 +219,7 @@ public class UserService {
         // open-in-view disabled a lazy collection on a detached entity is a 500 rather than a
         // decision. See the repository method for why fetching beats wrapping this in a transaction.
         User user = userRepository.findDetailedById(id)
-                .orElseThrow(() -> new IllegalArgumentException("No such user: " + id));
+                .orElseThrow(() -> new NotFoundException("No such user: " + id));
         if (principal.hasRole(Role.ADMIN)) {
             return user;
         }
@@ -457,7 +461,7 @@ public class UserService {
     public User getAuthorizedToChangeEmail(Long id, AppUserPrincipal principal) {
         refuseUnlessPlatformAdmin(principal);
         return userRepository.findDetailedById(id)
-                .orElseThrow(() -> new IllegalArgumentException("No such user: " + id));
+                .orElseThrow(() -> new NotFoundException("No such user: " + id));
     }
 
     private void refuseUnlessPlatformAdmin(AppUserPrincipal principal) {
@@ -471,7 +475,7 @@ public class UserService {
     public User changeEmail(Long id, String newEmail, AppUserPrincipal principal) {
         refuseUnlessPlatformAdmin(principal);
         User user = userRepository.findDetailedById(id)
-                .orElseThrow(() -> new IllegalArgumentException("No such user: " + id));
+                .orElseThrow(() -> new NotFoundException("No such user: " + id));
         user.setEmail(trimToNull(newEmail));
         // T322: a new address is unproven, and its predecessor's proof does not transfer. This also
         // restores the allowance, so correcting a typo actually unblocks the account - without it the
@@ -584,7 +588,7 @@ public class UserService {
         if (stillIs || userRepository.hasAnotherEnabledOrgAdmin(organisationId, user.getId())) {
             return;
         }
-        throw new IllegalArgumentException(
+        throw new InvalidRequestException(
                 "This is the last enabled administrator for " + user.getOrganisation().getName()
                         + ". Appoint another administrator first, or the organisation will have "
                         + "nobody able to manage its accounts.");
@@ -597,7 +601,7 @@ public class UserService {
         }
         for (Role role : List.of(Role.ADMIN, Role.ORG_ADMIN)) {
             if (before.contains(role) && !after.contains(role)) {
-                throw new IllegalArgumentException("You cannot remove your own " + role.getDisplayName()
+                throw new InvalidRequestException("You cannot remove your own " + role.getDisplayName()
                         + " role. Ask another administrator to change it, or you will not be able to "
                         + "change it back.");
             }
@@ -606,7 +610,7 @@ public class UserService {
 
     private void validateAssignable(Set<Role> roles, AppUserPrincipal principal) {
         if (roles == null || roles.isEmpty()) {
-            throw new IllegalArgumentException("At least one role is required");
+            throw new InvalidRequestException("At least one role is required");
         }
         if (!allowedRolesFor(principal).containsAll(roles)) {
             throw new AccessDeniedException("You cannot assign one or more of the selected roles");
@@ -616,15 +620,15 @@ public class UserService {
     /** The rules about what an ACCOUNT may hold at once - asked of the result, never of the request. */
     private void validateCombination(Set<Role> roles) {
         if (roles.size() > 1 && roles.contains(Role.HOME_STAFF)) {
-            throw new IllegalArgumentException("Home Staff cannot be combined with any other role");
+            throw new InvalidRequestException("Home Staff cannot be combined with any other role");
         }
         if (roles.size() > 1 && roles.contains(Role.ADMIN)) {
-            throw new IllegalArgumentException("Admin cannot be combined with any other role");
+            throw new InvalidRequestException("Admin cannot be combined with any other role");
         }
         boolean hasCareProviderOnlyRole = roles.stream().anyMatch(CARE_PROVIDER_ONLY::contains);
         boolean hasSupplierOnlyRole = roles.stream().anyMatch(SUPPLIER_ONLY::contains);
         if (hasCareProviderOnlyRole && hasSupplierOnlyRole) {
-            throw new IllegalArgumentException("Roles cannot span both a Care Provider and a Supplier organisation");
+            throw new InvalidRequestException("Roles cannot span both a Care Provider and a Supplier organisation");
         }
     }
 
@@ -672,7 +676,7 @@ public class UserService {
             return new HashSet<>();
         }
         if (homeIds == null || homeIds.isEmpty()) {
-            throw new IllegalArgumentException("Select at least one home");
+            throw new InvalidRequestException("Select at least one home");
         }
         Set<Home> homes = new LinkedHashSet<>();
         for (Long homeId : homeIds) {
@@ -684,10 +688,10 @@ public class UserService {
 
     private Home resolveHome(Long homeId, AppUserPrincipal principal) {
         if (homeId == null) {
-            throw new IllegalArgumentException("Home is required");
+            throw new InvalidRequestException("Home is required");
         }
         Home home = homeRepository.findById(homeId)
-                .orElseThrow(() -> new IllegalArgumentException("No such home: " + homeId));
+                .orElseThrow(() -> new NotFoundException("No such home: " + homeId));
         if (!principal.hasRole(Role.ADMIN) && !organisationAccessService.canViewHome(principal, home)) {
             throw new AccessDeniedException("Home does not belong to your organisation");
         }
@@ -709,7 +713,7 @@ public class UserService {
                 .distinct()
                 .count();
         if (distinctOrgs > 1) {
-            throw new IllegalArgumentException(
+            throw new InvalidRequestException(
                     "All of a user's homes must belong to the same care provider organisation");
         }
     }
@@ -737,10 +741,10 @@ public class UserService {
     private Organisation resolveOrganisation(Long organisationId, AppUserPrincipal principal) {
         if (principal.hasRole(Role.ADMIN)) {
             if (organisationId == null) {
-                throw new IllegalArgumentException("Organisation is required");
+                throw new InvalidRequestException("Organisation is required");
             }
             return organisationRepository.findById(organisationId)
-                    .orElseThrow(() -> new IllegalArgumentException("No such organisation: " + organisationId));
+                    .orElseThrow(() -> new NotFoundException("No such organisation: " + organisationId));
         }
         if (organisationId == null || organisationId.equals(principal.getOrganisationId())) {
             return organisationRepository.findById(principal.getOrganisationId()).orElseThrow();
@@ -750,6 +754,6 @@ public class UserService {
                     "You cannot create a user in organisation " + organisationId);
         }
         return organisationRepository.findById(organisationId)
-                .orElseThrow(() -> new IllegalArgumentException("No such organisation: " + organisationId));
+                .orElseThrow(() -> new NotFoundException("No such organisation: " + organisationId));
     }
 }

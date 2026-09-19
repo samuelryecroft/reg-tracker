@@ -1,5 +1,7 @@
 package ninja.samryecroft.returnhome.tracker.home;
 
+import ninja.samryecroft.returnhome.tracker.core.NotFoundException;
+
 import jakarta.validation.Valid;
 import java.util.List;
 import ninja.samryecroft.returnhome.tracker.home.dto.CreateHomeForm;
@@ -88,7 +90,7 @@ public class HomeAdminController {
                 organisation = null;
             } else {
                 organisation = organisationRepository.findById(form.getOrganisationId())
-                        .orElseThrow(() -> new IllegalArgumentException("No such organisation: " + form.getOrganisationId()));
+                        .orElseThrow(() -> new NotFoundException("No such organisation: " + form.getOrganisationId()));
                 // T168(b): the dropdown above is already filtered to care providers, but A FILTERED
                 // DROPDOWN IS NOT A CONSTRAINT - it shapes the form, not the POST, and a platform
                 // admin can post any organisation id. Nothing else stopped a home being hung off a

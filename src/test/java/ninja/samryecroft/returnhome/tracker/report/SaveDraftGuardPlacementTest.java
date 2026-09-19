@@ -1,5 +1,7 @@
 package ninja.samryecroft.returnhome.tracker.report;
 
+import ninja.samryecroft.returnhome.tracker.core.ConflictException;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -109,7 +111,7 @@ class SaveDraftGuardPlacementTest {
         form.setInterviewerComments("Rewritten after approval");
 
         assertThatThrownBy(() -> reportService.saveDraft(1L, form, admin))
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(ConflictException.class)
                 .hasMessageContaining("approved");
 
         verify(interviewReportRepository, never()).save(any());
@@ -147,7 +149,7 @@ class SaveDraftGuardPlacementTest {
         form.setInterviewerComments("Changed while the reviewer was reading it");
 
         assertThatThrownBy(() -> reportService.saveDraft(1L, form, admin))
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(ConflictException.class)
                 .hasMessageContaining("submitted for review");
 
         verify(interviewReportRepository, never()).save(any());
