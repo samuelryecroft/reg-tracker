@@ -61,6 +61,15 @@ env:
   # both together (get the sha256 from <mavenurl>/applicationinsights-agent-<ver>.jar.sha256). The
   # JVM attaches it via JAVA_OPTS=-javaagent:.../applicationinsights-agent.jar, which is set in the
   # Terraform app_service module (the durable source of truth for the setting; the version lives here).
+  # Every `az webapp deploy` below waits for the worker to START after pushing, and the platform's
+  # default for that wait is 10 MINUTES - tighter than this app's own cold boot, which is 330-490s
+  # measured (T190/T294) and longer again with the 46MB App Insights agent attached. The first real
+  # run of this workflow died exactly there: the agent pushed byte-perfectly and then the step failed
+  # with "the site failed to start within 10 mins / FailedInstances: 1" after 10m42s, with production
+  # left untouched. The smoke step already carries a 900s budget for this same reason; this is the
+  # other half of it, and the two are deliberately sized against the same measurement so a future
+  # change to one is an obvious prompt to look at the other. Milliseconds, unlike SMOKE_BUDGET_SECONDS.
+  DEPLOY_TIMEOUT_MS: "1200000" # 20 min: > observed max cold boot (~490s) + the push, with headroom
   AI_AGENT_VERSION: "3.7.9"
   AI_AGENT_SHA256: "4ab7a442bf9defc7475d026c6b49042793ebb010c391a1db91ae07da0c04d848"
 
@@ -347,9 +356,11 @@ jobs:
           curl -fsSL -o "$agent" "$url"
           echo "${AI_AGENT_SHA256}  ${agent}" | sha256sum -c -
           az webapp deploy --type static --clean false --restart false \
+            --timeout ${{ env.DEPLOY_TIMEOUT_MS }} \
             -g '${{ steps.tf.outputs.rg }}' -n '${{ steps.tf.outputs.app_name }}' \
             --target-path /home/site/wwwroot/applicationinsights-agent.jar --src-path "$agent"
           az webapp deploy --type static --clean false --restart false \
+            --timeout ${{ env.DEPLOY_TIMEOUT_MS }} \
             -g '${{ steps.tf.outputs.rg }}' -n '${{ steps.tf.outputs.app_name }}' \
             --target-path /home/site/wwwroot/applicationinsights.json \
             --src-path deploy/appservice/applicationinsights.json
@@ -392,6 +403,7 @@ jobs:
           set -- target/*.jar
           jar="$1"
           az webapp deploy --type jar --clean false \
+            --timeout ${{ env.DEPLOY_TIMEOUT_MS }} \
             -g '${{ steps.tf.outputs.rg }}' -n '${{ steps.tf.outputs.app_name }}' --src-path "$jar"
 
       # --- Fail LOUDLY if either agent artifact is missing after deploy (Kevin/README). A missing jar
@@ -474,7 +486,8 @@ jobs:
           # --clean false: leave the App Insights agent + config staged alongside. Note the agent staged
           # earlier in THIS run stays in place; it is version-pinned and backwards compatible, and a
           # partial rollback of the agent would be a second variable during an incident.
-          az webapp deploy --type jar --clean false -g "$rg" -n "$app" --src-path rollback/app.jar
+          az webapp deploy --type jar --clean false --timeout ${{ env.DEPLOY_TIMEOUT_MS }} \
+            -g "$rg" -n "$app" --src-path rollback/app.jar
           host="$(az webapp show -g "$rg" -n "$app" --query defaultHostName -o tsv)"
           deadline=$(( $(date +%s) + ROLLBACK_BUDGET_SECONDS ))
           recovered=0
