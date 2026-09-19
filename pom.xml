@@ -219,6 +219,15 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <configuration>
+                    <!-- The test JVM runs in the statutory zone - the zone production is pinned to via
+                         WEBSITE_TIME_ZONE in the app_service module. TimeZoneGuard refuses to boot a
+                         DEPLOYED application in any other zone, and a test that boots a real
+                         SpringApplication under the prod profile to prove another startup guard
+                         (DemoProfileGuardTest) is "deployed" by the guard's own definition, so on a UTC
+                         CI runner it was refused (CI red from #246 to #249). Pinned here rather than
+                         exempted in the guard: nothing in src/main knows it is under test, and a UTC
+                         runner and a UK laptop now run the same suite in the same zone. -->
+                    <argLine>-Duser.timezone=Europe/London</argLine>
                     <systemPropertyVariables>
                         <!-- Not a credential: integration tests get their real connection details
                              from a Testcontainers @ServiceConnection. This only satisfies the

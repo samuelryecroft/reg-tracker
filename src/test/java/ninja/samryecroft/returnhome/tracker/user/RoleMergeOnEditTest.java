@@ -1,5 +1,7 @@
 package ninja.samryecroft.returnhome.tracker.user;
 
+import ninja.samryecroft.returnhome.tracker.core.InvalidRequestException;
+
 import ninja.samryecroft.returnhome.tracker.security.session.SessionTerminationService;
 import org.springframework.security.core.session.SessionRegistryImpl;
 
@@ -120,7 +122,7 @@ class RoleMergeOnEditTest {
 
         assertThatThrownBy(() ->
                 service().update(TARGET_ID, formSubmitting(Set.of(Role.COORDINATOR)), supplierOrgAdmin(99L)))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(InvalidRequestException.class)
                 .hasMessageContaining("Home Staff");
     }
 
@@ -145,7 +147,7 @@ class RoleMergeOnEditTest {
 
         assertThatThrownBy(() ->
                 service().update(TARGET_ID, formSubmitting(Set.of(Role.COORDINATOR)), platformAdmin(TARGET_ID)))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(InvalidRequestException.class)
                 .hasMessageContaining("your own");
     }
 

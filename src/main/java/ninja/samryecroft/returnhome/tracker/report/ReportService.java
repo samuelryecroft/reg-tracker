@@ -1,5 +1,10 @@
 package ninja.samryecroft.returnhome.tracker.report;
 
+import ninja.samryecroft.returnhome.tracker.core.InvalidRequestException;
+import ninja.samryecroft.returnhome.tracker.core.ConflictException;
+
+import ninja.samryecroft.returnhome.tracker.core.NotFoundException;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
@@ -169,7 +174,7 @@ public class ReportService {
         // entry (getReviewable guards it on the review side only). Checked before anything is
         // mutated, so the refusal doesn't rest on the transaction rolling the field writes back.
         if (statusBefore == ReportStatus.APPROVED) {
-            throw new IllegalStateException("This report has already been approved and cannot be resubmitted");
+            throw new ConflictException("This report has already been approved and cannot be resubmitted");
         }
         applyFormValues(report, form);
         report.setStatus(ReportStatus.SUBMITTED);
@@ -221,7 +226,7 @@ public class ReportService {
     @Transactional
     public InterviewReport reject(Long requestId, SubmitReportForm form, AppUserPrincipal principal) {
         if (form.getReviewComments() == null || form.getReviewComments().isBlank()) {
-            throw new IllegalArgumentException("Comments are required when rejecting a report");
+            throw new InvalidRequestException("Comments are required when rejecting a report");
         }
         InterviewReport report = getReviewable(requestId, principal);
         report.setStatus(ReportStatus.REJECTED);
@@ -238,7 +243,7 @@ public class ReportService {
 
     public InterviewReport getByRequestId(Long requestId) {
         return interviewReportRepository.findByInterviewRequestId(requestId)
-                .orElseThrow(() -> new IllegalArgumentException("No report found for request " + requestId));
+                .orElseThrow(() -> new NotFoundException("No report found for request " + requestId));
     }
 
     /** Unlike {@link #getByRequestId}, tolerates a request that has not reached REPORT_SUBMITTED yet
@@ -279,7 +284,7 @@ public class ReportService {
         }
         InterviewReport report = getByRequestId(requestId);
         if (report.getStatus() != ReportStatus.SUBMITTED) {
-            throw new IllegalStateException("This report is not awaiting review");
+            throw new ConflictException("This report is not awaiting review");
         }
         if (report.getVisitor().getId().equals(principal.getUserId())) {
             throw new AccessDeniedException("You cannot review a report you submitted yourself");

@@ -1,5 +1,7 @@
 package ninja.samryecroft.returnhome.tracker.organisation;
 
+import ninja.samryecroft.returnhome.tracker.core.NotFoundException;
+
 import jakarta.validation.Valid;
 import java.util.HashMap;
 import java.util.Map;
@@ -107,7 +109,7 @@ public class OrganisationAdminController {
     public String activate(@PathVariable Long id, @AuthenticationPrincipal AppUserPrincipal principal,
             RedirectAttributes redirectAttributes) {
         Organisation organisation = organisationRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("No such organisation: " + id));
+                .orElseThrow(() -> new NotFoundException("No such organisation: " + id));
         try {
             lifecycleService.activate(organisation, principal);
             redirectAttributes.addFlashAttribute("activationMessage",
@@ -156,7 +158,7 @@ public class OrganisationAdminController {
                 bindingResult.addError(new FieldError("form", "supplierOrganisationId", "Please select a supplier"));
             } else {
                 supplier = organisationRepository.findById(form.getSupplierOrganisationId())
-                        .orElseThrow(() -> new IllegalArgumentException(
+                        .orElseThrow(() -> new NotFoundException(
                                 "No such organisation: " + form.getSupplierOrganisationId()));
             }
         }

@@ -1,5 +1,7 @@
 package ninja.samryecroft.returnhome.tracker.interview;
 
+import ninja.samryecroft.returnhome.tracker.core.ConflictException;
+
 import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.Map;
@@ -89,7 +91,7 @@ public final class InterviewStatusTransitions {
      */
     public static void require(InterviewStatus from, InterviewStatus to) {
         if (!isLegal(from, to)) {
-            throw new IllegalStateException(
+            throw new ConflictException(
                     "Illegal interview status transition: " + from + " -> " + to);
         }
     }

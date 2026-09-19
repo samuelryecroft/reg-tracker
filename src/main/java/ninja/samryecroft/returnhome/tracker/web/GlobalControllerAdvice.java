@@ -1,5 +1,9 @@
 package ninja.samryecroft.returnhome.tracker.web;
 
+import ninja.samryecroft.returnhome.tracker.core.ConflictException;
+import ninja.samryecroft.returnhome.tracker.core.InvalidRequestException;
+import ninja.samryecroft.returnhome.tracker.core.NotFoundException;
+
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import ninja.samryecroft.returnhome.tracker.audit.AuditEventPublisher;
@@ -361,19 +365,44 @@ public class GlobalControllerAdvice {
         return "export/expired";
     }
 
-    @ExceptionHandler(IllegalArgumentException.class)
+    /**
+     * T378 (CODE-REVIEW-2026-09-18 P0.4). Until this change every {@code IllegalArgumentException}
+     * became a 404 and every {@code IllegalStateException} a 409, application-wide. For a system of
+     * record that is the worst available failure mode: an internal bug - a scoping bug included -
+     * was reported to the person as "we can't find that page", never alarmed, and never reached a
+     * 500. The three types in {@code core} are the ONLY exceptions this advice maps to a client-side
+     * status. Anything untyped falls through to Spring Boot's error path: the generic branch of
+     * error.html, a 500, and a stack trace in the log, which is where a bug belongs.
+     * {@code GlobalControllerAdviceNoCatchAllGuardTest} pins the absence.
+     */
+    @ExceptionHandler(NotFoundException.class)
     @ResponseStatus(HttpStatus.NOT_FOUND)
-    public String handleNotFound(IllegalArgumentException ex, Model model) {
+    public String handleNotFound(NotFoundException ex, Model model) {
         model.addAttribute("status", 404);
         model.addAttribute("message", ex.getMessage());
         return "error";
     }
 
-    @ExceptionHandler(IllegalStateException.class)
+    /**
+     * {@code detail}, not {@code message}: error.html prints {@code message} only on its 404
+     * branch, because on any other status it may be Spring's default - the exception's own text.
+     * {@code detail} is set by these two handlers alone, from exceptions whose message is written
+     * for the person ("Comments are required when rejecting a report"), so the generic branch may
+     * print it.
+     */
+    @ExceptionHandler(InvalidRequestException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public String handleInvalidRequest(InvalidRequestException ex, Model model) {
+        model.addAttribute("status", 400);
+        model.addAttribute("detail", ex.getMessage());
+        return "error";
+    }
+
+    @ExceptionHandler(ConflictException.class)
     @ResponseStatus(HttpStatus.CONFLICT)
-    public String handleConflict(IllegalStateException ex, Model model) {
+    public String handleConflict(ConflictException ex, Model model) {
         model.addAttribute("status", 409);
-        model.addAttribute("message", ex.getMessage());
+        model.addAttribute("detail", ex.getMessage());
         return "error";
     }
 

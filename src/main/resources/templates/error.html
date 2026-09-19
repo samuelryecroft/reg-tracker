@@ -66,6 +66,12 @@
             <p class="error-body">Something went wrong and the page couldn't be shown. If you were
                 saving something, check the record before trying again — it may or may not have
                 gone through. If it keeps happening, tell your administrator.</p>
+            <!--/* T378: `detail` is the one thing this branch prints, and only the typed 400/409
+                 handlers in GlobalControllerAdvice set it, from a message written for the person
+                 ("Comments are required when rejecting a report"). Spring's default error path never
+                 sets `detail`, so the reasoning above about `message` holds unchanged. */-->
+            <p class="error-detail" th:if="${detail != null and !#strings.isEmpty(detail)}"
+               th:text="${detail}">This report is not awaiting review</p>
         </th:block>
 
         <div class="error-actions">

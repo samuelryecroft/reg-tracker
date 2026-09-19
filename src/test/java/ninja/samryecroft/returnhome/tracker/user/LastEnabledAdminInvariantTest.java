@@ -1,5 +1,7 @@
 package ninja.samryecroft.returnhome.tracker.user;
 
+import ninja.samryecroft.returnhome.tracker.core.InvalidRequestException;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -72,7 +74,7 @@ class LastEnabledAdminInvariantTest extends AbstractIntegrationTest {
     @Test
     void disablingTheLastEnabledAdministratorIsRefusedWithTheReason() {
         assertThatThrownBy(() -> userService.update(lastAdmin.getId(), form(Set.of(Role.ORG_ADMIN), false), platformAdmin))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(InvalidRequestException.class)
                 .hasMessageContaining("last enabled administrator")
                 .hasMessageContaining("Appoint another administrator first");
     }
@@ -81,7 +83,7 @@ class LastEnabledAdminInvariantTest extends AbstractIntegrationTest {
     @Test
     void removingTheRoleFromTheLastEnabledAdministratorIsRefusedToo() {
         assertThatThrownBy(() -> userService.update(lastAdmin.getId(), form(Set.of(Role.VIEWER), true), platformAdmin))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(InvalidRequestException.class)
                 .hasMessageContaining("last enabled administrator");
     }
 
@@ -108,7 +110,7 @@ class LastEnabledAdminInvariantTest extends AbstractIntegrationTest {
         saveOrgAdmin("t278-disabled-second" + suffix, false);
 
         assertThatThrownBy(() -> userService.update(lastAdmin.getId(), form(Set.of(Role.ORG_ADMIN), false), platformAdmin))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(InvalidRequestException.class)
                 .hasMessageContaining("last enabled administrator");
     }
 
@@ -132,7 +134,7 @@ class LastEnabledAdminInvariantTest extends AbstractIntegrationTest {
         userRepository.saveAndFlush(theirs);
 
         assertThatThrownBy(() -> userService.update(lastAdmin.getId(), form(Set.of(Role.ORG_ADMIN), false), platformAdmin))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(InvalidRequestException.class)
                 .hasMessageContaining("last enabled administrator");
     }
 

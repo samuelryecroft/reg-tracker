@@ -1,5 +1,7 @@
 package ninja.samryecroft.returnhome.tracker.export;
 
+import ninja.samryecroft.returnhome.tracker.core.NotFoundException;
+
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -88,7 +90,7 @@ public class CaseFileExportService {
         // is one added child.getHome() away from a LazyInitializationException outside the session.
         // The eager fetch is one join on a single-row lookup - cheaper than the trap.
         Child child = childRepository.findDetailedById(childId)
-                .orElseThrow(() -> new IllegalArgumentException("No such young person"));
+                .orElseThrow(() -> new NotFoundException("No such young person"));
 
         List<InterviewRequest> allForChild =
                 interviewRequestRepository.findByChildIdOrderByCreatedAtDesc(childId);

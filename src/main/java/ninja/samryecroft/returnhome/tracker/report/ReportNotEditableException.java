@@ -1,5 +1,7 @@
 package ninja.samryecroft.returnhome.tracker.report;
 
+import ninja.samryecroft.returnhome.tracker.core.ConflictException;
+
 /**
  * The report has moved past the point where saving means anything - it is submitted for review, or
  * approved.
@@ -19,7 +21,7 @@ package ninja.samryecroft.returnhome.tracker.report;
  * land. A client that treats the two alike leaves someone retrying forever against a report that
  * can no longer accept their work. "Not saved" is true in both cases and useless in one.
  */
-public class ReportNotEditableException extends IllegalStateException {
+public class ReportNotEditableException extends ConflictException {
 
     private final ReportStatus status;
 

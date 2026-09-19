@@ -1,5 +1,10 @@
 package ninja.samryecroft.returnhome.tracker.interview;
 
+import ninja.samryecroft.returnhome.tracker.core.InvalidRequestException;
+import ninja.samryecroft.returnhome.tracker.core.ConflictException;
+
+import ninja.samryecroft.returnhome.tracker.core.NotFoundException;
+
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -114,7 +119,7 @@ public class InterviewRequestService {
     /** Any role the principal holds that qualifies is enough - a multi-role user only needs one to match. */
     public InterviewRequest getAuthorized(Long id, AppUserPrincipal principal) {
         InterviewRequest request = interviewRequestRepository.findDetailedById(id)
-                .orElseThrow(() -> new IllegalArgumentException("No such interview request: " + id));
+                .orElseThrow(() -> new NotFoundException("No such interview request: " + id));
 
         boolean allowed = principal.hasRole(Role.ADMIN)
                 || (principal.hasRole(Role.HOME_STAFF) && organisationAccessService.canAccessHome(principal, request.getHome().getId()))
@@ -136,7 +141,7 @@ public class InterviewRequestService {
     @Transactional
     public InterviewRequest createRequest(NewRequestForm form, AppUserPrincipal principal) {
         Child child = childRepository.findById(form.getChildId())
-                .orElseThrow(() -> new IllegalArgumentException("No such young person: " + form.getChildId()));
+                .orElseThrow(() -> new NotFoundException("No such young person: " + form.getChildId()));
         if (!organisationAccessService.canAccessHome(principal, child.getHome().getId())) {
             throw new AccessDeniedException("Child does not belong to one of your homes");
         }
@@ -196,9 +201,9 @@ public class InterviewRequestService {
         InterviewStatusTransitions.require(request.getStatus(), target);
 
         User visitor = userRepository.findById(form.getVisitorId())
-                .orElseThrow(() -> new IllegalArgumentException("No such visitor: " + form.getVisitorId()));
+                .orElseThrow(() -> new NotFoundException("No such visitor: " + form.getVisitorId()));
         if (!visitor.hasRole(Role.VISITOR)) {
-            throw new IllegalArgumentException("User " + visitor.getUsername() + " is not a visitor");
+            throw new InvalidRequestException("The selected user is not a visitor");
         }
         if (!principal.hasRole(Role.ADMIN)
                 && !visitor.getOrganisation().getId().equals(principal.getOrganisationId())) {
@@ -222,7 +227,7 @@ public class InterviewRequestService {
     public InterviewRequest confirmSchedule(Long id, LocalDateTime scheduledAt, AppUserPrincipal principal) {
         InterviewRequest request = getAuthorized(id, principal);
         if (!isAwaitingSchedule(request)) {
-            throw new IllegalStateException("This interview is not awaiting a scheduled time");
+            throw new ConflictException("This interview is not awaiting a scheduled time");
         }
         InterviewStatus statusBefore = request.getStatus();
         request.setScheduledAt(scheduledAt);
