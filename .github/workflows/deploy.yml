@@ -30,9 +30,11 @@ name: Deploy
 #   1. Both OIDC identities exist WITH federated credentials (rht-cd-prod had none - no FIC, no token).
 #   2. The 'plan' and 'prod' Environments exist, prod has >=1 required reviewer, plan is main-only.
 #   3. All Environment vars/secrets are set: PLAN_CLIENT_ID, CD_CLIENT_ID, AZURE_TENANT_ID,
-#      AZURE_SUBSCRIPTION_ID, TF_STATE_*, ALERT_EMAIL, BUDGET_ALERT_EMAIL, and the four TF_VAR_*
-#      password secrets - taken from the EXISTING Key Vault values, never regenerated, or the first
-#      apply rotates the live DB credentials.
+#      AZURE_SUBSCRIPTION_ID, TF_STATE_*, ALERT_EMAIL, BUDGET_ALERT_EMAIL, and
+#      TF_VAR_POSTGRES_ADMINISTRATOR_PASSWORD - which must match the value the live server already
+#      has, or the apply resets it. The other three password secrets are no longer read by
+#      terraform at all (the Key Vault secret resources they fed are gone); their values are
+#      managed out of band.
 #   4. The rollback path has been exercised deliberately at least once. It is wired now (B1
 #      redeploy-previous), and a rollback nobody has tested is not a rollback.
 # Until then the pipeline runs ONLY on demand via workflow_dispatch. This does not fake success and
@@ -104,10 +106,12 @@ jobs:
           TF_VAR_subscription_id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
           TF_VAR_alert_email: ${{ vars.ALERT_EMAIL }}
           TF_VAR_budget_alert_email: ${{ vars.BUDGET_ALERT_EMAIL }}
+          # The ONLY password terraform still takes: the Postgres server resource requires it. The other
+          # three (admin seed, migrator, runtime) existed solely to write Key Vault secrets and were
+          # removed with those resources - their values are managed out of band now, so passing them here
+          # would put a live credential in a runner's environment for nothing. Their repo secrets can be
+          # deleted once nothing else reads them.
           TF_VAR_postgres_administrator_password: ${{ secrets.TF_VAR_POSTGRES_ADMINISTRATOR_PASSWORD }}
-          TF_VAR_admin_seed_password: ${{ secrets.TF_VAR_ADMIN_SEED_PASSWORD }}
-          TF_VAR_migrator_db_password: ${{ secrets.TF_VAR_MIGRATOR_DB_PASSWORD }}
-          TF_VAR_runtime_db_password: ${{ secrets.TF_VAR_RUNTIME_DB_PASSWORD }}
         run: |
           terraform init \
             -backend-config="resource_group_name=${{ vars.TF_STATE_RG }}" \
@@ -173,10 +177,12 @@ jobs:
           TF_VAR_subscription_id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
           TF_VAR_alert_email: ${{ vars.ALERT_EMAIL }}
           TF_VAR_budget_alert_email: ${{ vars.BUDGET_ALERT_EMAIL }}
+          # The ONLY password terraform still takes: the Postgres server resource requires it. The other
+          # three (admin seed, migrator, runtime) existed solely to write Key Vault secrets and were
+          # removed with those resources - their values are managed out of band now, so passing them here
+          # would put a live credential in a runner's environment for nothing. Their repo secrets can be
+          # deleted once nothing else reads them.
           TF_VAR_postgres_administrator_password: ${{ secrets.TF_VAR_POSTGRES_ADMINISTRATOR_PASSWORD }}
-          TF_VAR_admin_seed_password: ${{ secrets.TF_VAR_ADMIN_SEED_PASSWORD }}
-          TF_VAR_migrator_db_password: ${{ secrets.TF_VAR_MIGRATOR_DB_PASSWORD }}
-          TF_VAR_runtime_db_password: ${{ secrets.TF_VAR_RUNTIME_DB_PASSWORD }}
         run: |
           terraform init \
             -backend-config="resource_group_name=${{ vars.TF_STATE_RG }}" \

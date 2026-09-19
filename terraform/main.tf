@@ -105,42 +105,42 @@ module "postgres" {
   depends_on = [module.network]
 }
 
-# Secrets the app reads via Key Vault references. Values here are placeholders / module outputs;
-# no real secret is committed. Creating these at apply time needs the deployer to hold Key Vault
-# Secrets Officer on the vault (RBAC), and the app can read them once identity_rbac (below) grants
-# it Key Vault Secrets User - see README.
-resource "azurerm_key_vault_secret" "db_password" {
-  name         = "DB-PASSWORD"
-  value        = var.postgres_administrator_password
-  key_vault_id = module.keyvault.vault_id
-}
-
-resource "azurerm_key_vault_secret" "admin_seed_password" {
-  name         = "ADMIN-SEED-PASSWORD"
-  value        = var.admin_seed_password
-  key_vault_id = module.keyvault.vault_id
-}
-
-resource "azurerm_key_vault_secret" "ai_connection_string" {
-  name         = "APPLICATIONINSIGHTS-CONNECTION-STRING"
-  value        = module.observability.app_insights_connection_string
-  key_vault_id = module.keyvault.vault_id
-}
-
-# WS-G least-privilege DB role passwords. Provisioned here (mirroring db_password: sensitive var in,
-# no literal, no state output) so the pre-deploy step reads the migrator password from KV to run the
-# role SQL + Flyway, and the app reads the runtime password as a Key Vault reference. The GRANT SQL
-# that actually creates the roles lives in modules/postgres/sql/ and runs VNet-side (see README).
-resource "azurerm_key_vault_secret" "migrator_db_password" {
-  name         = "MIGRATOR-DB-PASSWORD"
-  value        = var.migrator_db_password
-  key_vault_id = module.keyvault.vault_id
-}
-
-resource "azurerm_key_vault_secret" "runtime_db_password" {
-  name         = "RUNTIME-DB-PASSWORD"
-  value        = var.runtime_db_password
-  key_vault_id = module.keyvault.vault_id
+# Secret VALUES are deliberately NOT managed by Terraform. Only their reference URIs are composed here.
+#
+# Five `azurerm_key_vault_secret` resources used to live here. Managing a secret's value means
+# `terraform plan` must READ it back on every refresh, and a Key Vault secret read is a DATA-PLANE
+# call. This vault is networkAcls.defaultAction = Deny with a single operator IP rule, and
+# `bypass: AzureServices` does NOT cover GitHub-hosted runners - so the first real run of deploy.yml
+# (2026-09-19) died with 403 ForbiddenByFirewall on all five. No RBAC grant fixes that: the runner is
+# not on the network, and the plan identity's permissions were never the problem.
+#
+# Managing them here cost two other things as well. It put all four DB passwords into Terraform state
+# in CLEAR, which made read access to the state account equivalent to full database access; and it
+# forced the plan tier to hold Key Vault Secrets User purely to refresh them, making a
+# branch-unrestricted environment a secret-read surface. Both are recorded as accepted risks in
+# WS-E-DESIGN 5.4, whose stated direction is exactly this: keep the values out of Terraform.
+#
+# The values are provisioned out of band and already exist in this vault. Rotation is likewise an
+# out-of-band operation now (`az keyvault secret set`), which is the trade being made: Terraform no
+# longer asserts what the values are, so a rotation is invisible to it - and correspondingly a plan
+# can no longer propose to overwrite a live credential, which is what made the first run dangerous.
+#
+# `versionless_id` rendered as "<vault_uri>secrets/<NAME>", and vault_uri carries its trailing slash,
+# so the strings below are byte-identical to what the removed resources produced. The app settings
+# that consume them do not change, which is why this refactor is not a redeploy.
+#
+# NB: `data "azurerm_key_vault_secret"` would NOT work here. It is the same data-plane read and fails
+# identically from CI. Composing the URI is the point - the reference is public information, the value
+# is not, and only App Service (via its managed identity, from inside the VNet) ever resolves it.
+#
+# DB-PASSWORD and MIGRATOR-DB-PASSWORD are not composed here: nothing in Terraform consumes them. The
+# DB-plane job reads them from the vault BY NAME, in-VNet, with its own identity (see
+# deploy/db-plane/ephemeral-migrate.sh), which is the arrangement that keeps a DB credential off the
+# runner entirely.
+locals {
+  kv_admin_seed_password_uri  = "${module.keyvault.vault_uri}secrets/ADMIN-SEED-PASSWORD"
+  kv_ai_connection_string_uri = "${module.keyvault.vault_uri}secrets/APPLICATIONINSIGHTS-CONNECTION-STRING"
+  kv_runtime_db_password_uri  = "${module.keyvault.vault_uri}secrets/RUNTIME-DB-PASSWORD"
 }
 
 module "app_service" {
@@ -166,9 +166,9 @@ module "app_service" {
 
   # Key Vault references (versionless, so rotation flows through without a config change). db_password
   # is the RUNTIME role's password (RUNTIME-DB-PASSWORD), not the admin's.
-  db_password_secret_uri          = azurerm_key_vault_secret.runtime_db_password.versionless_id
-  admin_seed_password_secret_uri  = azurerm_key_vault_secret.admin_seed_password.versionless_id
-  ai_connection_string_secret_uri = azurerm_key_vault_secret.ai_connection_string.versionless_id
+  db_password_secret_uri          = local.kv_runtime_db_password_uri
+  admin_seed_password_secret_uri  = local.kv_admin_seed_password_uri
+  ai_connection_string_secret_uri = local.kv_ai_connection_string_uri
 
   # App-Service-scoped alerts (5xx, health probe) live here and fan out to the shared action group.
   action_group_id = module.observability.action_group_id
