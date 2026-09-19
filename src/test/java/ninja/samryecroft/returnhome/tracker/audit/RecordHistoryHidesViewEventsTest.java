@@ -201,7 +201,7 @@ class RecordHistoryHidesViewEventsTest {
 
     private List<AuditHistoryEntry> caseRowsFor(AuditFeedScope scope, AuditEvent... requestEvents) {
         when(request.getCreatedAt()).thenReturn(at(8, 0));
-        when(interviewReportRepository.findByInterviewRequestId(REQUEST_ID)).thenReturn(Optional.empty());
+        when(interviewReportRepository.findByInterviewRequestIdIn(List.of(REQUEST_ID))).thenReturn(List.of());
         when(auditEventRepository.findByTargetTypeAndTargetIdInOrderByOccurredAtDesc(
                 "InterviewRequest", List.of(REQUEST_ID))).thenReturn(List.of(requestEvents));
         for (AuditEvent event : requestEvents) {

@@ -6,6 +6,7 @@ import static org.assertj.core.api.InstanceOfAssertFactories.list;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.anyCollection;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
@@ -62,7 +63,13 @@ class DraftSaveCollapseTest {
     void wireTheReportOntoTheRequest() {
         when(request.getId()).thenReturn(REQUEST_ID);
         when(report.getId()).thenReturn(REPORT_ID);
-        when(interviewReportRepository.findByInterviewRequestId(REQUEST_ID)).thenReturn(Optional.of(report));
+        // Which finder is asked depends on the path under test: historyFor asks for one request's
+        // report by itself; caseHistoryFor asks for the whole list's reports in one query (T385)
+        // and reads each report's request to key them. A test exercises exactly one path, so these
+        // three are lenient - strict, each test would fail on the stub its path never reaches.
+        lenient().when(interviewReportRepository.findByInterviewRequestId(REQUEST_ID)).thenReturn(Optional.of(report));
+        lenient().when(report.getInterviewRequest()).thenReturn(request);
+        lenient().when(interviewReportRepository.findByInterviewRequestIdIn(anyCollection())).thenReturn(List.of(report));
     }
 
     // --- the card ---

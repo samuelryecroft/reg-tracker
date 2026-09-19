@@ -181,10 +181,13 @@ public class AuditHistoryService {
             return List.of();
         }
         List<Long> requestIds = requests.stream().map(InterviewRequest::getId).toList();
-        List<Long> reportIds = requests.stream()
-                .map(r -> interviewReportRepository.findByInterviewRequestId(r.getId()).map(InterviewReport::getId).orElse(null))
-                .filter(Objects::nonNull)
-                .toList();
+        // One query for every report in the list (T385). This used to ask for each request's report
+        // by itself - and then, further down, ask again to build the very same map.
+        Map<Long, InterviewReport> reportByRequestId = new LinkedHashMap<>();
+        for (InterviewReport report : interviewReportRepository.findByInterviewRequestIdIn(requestIds)) {
+            reportByRequestId.put(report.getInterviewRequest().getId(), report);
+        }
+        List<Long> reportIds = reportByRequestId.values().stream().map(InterviewReport::getId).toList();
 
         List<AuditEvent> all = new ArrayList<>(
                 auditEventRepository.findByTargetTypeAndTargetIdInOrderByOccurredAtDesc("InterviewRequest", requestIds));
@@ -199,11 +202,6 @@ public class AuditHistoryService {
         // reintroduced by the fix for a different kind of noise.
         if (scope != AuditFeedScope.WITH_ACCESS_EVENTS) {
             all.removeIf(event -> ACCESS_TYPES.contains(event.getEventType()));
-        }
-
-        Map<Long, InterviewReport> reportByRequestId = new LinkedHashMap<>();
-        for (InterviewRequest r : requests) {
-            interviewReportRepository.findByInterviewRequestId(r.getId()).ifPresent(report -> reportByRequestId.put(r.getId(), report));
         }
 
         List<AuditHistorySection> sections = new ArrayList<>();

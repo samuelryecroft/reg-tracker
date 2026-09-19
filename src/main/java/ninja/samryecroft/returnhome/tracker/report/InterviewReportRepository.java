@@ -10,7 +10,13 @@ import org.springframework.data.repository.query.Param;
 
 public interface InterviewReportRepository extends JpaRepository<InterviewReport, Long> {
 
-    @EntityGraph(attributePaths = {"visitor", "reviewedBy"})
+    /**
+     * Fetches the request, its child and its home along with the report (T385). Every report load
+     * decrypts on {@code @PostLoad}, and the key is chosen by {@code owningOrganisationId()}, which
+     * walks {@code interviewRequest.home.organisation} - so a report loaded WITHOUT its request
+     * cost two more selects before it was even readable. The same graph as the list finders below.
+     */
+    @EntityGraph(attributePaths = {"visitor", "reviewedBy", "interviewRequest", "interviewRequest.child", "interviewRequest.home"})
     Optional<InterviewReport> findByInterviewRequestId(Long interviewRequestId);
 
     /**
@@ -33,5 +39,11 @@ public interface InterviewReportRepository extends JpaRepository<InterviewReport
     List<InterviewReport> findByHomeIdIn(@Param("homeIds") Collection<Long> homeIds);
 
     /** Batched form of {@link #findByInterviewRequestId} - the roadmap 2.5 audit feed resolves many requests at once. */
+    /**
+     * One query for the whole list, not one per row - and, since T385, one query rather than
+     * one plus two per row: this had no entity graph, so each report's request, home and
+     * organisation were fetched lazily as its {@code @PostLoad} decryption asked for them.
+     */
+    @EntityGraph(attributePaths = {"visitor", "reviewedBy", "interviewRequest", "interviewRequest.child", "interviewRequest.home"})
     List<InterviewReport> findByInterviewRequestIdIn(Collection<Long> interviewRequestIds);
 }
