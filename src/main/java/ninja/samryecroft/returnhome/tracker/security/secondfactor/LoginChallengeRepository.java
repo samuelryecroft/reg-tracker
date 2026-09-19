@@ -2,7 +2,9 @@ package ninja.samryecroft.returnhome.tracker.security.secondfactor;
 
 import java.time.Instant;
 import java.util.Optional;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -16,6 +18,25 @@ public interface LoginChallengeRepository extends JpaRepository<LoginChallenge, 
      */
     Optional<LoginChallenge> findFirstByUserIdAndPurposeOrderByCreatedAtDesc(Long userId,
             ChallengePurpose purpose);
+
+    /**
+     * The same row as the finder above, but locked for update for the rest of the transaction
+     * (T380). {@code verify} reads the attempt count, increments it and writes it back; two
+     * verifications running at once both read the same count and both write count-plus-one, so
+     * under enough concurrency the cap that burns a challenge after five wrong codes was never
+     * reached. The lock serialises them on the row: the second waits, then reads the first's
+     * write. It MUST be the first read of the challenge in the transaction - locking an entity
+     * already in the persistence context does not refresh it, so a lock taken after an unlocked
+     * read would guard stale state.
+     *
+     * <p>Only for a read-write transaction: the password-reset flow's own reads stay on the
+     * unlocked finder because a {@code FOR UPDATE} inside a read-only transaction is refused by
+     * PostgreSQL.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select c from LoginChallenge c where c.userId = :userId and c.purpose = :purpose "
+            + "order by c.createdAt desc limit 1")
+    Optional<LoginChallenge> lockNewest(@Param("userId") Long userId, @Param("purpose") ChallengePurpose purpose);
 
     /**
      * How many challenges this user has been sent recently IN THIS FLOW. This is the resend cap, and

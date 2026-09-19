@@ -6,6 +6,36 @@ first.
 
 ---
 
+## Second-factor code guessing is bounded per account (T380)
+
+Two changes to how wrong sign-in codes are counted; no change to a person signing in normally.
+
+1. **The five-attempt cap on a code is now exact under load.** The attempt counter was read,
+   incremented and written back without a lock, so many simultaneous wrong codes could each see
+   the same count and the challenge never burned. The row is now locked for the duration of a
+   verification, so concurrent guesses queue and the fifth wrong one burns the code as intended.
+2. **An account, and a client address, may submit only so many codes in a window,** right or
+   wrong, across all its challenges. Until now whoever held the password could take five guesses,
+   sign in again for a fresh code, and take five more, indefinitely. A refused submission ends the
+   pending sign-in exactly as a burned code does (the "Too many incorrect codes" message) and is
+   audited as an `MFA_FAILURE` with reason `verify-throttled`.
+
+| Setting | Key | Value |
+| --- | --- | --- |
+| Submissions per account per window | `app.security.second-factor.max-verifies-per-user` | **10** |
+| Submissions per client address per window | `app.security.second-factor.max-verifies-per-ip` | **30** |
+| Window | `app.security.second-factor.verify-window` | **15 minutes** |
+
+### Operational fact
+
+**The submission throttle is in-memory and per-instance**, like the sign-in lockout and the
+password-reset throttle. On the single-instance App Service it is exact; **if the app is ever
+scaled out, every one of these caps silently becomes N times looser**, one copy per instance.
+That is the third control with this property; scaling out is a security change, not a capacity
+change, until they share a store.
+
+---
+
 ## Self-service password reset (T353)
 
 A signed-out user can reset their own password: `/forgot-password` takes an email address, and — only
