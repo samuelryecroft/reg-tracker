@@ -70,12 +70,48 @@ ensure_fic "$PLAN_IDENTITY" "env-plan" "repo:${GITHUB_REPO}:environment:plan"
 ensure_fic "$CD_IDENTITY"   "env-prod" "repo:${GITHUB_REPO}:environment:prod"
 
 echo ">> Role assignments"
-# PLAN tier: read-only on the RG + state access. NOTE: state holds all four DB passwords in clear,
-# so Storage Blob Data Contributor on the state account = read of those passwords (Kevin: the plan
-# tier is NOT low-privilege; fenced by the 'plan' environment branch restriction until 5.4).
+# PLAN tier: read-only on the RG + state access. It is still NOT low-privilege: state access means
+# reading postgres_administrator_password in clear, because the Postgres server resource requires that
+# value and so it remains in state. It used to mean all FOUR DB passwords; the other three left state
+# when the azurerm_key_vault_secret resources did (see terraform/main.tf). The 'plan' environment's
+# branch restriction is what fences this.
 assign "$PLAN_PID" "Reader" "$RG_ID"
 assign "$PLAN_PID" "Storage Blob Data Contributor" "$STATE_SA_ID"
-assign "$PLAN_PID" "Key Vault Secrets User" "$KV_ID" # plan refreshes the azurerm_key_vault_secret resources
+# Key Vault Secrets User was needed because plan had to REFRESH the azurerm_key_vault_secret resources.
+# Those resources are gone, so nothing in a plan reads a secret value any more and this grant is now
+# believed unnecessary - left in place only because removing it is a separate, verifiable change (run a
+# plan without it and confirm it still succeeds) rather than an assumption to make blind. Removing it
+# closes the plan tier's last direct secret-read path.
+assign "$PLAN_PID" "Key Vault Secrets User" "$KV_ID"
+
+# PLAN tier extra action, via a NARROW CUSTOM ROLE.
+#
+# `Reader` does not include Microsoft.Web/sites/config/list/action (verified: it is absent from the
+# built-in definition), and the azurerm provider reads an app's AUTH SETTINGS as part of refreshing
+# azurerm_linux_web_app. So a pure-Reader identity cannot `terraform plan` this configuration at all -
+# the first real run failed with AuthorizationFailed on exactly that action.
+#
+# The built-in that would cover it is Website Contributor, which also grants WRITE on the site and
+# would end the "plan tier cannot change anything" property. So instead: a custom role that is Reader's
+# actions plus that single extra action, scoped to the app resource group. It is more to maintain than a
+# built-in, and that is the trade - the alternative is a plan tier that can deploy.
+PLAN_ROLE_NAME="${PLAN_ROLE_NAME:-rht-ci-plan-refresh}"
+if ! az role definition list --name "$PLAN_ROLE_NAME" --query "[0].roleName" -o tsv 2>/dev/null | grep -q .; then
+  az role definition create --role-definition "{
+    \"Name\": \"${PLAN_ROLE_NAME}\",
+    \"Description\": \"Reader plus Microsoft.Web/sites/config/list/action, which terraform plan needs to refresh an App Service's auth settings. No write actions - see bootstrap-deployer-identity.sh.\",
+    \"IsCustom\": true,
+    \"Actions\": [ \"*/read\", \"Microsoft.Web/sites/config/list/action\" ],
+    \"NotActions\": [],
+    \"AssignableScopes\": [ \"${RG_ID}\" ]
+  }" --output none
+  # Role definitions propagate; the assignment below can 400 if it lands first on a cold definition.
+  for _ in $(seq 1 12); do
+    az role definition list --name "$PLAN_ROLE_NAME" --query "[0].roleName" -o tsv 2>/dev/null | grep -q . && break
+    sleep 10
+  done
+fi
+assign "$PLAN_PID" "$PLAN_ROLE_NAME" "$RG_ID"
 
 # CD tier: create/update resources + write KV secrets + state access.
 assign "$CD_PID" "Contributor" "$RG_ID"

@@ -27,11 +27,6 @@ variable "postgres_administrator_password" {
   sensitive   = true
 }
 
-variable "admin_seed_password" {
-  description = "PLACEHOLDER ONLY. The app's bootstrap admin password, set once at deploy then rotated (runbook). Sensitive."
-  type        = string
-  sensitive   = true
-}
 
 # --- WS-G least-privilege DB roles (created VNet-side by the pre-deploy step; see README §WS-G). ---
 # The server admin login/password (above) is used ONLY by the pre-deploy bootstrap to create these
@@ -48,17 +43,7 @@ variable "runtime_db_login" {
   default     = "rht_app"
 }
 
-variable "migrator_db_password" {
-  description = "PLACEHOLDER ONLY. Password for the migrator role; in production generated and sourced from Key Vault (MIGRATOR-DB-PASSWORD), never committed. The pre-deploy step reads it from KV to run the role SQL + Flyway. Sensitive."
-  type        = string
-  sensitive   = true
-}
 
-variable "runtime_db_password" {
-  description = "PLACEHOLDER ONLY. Password for the runtime (app) role; in production generated and sourced from Key Vault (RUNTIME-DB-PASSWORD), never committed. The app reads it as a Key Vault reference. Sensitive."
-  type        = string
-  sensitive   = true
-}
 
 variable "alert_email" {
   description = "Email / distribution list for the observability action group. REQUIRED (no default, Kevin B3): apply must fail until a real recipient is set - an alert nobody receives is the same as no alert (closes the operational half of R5)."
@@ -127,3 +112,9 @@ variable "tags" {
   }
 }
 
+# admin_seed_password / migrator_db_password / runtime_db_password were removed when the
+# azurerm_key_vault_secret resources did (see main.tf). They existed ONLY to write those secrets, so
+# with the values managed out of band they had no remaining consumer - and every plan that accepted
+# them put a live credential into state in clear. postgres_administrator_password stays because the
+# Postgres server resource itself requires it; that one value is still in state, which is a smaller
+# surface than four but not zero, and is the remaining half of WS-E-DESIGN 5.4.

@@ -8,7 +8,6 @@ name_prefix     = "rht"
 
 postgres_administrator_login    = "rhtadmin"
 postgres_administrator_password = "REPLACE_ME_placeholder_not_a_real_secret"
-admin_seed_password             = "REPLACE_ME_placeholder_rotate_after_first_boot"
 
 # WS-G least-privilege DB roles. Logins have defaults (rht_migrator / rht_app); override only if
 # you must. Passwords are PLACEHOLDERS - generated and sourced from Key Vault in production. The
@@ -16,8 +15,6 @@ admin_seed_password             = "REPLACE_ME_placeholder_rotate_after_first_boo
 # the app connects with (both stored as KV secrets by this config).
 # migrator_db_login  = "rht_migrator"
 # runtime_db_login   = "rht_app"
-migrator_db_password = "REPLACE_ME_placeholder_migrator_role_secret"
-runtime_db_password  = "REPLACE_ME_placeholder_runtime_role_secret"
 
 alert_email = "REPLACE_ME_real_monitored_recipient"
 # Leave true for real data (private networking; Postgres+Blob not publicly reachable). Set false
@@ -28,3 +25,11 @@ enable_vnet = true
 # T114 budget notifications recipient. REQUIRED (no default) so a real mailbox is always chosen
 # deliberately - the human's is justsam33@gmail.com. Set it here (this file's real copy is git-ignored).
 budget_alert_email = "you@example.org"
+
+# admin_seed_password / migrator_db_password / runtime_db_password are gone from this file because
+# they are gone from variables.tf. Terraform no longer writes the Key Vault secrets they fed - a plan
+# had to read those back, and a Key Vault read is a data-plane call this vault's firewall refuses from
+# a CI runner. Set or rotate those values directly instead, e.g.:
+#   az keyvault secret set --vault-name kv-<prefix>-<sfx> --name RUNTIME-DB-PASSWORD --value '<value>'
+# Keep to [A-Za-z0-9]: the DB-plane job substitutes these into psql, where a quote or backslash fails
+# SILENTLY rather than loudly (WS-E F1).
