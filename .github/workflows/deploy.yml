@@ -61,23 +61,27 @@ env:
   # both together (get the sha256 from <mavenurl>/applicationinsights-agent-<ver>.jar.sha256). The
   # JVM attaches it via JAVA_OPTS=-javaagent:.../applicationinsights-agent.jar, which is set in the
   # Terraform app_service module (the durable source of truth for the setting; the version lives here).
-  # The two STATIC App Insights pushes below run with --async: the command exits once the artifact is
-  # PUSHED, and does not wait for the site to start. The jar deploys deliberately do NOT - see there.
+  # The two STATIC App Insights files are written with a plain Kudu VFS PUT, NOT `az webapp deploy`.
   #
-  # Why, with evidence. The synchronous form failed twice on this app, both times at the same step, and
-  # the deployment itself was never the problem: Kudu recorded DeploymentId 482fc479 as start 14:19:39,
-  # end 14:19:45 - SIX SECONDS, status 4 (Success). The CLI then spent 613s waiting for the site to
-  # start and reported "Deployment failed because the site failed to start within 10 mins /
-  # FailedInstances: 1", leaving a red run over a push that had worked.
+  # Why, with the platform's own records. `az webapp deploy --type static --restart false` failed three
+  # runs in a row at the same step, and the push was never the problem: Kudu logged every one of them
+  # "Deployment successful" within ~5s (e.g. DeploymentId f0a13081, 15:45:12 -> 15:45:17). What failed
+  # was the CLI's post-push wait for the SITE TO START - it sat at "Starting the site..." from t=31s
+  # with no state change for 570s, then reported "failed to start within 10 mins / FailedInstances: 1",
+  # while readiness stayed 200 the whole time. With --restart false no start ever begins, so that wait
+  # can only ever time out. Neither --timeout (governs the CLI's polling, not this server-side limit)
+  # nor --async (this CLI version polls the deployment status anyway) changes that.
   #
-  # That 10-minute limit is SERVER-side and --timeout does not govern it: a run with --timeout 1200000
-  # still failed at 613s. And the wait is self-defeating here anyway - these calls pass --restart false,
-  # so no new worker starts, so the start being waited for never happens.
+  # A VFS PUT is a file write: no deployment orchestration, no start expectation. It is the same
+  # endpoint and the same ARM bearer token the verify step below already uses to read the files back,
+  # so this adds no new auth path. "If-Match: *" is what lets it overwrite an existing file (Kudu's VFS
+  # is ETag-guarded and returns 412 otherwise).
   #
-  # Readiness is asserted by this workflow, not by the deploy call: the smoke step owns it with a
-  # warmup-aware 900s budget sized to this app's 330-490s cold boot, and the verify step confirms via
-  # Kudu VFS that both App Insights artifacts actually landed. Both are strictly better placed to judge
-  # it than a fixed platform timeout that is shorter than the app's own startup.
+  # The JAR deploy stays on `az webapp deploy` and stays synchronous: it DOES restart the app, and the
+  # wait is then a real signal. Measured today from the platform log: container start 10:21:50 ->
+  # WarmUpProbeSucceeded 10:29:10 = 440s, inside the platform's ~570s window with ~130s to spare. Tight
+  # but real; if boot creeps past it, that step needs the same treatment (Kudu's OneDeploy REST API with
+  # async=true, then the smoke step owns readiness).
   AI_AGENT_VERSION: "3.7.9"
   AI_AGENT_SHA256: "4ab7a442bf9defc7475d026c6b49042793ebb010c391a1db91ae07da0c04d848"
 
@@ -363,15 +367,21 @@ jobs:
           url="https://repo1.maven.org/maven2/com/microsoft/azure/applicationinsights-agent/${AI_AGENT_VERSION}/${agent}"
           curl -fsSL -o "$agent" "$url"
           echo "${AI_AGENT_SHA256}  ${agent}" | sha256sum -c -
-          az webapp deploy --type static --clean false --restart false \
-            --async true \
-            -g '${{ steps.tf.outputs.rg }}' -n '${{ steps.tf.outputs.app_name }}' \
-            --target-path /home/site/wwwroot/applicationinsights-agent.jar --src-path "$agent"
-          az webapp deploy --type static --clean false --restart false \
-            --async true \
-            -g '${{ steps.tf.outputs.rg }}' -n '${{ steps.tf.outputs.app_name }}' \
-            --target-path /home/site/wwwroot/applicationinsights.json \
-            --src-path deploy/appservice/applicationinsights.json
+          # Plain file writes via Kudu VFS (see the DEPLOY comment at the top of this file for why this is
+          # not `az webapp deploy`). Same token + endpoint as the verify step below. PUT returns 201 on
+          # create, 204 on overwrite; anything else is a failure worth stopping for.
+          app='${{ steps.tf.outputs.app_name }}'
+          token="$(az account get-access-token --resource https://management.azure.com --query accessToken -o tsv)"
+          put_file() { # $1 = local path, $2 = wwwroot target name
+            code="$(curl -s -o /dev/null -w '%{http_code}' -X PUT \
+              -H "Authorization: Bearer ${token}" -H "If-Match: *" \
+              --data-binary "@$1" \
+              "https://${app}.scm.azurewebsites.net/api/vfs/site/wwwroot/$2")"
+            echo "PUT $2: HTTP ${code}"
+            case "${code}" in 201|204) ;; *) echo "FATAL: Kudu VFS PUT of $2 returned HTTP ${code}" >&2; exit 1 ;; esac
+          }
+          put_file "$agent" applicationinsights-agent.jar
+          put_file deploy/appservice/applicationinsights.json applicationinsights.json
 
       # --- Rollback source (T269 Phase 2, B1). B1 has NO deployment slots, so there is nothing to swap
       # back to: the only previous known-good artifact is the jar currently running. Snapshot it BEFORE
@@ -410,9 +420,10 @@ jobs:
           # --clean false: keep the App Insights agent jar + config staged in the step above.
           set -- target/*.jar
           jar="$1"
-          # NOT --async: this one RESTARTS the app, its ~330-490s boot fits inside the platform's
-          # 10-minute window, and waiting is a real signal that the new worker actually started. Async
-          # here would let the smoke step below pass against the OLD process still serving traffic.
+          # Deliberately synchronous, unlike the static files above: this one RESTARTS the app, its
+          # measured ~440s boot fits inside the platform's ~570s window, and the wait is a real signal
+          # that the NEW worker started. Returning early here would let the smoke step below pass
+          # against the OLD process still serving traffic.
           az webapp deploy --type jar --clean false \
             -g '${{ steps.tf.outputs.rg }}' -n '${{ steps.tf.outputs.app_name }}' --src-path "$jar"
 
@@ -496,7 +507,7 @@ jobs:
           # --clean false: leave the App Insights agent + config staged alongside. Note the agent staged
           # earlier in THIS run stays in place; it is version-pinned and backwards compatible, and a
           # partial rollback of the agent would be a second variable during an incident.
-          # NOT --async, same reasoning as the forward deploy: we must know the restored worker
+          # Synchronous, same reasoning as the forward deploy: we must know the restored worker
           # actually started before judging whether the rollback recovered anything.
           az webapp deploy --type jar --clean false -g "$rg" -n "$app" --src-path rollback/app.jar
           host="$(az webapp show -g "$rg" -n "$app" --query defaultHostName -o tsv)"
