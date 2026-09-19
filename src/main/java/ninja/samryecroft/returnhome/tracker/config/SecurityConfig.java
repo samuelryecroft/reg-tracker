@@ -82,7 +82,11 @@ public class SecurityConfig {
                         // the second-factor step is that it happens while the session is NOT
                         // authenticated. It protects itself: the page is inert without the pending
                         // attribute that only a correct password can put in the session.
-                        .requestMatchers("/login", "/login/verify", "/forgot-password", "/reset-password", "/reset-password/**", "/css/**", "/js/**", "/fonts/**", "/icons/**", "/webjars/**", "/error").permitAll()
+                        // T375: /version is the anonymous running-process provenance check - a plain
+                        // MVC route (NOT under /actuator), so the ADMIN gate on the actuator surface
+                        // below is untouched. It serves only {commit, buildTime}; see VersionController
+                        // for why the operator needs a check they can run without a credential.
+                        .requestMatchers("/login", "/login/verify", "/forgot-password", "/reset-password", "/reset-password/**", "/version", "/css/**", "/js/**", "/fonts/**", "/icons/**", "/webjars/**", "/error").permitAll()
                         // WS-C: the health endpoint (and its liveness/readiness groups) is public so
                         // App Service probes can reach it unauthenticated. show-details=when-authorized
                         // means anonymous callers still only see {"status":"UP"}. Every OTHER actuator
