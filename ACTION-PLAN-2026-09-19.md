@@ -9,7 +9,7 @@ renumber if anything in flight collides.
 > **Wave 0:** #250 fixes the CI red that #246 introduced and awaits a human merge. **Wave 1, all
 > branched from #250:** T377 = #251, T376 = #252, T378 = #254, T387 = the PR carrying this file.
 > **Wave 2 in progress:** T380 = #256, T379 = #258 (stacked on #254), T384 = #259 (scanner at zero;
-> the ci.yml flip is the deployment agent's). T385 next, then T381, T382, T383. T386 and the 5xx
+> the ci.yml flip is the deployment agent's), T385 = #260. Next T381, T382, T383. T386 and the 5xx
 > threshold review are with the deployment agent, behind a clean Terraform baseline and Sam's go-ahead.
 
 Sizes: **S** ≤ half a day · **M** 1–3 days · **L** a week or more. Every item has a *Done when* so it
