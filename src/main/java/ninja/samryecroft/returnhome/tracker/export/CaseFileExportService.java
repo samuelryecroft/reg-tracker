@@ -7,6 +7,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.HashMap;
+import java.util.Map;
 import ninja.samryecroft.returnhome.tracker.audit.AuditFeedScope;
 import ninja.samryecroft.returnhome.tracker.audit.AuditHistorySection;
 import ninja.samryecroft.returnhome.tracker.audit.AuditHistoryService;
@@ -104,18 +106,20 @@ public class CaseFileExportService {
         }
 
         List<InterviewRequest> inPeriod = visible.stream().filter(period::covers).toList();
+        Map<Long, InterviewReport> reports = reportsByRequestId(
+                inPeriod.stream().map(InterviewRequest::getId).toList());
 
         List<ExportManifest.ManifestEntry> included = new ArrayList<>();
         List<ExportManifest.ManifestEntry> excluded = new ArrayList<>();
         for (InterviewRequest request : inPeriod) {
-            Optional<InterviewReport> report = approvedReportFor(request);
-            if (report.isPresent()) {
+            InterviewReport report = reports.get(request.getId());
+            if (approvedReport(report).isPresent()) {
                 included.add(ExportManifest.ManifestEntry.included(request.getId(), labelFor(request), true));
             } else {
                 // The reason is the point. "2 interviews have no approved report, and here is why"
                 // turns a gap into evidence of completeness; a bare count reads as concealment.
                 excluded.add(ExportManifest.ManifestEntry.excluded(
-                        request.getId(), labelFor(request), exclusionReasonFor(request)));
+                        request.getId(), labelFor(request), exclusionReasonFor(report)));
             }
         }
 
@@ -143,9 +147,11 @@ public class CaseFileExportService {
         List<ExportManifest.ManifestEntry> included = new ArrayList<>();
         List<ExportManifest.ManifestEntry> excluded = new ArrayList<>(manifest.excluded());
 
+        Map<Long, InterviewReport> reports = reportsByRequestId(
+                manifest.included().stream().map(ExportManifest.ManifestEntry::interviewId).toList());
         for (ExportManifest.ManifestEntry entry : manifest.included()) {
             InterviewRequest request = interviewRequestRepository.findDetailedById(entry.interviewId()).orElseThrow();
-            InterviewReport report = approvedReportFor(request).orElseThrow();
+            InterviewReport report = approvedReport(reports.get(entry.interviewId())).orElseThrow();
             try {
                 // Decrypted through the document store, so the attached file is byte-identical to
                 // the one issued. Each decryption raises its own DOCUMENT_KEY_UNWRAPPED, which is
@@ -198,15 +204,32 @@ public class CaseFileExportService {
                 principal.getUsername(), LocalDateTime.now(), passphrase));
     }
 
-    private Optional<InterviewReport> approvedReportFor(InterviewRequest request) {
-        return interviewReportRepository.findByInterviewRequestId(request.getId())
-                .filter(report -> report.getStatus() == ReportStatus.APPROVED)
-                .filter(report -> report.getGeneratedDocumentPath() != null);
+    /**
+     * Every report for these requests in one query, keyed by request id (T385). The manifest and
+     * the pack used to ask for each request's report on its own - and the pack asked again for
+     * each one the manifest had just found.
+     */
+    private Map<Long, InterviewReport> reportsByRequestId(List<Long> requestIds) {
+        Map<Long, InterviewReport> byRequestId = new HashMap<>();
+        if (!requestIds.isEmpty()) {
+            for (InterviewReport report : interviewReportRepository.findByInterviewRequestIdIn(requestIds)) {
+                byRequestId.put(report.getInterviewRequest().getId(), report);
+            }
+        }
+        return byRequestId;
     }
 
-    private String exclusionReasonFor(InterviewRequest request) {
-        return interviewReportRepository.findByInterviewRequestId(request.getId())
-                .map(report -> switch (report.getStatus()) {
+    /** @param report the request's report, or null when it has none */
+    private Optional<InterviewReport> approvedReport(InterviewReport report) {
+        return Optional.ofNullable(report)
+                .filter(r -> r.getStatus() == ReportStatus.APPROVED)
+                .filter(r -> r.getGeneratedDocumentPath() != null);
+    }
+
+    /** @param report the request's report, or null when it has none */
+    private String exclusionReasonFor(InterviewReport report) {
+        return Optional.ofNullable(report)
+                .map(r -> switch (r.getStatus()) {
                     case DRAFT -> "No approved report — the report is still a draft and has not been submitted";
                     case SUBMITTED -> "No approved report — the report is awaiting review";
                     case REJECTED -> "No approved report — the report was sent back for amendment";

@@ -8,6 +8,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.Mockito.lenient;
 
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
@@ -36,6 +38,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.test.util.ReflectionTestUtils;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Objects;
 
 /**
  * The rules that make this feature safe to ship, expressed as tests: fail closed, never omit
@@ -68,6 +74,8 @@ class CaseFileExportServiceTest {
 
     private InterviewRequest requestOne;
     private InterviewRequest requestTwo;
+    /** What the service's one-query report load returns, keyed by request id (T385). */
+    private final Map<Long, InterviewReport> reportsByRequestId = new HashMap<>();
 
     @BeforeEach
     void setUp() {
@@ -84,6 +92,12 @@ class CaseFileExportServiceTest {
         when(requestRepository.findByChildIdOrderByCreatedAtDesc(5L))
                 .thenReturn(List.of(requestOne, requestTwo));
         when(accessService.homeScopeFor(any())).thenReturn(home -> true);
+        // T385: the service loads every report for a list of requests in one query. Answered from
+        // the map the helpers below fill; lenient because a test that never reaches a manifest
+        // never asks.
+        lenient().when(reportRepository.findByInterviewRequestIdIn(anyCollection()))
+                .thenAnswer(invocation -> invocation.<Collection<Long>>getArgument(0).stream()
+                        .map(reportsByRequestId::get).filter(Objects::nonNull).toList());
     }
 
     /**
@@ -140,7 +154,8 @@ class CaseFileExportServiceTest {
         ReflectionTestUtils.setField(report, "id", reportId);
         report.setStatus(ReportStatus.APPROVED);
         report.setGeneratedDocumentPath("org-1/rhi-report-" + request.getId() + "-abc.docx");
-        when(reportRepository.findByInterviewRequestId(request.getId())).thenReturn(Optional.of(report));
+        report.setInterviewRequest(request);
+        reportsByRequestId.put(request.getId(), report);
     }
 
     /**
@@ -227,7 +242,8 @@ class CaseFileExportServiceTest {
         InterviewReport draft = new InterviewReport();
         ReflectionTestUtils.setField(draft, "id", 901L);
         draft.setStatus(ReportStatus.DRAFT);
-        when(reportRepository.findByInterviewRequestId(1191L)).thenReturn(Optional.of(draft));
+        draft.setInterviewRequest(requestTwo);
+        reportsByRequestId.put(1191L, draft);
 
         ExportManifest manifest = service.manifestFor(5L, ExportPeriod.all(), principal);
 
