@@ -13,6 +13,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Issues and checks the emailed one-time code (T322).
@@ -40,19 +41,38 @@ public class SecondFactorService {
     private final PasswordEncoder passwordEncoder;
     private final AuditEventPublisher audit;
     private final AppProperties appProperties;
+    private final TransactionTemplate transactionTemplate;
+
+    /**
+     * Verifications for one account run one at a time in this process (T380). The row lock in
+     * {@link LoginChallengeRepository#lockNewest} is what makes the attempt count exact; this is
+     * what stops the lock from starving the connection pool. A verification blocked on the row
+     * lock holds a pool connection while it waits, and the verification that holds the lock needs
+     * a SECOND connection after it commits - the audit row is written AFTER_COMMIT in REQUIRES_NEW
+     * - so with as many simultaneous guesses as the pool has connections, nobody could finish. Taken
+     * BEFORE the transaction opens, this queue holds no connection while it waits. Striped rather
+     * than per-user so it is bounded; two accounts sharing a stripe merely queue behind each other.
+     */
+    private static final int VERIFY_STRIPES = 64;
+    private final Object[] verifyQueues = new Object[VERIFY_STRIPES];
 
     public SecondFactorService(LoginChallengeRepository challenges,
             UserRepository users,
             VerificationCodeSender sender,
             PasswordEncoder passwordEncoder,
             AuditEventPublisher audit,
-            AppProperties appProperties) {
+            AppProperties appProperties,
+            TransactionTemplate transactionTemplate) {
         this.challenges = challenges;
         this.users = users;
         this.sender = sender;
         this.passwordEncoder = passwordEncoder;
         this.audit = audit;
         this.appProperties = appProperties;
+        this.transactionTemplate = transactionTemplate;
+        for (int i = 0; i < VERIFY_STRIPES; i++) {
+            verifyQueues[i] = new Object();
+        }
     }
 
     public boolean isEnabled() {
@@ -143,7 +163,6 @@ public class SecondFactorService {
      * the whole of the burn: a challenge that only counts its successes is a challenge an attacker
      * may guess at indefinitely.
      */
-    @Transactional
     public Outcome verify(User user, String submittedCode) {
         return verify(user, submittedCode, ChallengePurpose.SIGN_IN);
     }
@@ -154,11 +173,21 @@ public class SecondFactorService {
      * purpose-scoped - the two flows are kept apart by the query, not by a check a later caller could
      * forget.
      */
-    @Transactional
     public Outcome verify(User user, String submittedCode, ChallengePurpose purpose) {
+        Object queue = verifyQueues[Math.floorMod(Long.hashCode(user.getId()), VERIFY_STRIPES)];
+        synchronized (queue) {
+            // The transaction is opened INSIDE the queue, so a queued verification holds no
+            // connection - see the field's note. Joins an outer transaction if one exists.
+            return transactionTemplate.execute(status -> verifyWithinTransaction(user, submittedCode, purpose));
+        }
+    }
+
+    private Outcome verifyWithinTransaction(User user, String submittedCode, ChallengePurpose purpose) {
         Instant now = Instant.now();
-        Optional<LoginChallenge> found =
-                challenges.findFirstByUserIdAndPurposeOrderByCreatedAtDesc(user.getId(), purpose);
+        // Locked (T380): the attempt count below is read, incremented and written back, and without
+        // the row lock two concurrent wrong codes both read N and both write N+1, so the cap that
+        // burns the challenge was never reached under load. See LoginChallengeRepository#lockNewest.
+        Optional<LoginChallenge> found = challenges.lockNewest(user.getId(), purpose);
         if (found.isEmpty()) {
             audit.mfaFailure(user, "no-challenge");
             return Outcome.NO_CHALLENGE;
@@ -210,6 +239,16 @@ public class SecondFactorService {
      * without padding would produce a code of fewer digits about one time in ten and quietly shrink
      * the space for those users.
      */
+    /**
+     * A submission refused by {@link SecondFactorVerifyThrottle} before any code was checked (T380).
+     * Recorded as a factor failure with its own reason, so the audit trail can tell "guessed wrong"
+     * from "was not allowed to guess", and the account's pending sign-in is ended by the caller.
+     */
+    public void refuseThrottled(User user) {
+        audit.mfaFailure(user, "verify-throttled");
+        log.warn("Second-factor verification throttled for user id {}", user.getId());
+    }
+
     private String generateCode() {
         int digits = config().getCodeLength();
         int bound = (int) Math.pow(10, digits);

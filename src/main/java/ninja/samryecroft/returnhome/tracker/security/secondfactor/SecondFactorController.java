@@ -28,6 +28,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 public class SecondFactorController {
 
     private final SecondFactorService secondFactorService;
+    private final SecondFactorVerifyThrottle verifyThrottle;
     private final SecondFactorPolicy policy;
     private final UserRepository userRepository;
     private final AuditEventPublisher audit;
@@ -35,10 +36,12 @@ public class SecondFactorController {
             new HttpSessionSecurityContextRepository();
 
     public SecondFactorController(SecondFactorService secondFactorService,
+            SecondFactorVerifyThrottle verifyThrottle,
             SecondFactorPolicy policy,
             UserRepository userRepository,
             AuditEventPublisher audit) {
         this.secondFactorService = secondFactorService;
+        this.verifyThrottle = verifyThrottle;
         this.policy = policy;
         this.userRepository = userRepository;
         this.audit = audit;
@@ -64,6 +67,18 @@ public class SecondFactorController {
             return "redirect:/login";
         }
         User user = pending.get();
+
+        // T380: bounded per account and per address BEFORE the code is looked at. The per-challenge
+        // cap alone was no bound on an account: whoever holds the password mints a fresh challenge,
+        // and a fresh five attempts, by signing in again. Refused the same way a burned code is -
+        // the pending sign-in ends and the person starts from the password - because "too many
+        // incorrect codes" is exactly what happened. getRemoteAddr() is the real client address on
+        // the azure profile (ForwardedHeaderFilter has resolved X-Forwarded-For by now).
+        if (!verifyThrottle.allow(user.getId(), request.getRemoteAddr())) {
+            secondFactorService.refuseThrottled(user);
+            session.removeAttribute(SecondFactorSuccessHandler.PENDING_USER_ID);
+            return "redirect:/login?error=codeburned";
+        }
 
         SecondFactorService.Outcome outcome = secondFactorService.verify(user, code);
         if (outcome == SecondFactorService.Outcome.PASSED) {

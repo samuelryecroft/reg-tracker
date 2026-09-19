@@ -137,6 +137,17 @@ public class AppProperties {
         private int maxUnverifiedChallenges = 3;
         private Duration resendWindow = Duration.ofMinutes(15);
 
+        /**
+         * T380: submissions to /login/verify allowed per account and per client address inside
+         * {@link #verifyWindow}, counted whether or not the code was right. {@link #maxAttempts}
+         * bounds guesses against ONE challenge; this bounds guesses against an ACCOUNT, because a
+         * caller who holds the password mints a fresh challenge - and a fresh allowance - by signing
+         * in again. A person needs one or two submissions; the caps are for whoever needs hundreds.
+         */
+        private int maxVerifiesPerUser = 10;
+        private int maxVerifiesPerIp = 30;
+        private Duration verifyWindow = Duration.ofMinutes(15);
+
         /** From-address for the code. No default: a deployment must state who the mail is from. */
         private String fromAddress;
 
@@ -201,6 +212,30 @@ public class AppProperties {
 
         public void setResendWindow(Duration resendWindow) {
             this.resendWindow = resendWindow;
+        }
+
+        public int getMaxVerifiesPerUser() {
+            return maxVerifiesPerUser;
+        }
+
+        public void setMaxVerifiesPerUser(int maxVerifiesPerUser) {
+            this.maxVerifiesPerUser = maxVerifiesPerUser;
+        }
+
+        public int getMaxVerifiesPerIp() {
+            return maxVerifiesPerIp;
+        }
+
+        public void setMaxVerifiesPerIp(int maxVerifiesPerIp) {
+            this.maxVerifiesPerIp = maxVerifiesPerIp;
+        }
+
+        public Duration getVerifyWindow() {
+            return verifyWindow;
+        }
+
+        public void setVerifyWindow(Duration verifyWindow) {
+            this.verifyWindow = verifyWindow;
         }
 
         public String getFromAddress() {
