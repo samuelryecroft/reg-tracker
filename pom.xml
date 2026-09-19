@@ -211,6 +211,15 @@
             <version>1.60.0</version>
             <scope>test</scope>
         </dependency>
+        <!-- T387: architecture rules as tests (ArchitectureGuardTest). The plain library, not
+             archunit-junit5: the rules run as ordinary JUnit tests in the *GuardTest idiom this
+             suite already uses, with nothing to configure. -->
+        <dependency>
+            <groupId>com.tngtech.archunit</groupId>
+            <artifactId>archunit</artifactId>
+            <version>1.5.0</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
