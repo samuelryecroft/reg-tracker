@@ -1,7 +1,9 @@
 package ninja.samryecroft.returnhome.tracker.interview;
 
+import ninja.samryecroft.returnhome.tracker.core.ConflictException;
+
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -65,7 +67,7 @@ class MarkStatusConstructionVsTransitionTest {
         ReflectionTestUtils.setField(persisted, "id", 1L);
         assertThat(persisted.getStatus()).as("the field's own default").isEqualTo(InterviewStatus.REQUESTED);
 
-        assertThatIllegalStateException()
+        assertThatExceptionOfType(ConflictException.class)
                 .isThrownBy(() -> service.markStatus(persisted, InterviewStatus.CANCELLED))
                 .withMessageContaining("REQUESTED").withMessageContaining("CANCELLED");
 
