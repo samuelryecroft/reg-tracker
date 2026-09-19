@@ -122,13 +122,56 @@ if ! az role assignment list --assignee "$CD_PID" --role "Role Based Access Cont
 fi
 
 echo ">> GitHub Environments + protection rules"
-# 'plan': restrict to the main branch (branch policy). 'prod': required reviewers + main only.
-gh api -X PUT "repos/${GITHUB_REPO}/environments/plan" >/dev/null
-gh api -X PUT "repos/${GITHUB_REPO}/environments/prod" \
-  -F "reviewers[][type]=User" 2>/dev/null || \
-  echo "   (set required reviewers on the 'prod' environment in the GitHub UI - add at least one)"
-gh api -X PUT "repos/${GITHUB_REPO}/environments/prod/deployment-branch-policies" >/dev/null 2>&1 || true
+# Two bugs lived here and both failed SILENTLY, which is why prod ran with no gate at all after a
+# "successful" bootstrap:
+#
+#  1. `-F "reviewers[][type]=User"` sent a reviewer with a type and NO id. The API rejects that 422,
+#     and the `|| echo` swallowed it into a hint that scrolls past in a long run. `gh api -F` cannot
+#     express a nested array of objects at all, so the body has to be JSON on stdin.
+#  2. `PUT .../environments/prod/deployment-branch-policies` is not an endpoint (the collection takes
+#     POST, and only once the environment itself declares custom_branch_policies). `|| true` hid that
+#     too, so neither environment was ever branch-restricted.
+#
+# BRANCH POLICY - custom_branch_policies, deliberately NOT protected_branches: `protected_branches`
+# means "only branches that have branch-protection rules may deploy", and main is NOT a protected
+# branch on this repo. Setting it would permit NOTHING and lock the pipeline out while looking
+# stricter. A named custom policy for 'main' expresses the actual intent and needs no branch
+# protection to exist first. If main is protected later, either setting works and this still holds.
+#
+# Requires a PUBLIC repo or a paid plan: environment protection rules are unavailable on private
+# repos on the free tier. This repo is public, so they apply.
+REVIEWER_LOGINS="${REVIEWER_LOGINS:-$(gh api user --jq .login)}"   # override: REVIEWER_LOGINS="alice bob"
+reviewers_json=""
+for login in $REVIEWER_LOGINS; do
+  uid="$(gh api "users/${login}" --jq .id)"   # fails loudly under set -e on a bad login
+  reviewers_json="${reviewers_json}{\"type\":\"User\",\"id\":${uid}},"
+done
+reviewers_json="[${reviewers_json%,}]"
 
+configure_env() { # $1 = environment name, $2 = reviewers JSON array ('[]' for none)
+  gh api -X PUT "repos/${GITHUB_REPO}/environments/$1" --input - >/dev/null <<JSON
+{
+  "reviewers": $2,
+  "deployment_branch_policy": { "protected_branches": false, "custom_branch_policies": true }
+}
+JSON
+  # Named policy, added only if absent so a re-run is a no-op rather than a 422.
+  if ! gh api "repos/${GITHUB_REPO}/environments/$1/deployment-branch-policies" \
+       --jq '.branch_policies[].name' 2>/dev/null | grep -qx main; then
+    gh api -X POST "repos/${GITHUB_REPO}/environments/$1/deployment-branch-policies" \
+      -f name=main >/dev/null
+  fi
+}
+
+# 'plan': main-only, no reviewer. NOTE it is NOT low-privilege - it holds Key Vault Secrets User and
+# Storage Blob Data Contributor on the state account, and state carries all four DB passwords in
+# clear, so the branch restriction is the only thing fencing a secret-read surface.
+configure_env "plan" "[]"
+# 'prod': main-only AND at least one required reviewer. The reviewer is what makes an
+# environment-scoped federated credential mean anything: the gate is evaluated BEFORE a token is
+# minted, so with no reviewer any dispatch mints a Contributor + RBAC-Administrator token against the
+# live estate, unattended.
+configure_env "prod" "$reviewers_json"
 echo ">> GitHub Environment variables (non-secret config)"
 gh variable set AZURE_TENANT_ID       --body "$(az account show --query tenantId -o tsv)" --repo "$GITHUB_REPO"
 gh variable set AZURE_SUBSCRIPTION_ID --body "$SUBSCRIPTION_ID" --repo "$GITHUB_REPO"
@@ -145,7 +188,22 @@ Done. Still to set BY HAND (secrets - never put these in this script or in varia
   gh secret set TF_VAR_ADMIN_SEED_PASSWORD             --repo ${GITHUB_REPO}
   gh secret set TF_VAR_MIGRATOR_DB_PASSWORD            --repo ${GITHUB_REPO}
   gh secret set TF_VAR_RUNTIME_DB_PASSWORD             --repo ${GITHUB_REPO}
-  gh variable set ALERT_EMAIL --body '<monitored@org>' --repo ${GITHUB_REPO}
-And confirm the 'prod' environment has at least one REQUIRED REVIEWER (this is what makes the
-environment-scoped identity meaningful - every prod deploy then waits for a human).
+  gh variable set ALERT_EMAIL        --body '<monitored@org>' --repo ${GITHUB_REPO}
+  gh variable set BUDGET_ALERT_EMAIL --body '<monitored@org>' --repo ${GITHUB_REPO}
+
+Both email variables are REQUIRED: alert_email and budget_alert_email are Terraform variables with
+no default, and deploy.yml passes both, so 'terraform plan -input=false' aborts on "No value for
+required variable" until they are set. They must be mailboxes someone actually reads - alert_email's
+regex rejects a malformed value but would happily accept a well-formed placeholder.
+
+The DB password secrets must match the values ALREADY in Key Vault (DB-PASSWORD,
+ADMIN-SEED-PASSWORD, MIGRATOR-DB-PASSWORD, RUNTIME-DB-PASSWORD) on an estate that is already
+deployed. Fresh values make the next apply ROTATE the live credentials. If a plan proposes any change
+to an azurerm_key_vault_secret, that is a mismatch - stop, do not approve it.
+
+Reviewers and branch policies are now set by this script (above), not by hand. VERIFY rather than
+assume - both were silently failing before:
+  gh api repos/${GITHUB_REPO}/environments/prod --jq '.protection_rules'
+  gh api repos/${GITHUB_REPO}/environments/prod/deployment-branch-policies --jq '.branch_policies[].name'
+Expect a required_reviewers rule on 'prod' and a 'main' policy on both environments.
 NOTE
