@@ -20,6 +20,34 @@
                 <div><strong>This young person cannot be added yet</strong><p th:text="${orgInactiveError}">Error</p></div>
             </div>
 
+            <!--/* T328: this young person already has an ARCHIVED record here, so the create is
+                 REFUSED rather than warned about. Creating a second one splits their history in two
+                 with nothing on any screen saying both exist - and the picker cannot show them the
+                 archived one, so nothing the person can see tells them it is there.
+
+                 SAME SHAPE AS orgInactiveError ABOVE, deliberately: a create refused for a
+                 page-level reason that no field on this form can correct. Not a field error on
+                 lastName - the name is not wrong, and anchoring to it would invite somebody to
+                 change a young person's surname until the form let them through, which is the
+                 defect wearing a fix.
+
+                 NO RESTORE BUTTON HERE. Restore is a first-class action on the RECORD, reached
+                 deliberately, so the link goes to the record and the control lives there - the same
+                 rule that kept a second "Add user" off T267's banner. It is also the honest one:
+                 the person most likely to be reading this is home staff, who may not restore at
+                 all, so a button here would be refused by the route. */-->
+            <div class="banner err" role="alert" th:if="${archivedMatchId != null}">
+                <span class="ic" aria-hidden="true">▲</span>
+                <div>
+                    <strong>This young person already has a record here</strong>
+                    <p>Their record was archived rather than removed, so adding them again would
+                        split their history across two records. Open the existing record to check it
+                        is the right young person, and restore it rather than creating a new one.</p>
+                    <p><a class="rowlink" th:href="@{/children/{id}(id=${archivedMatchId})}">Open the
+                        existing record</a></p>
+                </div>
+            </div>
+
             <div class="banner err" role="alert" th:if="${#fields.hasErrors('*')}">
                 <span class="ic" aria-hidden="true">▲</span>
                 <div>
