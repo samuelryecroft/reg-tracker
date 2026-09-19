@@ -2,8 +2,10 @@ name: Deploy
 
 # WS-E deploy pipeline. Execution is SPLIT (design fork 2c): the control plane (terraform, Key Vault
 # writes, App Service deploy, smoke, rollback) runs on hosted runners over public ARM endpoints; only
-# the three DB-plane steps run VNet-side, in the Container Apps job (see the migrator_job module and
-# deploy/db-plane/run-db-plane.sh). No standing credentialed host inside the VNet.
+# the DB-plane migration runs VNet-side, in a PER-RUN EPHEMERAL Container Apps job created and torn
+# down by deploy/db-plane/ephemeral-migrate.sh (T180). No standing credentialed host inside the VNet,
+# and no standing Container Apps environment either - the old migrator_job module is gated off
+# (enable_migrator_job=false) precisely because its idle internal load balancer cost ~£6.5/mo.
 #
 # Identity: two user-assigned managed identities via OIDC, gated by GitHub Environments so protection
 # rules are evaluated BEFORE a token is minted (environment: subjects, not ref:/pull_request):
@@ -12,18 +14,29 @@ name: Deploy
 # Both created out of band by bootstrap-deployer-identity.sh; client ids + config come from the
 # Environment vars/secrets that script + PREFLIGHT set up.
 
-# GATED (T122): the push-to-main trigger is intentionally DISABLED until the deploy is actually
-# enabled. This workflow authenticates to Azure via OIDC user-assigned identities (rht-ci-plan /
-# rht-cd-prod) gated by the 'plan' and 'prod' GitHub Environments, plus their vars/secrets
-# (PLAN_CLIENT_ID, CD_CLIENT_ID, AZURE_TENANT_ID, TF_STATE_*, the four TF_VAR_* password secrets, ...).
-# None of that has been provisioned yet (bootstrap-deployer-identity.sh still has the T100 ordering
-# deadlock; go-live was a MANUAL deploy), so on every push to main the very first step - "Azure login
-# (rht-ci-plan, OIDC)" - fails and the run goes red for a deploy that never actually runs. That is
-# pure noise, so the auto-fire is off: the pipeline runs ONLY on-demand via workflow_dispatch.
-# TO RE-ENABLE once enablement (T122 scope / T110) is real: restore the `push:` block below AND make
-# sure the Environments + OIDC identities + vars/secrets exist first (see the scope note in the T122
-# report). This does NOT fake success and does NOT delete the pipeline - it just stops it firing
-# before the identities it needs exist.
+# STILL DISPATCH-ONLY, but for a narrower reason than before. The push-to-main trigger stays commented
+# out until this pipeline has actually completed several green runs on demand. What has changed:
+#
+#   - The T100 ordering deadlock in bootstrap-deployer-identity.sh is GONE. It existed because the
+#     script's KV/ACR grants needed resources that only the first apply creates; those resources now
+#     exist (the estate was deployed manually), so the script's EDIT THESE block is simply filled in.
+#   - The DB-plane steps have been REWRITTEN to the ephemeral path. They previously read
+#     `terraform output -raw container_app_job_name`, which is null since T355 - so the apply step would
+#     have failed AFTER changing the estate. That trap is removed.
+#   - TF_VAR_budget_alert_email is now passed. It is a required variable with no default, so with
+#     -input=false the plan job aborted on "No value for required variable" before this fix.
+#
+# What must be true BEFORE uncommenting `push:` below:
+#   1. Both OIDC identities exist WITH federated credentials (rht-cd-prod had none - no FIC, no token).
+#   2. The 'plan' and 'prod' Environments exist, prod has >=1 required reviewer, plan is main-only.
+#   3. All Environment vars/secrets are set: PLAN_CLIENT_ID, CD_CLIENT_ID, AZURE_TENANT_ID,
+#      AZURE_SUBSCRIPTION_ID, TF_STATE_*, ALERT_EMAIL, BUDGET_ALERT_EMAIL, and the four TF_VAR_*
+#      password secrets - taken from the EXISTING Key Vault values, never regenerated, or the first
+#      apply rotates the live DB credentials.
+#   4. The rollback path has been exercised deliberately at least once. It is wired now (B1
+#      redeploy-previous), and a rollback nobody has tested is not a rollback.
+# Until then the pipeline runs ONLY on demand via workflow_dispatch. This does not fake success and
+# does not delete anything - it stops the workflow firing before the things it needs are real.
 on:
   workflow_dispatch:
   # push:
@@ -79,6 +92,7 @@ jobs:
           ARM_USE_OIDC: "true"
           TF_VAR_subscription_id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
           TF_VAR_alert_email: ${{ vars.ALERT_EMAIL }}
+          TF_VAR_budget_alert_email: ${{ vars.BUDGET_ALERT_EMAIL }}
           TF_VAR_postgres_administrator_password: ${{ secrets.TF_VAR_POSTGRES_ADMINISTRATOR_PASSWORD }}
           TF_VAR_admin_seed_password: ${{ secrets.TF_VAR_ADMIN_SEED_PASSWORD }}
           TF_VAR_migrator_db_password: ${{ secrets.TF_VAR_MIGRATOR_DB_PASSWORD }}
@@ -136,6 +150,7 @@ jobs:
           ARM_USE_OIDC: "true"
           TF_VAR_subscription_id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
           TF_VAR_alert_email: ${{ vars.ALERT_EMAIL }}
+          TF_VAR_budget_alert_email: ${{ vars.BUDGET_ALERT_EMAIL }}
           TF_VAR_postgres_administrator_password: ${{ secrets.TF_VAR_POSTGRES_ADMINISTRATOR_PASSWORD }}
           TF_VAR_admin_seed_password: ${{ secrets.TF_VAR_ADMIN_SEED_PASSWORD }}
           TF_VAR_migrator_db_password: ${{ secrets.TF_VAR_MIGRATOR_DB_PASSWORD }}
@@ -148,11 +163,26 @@ jobs:
             -backend-config="key=reg-tracker.tfstate" \
             -backend-config="use_azuread_auth=true"
           terraform apply -input=false -auto-approve
+          # NB: container_app_job_name is deliberately NOT read here. Since T355 the standing migrator
+          # job is gated off (enable_migrator_job=false), so that output is null, and `output -raw` on a
+          # null value EXITS NON-ZERO - which would fail this step AFTER apply had already changed the
+          # estate, the worst possible place to fail. The migration path is the per-run ephemeral env
+          # below, which names its own job, so nothing needs that output.
           {
             echo "rg=$(terraform output -raw resource_group_name)"
             echo "app_name=$(terraform output -raw app_service_name)"
-            echo "job_name=$(terraform output -raw container_app_job_name)"
             echo "acr=$(terraform output -raw container_registry_login_server)"
+            # Inputs for the ephemeral DB-migration env (see deploy/db-plane/ephemeral-migrate.sh).
+            echo "name_prefix=$(terraform output -raw name_prefix)"
+            echo "location=$(terraform output -raw location)"
+            echo "migrate_subnet_id=$(terraform output -raw migrate_subnet_id)"
+            echo "log_ws_id=$(terraform output -raw log_analytics_workspace_customer_id)"
+            echo "key_vault_uri=$(terraform output -raw key_vault_uri)"
+            echo "db_host=$(terraform output -raw postgres_fqdn)"
+            echo "db_name=$(terraform output -raw database_name)"
+            echo "admin_login=$(terraform output -raw postgres_administrator_login)"
+            echo "migrator_login=$(terraform output -raw migrator_db_login)"
+            echo "cd_identity_name=$(terraform output -raw cd_identity_name)"
           } >> "$GITHUB_OUTPUT"
 
       # --- 5.1: assert the app is pinned to an allowed profile and NEVER 'demo' (fail closed). ---
@@ -181,9 +211,12 @@ jobs:
           esac
 
       # --- DB-plane image: build the custom flyway+psql+jq image with the migration payload baked in
-      # (deploy/db-plane/Dockerfile), push to ACR, and DIGEST-PIN it into the job. The CD identity has
+      # (deploy/db-plane/Dockerfile) and push it to ACR, capturing the DIGEST. The CD identity has
       # AcrPush (out-of-band bootstrap). No registry credential: az acr login uses the OIDC session.
-      - name: Build + push + pin DB-plane image
+      # The DIGEST - never the tag - is what the migration job below runs, so the image this run built
+      # is provably the image that touches the database.
+      - name: Build + push DB-plane image
+        id: dbimage
         run: |
           acr='${{ steps.tf.outputs.acr }}'                 # e.g. crrht<sfx>.azurecr.io
           tag="${GITHUB_SHA}"
@@ -192,41 +225,77 @@ jobs:
           docker push "${acr}/rht-db-plane:${tag}"
           digest="$(az acr repository show --name "${acr%%.*}" \
             --image "rht-db-plane:${tag}" --query digest -o tsv)"
-          echo "pinning ${acr}/rht-db-plane@${digest}"
-          az containerapp job update -g '${{ steps.tf.outputs.rg }}' -n '${{ steps.tf.outputs.job_name }}' \
-            --image "${acr}/rht-db-plane@${digest}"
+          echo "image=rht-db-plane@${digest}" >> "$GITHUB_OUTPUT"
+          echo "pushed ${acr}/rht-db-plane@${digest}"
 
-      # !!! T180 STALE-STEP WARNING - READ BEFORE TRUSTING THIS STEP !!!
-      # This workflow has NEVER completed a deploy (see the header: no 'prod' Environment, no OIDC
-      # identities/secrets, deploy job guarded to main only). GO-LIVE IS THE MANUAL RUNBOOK, and the
-      # LIVE migration path is no longer this standing `az containerapp job start`: it is the
-      # PER-RUN EPHEMERAL Container Apps env documented in terraform/README.md (WS-E "Ephemeral
-      # migration env (T180)"), which kills the idle load balancer's ~£6.5/mo. The step below is left
-      # as-is ON PURPOSE - a fake-working ephemeral rewrite in a pipeline that never runs would be a
-      # stale claim that misleads. When the pipeline is actually enabled (T122/T110), REWRITE this
-      # step to the ephemeral create->run->destroy pattern from the runbook; do not enable it as-is.
-      #
       # --- DB plane: run 01 SQL -> Flyway -> 02 SQL VNet-side, BEFORE the new jar goes live ---
-      # (expand/contract migrations keep the running jar valid, so rollback-by-swap stays safe).
-      # M2 (Kevin T89): 'az containerapp job start' returns as soon as the execution is CREATED, so we
-      # MUST poll to Succeeded and FAIL on Failed before deploying the jar - otherwise the jar races
-      # the migration and the WS-G ordering (01 -> Flyway -> 02 -> jar) is lost.
-      - name: Run DB-plane migration job (VNet-side) and wait for success
+      # (expand/contract migrations keep the running jar valid, so redeploy-previous rollback stays safe).
+      #
+      # T180 EPHEMERAL PATH. This replaces the old `az containerapp job start` against a STANDING job,
+      # which could never have worked here: T355 gated that job off (enable_migrator_job=false), so its
+      # name output is null. deploy/db-plane/ephemeral-migrate.sh creates a per-run env in the dedicated
+      # migrate subnet, runs the digest-pinned job, and ALWAYS tears the env down again - verified, via a
+      # trap on every exit path - so its internal load balancer lives for the minutes of a migration
+      # instead of idling 24/7 (the ~£6.5/mo T180 removed).
+      #
+      # Kevin T89 preserved: the job runs with the CD user-assigned identity IN the VNet and reads the DB
+      # passwords from Key Vault itself. No DB credential is passed in from this runner - the four
+      # TF_VAR_* password secrets are used by terraform only, and are not in this step's environment.
+      #
+      # LOG_WS_KEY is fetched here rather than carried through a Terraform output. It is the workspace's
+      # log-INGESTION shared key - rotatable, ingestion-scoped, and NOT a DB/Key Vault/application
+      # credential; the exception is argued in the script's header (Kevin F1). It is masked so it cannot
+      # surface in the run log even if a later command echoes its environment.
+      - name: Run DB-plane migration (ephemeral env, VNet-side) and wait for success
+        env:
+          RG: ${{ steps.tf.outputs.rg }}
+          NAME_PREFIX: ${{ steps.tf.outputs.name_prefix }}
+          LOCATION: ${{ steps.tf.outputs.location }}
+          MIGRATE_SUBNET_ID: ${{ steps.tf.outputs.migrate_subnet_id }}
+          LOG_WS_ID: ${{ steps.tf.outputs.log_ws_id }}
+          ACR_LOGIN_SERVER: ${{ steps.tf.outputs.acr }}
+          DB_PLANE_IMAGE: ${{ steps.dbimage.outputs.image }}
+          CD_CLIENT_ID: ${{ vars.CD_CLIENT_ID }}
+          KEY_VAULT_URI: ${{ steps.tf.outputs.key_vault_uri }}
+          DB_HOST: ${{ steps.tf.outputs.db_host }}
+          DB_NAME: ${{ steps.tf.outputs.db_name }}
+          ADMIN_LOGIN: ${{ steps.tf.outputs.admin_login }}
+          MIGRATOR_LOGIN: ${{ steps.tf.outputs.migrator_login }}
+          CD_IDENTITY_NAME: ${{ steps.tf.outputs.cd_identity_name }}
         run: |
-          rg='${{ steps.tf.outputs.rg }}'; job='${{ steps.tf.outputs.job_name }}'
-          exec_name="$(az containerapp job start -g "$rg" -n "$job" --query name -o tsv)"
-          echo "started execution: $exec_name"
-          for i in $(seq 1 60); do
-            status="$(az containerapp job execution show -g "$rg" -n "$job" \
-              --job-execution-name "$exec_name" --query properties.status -o tsv 2>/dev/null || echo Unknown)"
-            echo "attempt $i: $status"
-            case "$status" in
-              Succeeded) echo "migration succeeded"; exit 0 ;;
-              Failed|Degraded) echo "FATAL: DB-plane job execution $status - aborting before jar deploy." >&2; exit 1 ;;
-            esac
-            sleep 15
-          done
-          echo "FATAL: DB-plane job did not reach Succeeded within ~15min." >&2; exit 1
+          # The CD identity is created out of band (bootstrap-deployer-identity.sh), so its resource id
+          # is not a Terraform output - resolve it from the name, which is.
+          CD_IDENTITY_ID="$(az identity show -g "$RG" -n "$CD_IDENTITY_NAME" --query id -o tsv)"
+          export CD_IDENTITY_ID
+
+          LOG_WS_KEY="$(az monitor log-analytics workspace get-shared-keys \
+            -g "$RG" -n "log-${NAME_PREFIX}" --query primarySharedKey -o tsv)"
+          echo "::add-mask::${LOG_WS_KEY}"
+          export LOG_WS_KEY
+
+          # The script owns its own budgets and teardown; it exits 0 / 1 / 3 and we must distinguish all
+          # three (a bare `set -e` would collapse 1 and 3 into "failed" and throw away the one case where
+          # the migration DID apply).
+          set +e
+          bash deploy/db-plane/ephemeral-migrate.sh
+          rc=$?
+          set -e
+          case "$rc" in
+            0)
+              echo "DB-plane migration succeeded; ephemeral env teardown CONFIRMED."
+              ;;
+            3)
+              # Migration applied, but teardown could not be CONFIRMED (distinct from "failed to delete"
+              # - an ARM throttle or token failure reads the same from outside). Deploying is correct: the
+              # schema is migrated and the jar must follow it. But a stranded internal load balancer is
+              # exactly the invisible cost T180 removed, so this must not pass silently.
+              echo "::warning title=Ephemeral migration env teardown unconfirmed::Migration SUCCEEDED and the deploy continues, but teardown of cae-${NAME_PREFIX}-migrate was not confirmed. CHECK for a leftover platform-managed ME_cae-${NAME_PREFIX}-migrate_${RG}_* resource group and delete any stranded internal load balancer."
+              ;;
+            *)
+              echo "::error title=DB-plane migration failed::Aborting BEFORE the jar deploy so the running jar keeps a schema it is valid against (WS-G ordering: 01 -> Flyway -> 02 -> jar). The script captured the failed execution's console logs above, or printed a retrieval recipe against the standing Log Analytics workspace."
+              exit 1
+              ;;
+          esac
 
       # --- Deploy the jar. TARGET DESIGN = staging-slot deploy + swap (zero-downtime, instant ---
       # rollback-by-swap). Slots need App Service STANDARD+ (S1); WS-D provisions B1 (Basic) which has
@@ -256,6 +325,37 @@ jobs:
             -g '${{ steps.tf.outputs.rg }}' -n '${{ steps.tf.outputs.app_name }}' \
             --target-path /home/site/wwwroot/applicationinsights.json \
             --src-path deploy/appservice/applicationinsights.json
+
+      # --- Rollback source (T269 Phase 2, B1). B1 has NO deployment slots, so there is nothing to swap
+      # back to: the only previous known-good artifact is the jar currently running. Snapshot it BEFORE
+      # it is overwritten. Kudu VFS with the CD identity's ARM token - the same mechanism the verify step
+      # below already uses, so this adds no new auth path and no publish profile.
+      #
+      # Deliberately NOT a cross-run artifact download: that would depend on the previous run's retention
+      # and on the artifact matching what is actually deployed, which drifts the moment anyone deploys by
+      # hand (and go-live WAS a manual deploy). Reading the live filesystem cannot drift - what it copies
+      # is by definition what is serving traffic right now.
+      #
+      # NEVER fails the deploy: a missing snapshot is recorded as available=false and surfaces at rollback
+      # time, because refusing to deploy over an un-snapshottable app would be a worse failure than
+      # deploying without a net.
+      - name: Snapshot the currently-live jar (rollback source)
+        id: snapshot
+        run: |
+          app='${{ steps.tf.outputs.app_name }}'
+          token="$(az account get-access-token --resource https://management.azure.com --query accessToken -o tsv)"
+          mkdir -p rollback
+          code="$(curl -s -o rollback/app.jar -w '%{http_code}' \
+            -H "Authorization: Bearer ${token}" \
+            "https://${app}.scm.azurewebsites.net/api/vfs/site/wwwroot/app.jar" || echo 000)"
+          if [ "${code}" = "200" ] && [ -s rollback/app.jar ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+            echo "snapshotted the live jar for rollback ($(wc -c < rollback/app.jar) bytes)"
+          else
+            rm -f rollback/app.jar
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "::warning title=No rollback snapshot::Could not read the live app.jar (HTTP ${code}). Expected on the FIRST automated deploy. This deploy proceeds with NO rollback artifact - if it fails, recovery is manual."
+          fi
 
       - name: Deploy jar to App Service (B1 direct deploy)
         run: |
@@ -318,16 +418,47 @@ jobs:
           done
           echo "FATAL: readiness never returned 200 within ${SMOKE_BUDGET_SECONDS}s - i.e. PAST the known warmup window, so this is a real failure." >&2
           exit 1
-      # --- Rollback on failure. By construction this runs ONLY if the smoke step exhausted its full
-      # SMOKE_BUDGET_SECONDS (readiness still not 200 past the warmup window) - so it cannot fire during
-      # a normal cold start. The concrete rollback is DELIBERATELY still a stub: wiring it (slot swap on
-      # S1+, or redeploy-previous-artifact on B1) is T269 Phase 2 and needs the human's go plus the deploy
-      # identities that do not exist yet (see the GitHub automated-deploy plan). Do NOT implement it here.
+      # --- Rollback on failure (T269 Phase 2, wired for B1). By construction this runs ONLY if the smoke
+      # step exhausted its full SMOKE_BUDGET_SECONDS (readiness still not 200 past the warmup window), so
+      # it cannot fire during a normal cold start - that property is what makes an automatic redeploy safe
+      # to arm at all.
+      #
+      # B1 rollback is redeploy-previous-artifact, not slot swap: Basic has no slots. So this is NOT
+      # zero-downtime and NOT instant - it costs another full cold boot (~330-490s measured), during which
+      # the service is down. That is the accepted cost of the B1 tier decision; S1 + slot swap is the
+      # documented upgrade path (see the commented swap flow above).
+      #
+      # The step ALWAYS ends non-zero. The deploy failed; restoring the previous jar makes the outage
+      # shorter, it does not make the run successful, and a green tick here would hide a failed release.
       - name: Rollback on failure
         if: failure()
+        env:
+          ROLLBACK_BUDGET_SECONDS: "900" # same warmup reasoning as the smoke step - a cold boot either way
+          ROLLBACK_INTERVAL_SECONDS: "15"
         run: |
           echo "Deploy/smoke failed AFTER the ${SMOKE_BUDGET_SECONDS:-900}s warmup budget (a real failure, not warmup)."
-          echo "Rollback is NOT yet wired - that is T269 Phase 2 (needs human go + deploy identities)."
-          echo "On S1+: 'az webapp deployment slot swap' back to the previous slot for an instant rollback."
-          echo "On B1: redeploy the previous known-good artifact."
-          echo "TODO(T269 Phase 2): wire the concrete rollback for the chosen tier."
+          if [ '${{ steps.snapshot.outputs.available }}' != 'true' ] || [ ! -s rollback/app.jar ]; then
+            echo "::error title=Cannot roll back::No previous jar was snapshotted (expected only on the FIRST automated deploy, or if Kudu was unreachable before the deploy). The app is left running whatever this run deployed. Recover by hand: redeploy the last known-good jar with 'az webapp deploy --type jar --clean false'."
+            exit 1
+          fi
+          rg='${{ steps.tf.outputs.rg }}'; app='${{ steps.tf.outputs.app_name }}'
+          echo ">> redeploying the previous jar ($(wc -c < rollback/app.jar) bytes) - expect a full cold boot"
+          # --clean false: leave the App Insights agent + config staged alongside. Note the agent staged
+          # earlier in THIS run stays in place; it is version-pinned and backwards compatible, and a
+          # partial rollback of the agent would be a second variable during an incident.
+          az webapp deploy --type jar --clean false -g "$rg" -n "$app" --src-path rollback/app.jar
+          host="$(az webapp show -g "$rg" -n "$app" --query defaultHostName -o tsv)"
+          deadline=$(( $(date +%s) + ROLLBACK_BUDGET_SECONDS ))
+          recovered=0
+          while [ "$(date +%s)" -lt "$deadline" ]; do
+            code="$(curl -s -o /dev/null -w '%{http_code}' "https://${host}/actuator/health/readiness" || true)"
+            if [ "$code" = "200" ]; then recovered=1; break; fi
+            echo "rollback readiness: HTTP ${code} (~$(( deadline - $(date +%s) ))s of budget left)"
+            sleep "$ROLLBACK_INTERVAL_SECONDS"
+          done
+          if [ "$recovered" = "1" ]; then
+            echo "::warning title=Rolled back to the previous jar::The failed release was reverted and readiness is green again. The RUN still fails on purpose - the release did not ship. Investigate before retrying."
+          else
+            echo "::error title=Rollback did not recover::The previous jar was redeployed but readiness never returned 200 within ${ROLLBACK_BUDGET_SECONDS}s. The service is DOWN and needs a human now - check App Insights and the /actuator/health/readiness detail, and consider a PITR restore if the DB migration is implicated."
+          fi
+          exit 1

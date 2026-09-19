@@ -119,3 +119,67 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: Run actionlint
         run: docker run --rm -v "${PWD}:/repo" -w /repo rhysd/actionlint:1.7.7 -color
+
+  terraform:
+    name: terraform fmt + validate (required gate)
+    runs-on: ubuntu-latest
+    # Until now `terraform validate` ran ONLY inside deploy.yml, which is dispatch-only and has never
+    # completed a run - so a malformed .tf merged green and would first surface mid-apply, against the
+    # live estate. This gate moves that check to the place it belongs.
+    #
+    # NO Azure identity, consistent with the rest of this file: `init -backend=false` is exactly the
+    # path backend.tf documents for validating without a state account or cloud auth, so this needs no
+    # token and cannot touch state. It validates the ROOT module; the modules are validated with it as
+    # part of the root's configuration.
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+        with:
+          terraform_version: 1.5.7 # keep in step with TF_VERSION in deploy.yml
+      # -recursive so the modules/ tree is covered too. fmt drift is cosmetic on its own, but an
+      # unformatted file makes every later diff noisier than the change it contains.
+      - name: terraform fmt -check
+        working-directory: terraform
+        run: terraform fmt -check -recursive
+      - name: terraform validate
+        working-directory: terraform
+        run: |
+          terraform init -backend=false -input=false
+          terraform validate
+
+  dependency-scan:
+    name: dependency vulnerability scan (reported, not yet required)
+    runs-on: ubuntu-latest
+    # This application holds Article 9 data about children and its dependency tree was entirely
+    # unscanned: pom.xml carries no security plugins, and CI checked nothing. OSV-Scanner needs no API
+    # key and no credentials (unlike OWASP dependency-check, which now wants an NVD key), so it fits
+    # this file's "CI holds no identity" rule. Pinned by version, and run through docker exactly like
+    # the actionlint job above.
+    #
+    # NON-BLOCKING, ON PURPOSE, AND THIS IS TIME-BOUNDED. First run (2026-09-18) reports 27 known
+    # vulnerabilities across 14 packages, 5 of them Critical - including tomcat-embed-core 11.0.22
+    # (CVSS 9.8) and netty-handler / azure-security-keyvault-keys (9.1). Nearly all of them are
+    # TRANSITIVE and version-managed by spring-boot-starter-parent 4.1.0, so they are not fixable by
+    # pinning individual dependencies here: they need a Spring Boot patch bump, which is its own change
+    # with its own test run. Making this blocking first would have stopped every merge on a backlog
+    # that predates the gate.
+    #
+    # This file already argues the other side of exactly this trade-off ("silent non-coverage is
+    # invisible and self-perpetuating", T212), and that argument applies here too - which is why the
+    # baseline is written down above rather than left for someone to rediscover. FLIP continue-on-error
+    # TO false once the Spring Boot bump lands and the count is 0. A permanently non-blocking scanner
+    # is a scanner nobody reads.
+    continue-on-error: true
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Run OSV-Scanner over the Maven tree
+        run: |
+          docker run --rm -v "${PWD}:/repo" -w /repo \
+            ghcr.io/google/osv-scanner:v2.6.0 scan source --lockfile=pom.xml

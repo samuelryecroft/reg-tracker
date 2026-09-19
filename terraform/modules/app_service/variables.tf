@@ -67,3 +67,13 @@ variable "health_check_path" {
   default = "/actuator/health/readiness"
 }
 
+
+# The platform's WEBSITE_TIME_ZONE, which becomes the JVM's default zone. Europe/London is the
+# statutory zone this service's 72-hour deadlines are counted in; it is a variable rather than a
+# literal only so a future non-UK deployment is a root-level decision. It must stay a zone whose
+# offset tracks UK civil time - the application's TimeZoneGuard refuses to boot on a mismatch, and a
+# fixed-offset value such as "UTC" or "GMT+1" would be wrong for half the year either way.
+variable "website_time_zone" {
+  type    = string
+  default = "Europe/London"
+}
