@@ -282,8 +282,12 @@ instance out of rotation), and nothing in it constructs a Key Vault, Blob or ACS
 SDK regression ships green and surfaces on the first document or the first 2FA code. Add
 `HealthIndicator`s for Key Vault (a key-get on the platform key), Blob storage and ACS to the
 **full** `/actuator/health` (never the readiness group), so the smoke step can read a meaningful
-answer after each deploy. *Done when:* an SDK bump that breaks any of the three turns
-`/actuator/health` DOWN with the component named.
+answer after each deploy. Agreed with the deployment agent: each indicator is a cheap read with a
+short timeout and reports **DOWN, never UNKNOWN**, on failure (Spring's aggregate orders UNKNOWN
+near UP, and the smoke step keys on the literal `"status":"UP"` of the anonymous status-only GET,
+which `SecurityConfig` already permits). Their smoke step gains that assertion after the Terraform
+baseline is clean. *Done when:* an SDK bump that breaks any of the three turns `/actuator/health`
+DOWN with the component named, and the smoke step goes red on it.
 
 ### T394 — Time as `Instant`/`TIMESTAMPTZ` · **L** · *Later*
 
