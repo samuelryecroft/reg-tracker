@@ -61,15 +61,23 @@ env:
   # both together (get the sha256 from <mavenurl>/applicationinsights-agent-<ver>.jar.sha256). The
   # JVM attaches it via JAVA_OPTS=-javaagent:.../applicationinsights-agent.jar, which is set in the
   # Terraform app_service module (the durable source of truth for the setting; the version lives here).
-  # Every `az webapp deploy` below waits for the worker to START after pushing, and the platform's
-  # default for that wait is 10 MINUTES - tighter than this app's own cold boot, which is 330-490s
-  # measured (T190/T294) and longer again with the 46MB App Insights agent attached. The first real
-  # run of this workflow died exactly there: the agent pushed byte-perfectly and then the step failed
-  # with "the site failed to start within 10 mins / FailedInstances: 1" after 10m42s, with production
-  # left untouched. The smoke step already carries a 900s budget for this same reason; this is the
-  # other half of it, and the two are deliberately sized against the same measurement so a future
-  # change to one is an obvious prompt to look at the other. Milliseconds, unlike SMOKE_BUDGET_SECONDS.
-  DEPLOY_TIMEOUT_MS: "1200000" # 20 min: > observed max cold boot (~490s) + the push, with headroom
+  # The two STATIC App Insights pushes below run with --async: the command exits once the artifact is
+  # PUSHED, and does not wait for the site to start. The jar deploys deliberately do NOT - see there.
+  #
+  # Why, with evidence. The synchronous form failed twice on this app, both times at the same step, and
+  # the deployment itself was never the problem: Kudu recorded DeploymentId 482fc479 as start 14:19:39,
+  # end 14:19:45 - SIX SECONDS, status 4 (Success). The CLI then spent 613s waiting for the site to
+  # start and reported "Deployment failed because the site failed to start within 10 mins /
+  # FailedInstances: 1", leaving a red run over a push that had worked.
+  #
+  # That 10-minute limit is SERVER-side and --timeout does not govern it: a run with --timeout 1200000
+  # still failed at 613s. And the wait is self-defeating here anyway - these calls pass --restart false,
+  # so no new worker starts, so the start being waited for never happens.
+  #
+  # Readiness is asserted by this workflow, not by the deploy call: the smoke step owns it with a
+  # warmup-aware 900s budget sized to this app's 330-490s cold boot, and the verify step confirms via
+  # Kudu VFS that both App Insights artifacts actually landed. Both are strictly better placed to judge
+  # it than a fixed platform timeout that is shorter than the app's own startup.
   AI_AGENT_VERSION: "3.7.9"
   AI_AGENT_SHA256: "4ab7a442bf9defc7475d026c6b49042793ebb010c391a1db91ae07da0c04d848"
 
@@ -356,11 +364,11 @@ jobs:
           curl -fsSL -o "$agent" "$url"
           echo "${AI_AGENT_SHA256}  ${agent}" | sha256sum -c -
           az webapp deploy --type static --clean false --restart false \
-            --timeout ${{ env.DEPLOY_TIMEOUT_MS }} \
+            --async true \
             -g '${{ steps.tf.outputs.rg }}' -n '${{ steps.tf.outputs.app_name }}' \
             --target-path /home/site/wwwroot/applicationinsights-agent.jar --src-path "$agent"
           az webapp deploy --type static --clean false --restart false \
-            --timeout ${{ env.DEPLOY_TIMEOUT_MS }} \
+            --async true \
             -g '${{ steps.tf.outputs.rg }}' -n '${{ steps.tf.outputs.app_name }}' \
             --target-path /home/site/wwwroot/applicationinsights.json \
             --src-path deploy/appservice/applicationinsights.json
@@ -402,8 +410,10 @@ jobs:
           # --clean false: keep the App Insights agent jar + config staged in the step above.
           set -- target/*.jar
           jar="$1"
+          # NOT --async: this one RESTARTS the app, its ~330-490s boot fits inside the platform's
+          # 10-minute window, and waiting is a real signal that the new worker actually started. Async
+          # here would let the smoke step below pass against the OLD process still serving traffic.
           az webapp deploy --type jar --clean false \
-            --timeout ${{ env.DEPLOY_TIMEOUT_MS }} \
             -g '${{ steps.tf.outputs.rg }}' -n '${{ steps.tf.outputs.app_name }}' --src-path "$jar"
 
       # --- Fail LOUDLY if either agent artifact is missing after deploy (Kevin/README). A missing jar
@@ -486,8 +496,9 @@ jobs:
           # --clean false: leave the App Insights agent + config staged alongside. Note the agent staged
           # earlier in THIS run stays in place; it is version-pinned and backwards compatible, and a
           # partial rollback of the agent would be a second variable during an incident.
-          az webapp deploy --type jar --clean false --timeout ${{ env.DEPLOY_TIMEOUT_MS }} \
-            -g "$rg" -n "$app" --src-path rollback/app.jar
+          # NOT --async, same reasoning as the forward deploy: we must know the restored worker
+          # actually started before judging whether the rollback recovered anything.
+          az webapp deploy --type jar --clean false -g "$rg" -n "$app" --src-path rollback/app.jar
           host="$(az webapp show -g "$rg" -n "$app" --query defaultHostName -o tsv)"
           deadline=$(( $(date +%s) + ROLLBACK_BUDGET_SECONDS ))
           recovered=0
