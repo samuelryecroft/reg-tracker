@@ -1,5 +1,7 @@
 package ninja.samryecroft.returnhome.tracker.audit;
 
+import io.micrometer.core.instrument.MeterRegistry;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -22,10 +24,20 @@ public class AuditEventListener {
 
     private static final Logger log = LoggerFactory.getLogger(AuditEventListener.class);
 
-    private final AuditEventRepository auditEventRepository;
+    /**
+     * Rows that could not be written, by event type (T379). The catch below is deliberate and
+     * stays; what changes is that it is now visible somewhere other than a log line, because the
+     * question "did we lose audit rows this month" needs an answer that does not involve reading
+     * logs. Metrics reach Application Insights through the agent, where a threshold can page.
+     */
+    static final String LOST_ROWS_METRIC = "audit.events.lost";
 
-    public AuditEventListener(AuditEventRepository auditEventRepository) {
+    private final AuditEventRepository auditEventRepository;
+    private final MeterRegistry meterRegistry;
+
+    public AuditEventListener(AuditEventRepository auditEventRepository, MeterRegistry meterRegistry) {
         this.auditEventRepository = auditEventRepository;
+        this.meterRegistry = meterRegistry;
     }
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
@@ -39,6 +51,7 @@ public class AuditEventListener {
             // is bad, so this is loud - but it must not break a safeguarding workflow.
             log.error("Failed to persist audit event {} for actor {} on {} {}", record.eventType(),
                     record.actorIdentifier(), record.targetType(), record.targetId(), ex);
+            meterRegistry.counter(LOST_ROWS_METRIC, "eventType", record.eventType().name()).increment();
         }
     }
 }

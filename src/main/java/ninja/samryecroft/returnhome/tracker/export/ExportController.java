@@ -94,6 +94,9 @@ public class ExportController {
             // to prevent, so it is rejected rather than defaulted.
             return ResponseEntity.badRequest().body(new ErrorResponse("A purpose is required for every export"));
         }
+        if (!ExportReference.fits(body.reference())) {
+            return ResponseEntity.badRequest().body(new ErrorResponse(ExportReference.tooLongMessage()));
+        }
         ExportPeriod period = periodOf(body.from(), body.to());
         Long organisationId = organisationIdFor(childId);
 

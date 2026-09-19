@@ -47,7 +47,7 @@
 
             <label for="reference">Reference <span class="hint" style="display:inline;font-weight:400">(optional)</span></label>
             <p class="hint">An inspection or case reference, so this export can be tied to the thing that asked for it.</p>
-            <input id="reference" name="reference" type="text" th:value="${selectedReference}"/>
+            <input id="reference" name="reference" type="text" maxlength="200" th:value="${selectedReference}"/>
 
             <label for="period">Period</label>
             <select id="period" name="period">

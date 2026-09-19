@@ -596,11 +596,10 @@ public class AuditEventPublisher {
     public void caseFileExported(Long childId, Long organisationId, ExportPurpose purpose, String reference,
             String periodLabel, int includedCount, int excludedCount, int documentCount,
             boolean passphraseSet, String checksum, AppUserPrincipal principal) {
-        publish(actor(AuditEventRecord.of(AuditEventType.CASE_FILE_EXPORTED), principal)
+        recordDisclosure(actor(AuditEventRecord.of(AuditEventType.CASE_FILE_EXPORTED), principal)
                 .target("Child", childId)
                 .scope(organisationId, null)
                 .meta("purpose", purpose.name())
-                .meta("reference", reference)
                 .meta("period", periodLabel)
                 .meta("included", includedCount)
                 .meta("excluded", excludedCount)
@@ -608,20 +607,25 @@ public class AuditEventPublisher {
                 .meta("passphraseSet", passphraseSet)
                 .meta("checksum", checksum)
                 .meta("actorsNamed", false)
+                // LAST, on purpose (T379): the one operator-typed value, and the one that can be
+                // long. Metadata is cut at the column length from the end, so whatever a cut loses
+                // is the reference and never the checksum or the counts. ExportReference bounds it
+                // so the cut is not reached; this ordering is what holds if that bound ever slips.
+                .meta("reference", reference)
                 .build());
     }
 
     /** The audit view was exported as a CSV - the row count is what makes the scope reviewable. */
     public void auditQueryExported(Long organisationId, ExportPurpose purpose, String reference,
             String scopeLabel, int rowCount, String checksum, AppUserPrincipal principal) {
-        publish(actor(AuditEventRecord.of(AuditEventType.AUDIT_QUERY_EXPORTED), principal)
+        recordDisclosure(actor(AuditEventRecord.of(AuditEventType.AUDIT_QUERY_EXPORTED), principal)
                 .scope(organisationId, null)
                 .meta("purpose", purpose.name())
-                .meta("reference", reference)
                 .meta("scope", scopeLabel)
                 .meta("rows", rowCount)
                 .meta("checksum", checksum)
                 .meta("actorsNamed", false)
+                .meta("reference", reference) // last - see caseFileExported
                 .build());
     }
 
@@ -766,6 +770,23 @@ public class AuditEventPublisher {
 
     private void publish(AuditEventRecord record) {
         applicationEventPublisher.publishEvent(record);
+    }
+
+    /**
+     * A disclosure is recorded BEFORE it happens, and a failure to record it stops it (T379).
+     *
+     * <p>Every other event goes through {@link #publish}: written after the business transaction
+     * commits, in its own transaction, with a failure logged rather than thrown - because a lost
+     * audit row must not undo committed safeguarding work. For the two events that record a
+     * child's case file or the audit trail LEAVING the system, that trade is backwards. The row is
+     * the only evidence the disclosure occurred, and the disclosure has not yet occurred when this
+     * is called: both callers mint the download token only after it returns. So this writes
+     * through the repository in the caller's own context and lets any failure propagate, and the
+     * export simply never exists. {@code ADisclosureIsNotIssuedWithoutItsAuditRowTest} holds both
+     * callers to that.
+     */
+    private void recordDisclosure(AuditEventRecord record) {
+        auditEventRepository.save(new AuditEvent(record));
     }
 
     private AuditEventRecord.Builder reportEvent(AuditEventType eventType, InterviewReport report,

@@ -1,5 +1,9 @@
 package ninja.samryecroft.returnhome.tracker.audit;
 
+import ninja.samryecroft.returnhome.tracker.core.InvalidRequestException;
+
+import ninja.samryecroft.returnhome.tracker.export.ExportReference;
+
 import ninja.samryecroft.returnhome.tracker.core.NotFoundException;
 
 import java.security.MessageDigest;
@@ -145,6 +149,9 @@ public class AuditFeedController {
             @RequestParam(required = false) String reference,
             Model model) {
         authorize(principal);
+        if (!ExportReference.fits(reference)) {
+            throw new InvalidRequestException(ExportReference.tooLongMessage());
+        }
         List<InterviewRequest> scope = requestsInScope(principal);
         // T274 A2/A3: the CSV keeps case activity ONLY, and says so - see exportScope below. Adding
         // access rows here would change every disclosure this system makes from here on, and the
@@ -161,7 +168,6 @@ public class AuditFeedController {
         byte[] csv = auditQueryCsvWriter.writeFeed(feedRows);
         String checksum = sha256Hex(csv);
         ExportPack pack = new ExportPack("audit-trail-" + LocalDate.now() + ".csv", csv, checksum, null);
-        String token = exportLinkService.hold(pack, principal.getUserId());
 
         // T274 A4, AND IT IS THE NON-NEGOTIABLE PART: THE DISCLOSURE STATES ON ITS FACE WHAT IT
         // CONTAINS. This is T283's R3 one level up - the artefact must say what it is. The property
@@ -169,8 +175,13 @@ public class AuditFeedController {
         // OMIT WHAT THE SCREEN SHOWED". A declared scope satisfies that; a silent default does not.
         String scopeLabel = scopeDescription(homeId, from, to) + " · " + describe(exportScope)
                 + " · " + rows.size() + " rows";
+        // T379: recorded BEFORE the download token exists. auditQueryExported writes its row
+        // synchronously and throws if it cannot, so a disclosure that cannot be put on the record
+        // does not happen - there is no token to hand out. Until now the token was minted first and
+        // the row was written afterwards, in a listener that logged a failure and moved on.
         auditEventPublisher.auditQueryExported(principal.getOrganisationId(), purpose, reference, scopeLabel,
                 rows.size(), checksum, principal);
+        String token = exportLinkService.hold(pack, principal.getUserId());
 
         model.addAttribute("token", token);
         model.addAttribute("filename", pack.filename());
