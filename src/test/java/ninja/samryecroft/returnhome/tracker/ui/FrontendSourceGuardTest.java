@@ -61,6 +61,39 @@ class FrontendSourceGuardTest {
     }
 
     /**
+     * T377 (CODE-REVIEW-2026-09-18 P0.2). Thymeleaf injects the Spring Security CSRF hidden input
+     * through {@code RequestDataValueProcessor}, which runs ONLY for {@code th:action}. A mutating
+     * form written with a plain {@code action=} renders without the token, {@code CsrfFilter}
+     * rejects the post with a 403, and the user loses what they typed. The audit CSV export form was
+     * the one such form in 26, and it had been broken in production since it was written.
+     *
+     * <p>No other test can see this: every MockMvc test posts {@code .with(csrf())}, which
+     * synthesises the token the rendered form never carried. The rendered source is where the bug
+     * lives, so the source is what is read.
+     */
+    @Test
+    void everyPostFormUsesThActionSoTheCsrfTokenIsRendered() throws IOException {
+        Pattern openingFormTag = Pattern.compile("<form\\b[^>]*>");
+        List<String> violations = new ArrayList<>();
+        for (Path file : sourceFilesUnder(TEMPLATES_DIR)) {
+            String source = Files.readString(file, StandardCharsets.UTF_8);
+            Matcher forms = openingFormTag.matcher(source);
+            while (forms.find()) {
+                String tag = forms.group();
+                boolean posts = tag.toLowerCase(Locale.ROOT).contains("method=\"post\"");
+                if (posts && !tag.contains("th:action=")) {
+                    violations.add(file + ": " + tag.replaceAll("\\s+", " "));
+                }
+            }
+        }
+
+        assertThat(violations)
+                .as("a method=\"post\" form without th:action renders no CSRF token and every "
+                        + "submission of it is refused with a 403")
+                .isEmpty();
+    }
+
+    /**
      * Every screen below 720px hides {@code .table-wrap.responsive} and shows {@code .stack}
      * instead (see app.css's 720px breakpoint) - a table with no {@code .stack} sibling simply
      * vanishes on a phone, it does not fall back to a scrollable table. So the two must always
