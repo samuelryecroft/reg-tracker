@@ -90,6 +90,17 @@ jobs:
         working-directory: ${{ env.TF_DIR }}
         env:
           ARM_USE_OIDC: "true"
+          # azure/login authenticates the az CLI; it does NOT configure the azurerm PROVIDER, which
+          # reads its own ARM_* variables. With only ARM_USE_OIDC set, terraform fails at init with
+          # "a Tenant ID must be configured when authenticating with OIDC / a Client ID must be
+          # configured" - which is exactly what the first real run of this workflow did. The OIDC
+          # request url/token are picked up from the ACTIONS_ID_TOKEN_REQUEST_* variables the runner
+          # exports because this job has id-token: write, so only the identity triple is needed.
+          # ARM_SUBSCRIPTION_ID is set alongside TF_VAR_subscription_id: the provider takes the
+          # subscription from the variable, but the azurerm BACKEND reads the ARM_ one.
+          ARM_CLIENT_ID: ${{ vars.PLAN_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+          ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
           TF_VAR_subscription_id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
           TF_VAR_alert_email: ${{ vars.ALERT_EMAIL }}
           TF_VAR_budget_alert_email: ${{ vars.BUDGET_ALERT_EMAIL }}
@@ -148,6 +159,17 @@ jobs:
         working-directory: ${{ env.TF_DIR }}
         env:
           ARM_USE_OIDC: "true"
+          # azure/login authenticates the az CLI; it does NOT configure the azurerm PROVIDER, which
+          # reads its own ARM_* variables. With only ARM_USE_OIDC set, terraform fails at init with
+          # "a Tenant ID must be configured when authenticating with OIDC / a Client ID must be
+          # configured" - which is exactly what the first real run of this workflow did. The OIDC
+          # request url/token are picked up from the ACTIONS_ID_TOKEN_REQUEST_* variables the runner
+          # exports because this job has id-token: write, so only the identity triple is needed.
+          # ARM_SUBSCRIPTION_ID is set alongside TF_VAR_subscription_id: the provider takes the
+          # subscription from the variable, but the azurerm BACKEND reads the ARM_ one.
+          ARM_CLIENT_ID: ${{ vars.CD_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+          ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
           TF_VAR_subscription_id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
           TF_VAR_alert_email: ${{ vars.ALERT_EMAIL }}
           TF_VAR_budget_alert_email: ${{ vars.BUDGET_ALERT_EMAIL }}
